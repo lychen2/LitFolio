@@ -22,6 +22,10 @@ export interface Paper {
   key_findings: string[];
   limitations: string | null;
   comparison: string | null;
+  title_translated: string | null;
+  abstract_translated: string | null;
+  translate_target_lang: string | null;
+  translated_at: number | null;
 }
 
 export interface PdfImportSummary {
@@ -70,6 +74,39 @@ export interface LlmProfile {
 export interface LlmConfig {
   profiles: LlmProfile[];
   active: string | null;
+  task_assignments: TaskAssignments;
+}
+
+export interface TranslationResult {
+  title: string;
+  abstract_text: string;
+  target_lang: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+export interface BatchError {
+  paper_id: string;
+  title: string;
+  message: string;
+}
+
+export interface BatchSummary {
+  kind: string;
+  total: number;
+  ok: number;
+  failed: number;
+  cancelled: boolean;
+  errors: BatchError[];
+}
+
+export interface TaskAssignments {
+  tldr: string | null;
+  quick_read: string | null;
+  translate: string | null;
+  tag: string | null;
+  link: string | null;
 }
 
 export interface LlmTestResult {
@@ -179,6 +216,18 @@ export const api = {
   paperTldr: (id: string) => invoke<TldrResult>("paper_tldr", { id }),
   paperQuickRead: (id: string) =>
     invoke<QuickReadResult>("paper_quick_read", { id }),
+  paperTranslate: (id: string, targetLang?: string) =>
+    invoke<TranslationResult>("paper_translate", { id, targetLang: targetLang ?? "Chinese" }),
+  batchTldr: (ids: string[]) => invoke<BatchSummary>("batch_tldr", { ids }),
+  batchQuickRead: (ids: string[]) => invoke<BatchSummary>("batch_quick_read", { ids }),
+  batchTranslate: (ids: string[], targetLang?: string) =>
+    invoke<BatchSummary>("batch_translate", { ids, targetLang: targetLang ?? "Chinese" }),
+  batchAttachTag: (ids: string[], tagId: number) =>
+    invoke<number>("batch_attach_tag", { ids, tagId }),
+  batchSetStatus: (ids: string[], status: ReadStatus) =>
+    invoke<number>("batch_set_status", { ids, status }),
+  batchDelete: (ids: string[]) => invoke<number>("batch_delete", { ids }),
+  batchCancel: () => invoke<boolean>("batch_cancel"),
 };
 
 export async function pickPdfFiles(): Promise<string[] | null> {
