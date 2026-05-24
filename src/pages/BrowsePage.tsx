@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Atom, Loader2, RefreshCw, BookPlus, ExternalLink, Search, ChevronDown, ChevronRight,
+  Atom, Loader2, RefreshCw, ExternalLink, Search, ChevronDown, ChevronRight,
+  Rocket, CheckCircle2,
 } from "lucide-react";
-import { api, type ArxivDraft } from "@/lib/api";
+import { api, type ArxivDraft, type Paper } from "@/lib/api";
 import { ARXIV_GROUPS, findCategoryLabel } from "@/lib/arxiv-categories";
 
 const DEFAULT_CATEGORY = "physics.optics";
@@ -41,7 +42,8 @@ export function BrowsePage() {
   }
 
   return (
-    <section className="h-full flex overflow-hidden">
+    <section className="h-full flex flex-col overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
       {/* sidebar: category tree */}
       <aside className="w-[240px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto">
         <div className="px-3 py-3 border-b border-litera-line">
@@ -51,7 +53,7 @@ export function BrowsePage() {
             placeholder="cs.LG, physics.optics, …"
             className="litera-input w-full text-xs font-mono"
           />
-          <p className="text-[10px] text-litera-mute mt-1.5">type any arXiv category id</p>
+          <p className="text-[10px] text-litera-mute mt-1.5">输入任意 arXiv 分类 ID</p>
         </div>
         <nav className="px-2 py-2">
           {ARXIV_GROUPS.map((g) => {
@@ -102,7 +104,7 @@ export function BrowsePage() {
               <span className="text-litera-mute font-mono text-sm">/ {category}</span>
             </h1>
             <p className="text-xs text-litera-mute mt-0.5">
-              Newest submissions from arXiv · sorted by submitted date descending
+              arXiv 最新提交 · 按投稿时间倒序
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -111,7 +113,7 @@ export function BrowsePage() {
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="filter results…"
+                placeholder="过滤结果…"
                 className="litera-input pl-7 w-48 text-xs"
               />
             </div>
@@ -127,7 +129,7 @@ export function BrowsePage() {
             </select>
             <button onClick={() => q.refetch()} disabled={q.isFetching} className="litera-btn text-xs disabled:opacity-50">
               {q.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Refresh
+              刷新
             </button>
           </div>
         </header>
@@ -135,13 +137,13 @@ export function BrowsePage() {
         <div className="flex-1 overflow-auto">
           {q.isLoading ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
-              <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Fetching {category}…</div>
+              <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 正在获取 {category}…</div>
             </div>
           ) : q.error ? (
             <div className="p-6 text-sm text-red-400/90">✕ {(q.error as Error).message}</div>
           ) : filtered.length === 0 ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
-              No results. Try a different category or wider filter.
+              没有结果。换一个分类或放宽过滤条件。
             </div>
           ) : (
             <ul className="divide-y divide-litera-line">
@@ -152,15 +154,20 @@ export function BrowsePage() {
           )}
         </div>
       </div>
+      </div>
     </section>
   );
 }
 
 function DraftRow({ draft, rank }: { draft: ArxivDraft; rank: number }) {
   const qc = useQueryClient();
+  const [saved, setSaved] = useState<Paper | null>(null);
   const add = useMutation({
-    mutationFn: () => api.arxivAddDraft(draft),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
+    mutationFn: () => api.arxivAddWithPdf(draft.arxiv_id!),
+    onSuccess: (p) => {
+      setSaved(p);
+      qc.invalidateQueries({ queryKey: ["papers"] });
+    },
   });
   return (
     <li className="px-6 py-3.5 hover:bg-litera-panel/40 transition-colors group">
@@ -191,20 +198,28 @@ function DraftRow({ draft, rank }: { draft: ArxivDraft; rank: number }) {
               {draft.abstract_text}
             </p>
           )}
+          {add.error && (
+            <div className="mt-1.5 text-xs text-red-400/90">✕ {(add.error as Error).message}</div>
+          )}
         </div>
-        <button
-          onClick={() => add.mutate()}
-          disabled={add.isPending || add.isSuccess}
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity litera-btn text-xs disabled:opacity-50"
-          title={add.isSuccess ? "Already added" : "Add to library"}
-        >
-          {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookPlus className="h-3.5 w-3.5" />}
-          {add.isSuccess ? "Added" : "Add"}
-        </button>
+        <div className="shrink-0">
+          {saved ? (
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
+            </span>
+          ) : (
+            <button
+              onClick={() => add.mutate()}
+              disabled={add.isPending || !draft.arxiv_id}
+              className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+              title="从 arxiv.org 下载 PDF 并入库"
+            >
+              {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+              下载并入库
+            </button>
+          )}
+        </div>
       </div>
-      {add.error && (
-        <div className="ml-10 mt-1 text-xs text-red-400/90">✕ {(add.error as Error).message}</div>
-      )}
     </li>
   );
 }
