@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LibraryBig, FileText, Sparkles, Loader2, BookOpen, X, Search,
   AlertTriangle, Wrench, Compass, Layers, Tag as TagIcon, Plus, Trash2,
-  Circle, CircleDot, CircleCheck, Star, Languages,
+  Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw,
 } from "lucide-react";
-import { api, openPdfInSystem, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
+import { api, openPdfInSystem, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
 
 const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
@@ -113,6 +113,23 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
       qc.invalidateQueries({ queryKey: ["paper", p.id] });
     },
   });
+  const attachPdf = useMutation({
+    mutationFn: async () => {
+      const src = await pickSinglePdf();
+      if (!src) return null;
+      return api.paperAttachPdf(p.id, src);
+    },
+    onSuccess: (paper) => {
+      if (paper) {
+        qc.invalidateQueries({ queryKey: ["papers"] });
+        qc.invalidateQueries({ queryKey: ["paper", p.id] });
+      }
+    },
+  });
+  const del = useMutation({
+    mutationFn: () => api.paperDelete(p.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
+  });
   const tagsQ = useQuery({
     queryKey: ["paper-tags", p.id],
     queryFn: () => api.paperTags(p.id),
@@ -127,6 +144,12 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
       await openPdfInSystem(p.pdf_path);
     } catch (e) {
       setOpenErr((e as Error).message);
+    }
+  }
+
+  function confirmDelete() {
+    if (confirm(`确定从库中删除「${p.title}」吗?\n\n会同时删除 papers/${p.id}/ 目录里的 PDF 等文件。`)) {
+      del.mutate();
     }
   }
 
@@ -173,15 +196,26 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
           )}
           <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={openPdf}
-            disabled={!canOpenPdf}
-            className="litera-btn text-xs disabled:opacity-30 whitespace-nowrap"
-            title={canOpenPdf ? "在系统 PDF 阅读器中打开" : "未绑定 PDF"}
-          >
-            <FileText className="h-3.5 w-3.5" /> 📄 打开
-          </button>
+        <div className="shrink-0 flex flex-col items-end gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
+          {canOpenPdf ? (
+            <button
+              onClick={openPdf}
+              className="litera-btn text-xs whitespace-nowrap"
+              title="在系统 PDF 阅读器中打开"
+            >
+              <FileText className="h-3.5 w-3.5" /> 📄 打开
+            </button>
+          ) : (
+            <button
+              onClick={() => attachPdf.mutate()}
+              disabled={attachPdf.isPending}
+              className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
+              title="选择本地 PDF 文件绑定到此文献"
+            >
+              {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+              📎 添加 PDF
+            </button>
+          )}
           <button
             onClick={() => translate.mutate()}
             disabled={translate.isPending}
@@ -204,6 +238,26 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
             title="深读:问题 / 方法 / 不同 / 局限">
             <BookOpen className="h-3.5 w-3.5" /> 深读
           </button>
+          <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {canOpenPdf && (
+              <button
+                onClick={() => attachPdf.mutate()}
+                disabled={attachPdf.isPending}
+                className="p-1 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50"
+                title="重新选择 PDF 文件(替换当前)"
+              >
+                {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <button
+              onClick={confirmDelete}
+              disabled={del.isPending}
+              className="p-1 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              title="从库中删除"
+            >
+              {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </div>
       </div>
       {tldr.error && (
@@ -211,6 +265,12 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
       )}
       {translate.error && (
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 翻译失败:{(translate.error as Error).message}</div>
+      )}
+      {attachPdf.error && (
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 绑定 PDF 失败:{(attachPdf.error as Error).message}</div>
+      )}
+      {del.error && (
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 删除失败:{(del.error as Error).message}</div>
       )}
       {openErr && (
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 打开失败:{openErr}</div>
