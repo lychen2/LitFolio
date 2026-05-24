@@ -207,6 +207,10 @@ fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
         key_findings,
         limitations: row.try_get("limitations").ok(),
         comparison: row.try_get("comparison").ok(),
+        title_translated: row.try_get("title_translated").ok(),
+        abstract_translated: row.try_get("abstract_translated").ok(),
+        translate_target_lang: row.try_get("translate_target_lang").ok(),
+        translated_at: row.try_get("translated_at").ok(),
     })
 }
 
@@ -248,6 +252,10 @@ mod tests {
             key_findings: vec![],
             limitations: None,
             comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
         }
     }
 
