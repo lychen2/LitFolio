@@ -377,6 +377,43 @@ pub async fn arxiv_add_with_pdf(
     Ok(paper)
 }
 
+// ─── Two-step metadata + PDF flow ────────────────────────────────────────
+
+#[tauri::command]
+pub async fn prepare_doi_draft(
+    state: State<'_, Arc<AppState>>,
+    doi: String,
+) -> Result<PaperDraft, String> {
+    fetch_doi(&state.http, &doi).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn prepare_arxiv_draft(
+    state: State<'_, Arc<AppState>>,
+    arxiv_id: String,
+) -> Result<PaperDraft, String> {
+    fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_save_with_pdf(
+    state: State<'_, Arc<AppState>>,
+    draft: PaperDraft,
+    source_pdf_path: String,
+) -> Result<Paper, String> {
+    let paper_id = Ulid::new().to_string();
+    let dest = state.paths.paper_dir(&paper_id).join("original.pdf");
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::copy(&source_pdf_path, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    let mut paper = draft.into_paper();
+    paper.id = paper_id;
+    paper.pdf_path = Some(dest.display().to_string());
+    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
 // ─── LLM config ──────────────────────────────────────────────────────────
 
 #[tauri::command]
