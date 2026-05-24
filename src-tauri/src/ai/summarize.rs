@@ -50,7 +50,7 @@ pub async fn summarize_paper_text(
         ],
     )
     .await?;
-    let v = parse_json(&resp.content);
+    let v = parse_json_lenient(&resp.content);
     let tldr = v.get("tldr").and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
     let findings = v
         .get("key_findings")
@@ -86,7 +86,7 @@ pub async fn quick_read_paper_text(
         ],
     )
     .await?;
-    let v = parse_json(&resp.content);
+    let v = parse_json_lenient(&resp.content);
     Ok(QuickReadResult {
         problem: v.get("problem").and_then(|x| x.as_str()).unwrap_or("").trim().to_string(),
         method: v.get("method").and_then(|x| x.as_str()).unwrap_or("").trim().to_string(),
@@ -120,7 +120,7 @@ fn format_user_prompt(
     s
 }
 
-fn parse_json(raw: &str) -> serde_json::Value {
+pub(crate) fn parse_json_lenient(raw: &str) -> serde_json::Value {
     let trimmed = raw.trim();
     let body = strip_code_fence(trimmed);
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn tldr_parses_clean_json() {
         let raw = r#"{"tldr":"Foo bar.","key_findings":["a","b","c"]}"#;
-        let v = parse_json(raw);
+        let v = parse_json_lenient(raw);
         assert_eq!(v["tldr"], "Foo bar.");
         assert_eq!(v["key_findings"][1], "b");
     }
@@ -158,14 +158,14 @@ mod tests {
     #[test]
     fn tldr_parses_fenced_json() {
         let raw = "```json\n{\"tldr\":\"X\",\"key_findings\":[\"y\"]}\n```";
-        let v = parse_json(raw);
+        let v = parse_json_lenient(raw);
         assert_eq!(v["tldr"], "X");
     }
 
     #[test]
     fn quickread_parses_four_fields() {
         let raw = r#"{"problem":"P","method":"M","comparison":"C","limitations":"L"}"#;
-        let v = parse_json(raw);
+        let v = parse_json_lenient(raw);
         assert_eq!(v["problem"], "P");
         assert_eq!(v["comparison"], "C");
     }
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn parses_prose_wrapped_json() {
         let raw = "Sure, here you go:\n{\"problem\":\"yes\"}\nThanks!";
-        let v = parse_json(raw);
+        let v = parse_json_lenient(raw);
         assert_eq!(v["problem"], "yes");
     }
 }
