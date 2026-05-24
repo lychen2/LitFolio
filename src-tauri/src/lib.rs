@@ -80,6 +80,9 @@ pub fn run() {
             commands::paper_tldr,
             commands::paper_quick_read,
             commands::paper_translate,
+            commands::batch_attach_tag,
+            commands::batch_set_status,
+            commands::batch_delete,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
