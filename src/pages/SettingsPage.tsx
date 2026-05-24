@@ -13,6 +13,22 @@ const PRESETS: { label: string; profile: Partial<LlmProfile> }[] = [
   { label: "Ollama",      profile: { base_url: "http://localhost:11434/v1", chat_model: "qwen2.5:7b", embed_model: "nomic-embed-text", api_key: "ollama" } },
 ];
 
+// Curated lists of officially advertised chat models per provider, keyed by base_url
+// substring match. Surfaced as <datalist> suggestions so users don't typo (e.g. "deepseek-v4-flash"
+// which doesn't exist). Custom values still work — datalist is suggestions, not validation.
+const MODEL_SUGGESTIONS: { match: string; models: string[] }[] = [
+  { match: "api.openai.com",     models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o3-mini", "o1", "o1-mini"] },
+  { match: "api.deepseek.com",   models: ["deepseek-chat", "deepseek-reasoner"] },
+  { match: "api.moonshot.cn",    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k", "kimi-k2-0905-preview"] },
+  { match: "api.siliconflow.cn", models: ["Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-14B-Instruct", "Qwen/Qwen2.5-32B-Instruct", "Qwen/Qwen3-8B", "deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1"] },
+  { match: "localhost:11434",    models: ["qwen2.5:7b", "qwen2.5:14b", "llama3.1:8b", "llama3.2:3b", "mistral:7b", "gemma2:9b"] },
+];
+
+function suggestionsForBaseUrl(baseUrl: string): string[] {
+  const hit = MODEL_SUGGESTIONS.find((s) => baseUrl.includes(s.match));
+  return hit?.models ?? [];
+}
+
 export function SettingsPage() {
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["llm", "config"],
@@ -205,8 +221,45 @@ function ProfileCard({
           </div>
         </FieldLabel>
         <FieldLabel label="对话模型">
-          <input value={local.chat_model} onChange={(e) => field("chat_model", e.target.value)}
-            className="litera-input w-full font-mono text-xs" placeholder="gpt-4o-mini" />
+          {(() => {
+            const suggestions = suggestionsForBaseUrl(local.base_url);
+            const listId = `models-${profile.name.replace(/[^a-zA-Z0-9]/g, "_")}`;
+            return (
+              <div>
+                <input
+                  value={local.chat_model}
+                  onChange={(e) => field("chat_model", e.target.value)}
+                  list={suggestions.length ? listId : undefined}
+                  className="litera-input w-full font-mono text-xs"
+                  placeholder="gpt-4o-mini"
+                />
+                {suggestions.length > 0 && (
+                  <>
+                    <datalist id={listId}>
+                      {suggestions.map((m) => <option key={m} value={m} />)}
+                    </datalist>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {suggestions.slice(0, 5).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => field("chat_model", m)}
+                          className={
+                            "px-1.5 py-0.5 rounded text-[10px] border transition-colors " +
+                            (local.chat_model === m
+                              ? "border-litera-accent/40 bg-litera-accent/10 text-litera-accent"
+                              : "border-litera-line text-litera-mute hover:text-litera-text hover:bg-litera-panel")
+                          }
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </FieldLabel>
         <FieldLabel label="向量模型 (可选)">
           <input value={local.embed_model ?? ""}
