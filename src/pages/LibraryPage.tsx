@@ -5,7 +5,7 @@ import {
   AlertTriangle, Wrench, Compass, Layers, Tag as TagIcon, Plus, Trash2,
   Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw,
 } from "lucide-react";
-import { api, openPdfInSystem, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
+import { api, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
 
 const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
@@ -136,15 +136,10 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
   });
 
   const canOpenPdf = !!p.pdf_path;
-  const [openErr, setOpenErr] = useState<string | null>(null);
-  async function openPdf() {
+  const openMut = useMutation({ mutationFn: () => api.paperOpenPdf(p.id) });
+  function openPdf() {
     if (!p.pdf_path) return;
-    setOpenErr(null);
-    try {
-      await openPdfInSystem(p.pdf_path);
-    } catch (e) {
-      setOpenErr((e as Error).message);
-    }
+    openMut.mutate();
   }
 
   function confirmDelete() {
@@ -200,10 +195,12 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
           {canOpenPdf ? (
             <button
               onClick={openPdf}
-              className="litera-btn text-xs whitespace-nowrap"
+              disabled={openMut.isPending}
+              className="litera-btn text-xs whitespace-nowrap disabled:opacity-60"
               title="在系统 PDF 阅读器中打开"
             >
-              <FileText className="h-3.5 w-3.5" /> 📄 打开
+              {openMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              📄 打开
             </button>
           ) : (
             <button
@@ -272,8 +269,8 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
       {del.error && (
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 删除失败:{(del.error as Error).message}</div>
       )}
-      {openErr && (
-        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 打开失败:{openErr}</div>
+      {openMut.error && (
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 打开失败:{(openMut.error as Error).message}</div>
       )}
     </li>
   );
