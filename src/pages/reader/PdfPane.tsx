@@ -101,6 +101,8 @@ export function PdfPane({
         url={pdfUrl}
         workerSrc={workerUrl}
         beforeLoad={<Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> 渲染中…</Center>}
+        errorMessage={<PdfLoadError />}
+        onError={(e) => { console.error("[PdfLoader] getDocument failed", e); }}
       >
         {(pdfDocument) => (
           <PdfHighlighter
@@ -161,6 +163,25 @@ function Center({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-full grid place-items-center text-sm text-litera-mute">
       <div>{children}</div>
+    </div>
+  );
+}
+
+// RPH's PdfLoader silently returns null on getDocument failure if you don't pass
+// errorMessage — that's how this component appeared to "hang at black screen".
+// React.cloneElement injects { error } so we can display the actual cause.
+function PdfLoadError({ error }: { error?: Error }) {
+  return (
+    <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
+      <div>
+        <div className="font-medium mb-1">✕ PDF 渲染失败</div>
+        <div className="text-xs text-litera-mute font-mono break-all">
+          {error?.message || String(error) || "未知错误"}
+        </div>
+        <div className="text-[11px] text-litera-mute mt-2">
+          打开浏览器开发者工具 (F12) 看 console 拿完整错误堆栈。
+        </div>
+      </div>
     </div>
   );
 }
