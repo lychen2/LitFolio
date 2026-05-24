@@ -684,3 +684,14 @@ pub async fn batch_translate(
         }
     }).await
 }
+
+#[tauri::command]
+pub fn batch_cancel(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
+    let mut g = state.batch_cancel.lock().map_err(|e| e.to_string())?;
+    if let Some(t) = g.as_ref() {
+        t.cancel();
+        return Ok(true);
+    }
+    *g = None;
+    Ok(false)
+}
