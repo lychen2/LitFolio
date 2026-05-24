@@ -52,6 +52,10 @@ pub struct Paper {
     pub key_findings: Vec<String>,
     pub limitations: Option<String>,
     pub comparison: Option<String>,
+    pub title_translated: Option<String>,
+    pub abstract_translated: Option<String>,
+    pub translate_target_lang: Option<String>,
+    pub translated_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

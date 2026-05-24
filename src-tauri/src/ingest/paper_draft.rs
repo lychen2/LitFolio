@@ -43,6 +43,10 @@ impl PaperDraft {
             key_findings: vec![],
             limitations: None,
             comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
         }
     }
 }
