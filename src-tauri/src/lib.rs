@@ -8,8 +8,9 @@ mod index;
 mod cluster;
 
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 use storage::{open_pool, run_migrations, LibraryPaths, default_library_root, Pool};
@@ -18,6 +19,7 @@ pub struct AppState {
     pub pool: Pool,
     pub paths: LibraryPaths,
     pub http: reqwest::Client,
+    pub batch_cancel: Mutex<Option<CancellationToken>>,
 }
 
 async fn bootstrap_state() -> Result<Arc<AppState>> {
@@ -31,7 +33,7 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
         .timeout(std::time::Duration::from_secs(30))
         .build()?;
     tracing::info!(root = %paths.root.display(), "library ready");
-    Ok(Arc::new(AppState { pool, paths, http }))
+    Ok(Arc::new(AppState { pool, paths, http, batch_cancel: Mutex::new(None) }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

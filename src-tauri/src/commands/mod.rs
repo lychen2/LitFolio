@@ -454,3 +454,40 @@ pub async fn paper_translate(
         .await.map_err(|e| e.to_string())?;
     Ok(result)
 }
+
+// ─── Batch primitives ────────────────────────────────────────────────────
+
+use tokio_util::sync::CancellationToken;
+
+#[derive(serde::Serialize)]
+pub struct BatchError {
+    pub paper_id: String,
+    pub title: String,
+    pub message: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct BatchSummary {
+    pub kind: String,
+    pub total: usize,
+    pub ok: usize,
+    pub failed: usize,
+    pub cancelled: bool,
+    pub errors: Vec<BatchError>,
+}
+
+fn install_cancel_token(state: &AppState) -> Result<CancellationToken, String> {
+    let mut guard = state.batch_cancel.lock().map_err(|e| e.to_string())?;
+    if let Some(existing) = guard.as_ref() {
+        if !existing.is_cancelled() {
+            return Err("a batch is already running; cancel it first".into());
+        }
+    }
+    let tok = CancellationToken::new();
+    *guard = Some(tok.clone());
+    Ok(tok)
+}
+
+fn clear_cancel_token(state: &AppState) {
+    if let Ok(mut g) = state.batch_cancel.lock() { *g = None; }
+}
