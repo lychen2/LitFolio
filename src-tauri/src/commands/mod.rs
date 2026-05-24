@@ -633,3 +633,54 @@ pub async fn batch_tldr(
         }
     }).await
 }
+
+#[tauri::command]
+pub async fn batch_quick_read(
+    app: AppHandle, state: State<'_, Arc<AppState>>, ids: Vec<String>,
+) -> Result<BatchSummary, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead).map_err(|e| e.to_string())?.clone();
+    let http = state.http.clone();
+    let pool = state.pool.clone();
+    run_ai_batch(app, state, "quick_read", ids, move |paper| {
+        let http = http.clone();
+        let prof = prof.clone();
+        let pool = pool.clone();
+        async move {
+            let r = quick_read_paper_text(
+                &http, &prof, &paper.title, &paper.authors, paper.venue.as_deref(),
+                paper.year, paper.abstract_text.as_deref(), None,
+            ).await?;
+            PaperRepo::new(&pool).update_quick_read(
+                &paper.id, &r.problem, &r.method, &r.comparison, &r.limitations,
+            ).await?;
+            Ok(())
+        }
+    }).await
+}
+
+#[tauri::command]
+pub async fn batch_translate(
+    app: AppHandle, state: State<'_, Arc<AppState>>,
+    ids: Vec<String>, target_lang: Option<String>,
+) -> Result<BatchSummary, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?.clone();
+    let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
+    let http = state.http.clone();
+    let pool = state.pool.clone();
+    run_ai_batch(app, state, "translate", ids, move |paper| {
+        let http = http.clone();
+        let prof = prof.clone();
+        let pool = pool.clone();
+        let lang = lang.clone();
+        async move {
+            let r = crate::ai::translate_paper_text(
+                &http, &prof, &paper.title, paper.abstract_text.as_deref(), &lang,
+            ).await?;
+            PaperRepo::new(&pool)
+                .update_translation(&paper.id, &r.title, &r.abstract_text, &r.target_lang).await?;
+            Ok(())
+        }
+    }).await
+}
