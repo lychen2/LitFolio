@@ -81,7 +81,6 @@ export function ReaderPage() {
           <Panel defaultSize={55} minSize={30}>
             <PdfPane
               paperId={paperId}
-              pdfPath={paper.pdf_path}
               scrollRefCb={(fn) => { scrollFn.current = fn; }}
             />
           </Panel>

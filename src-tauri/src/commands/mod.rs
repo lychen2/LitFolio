@@ -486,6 +486,27 @@ pub async fn paper_open_pdf(
     Ok(())
 }
 
+/// Return the bound PDF's raw bytes. The frontend wraps these in a Blob URL and
+/// feeds it to pdfjs — sidesteps Tauri's asset:// protocol entirely, which has been
+/// flaky on this host (no error, no spinner termination, just black screen). Slower
+/// than streaming via a custom protocol but the cost is paid once per open.
+#[tauri::command]
+pub async fn paper_read_pdf_bytes(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Vec<u8>, String> {
+    let paper = PaperRepo::new(&state.pool)
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {id} not found"))?;
+    let path = paper
+        .pdf_path
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "这篇文献还没有绑定 PDF".to_string())?;
+    std::fs::read(&path).map_err(|e| format!("read pdf {path}: {e}"))
+}
+
 // ─── LLM config ──────────────────────────────────────────────────────────
 
 #[tauri::command]

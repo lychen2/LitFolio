@@ -80,6 +80,7 @@ pub fn run() {
             commands::paper_save_with_pdf,
             commands::paper_attach_pdf,
             commands::paper_open_pdf,
+            commands::paper_read_pdf_bytes,
             commands::llm_get_config,
             commands::llm_save_config,
             commands::llm_test,
