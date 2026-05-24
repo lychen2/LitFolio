@@ -102,12 +102,17 @@ export interface BatchSummary {
   errors: BatchError[];
 }
 
+export interface TaskBinding {
+  profile: string;
+  model: string | null;
+}
+
 export interface TaskAssignments {
-  tldr: string | null;
-  quick_read: string | null;
-  translate: string | null;
-  tag: string | null;
-  link: string | null;
+  tldr: TaskBinding | null;
+  quick_read: TaskBinding | null;
+  translate: TaskBinding | null;
+  tag: TaskBinding | null;
+  link: TaskBinding | null;
 }
 
 export interface LlmTestResult {
