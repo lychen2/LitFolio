@@ -157,6 +157,17 @@ export interface ArxivDraft {
   abstract_text: string | null;
 }
 
+export interface Highlight {
+  id: string;
+  paper_id: string;
+  page: number;
+  rect: unknown;
+  color: string;
+  text: string;
+  note: string | null;
+  created_at: number;
+}
+
 export const api = {
   appVersion: () => invoke<string>("app_version"),
   libraryRoot: () => invoke<string>("library_root"),
@@ -238,6 +249,18 @@ export const api = {
     invoke<number>("batch_set_status", { ids, status }),
   batchDelete: (ids: string[]) => invoke<number>("batch_delete", { ids }),
   batchCancel: () => invoke<boolean>("batch_cancel"),
+  highlightCreate: (paperId: string, page: number, rect: unknown, text: string, color?: string) =>
+    invoke<Highlight>("highlight_create", { paperId, page, rect, text, color: color ?? null }),
+  highlightList: (paperId: string) =>
+    invoke<Highlight[]>("highlight_list", { paperId }),
+  highlightUpdateNote: (id: string, note: string | null) =>
+    invoke<void>("highlight_update_note", { id, note }),
+  highlightDelete: (id: string) => invoke<void>("highlight_delete", { id }),
+  noteGet: (paperId: string) => invoke<string>("note_get", { paperId }),
+  noteSave: (paperId: string, content: string) =>
+    invoke<void>("note_save", { paperId, content }),
+  llmListModels: (profile: LlmProfile) =>
+    invoke<string[]>("llm_list_models", { profile }),
 };
 
 export async function pickPdfFiles(): Promise<string[] | null> {

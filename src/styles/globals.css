@@ -12,6 +12,17 @@
     background: radial-gradient(1200px 800px at 12% -10%, #1b1623 0%, #0a0a0f 55%) fixed;
   }
   ::selection { background: rgba(167, 139, 250, 0.35); }
+
+  /* <select> dropdown items: browsers ignore parent CSS for the popup, so without
+     this rule every <option> renders white-on-white in the dark theme. The select
+     element itself picks up .litera-input; this fixes the rendered popup list. */
+  select {
+    color-scheme: dark;
+  }
+  select option, select optgroup {
+    background-color: #15131d;
+    color: #e9e6f3;
+  }
 }
 
 @layer components {
