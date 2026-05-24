@@ -43,7 +43,7 @@ export function SettingsPage() {
       profiles: d.profiles.filter((p) => p.name !== name),
       active: d.active === name ? null : d.active,
       task_assignments: Object.fromEntries(
-        Object.entries(d.task_assignments).map(([k, v]) => [k, v === name ? null : v])
+        Object.entries(d.task_assignments).map(([k, v]) => [k, v?.profile === name ? null : v])
       ) as LlmConfig["task_assignments"],
     }));
   }
