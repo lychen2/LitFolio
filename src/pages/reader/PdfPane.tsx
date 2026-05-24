@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { Loader2, Highlighter } from "lucide-react";
 import {
   PdfLoader, PdfHighlighter, Highlight as RphHighlight, Tip, Popup,
@@ -23,21 +22,42 @@ import { api, type Highlight as BackendHighlight } from "@/lib/api";
  * - Exposes a scroll-to-highlight function to the parent via scrollRefCb.
  */
 export function PdfPane({
-  paperId, pdfPath, scrollRefCb,
+  paperId, scrollRefCb,
 }: {
   paperId: string;
-  pdfPath: string;
   scrollRefCb?: (fn: (id: string) => void) => void;
 }) {
   const qc = useQueryClient();
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
 
-  // Tauri's asset:// protocol gives the webview a fetchable URL for a local file
-  // without round-tripping bytes through IPC. Needs `app.security.assetProtocol.enable
-  // = true` (+ scope) in tauri.conf.json, which we do.
-  const pdfUrl = pdfPath ? convertFileSrc(pdfPath) : null;
-  useEffect(() => { setLoadErr(null); }, [pdfPath]);
+  // Read PDF bytes via Tauri IPC and turn into a Blob URL. We previously tried
+  // Tauri's asset:// protocol (convertFileSrc), but on this host PdfLoader's
+  // request to that URL silently hangs — no error, no completion. The IPC byte
+  // round-trip is slower for very large PDFs (one transfer at open time) but is
+  // deterministic and works regardless of capability scope.
+  useEffect(() => {
+    let cancelled = false;
+    let revoke: string | null = null;
+    setPdfUrl(null);
+    setLoadErr(null);
+    (async () => {
+      try {
+        const bytes = await api.paperReadPdfBytes(paperId);
+        if (cancelled) return;
+        // Tauri IPC returns number[] for Vec<u8>; convert to Uint8Array.
+        const arr = new Uint8Array(bytes);
+        const blob = new Blob([arr], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        revoke = url;
+        setPdfUrl(url);
+      } catch (e) {
+        if (!cancelled) setLoadErr((e as Error).message);
+      }
+    })();
+    return () => { cancelled = true; if (revoke) URL.revokeObjectURL(revoke); };
+  }, [paperId]);
 
   const highlightsQ = useQuery({
     queryKey: ["highlights", paperId],
