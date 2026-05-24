@@ -445,6 +445,47 @@ pub async fn paper_attach_pdf(
         .ok_or_else(|| "paper vanished after update".to_string())
 }
 
+/// Spawn the system PDF viewer for this paper's bound PDF.
+/// We bypass tauri-plugin-shell here because its `open` returns success immediately
+/// even when the underlying xdg-open is slow (DE detection) or silently fails — that
+/// leaves the UI looking dead. Spawning ourselves at least validates the binary exists
+/// and the path is openable; the viewer takes over from there.
+#[tauri::command]
+pub async fn paper_open_pdf(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), String> {
+    let paper = PaperRepo::new(&state.pool)
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {id} not found"))?;
+    let path = paper
+        .pdf_path
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "这篇文献还没有绑定 PDF,请先点击 📎 添加 PDF".to_string())?;
+    if !std::path::Path::new(&path).exists() {
+        return Err(format!("PDF 文件不存在(已被删除或移动):{path}"));
+    }
+    let opener = if cfg!(target_os = "linux") {
+        "xdg-open"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        "explorer"
+    } else {
+        return Err("unsupported OS".into());
+    };
+    std::process::Command::new(opener)
+        .arg(&path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("启动 {opener} 失败: {e}"))?;
+    Ok(())
+}
+
 // ─── LLM config ──────────────────────────────────────────────────────────
 
 #[tauri::command]

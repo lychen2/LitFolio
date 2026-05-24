@@ -217,6 +217,7 @@ export const api = {
     invoke<Paper>("paper_save_with_pdf", { draft, sourcePdfPath }),
   paperAttachPdf: (id: string, sourcePdfPath: string) =>
     invoke<Paper>("paper_attach_pdf", { id, sourcePdfPath }),
+  paperOpenPdf: (id: string) => invoke<void>("paper_open_pdf", { id }),
   llmGetConfig: () => invoke<LlmConfig>("llm_get_config"),
   llmSaveConfig: (config: LlmConfig) =>
     invoke<void>("llm_save_config", { config }),
