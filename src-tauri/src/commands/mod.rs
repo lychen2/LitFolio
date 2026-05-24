@@ -6,8 +6,9 @@ use tauri::State;
 use ulid::Ulid;
 
 use crate::ai::{
-    active_profile, chat_complete, load_config, quick_read_paper_text, save_config,
-    summarize_paper_text, ChatMessage, LlmConfig, LlmProfile, QuickReadResult, TldrResult,
+    active_profile, active_profile_for_task, chat_complete, load_config, quick_read_paper_text,
+    save_config, summarize_paper_text, ChatMessage, LlmConfig, LlmProfile, QuickReadResult,
+    TaskKind, TldrResult,
 };
 use crate::ingest::{
     discover_topic, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
@@ -383,7 +384,7 @@ pub async fn paper_tldr(
     id: String,
 ) -> Result<TldrResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?.clone();
     let repo = PaperRepo::new(&state.pool);
     let paper = repo.get(&id).await.map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
@@ -410,7 +411,7 @@ pub async fn paper_quick_read(
     id: String,
 ) -> Result<QuickReadResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead).map_err(|e| e.to_string())?.clone();
     let repo = PaperRepo::new(&state.pool);
     let paper = repo.get(&id).await.map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
