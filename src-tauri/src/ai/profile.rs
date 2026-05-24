@@ -30,7 +30,21 @@ pub struct LlmConfig {
     pub profiles: Vec<LlmProfile>,
     #[serde(default)]
     pub active: Option<String>,
+    #[serde(default)]
+    pub task_assignments: TaskAssignments,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskAssignments {
+    #[serde(default)] pub tldr: Option<String>,
+    #[serde(default)] pub quick_read: Option<String>,
+    #[serde(default)] pub translate: Option<String>,
+    #[serde(default)] pub tag: Option<String>,
+    #[serde(default)] pub link: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TaskKind { Tldr, QuickRead, Translate, Tag, Link }
 
 impl LlmConfig {
     pub fn upsert(&mut self, p: LlmProfile) {
@@ -79,6 +93,21 @@ pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
         .ok_or_else(|| anyhow!("no LLM profile configured; add one in Settings"))?;
     cfg.profiles.iter().find(|p| p.name == active)
         .ok_or_else(|| anyhow!("active profile `{active}` not found in config"))
+}
+
+pub fn active_profile_for_task<'a>(cfg: &'a LlmConfig, task: TaskKind) -> Result<&'a LlmProfile> {
+    let assigned: Option<&str> = match task {
+        TaskKind::Tldr      => cfg.task_assignments.tldr.as_deref(),
+        TaskKind::QuickRead => cfg.task_assignments.quick_read.as_deref(),
+        TaskKind::Translate => cfg.task_assignments.translate.as_deref(),
+        TaskKind::Tag       => cfg.task_assignments.tag.as_deref(),
+        TaskKind::Link      => cfg.task_assignments.link.as_deref(),
+    };
+    if let Some(name) = assigned {
+        return cfg.profiles.iter().find(|p| p.name == name)
+            .ok_or_else(|| anyhow!("profile `{name}` not in config"));
+    }
+    active_profile(cfg)
 }
 
 #[cfg(test)]
@@ -134,5 +163,34 @@ mod tests {
         cfg.upsert(sample_profile("only"));
         let a = active_profile(&cfg).unwrap();
         assert_eq!(a.name, "only");
+    }
+
+    #[test]
+    fn task_assignment_resolves_to_assigned_profile() {
+        let mut cfg = LlmConfig::default();
+        cfg.upsert(sample_profile("cheap"));
+        cfg.upsert(sample_profile("strong"));
+        cfg.active = Some("cheap".into());
+        cfg.task_assignments.quick_read = Some("strong".into());
+        let p = active_profile_for_task(&cfg, TaskKind::QuickRead).unwrap();
+        assert_eq!(p.name, "strong");
+        let p = active_profile_for_task(&cfg, TaskKind::Tldr).unwrap();
+        assert_eq!(p.name, "cheap"); // falls back to active
+    }
+
+    #[test]
+    fn task_assignment_falls_back_to_first_when_no_active() {
+        let mut cfg = LlmConfig::default();
+        cfg.upsert(sample_profile("only"));
+        let p = active_profile_for_task(&cfg, TaskKind::Translate).unwrap();
+        assert_eq!(p.name, "only");
+    }
+
+    #[test]
+    fn task_assignment_errors_when_profile_missing() {
+        let mut cfg = LlmConfig::default();
+        cfg.upsert(sample_profile("a"));
+        cfg.task_assignments.translate = Some("nonexistent".into());
+        assert!(active_profile_for_task(&cfg, TaskKind::Translate).is_err());
     }
 }
