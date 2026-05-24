@@ -3,15 +3,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LibraryBig, FileText, Sparkles, Loader2, BookOpen, X, Search,
   AlertTriangle, Wrench, Compass, Layers, Tag as TagIcon, Plus, Trash2,
-  Circle, CircleDot, CircleCheck, Star,
+  Circle, CircleDot, CircleCheck, Star, Languages,
 } from "lucide-react";
-import { api, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
+import { api, openPdfInSystem, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
 
 const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
-  unread:  { label: "Unread",  icon: Circle,      tone: "text-litera-mute" },
-  reading: { label: "Reading", icon: CircleDot,   tone: "text-litera-accent2" },
-  read:    { label: "Read",    icon: CircleCheck, tone: "text-emerald-400" },
-  must:    { label: "Must",    icon: Star,        tone: "text-amber-400" },
+  unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
+  reading: { label: "在读", icon: CircleDot,   tone: "text-litera-accent2" },
+  read:    { label: "已读",    icon: CircleCheck, tone: "text-emerald-400" },
+  must:    { label: "必读",    icon: Star,        tone: "text-amber-400" },
 };
 
 const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
@@ -33,13 +33,13 @@ export function LibraryPage() {
     <section className="h-full flex flex-col">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-serif text-2xl tracking-tight">Library</h1>
+          <h1 className="font-serif text-2xl tracking-tight">文献库</h1>
           <p className="text-sm text-litera-mute">
             {trimmed
-              ? `${papers?.length ?? 0} results for "${trimmed}"`
+              ? `“${trimmed}” 共 ${papers?.length ?? 0} 条结果`
               : papers
-              ? `${papers.length} most recent`
-              : "Loading…"}
+              ? `${papers.length} 篇最近文献`
+              : "加载中…"}
           </p>
         </div>
         <div className="relative w-80 max-w-[40vw]">
@@ -47,7 +47,7 @@ export function LibraryPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, authors, abstract, TL;DR…"
+            placeholder="搜索 标题 / 作者 / 摘要 / 速读…"
             className="litera-input pl-9 pr-8 w-full"
           />
           {search && (
@@ -62,7 +62,7 @@ export function LibraryPage() {
       </header>
       <div className="flex-1 overflow-auto">
         {isLoading ? (
-          <div className="grid place-items-center h-full text-litera-mute text-sm">Loading…</div>
+          <div className="grid place-items-center h-full text-litera-mute text-sm">加载中…</div>
         ) : !papers || papers.length === 0 ? (
           trimmed ? <NoResults q={trimmed} /> : <Empty />
         ) : (
@@ -83,7 +83,7 @@ function Empty() {
     <div className="grid place-items-center h-full text-litera-mute">
       <div className="text-center">
         <LibraryBig className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-sm">No papers yet. Import to get started.</p>
+        <p className="text-sm">还没有文献。拖入 PDF 文件开始。</p>
       </div>
     </div>
   );
@@ -94,7 +94,7 @@ function NoResults({ q }: { q: string }) {
     <div className="grid place-items-center h-full text-litera-mute">
       <div className="text-center">
         <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">No papers match <span className="font-mono">{q}</span>.</p>
+        <p className="text-sm">没有匹配 <span className="font-mono">{q}</span> 的文献。</p>
       </div>
     </div>
   );
@@ -106,10 +106,29 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
     mutationFn: () => api.paperTldr(p.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
   });
+  const translate = useMutation({
+    mutationFn: () => api.paperTranslate(p.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["papers"] });
+      qc.invalidateQueries({ queryKey: ["paper", p.id] });
+    },
+  });
   const tagsQ = useQuery({
     queryKey: ["paper-tags", p.id],
     queryFn: () => api.paperTags(p.id),
   });
+
+  const canOpenPdf = !!p.pdf_path;
+  const [openErr, setOpenErr] = useState<string | null>(null);
+  async function openPdf() {
+    if (!p.pdf_path) return;
+    setOpenErr(null);
+    try {
+      await openPdfInSystem(p.pdf_path);
+    } catch (e) {
+      setOpenErr((e as Error).message);
+    }
+  }
 
   return (
     <li className="px-6 py-3.5 hover:bg-litera-panel/50 transition-colors group">
@@ -118,6 +137,12 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-litera-text leading-snug">{p.title}</div>
+          {p.title_translated && (
+            <div className="text-xs text-litera-accent/90 mt-0.5 italic flex items-start gap-1.5">
+              <Languages className="h-3 w-3 mt-0.5 shrink-0" />
+              <span>{p.title_translated}</span>
+            </div>
+          )}
           <div className="text-xs text-litera-mute mt-0.5 flex items-center gap-2 flex-wrap">
             {p.authors.length > 0 && (
               <span className="truncate max-w-[420px]">
@@ -128,6 +153,7 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
             {p.venue && <span className="truncate">· {p.venue}</span>}
             {p.doi && <span className="font-mono">· {p.doi}</span>}
             {p.arxiv_id && <span className="font-mono">· arXiv:{p.arxiv_id}</span>}
+            {!p.pdf_path && <span className="text-amber-400/80">· 无 PDF</span>}
           </div>
           {p.tldr && (
             <div className="text-xs text-litera-text/80 mt-1.5 leading-relaxed flex items-start gap-1.5">
@@ -142,29 +168,52 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
           )}
           {(p.research_question || p.method) && (
             <div className="mt-1.5 text-[11px] flex items-center gap-2 text-litera-accent2">
-              <BookOpen className="h-3 w-3" /> Quick-read available
+              <BookOpen className="h-3 w-3" /> 已有深读结果
             </div>
           )}
           <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
           <button
+            onClick={openPdf}
+            disabled={!canOpenPdf}
+            className="litera-btn text-xs disabled:opacity-30 whitespace-nowrap"
+            title={canOpenPdf ? "在系统 PDF 阅读器中打开" : "未绑定 PDF"}
+          >
+            <FileText className="h-3.5 w-3.5" /> 📄 打开
+          </button>
+          <button
+            onClick={() => translate.mutate()}
+            disabled={translate.isPending}
+            className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
+            title={p.title_translated ? "重新翻译标题 + 摘要" : "将标题 + 摘要翻译为中文"}
+          >
+            {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
+            🌐 翻译
+          </button>
+          <button
             onClick={() => tldr.mutate()}
             disabled={tldr.isPending}
             className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
-            title="Generate one-sentence summary + key findings"
+            title="生成一句话摘要 + 关键发现"
           >
             {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            TL;DR
+            速读
           </button>
           <button onClick={onQuickRead} className="litera-btn text-xs whitespace-nowrap"
-            title="Quick deep-read: problem / method / comparison / limitations">
-            <BookOpen className="h-3.5 w-3.5" /> Quick read
+            title="深读:问题 / 方法 / 不同 / 局限">
+            <BookOpen className="h-3.5 w-3.5" /> 深读
           </button>
         </div>
       </div>
       {tldr.error && (
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {(tldr.error as Error).message}</div>
+      )}
+      {translate.error && (
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 翻译失败:{(translate.error as Error).message}</div>
+      )}
+      {openErr && (
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 打开失败:{openErr}</div>
       )}
     </li>
   );
@@ -188,7 +237,7 @@ function StatusToggle({ paper }: { paper: Paper }) {
       onClick={cycle}
       disabled={m.isPending}
       className={"mt-0.5 shrink-0 p-0.5 rounded hover:bg-litera-panel transition-colors " + meta.tone}
-      title={`Status: ${meta.label} (click to cycle)`}
+      title={`状态: ${meta.label} (点击切换)`}
     >
       {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
     </button>
@@ -310,9 +359,14 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-litera-accent2 flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" /> Quick read
+              <BookOpen className="h-3.5 w-3.5" /> 深读
             </div>
             <div className="font-serif text-lg leading-snug mt-0.5">{current.title}</div>
+            {current.title_translated && (
+              <div className="text-xs text-litera-accent/90 mt-0.5 italic">
+                译: {current.title_translated}
+              </div>
+            )}
             <div className="text-xs text-litera-mute mt-1 truncate">
               {current.authors.slice(0, 4).join(", ")}{current.authors.length > 4 ? " et al." : ""}
               {current.year ? ` · ${current.year}` : ""}
@@ -326,20 +380,20 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
 
         <div className="px-5 py-3 border-b border-litera-line flex items-center justify-between gap-2">
           <div className="text-xs text-litera-mute">
-            {hasCached ? "Showing cached analysis." : m.isPending ? "Asking the model…" : "Generate four-part analysis."}
+            {hasCached ? "显示缓存的深读结果。" : m.isPending ? "正在调用模型…" : "生成四段式深读。"}
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { if (confirm("Delete this paper from library?")) del.mutate(); }}
+              onClick={() => { if (confirm("确定从库中删除这篇文献吗?")) del.mutate(); }}
               disabled={del.isPending}
               className="litera-btn text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50"
-              title="Delete this paper"
+              title="删除这篇文献"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => m.mutate()} disabled={m.isPending} className="litera-btn-primary text-xs disabled:opacity-50">
               {m.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {hasCached ? "Regenerate" : "Run quick read"}
+              {hasCached ? "重新生成" : "运行深读"}
             </button>
           </div>
         </div>
@@ -348,13 +402,13 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
           {!result && !m.isPending && (
             <div className="text-sm text-litera-mute text-center py-12">
               <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              No analysis yet. Click <span className="text-litera-text">Run quick read</span>.
-              <div className="text-[11px] mt-2">Requires an LLM profile in Settings.</div>
+              暂无深读结果。点击 <span className="text-litera-text">运行深读</span>。
+              <div className="text-[11px] mt-2">需要在设置页配置 LLM 接口。</div>
             </div>
           )}
           {m.isPending && !result && (
             <div className="text-sm text-litera-mute flex items-center justify-center gap-2 py-12">
-              <Loader2 className="h-4 w-4 animate-spin" /> Generating four-part analysis…
+              <Loader2 className="h-4 w-4 animate-spin" /> 正在生成四段式分析…
             </div>
           )}
           {result && <ResultBody r={result} />}
