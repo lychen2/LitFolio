@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LibraryBig, FileText, Sparkles, Loader2, BookOpen, X, Search,
@@ -222,6 +223,15 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
             🌐 翻译
           </button>
+          {canOpenPdf && (
+            <Link
+              to={`/reader/${p.id}`}
+              className="litera-btn text-xs whitespace-nowrap"
+              title="在内置 PDF 阅读器中打开,可高亮 + 写笔记"
+            >
+              <BookOpen className="h-3.5 w-3.5" /> 📖 阅读
+            </Link>
+          )}
           <button
             onClick={() => tldr.mutate()}
             disabled={tldr.isPending}
