@@ -18,7 +18,11 @@ export function SettingsPage() {
     queryKey: ["llm", "config"],
     queryFn: api.llmGetConfig,
   });
-  const [draft, setDraft] = useState<LlmConfig>({ profiles: [], active: null });
+  const [draft, setDraft] = useState<LlmConfig>({
+    profiles: [],
+    active: null,
+    task_assignments: { tldr: null, quick_read: null, translate: null, tag: null, link: null },
+  });
   useEffect(() => { if (data) setDraft(data); }, [data]);
 
   const save = useMutation({
@@ -59,8 +63,8 @@ export function SettingsPage() {
     <section className="h-full flex flex-col overflow-hidden">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between">
         <div>
-          <h1 className="font-serif text-2xl tracking-tight">Settings</h1>
-          <p className="text-sm text-litera-mute">LLM endpoints · library config</p>
+          <h1 className="font-serif text-2xl tracking-tight">设置</h1>
+          <p className="text-sm text-litera-mute">LLM 端点 · 文献库设置</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -69,7 +73,7 @@ export function SettingsPage() {
             className="litera-btn-primary disabled:opacity-50"
           >
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
+            保存
           </button>
         </div>
       </header>
@@ -77,10 +81,10 @@ export function SettingsPage() {
       <div className="flex-1 overflow-auto p-6 max-w-4xl">
         <div className="mb-4">
           <h2 className="text-litera-text font-medium mb-2 flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-litera-accent" /> LLM profiles
+            <Cpu className="h-4 w-4 text-litera-accent" /> LLM 配置
           </h2>
           <p className="text-xs text-litera-mute">
-            Any OpenAI-compatible endpoint works. Pick a preset or fill in your own.
+            任何兼容 OpenAI 协议的端点均可使用,可选用预设或自行填写。
           </p>
         </div>
 
@@ -97,12 +101,12 @@ export function SettingsPage() {
         </div>
 
         {isLoading ? (
-          <div className="text-litera-mute text-sm">Loading…</div>
+          <div className="text-litera-mute text-sm">加载中…</div>
         ) : draft.profiles.length === 0 ? (
           <div className="litera-panel p-8 text-center">
             <KeyRound className="h-8 w-8 mx-auto mb-2 text-litera-mute" />
-            <p className="text-sm text-litera-text">No LLM profile yet.</p>
-            <p className="text-xs text-litera-mute mt-1">Pick a preset above to get started.</p>
+            <p className="text-sm text-litera-text">还没有 LLM 配置。</p>
+            <p className="text-xs text-litera-mute mt-1">点击上方任意预设即可开始。</p>
           </div>
         ) : (
           <ul className="space-y-3">
@@ -120,7 +124,7 @@ export function SettingsPage() {
         )}
 
         {save.error && <div className="text-sm text-red-400/90 mt-3">✕ {(save.error as Error).message}</div>}
-        {save.isSuccess && <div className="text-sm text-litera-accent mt-3">✓ Saved.</div>}
+        {save.isSuccess && <div className="text-sm text-litera-accent mt-3">✓ 已保存。</div>}
       </div>
     </section>
   );
@@ -161,11 +165,11 @@ function ProfileCard({
           />
           {isActive ? (
             <span className="px-2 py-0.5 text-[11px] rounded border border-litera-accent/40 bg-litera-accent/10 text-litera-accent">
-              ACTIVE
+              当前
             </span>
           ) : (
             <button onClick={onActivate} className="text-[11px] text-litera-mute hover:text-litera-text">
-              Set active
+              设为当前
             </button>
           )}
         </div>
@@ -176,7 +180,7 @@ function ProfileCard({
             className="litera-btn text-xs disabled:opacity-50"
           >
             {test.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-            Test
+            测试连接
           </button>
           <button onClick={onRemove} className="litera-btn text-xs text-red-400/80 hover:text-red-400">
             <Trash2 className="h-3.5 w-3.5" />
@@ -185,11 +189,11 @@ function ProfileCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <FieldLabel label="Base URL">
+        <FieldLabel label="API 地址">
           <input value={local.base_url} onChange={(e) => field("base_url", e.target.value)}
             className="litera-input w-full font-mono text-xs" placeholder="https://api.openai.com/v1" />
         </FieldLabel>
-        <FieldLabel label="API key">
+        <FieldLabel label="密钥">
           <div className="relative">
             <input value={local.api_key} onChange={(e) => field("api_key", e.target.value)}
               type={showKey ? "text" : "password"}
@@ -200,22 +204,22 @@ function ProfileCard({
             </button>
           </div>
         </FieldLabel>
-        <FieldLabel label="Chat model">
+        <FieldLabel label="对话模型">
           <input value={local.chat_model} onChange={(e) => field("chat_model", e.target.value)}
             className="litera-input w-full font-mono text-xs" placeholder="gpt-4o-mini" />
         </FieldLabel>
-        <FieldLabel label="Embedding model (optional)">
+        <FieldLabel label="向量模型 (可选)">
           <input value={local.embed_model ?? ""}
             onChange={(e) => field("embed_model", e.target.value || null)}
             className="litera-input w-full font-mono text-xs"
             placeholder="text-embedding-3-small" />
         </FieldLabel>
-        <FieldLabel label="Max tokens">
+        <FieldLabel label="最大 token">
           <input type="number" value={local.max_tokens}
             onChange={(e) => field("max_tokens", parseInt(e.target.value || "0"))}
             className="litera-input w-full" min={1} max={32000} />
         </FieldLabel>
-        <FieldLabel label="Temperature">
+        <FieldLabel label="采样温度">
           <input type="number" step="0.1" value={local.temperature}
             onChange={(e) => field("temperature", parseFloat(e.target.value || "0"))}
             className="litera-input w-full" min={0} max={2} />

@@ -211,6 +211,10 @@ export const api = {
     invoke<Paper>("arxiv_add_draft", { draft }),
   arxivAddWithPdf: (arxivId: string) =>
     invoke<Paper>("arxiv_add_with_pdf", { arxivId }),
+  prepareDoiDraft: (doi: string) => invoke<ArxivDraft>("prepare_doi_draft", { doi }),
+  prepareArxivDraft: (arxivId: string) => invoke<ArxivDraft>("prepare_arxiv_draft", { arxivId }),
+  paperSaveWithPdf: (draft: ArxivDraft, sourcePdfPath: string) =>
+    invoke<Paper>("paper_save_with_pdf", { draft, sourcePdfPath }),
   llmGetConfig: () => invoke<LlmConfig>("llm_get_config"),
   llmSaveConfig: (config: LlmConfig) =>
     invoke<void>("llm_save_config", { config }),
@@ -241,6 +245,16 @@ export async function pickPdfFiles(): Promise<string[] | null> {
   });
   if (!selection) return null;
   return Array.isArray(selection) ? selection : [selection];
+}
+
+export async function pickSinglePdf(): Promise<string | null> {
+  const sel = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (!sel) return null;
+  return Array.isArray(sel) ? sel[0] : sel;
 }
 
 export async function openPdfInSystem(path: string): Promise<void> {
