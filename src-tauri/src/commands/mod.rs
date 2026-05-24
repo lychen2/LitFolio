@@ -1,0 +1,434 @@
+//! IPC command surface exposed to the React frontend.
+
+use std::path::PathBuf;
+use std::sync::Arc;
+use tauri::State;
+use ulid::Ulid;
+
+use crate::ai::{
+    active_profile, chat_complete, load_config, quick_read_paper_text, save_config,
+    summarize_paper_text, ChatMessage, LlmConfig, LlmProfile, QuickReadResult, TldrResult,
+};
+use crate::ingest::{
+    discover_topic, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
+    search_semantic_scholar, PaperDraft, SearchResult, TopicReport, TopicRequest,
+};
+use crate::storage::{Paper, PaperRepo, ReadStatus, Tag, TagRepo, TagWithCount};
+use crate::AppState;
+
+#[tauri::command]
+pub fn greet(name: &str) -> String {
+    format!("Hello, {name}, welcome to Litera.")
+}
+
+#[tauri::command]
+pub fn app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+#[tauri::command]
+pub fn library_root(state: State<'_, Arc<AppState>>) -> String {
+    state.paths.root.display().to_string()
+}
+
+#[tauri::command]
+pub async fn papers_count(state: State<'_, Arc<AppState>>) -> Result<i64, String> {
+    PaperRepo::new(&state.pool).count().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn papers_recent(
+    state: State<'_, Arc<AppState>>,
+    limit: Option<i64>,
+) -> Result<Vec<Paper>, String> {
+    PaperRepo::new(&state.pool)
+        .list_recent(limit.unwrap_or(50))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_get(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Option<Paper>, String> {
+    PaperRepo::new(&state.pool).get(&id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn papers_search(
+    state: State<'_, Arc<AppState>>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<Paper>, String> {
+    PaperRepo::new(&state.pool)
+        .search(&query, limit.unwrap_or(100))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_set_read_status(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    status: String,
+) -> Result<(), String> {
+    let s = match status.as_str() {
+        "reading" => ReadStatus::Reading,
+        "read" => ReadStatus::Read,
+        "must" => ReadStatus::Must,
+        _ => ReadStatus::Unread,
+    };
+    PaperRepo::new(&state.pool).set_read_status(&id, s).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_delete(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), String> {
+    PaperRepo::new(&state.pool).delete(&id).await.map_err(|e| e.to_string())
+}
+
+// ─── Tags ────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn tags_list(state: State<'_, Arc<AppState>>) -> Result<Vec<TagWithCount>, String> {
+    TagRepo::new(&state.pool).list().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn tag_create(
+    state: State<'_, Arc<AppState>>,
+    name: String,
+    color: Option<String>,
+) -> Result<Tag, String> {
+    TagRepo::new(&state.pool)
+        .create(&name, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn tag_rename(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+    new_name: String,
+) -> Result<(), String> {
+    TagRepo::new(&state.pool).rename(id, &new_name).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn tag_set_color(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+    color: Option<String>,
+) -> Result<(), String> {
+    TagRepo::new(&state.pool)
+        .set_color(id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn tag_delete(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
+    TagRepo::new(&state.pool).delete(id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_attach_tag(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    tag_id: i64,
+) -> Result<(), String> {
+    TagRepo::new(&state.pool).attach(&paper_id, tag_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_detach_tag(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    tag_id: i64,
+) -> Result<(), String> {
+    TagRepo::new(&state.pool).detach(&paper_id, tag_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_tags(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<Tag>, String> {
+    TagRepo::new(&state.pool).for_paper(&paper_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_doi(
+    state: State<'_, Arc<AppState>>,
+    doi: String,
+) -> Result<Paper, String> {
+    let draft = fetch_doi(&state.http, &doi).await.map_err(|e| e.to_string())?;
+    let paper = draft.into_paper();
+    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
+#[tauri::command]
+pub async fn import_arxiv(
+    state: State<'_, Arc<AppState>>,
+    arxiv_id: String,
+) -> Result<Paper, String> {
+    let draft = fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())?;
+    let paper = draft.into_paper();
+    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
+#[tauri::command]
+pub async fn import_bibtex(
+    state: State<'_, Arc<AppState>>,
+    text: String,
+) -> Result<Vec<Paper>, String> {
+    let drafts = parse_bibtex(&text);
+    let repo = PaperRepo::new(&state.pool);
+    let mut papers = Vec::with_capacity(drafts.len());
+    for d in drafts {
+        let p = d.into_paper();
+        repo.insert(&p).await.map_err(|e| e.to_string())?;
+        papers.push(p);
+    }
+    Ok(papers)
+}
+
+#[derive(serde::Serialize)]
+pub struct PdfImportSummary {
+    pub imported: Vec<Paper>,
+    pub failed: Vec<PdfFailure>,
+}
+
+#[derive(serde::Serialize)]
+pub struct PdfFailure {
+    pub path: String,
+    pub error: String,
+}
+
+#[tauri::command]
+pub async fn import_pdf_files(
+    state: State<'_, Arc<AppState>>,
+    paths: Vec<String>,
+) -> Result<PdfImportSummary, String> {
+    let library = state.paths.clone();
+    let repo = PaperRepo::new(&state.pool);
+    let mut imported = Vec::new();
+    let mut failed = Vec::new();
+    for p in paths {
+        let path = PathBuf::from(&p);
+        let paper_id = Ulid::new().to_string();
+        let library_clone = library.clone();
+        let path_clone = path.clone();
+        let id_clone = paper_id.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            import_pdf_file(&path_clone, &id_clone, &library_clone)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        match result {
+            Ok(r) => {
+                let mut paper = r.draft.into_paper();
+                paper.id = paper_id;
+                paper.pdf_path = Some(r.stored_path.display().to_string());
+                if let Err(e) = repo.insert(&paper).await {
+                    failed.push(PdfFailure { path: p, error: e.to_string() });
+                } else {
+                    imported.push(paper);
+                }
+            }
+            Err(e) => failed.push(PdfFailure { path: p, error: e.to_string() }),
+        }
+    }
+    Ok(PdfImportSummary { imported, failed })
+}
+
+#[tauri::command]
+pub async fn search_papers(
+    state: State<'_, Arc<AppState>>,
+    query: String,
+    limit: Option<u32>,
+) -> Result<Vec<SearchResult>, String> {
+    search_semantic_scholar(&state.http, &query, limit.unwrap_or(15))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_from_search(
+    state: State<'_, Arc<AppState>>,
+    result: SearchResult,
+) -> Result<Paper, String> {
+    let paper = result.draft.into_paper();
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
+#[derive(serde::Serialize)]
+pub struct BulkAddSummary {
+    pub imported: Vec<Paper>,
+    pub skipped: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn add_many_from_search(
+    state: State<'_, Arc<AppState>>,
+    results: Vec<SearchResult>,
+) -> Result<BulkAddSummary, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let mut imported = Vec::new();
+    let mut skipped = Vec::new();
+    for r in results {
+        let paper = r.draft.into_paper();
+        match repo.insert(&paper).await {
+            Ok(()) => imported.push(paper),
+            Err(e) => skipped.push(format!("{}: {}", paper.title, e)),
+        }
+    }
+    Ok(BulkAddSummary { imported, skipped })
+}
+
+#[tauri::command]
+pub async fn topic_discover(
+    state: State<'_, Arc<AppState>>,
+    query: String,
+    recent_limit: Option<u32>,
+    classic_limit: Option<u32>,
+    recent_window_years: Option<u32>,
+) -> Result<TopicReport, String> {
+    let req = TopicRequest {
+        recent_limit: recent_limit.unwrap_or(20),
+        classic_limit: classic_limit.unwrap_or(20),
+        recent_window_years: recent_window_years.unwrap_or(3),
+    };
+    discover_topic(&state.http, &query, req)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn arxiv_list_category(
+    state: State<'_, Arc<AppState>>,
+    category: String,
+    max_results: Option<u32>,
+) -> Result<Vec<PaperDraft>, String> {
+    fetch_arxiv_category(&state.http, &category, max_results.unwrap_or(50))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn arxiv_add_draft(
+    state: State<'_, Arc<AppState>>,
+    draft: PaperDraft,
+) -> Result<Paper, String> {
+    let paper = draft.into_paper();
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
+// ─── LLM config ──────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn llm_get_config(state: State<'_, Arc<AppState>>) -> Result<LlmConfig, String> {
+    load_config(&state.paths).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn llm_save_config(state: State<'_, Arc<AppState>>, config: LlmConfig) -> Result<(), String> {
+    save_config(&state.paths, &config).map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct LlmTestResult {
+    pub ok: bool,
+    pub model: String,
+    pub reply: String,
+}
+
+#[tauri::command]
+pub async fn llm_test(
+    state: State<'_, Arc<AppState>>,
+    profile: LlmProfile,
+) -> Result<LlmTestResult, String> {
+    let resp = chat_complete(
+        &state.http,
+        &profile,
+        &[
+            ChatMessage { role: "system".into(), content: "Reply with the single word: pong".into() },
+            ChatMessage { role: "user".into(), content: "ping".into() },
+        ],
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(LlmTestResult { ok: !resp.content.trim().is_empty(), model: resp.model, reply: resp.content })
+}
+
+// ─── Paper summarization ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn paper_tldr(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<TldrResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper not found".to_string())?;
+    let result = summarize_paper_text(
+        &state.http,
+        &prof,
+        &paper.title,
+        &paper.authors,
+        paper.venue.as_deref(),
+        paper.year,
+        paper.abstract_text.as_deref(),
+        None,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    repo.update_tldr(&id, &result.tldr, &result.key_findings)
+        .await.map_err(|e| e.to_string())?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn paper_quick_read(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<QuickReadResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper not found".to_string())?;
+    let result = quick_read_paper_text(
+        &state.http,
+        &prof,
+        &paper.title,
+        &paper.authors,
+        paper.venue.as_deref(),
+        paper.year,
+        paper.abstract_text.as_deref(),
+        None,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    repo.update_quick_read(
+        &id, &result.problem, &result.method, &result.comparison, &result.limitations,
+    )
+    .await.map_err(|e| e.to_string())?;
+    Ok(result)
+}

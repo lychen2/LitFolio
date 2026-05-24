@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --litera-radius: 10px;
+  }
+  html, body, #root { height: 100%; }
+  body {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background: radial-gradient(1200px 800px at 12% -10%, #1b1623 0%, #0a0a0f 55%) fixed;
+  }
+  ::selection { background: rgba(167, 139, 250, 0.35); }
+}
+
+@layer components {
+  .litera-panel {
+    @apply bg-litera-panel/80 border border-litera-line rounded-[var(--litera-radius)] backdrop-blur;
+  }
+  .litera-btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
+           border border-litera-line bg-litera-paper hover:bg-litera-panel
+           transition-colors duration-150 text-litera-text;
+  }
+  .litera-btn-primary {
+    @apply litera-btn bg-litera-accent/90 hover:bg-litera-accent text-zinc-950 border-litera-accent;
+  }
+  .litera-input {
+    @apply bg-litera-paper border border-litera-line rounded-md px-2.5 py-1.5
+           text-sm text-litera-text placeholder:text-litera-mute
+           focus:outline-none focus:ring-2 focus:ring-litera-accent/40;
+  }
+}
