@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Compass, Loader2, Search, Sparkles, Quote, FlaskConical,
-  Calendar, Rocket, CheckCircle2,
+  Calendar, Rocket, CheckCircle2, Wand2,
 } from "lucide-react";
 import { api, type SearchHit, type TopicReport, type Paper } from "@/lib/api";
 
@@ -10,16 +10,26 @@ export function TopicPage() {
   const [query, setQuery] = useState("");
   const [window, setWindow] = useState(3);
   const [report, setReport] = useState<TopicReport | null>(null);
+  const [expandedTerms, setExpandedTerms] = useState<string[] | null>(null);
 
   const discover = useMutation({
     mutationFn: (q: string) =>
       api.topicDiscover({
         query: q,
+        terms: expandedTerms ?? undefined,
         recentLimit: 20,
         classicLimit: 20,
         recentWindowYears: window,
       }),
     onSuccess: (r) => setReport(r),
+  });
+
+  const expand = useMutation({
+    mutationFn: (raw: string) => api.searchExpandQuery(raw),
+    onSuccess: (r) => {
+      setExpandedTerms(r.terms);
+      setQuery(r.expanded);
+    },
   });
 
   const examples = [
@@ -50,11 +60,20 @@ export function TopicPage() {
           <div className="flex gap-2 mt-2">
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setExpandedTerms(null); }}
               onKeyDown={(e) => e.key === "Enter" && query.trim() && discover.mutate(query.trim())}
-              placeholder="例如:retrieval augmented generation"
+              placeholder="例如:retrieval augmented generation · 或粘贴中文,点 ✨ 让 LLM 改写"
               className="litera-input flex-1"
             />
+            <button
+              onClick={() => query.trim() && expand.mutate(query.trim())}
+              disabled={expand.isPending || !query.trim()}
+              className="litera-btn text-sm disabled:opacity-50"
+              title="让 LLM 把当前输入改写成精确的英文检索词(支持中文输入)"
+            >
+              {expand.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              ✨ 扩写
+            </button>
             <div className="flex items-center gap-1.5 text-sm text-litera-mute border border-litera-line rounded-md px-2.5 bg-litera-paper">
               <Calendar className="h-3.5 w-3.5" />
               <span>最近 =</span>
@@ -78,6 +97,20 @@ export function TopicPage() {
               发现
             </button>
           </div>
+          {expandedTerms && expandedTerms.length > 0 && (
+            <div className="mt-2 text-xs text-litera-mute flex items-start gap-1.5 flex-wrap">
+              <span className="text-litera-accent2/90">✨ 已扩写为:</span>
+              {expandedTerms.map((t) => (
+                <span key={t} className="px-1.5 py-0.5 rounded border border-litera-accent2/30 bg-litera-accent2/5 text-litera-accent2 font-mono text-[11px]">
+                  {t}
+                </span>
+              ))}
+              <span className="text-litera-mute italic">— 不满意可直接编辑上方输入框</span>
+            </div>
+          )}
+          {expand.error && (
+            <div className="mt-2 text-xs text-red-400/90">✕ 扩写失败:{(expand.error as Error).message}</div>
+          )}
           {!report && (
             <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
               <span className="text-litera-mute">试试:</span>

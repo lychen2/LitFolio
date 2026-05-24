@@ -220,12 +220,14 @@ export const api = {
     invoke<BulkAddSummary>("add_many_from_search", { results }),
   topicDiscover: (params: {
     query: string;
+    terms?: string[];
     recentLimit?: number;
     classicLimit?: number;
     recentWindowYears?: number;
   }) =>
     invoke<TopicReport>("topic_discover", {
       query: params.query,
+      terms: params.terms ?? null,
       recentLimit: params.recentLimit,
       classicLimit: params.classicLimit,
       recentWindowYears: params.recentWindowYears,

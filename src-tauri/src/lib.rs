@@ -101,6 +101,7 @@ pub fn run() {
             commands::note_get,
             commands::note_save,
             commands::llm_list_models,
+            commands::search_expand_query,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
