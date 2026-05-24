@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { readFile } from "@tauri-apps/plugin-fs";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { Loader2, Highlighter } from "lucide-react";
 import {
   PdfLoader, PdfHighlighter, Highlight as RphHighlight, Tip, Popup,
@@ -29,32 +29,14 @@ export function PdfPane({
   scrollRefCb?: (fn: (id: string) => void) => void;
 }) {
   const qc = useQueryClient();
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    let revokeUrl: string | null = null;
-    setPdfUrl(null);
-    setLoadErr(null);
-    (async () => {
-      try {
-        const data = await readFile(pdfPath);
-        if (cancelled) return;
-        const blob = new Blob([new Uint8Array(data)], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        revokeUrl = url;
-        setPdfUrl(url);
-      } catch (e) {
-        if (!cancelled) setLoadErr((e as Error).message);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (revokeUrl) URL.revokeObjectURL(revokeUrl);
-    };
-  }, [pdfPath]);
+  // Tauri's asset:// protocol gives the webview a fetchable URL for a local file
+  // without round-tripping bytes through IPC. Needs `app.security.assetProtocol.enable
+  // = true` (+ scope) in tauri.conf.json, which we do.
+  const pdfUrl = pdfPath ? convertFileSrc(pdfPath) : null;
+  useEffect(() => { setLoadErr(null); }, [pdfPath]);
 
   const highlightsQ = useQuery({
     queryKey: ["highlights", paperId],
