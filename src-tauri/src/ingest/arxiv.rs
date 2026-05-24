@@ -36,10 +36,12 @@ pub async fn fetch_arxiv(client: &reqwest::Client, arxiv_id: &str) -> Result<Pap
 
 /// List recent papers within a given arXiv category, newest first.
 /// `category` is the canonical id, e.g. `physics.optics`, `cs.LG`, `quant-ph`.
+/// `start` is the 0-based offset into the result set (for pagination).
 pub async fn fetch_arxiv_category(
     client: &reqwest::Client,
     category: &str,
     max_results: u32,
+    start: u32,
 ) -> Result<Vec<PaperDraft>> {
     let max = max_results.clamp(1, 200);
     let cat = category.trim();
@@ -47,7 +49,7 @@ pub async fn fetch_arxiv_category(
         return Err(anyhow!("category must not be empty"));
     }
     let url = format!(
-        "{ARXIV_BASE}?search_query=cat:{}&sortBy=submittedDate&sortOrder=descending&max_results={max}&start=0",
+        "{ARXIV_BASE}?search_query=cat:{}&sortBy=submittedDate&sortOrder=descending&max_results={max}&start={start}",
         urlencode(cat),
     );
     let resp = client.get(&url).send().await.with_context(|| format!("GET {url}"))?;

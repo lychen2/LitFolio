@@ -1,37 +1,63 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Atom, Loader2, RefreshCw, ExternalLink, Search, ChevronDown, ChevronRight,
-  Rocket, CheckCircle2,
+  Rocket, CheckCircle2, ChevronsDown,
 } from "lucide-react";
 import { api, type ArxivDraft, type Paper } from "@/lib/api";
 import { ARXIV_GROUPS, findCategoryLabel } from "@/lib/arxiv-categories";
 
 const DEFAULT_CATEGORY = "physics.optics";
-const DEFAULT_LIMIT = 50;
+const PAGE_SIZE = 50;
 
 export function BrowsePage() {
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
-  const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [filter, setFilter] = useState("");
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(["Physics"]));
 
-  const q = useQuery({
-    queryKey: ["arxiv-list", category, limit],
-    queryFn: () => api.arxivListCategory(category, limit),
+  // Cumulative list: each "加载更多" call appends PAGE_SIZE more entries via the
+  // arxiv `start` offset. arXiv's API caps a single request at 200 entries, so this
+  // is how we get past that ceiling.
+  const [drafts, setDrafts] = useState<ArxivDraft[]>([]);
+  const [exhausted, setExhausted] = useState(false);
+  const [firstLoadErr, setFirstLoadErr] = useState<string | null>(null);
+
+  const loadMore = useMutation({
+    mutationFn: () => api.arxivListCategory(category, PAGE_SIZE, drafts.length),
+    onSuccess: (next) => {
+      setDrafts((cur) => [...cur, ...next]);
+      if (next.length < PAGE_SIZE) setExhausted(true);
+      setFirstLoadErr(null);
+    },
+    onError: (e: Error) => { if (drafts.length === 0) setFirstLoadErr(e.message); },
   });
 
-  const filtered =
-    q.data && filter
-      ? q.data.filter((p) => {
-          const needle = filter.toLowerCase();
-          return (
-            p.title.toLowerCase().includes(needle) ||
-            p.authors.some((a) => a.toLowerCase().includes(needle)) ||
-            (p.abstract_text ?? "").toLowerCase().includes(needle)
-          );
-        })
-      : q.data ?? [];
+  // (Re)load from scratch whenever category changes.
+  useEffect(() => {
+    setDrafts([]);
+    setExhausted(false);
+    setFirstLoadErr(null);
+    loadMore.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
+  function refresh() {
+    setDrafts([]);
+    setExhausted(false);
+    setFirstLoadErr(null);
+    loadMore.mutate();
+  }
+
+  const filtered = filter
+    ? drafts.filter((p) => {
+        const needle = filter.toLowerCase();
+        return (
+          p.title.toLowerCase().includes(needle) ||
+          p.authors.some((a) => a.toLowerCase().includes(needle)) ||
+          (p.abstract_text ?? "").toLowerCase().includes(needle)
+        );
+      })
+    : drafts;
 
   function toggleGroup(label: string) {
     setOpenGroups((s) => {
@@ -40,6 +66,8 @@ export function BrowsePage() {
       return n;
     });
   }
+
+  const initialLoading = loadMore.isPending && drafts.length === 0;
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
@@ -113,44 +141,56 @@ export function BrowsePage() {
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="过滤结果…"
+                placeholder="过滤已加载…"
                 className="litera-input pl-7 w-48 text-xs"
               />
             </div>
-            <select
-              value={limit}
-              onChange={(e) => setLimit(parseInt(e.target.value))}
-              className="litera-input text-xs px-2 py-1.5 bg-litera-paper"
-            >
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="200">200</option>
-            </select>
-            <button onClick={() => q.refetch()} disabled={q.isFetching} className="litera-btn text-xs disabled:opacity-50">
-              {q.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            <span className="text-[11px] text-litera-mute font-mono">
+              已加载 {drafts.length}{exhausted ? " (完)" : ""}
+            </span>
+            <button onClick={refresh} disabled={loadMore.isPending} className="litera-btn text-xs disabled:opacity-50">
+              {loadMore.isPending && drafts.length === 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               刷新
             </button>
           </div>
         </header>
 
         <div className="flex-1 overflow-auto">
-          {q.isLoading ? (
+          {initialLoading ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
               <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 正在获取 {category}…</div>
             </div>
-          ) : q.error ? (
-            <div className="p-6 text-sm text-red-400/90">✕ {(q.error as Error).message}</div>
+          ) : firstLoadErr ? (
+            <div className="p-6 text-sm text-red-400/90">✕ {firstLoadErr}</div>
           ) : filtered.length === 0 ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
-              没有结果。换一个分类或放宽过滤条件。
+              {filter ? "过滤后无匹配,清空过滤或加载更多。" : "没有结果。换一个分类。"}
             </div>
           ) : (
-            <ul className="divide-y divide-litera-line">
-              {filtered.map((d, i) => (
-                <DraftRow key={(d.arxiv_id ?? "") + i} draft={d} rank={i + 1} />
-              ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-litera-line">
+                {filtered.map((d, i) => (
+                  <DraftRow key={(d.arxiv_id ?? "") + i} draft={d} rank={i + 1} />
+                ))}
+              </ul>
+              <div className="p-4 flex items-center justify-center gap-3">
+                {exhausted ? (
+                  <span className="text-xs text-litera-mute italic">已加载全部 {drafts.length} 条</span>
+                ) : (
+                  <button
+                    onClick={() => loadMore.mutate()}
+                    disabled={loadMore.isPending}
+                    className="litera-btn text-xs disabled:opacity-50"
+                  >
+                    {loadMore.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronsDown className="h-3.5 w-3.5" />}
+                    {loadMore.isPending ? "加载中…" : `加载更多 ${PAGE_SIZE} 条`}
+                  </button>
+                )}
+                {loadMore.error && drafts.length > 0 && (
+                  <span className="text-xs text-red-400/90">✕ {(loadMore.error as Error).message}</span>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
