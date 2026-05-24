@@ -83,6 +83,7 @@ pub fn run() {
             commands::batch_attach_tag,
             commands::batch_set_status,
             commands::batch_delete,
+            commands::batch_tldr,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

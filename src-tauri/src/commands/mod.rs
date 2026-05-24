@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
 
 use crate::ai::{
@@ -537,4 +537,99 @@ pub async fn batch_delete(
         if repo.delete(&id).await.is_ok() { ok += 1; }
     }
     Ok(ok)
+}
+
+// ─── Batch commands (AI, with progress events) ──────────────────────────
+
+async fn run_ai_batch<F, Fut>(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    kind: &'static str,
+    ids: Vec<String>,
+    mut op: F,
+) -> Result<BatchSummary, String>
+where
+    F: FnMut(Paper) -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<()>>,
+{
+    let token = install_cancel_token(&state)?;
+    let total = ids.len();
+    let mut ok = 0usize;
+    let mut errors = Vec::<BatchError>::new();
+    let repo = PaperRepo::new(&state.pool);
+
+    for id in ids {
+        if token.is_cancelled() { break; }
+        let paper = match repo.get(&id).await.map_err(|e| e.to_string())? {
+            Some(p) => p,
+            None => {
+                errors.push(BatchError {
+                    paper_id: id,
+                    title: "(missing)".into(),
+                    message: "paper not found".into(),
+                });
+                continue;
+            }
+        };
+        let _ = app.emit("batch-progress", serde_json::json!({
+            "kind": kind, "done": ok + errors.len(), "total": total,
+            "current_id": paper.id, "current_title": paper.title, "phase": "start",
+        }));
+        match op(paper.clone()).await {
+            Ok(()) => {
+                ok += 1;
+                let _ = app.emit("batch-progress", serde_json::json!({
+                    "kind": kind, "done": ok + errors.len(), "total": total,
+                    "current_id": paper.id, "current_title": paper.title, "phase": "ok",
+                }));
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                errors.push(BatchError {
+                    paper_id: paper.id.clone(),
+                    title: paper.title.clone(),
+                    message: msg.clone(),
+                });
+                let _ = app.emit("batch-progress", serde_json::json!({
+                    "kind": kind, "done": ok + errors.len(), "total": total,
+                    "current_id": paper.id, "current_title": paper.title,
+                    "phase": "fail", "error": msg,
+                }));
+            }
+        }
+    }
+    let cancelled = token.is_cancelled();
+    clear_cancel_token(&state);
+    let summary = BatchSummary {
+        kind: kind.to_string(),
+        total, ok, failed: errors.len(), cancelled, errors,
+    };
+    let _ = app.emit("batch-done", &summary);
+    Ok(summary)
+}
+
+#[tauri::command]
+pub async fn batch_tldr(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    ids: Vec<String>,
+) -> Result<BatchSummary, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?.clone();
+    let http = state.http.clone();
+    let pool = state.pool.clone();
+    run_ai_batch(app, state, "tldr", ids, move |paper| {
+        let http = http.clone();
+        let prof = prof.clone();
+        let pool = pool.clone();
+        async move {
+            let r = summarize_paper_text(
+                &http, &prof, &paper.title, &paper.authors, paper.venue.as_deref(),
+                paper.year, paper.abstract_text.as_deref(), None,
+            ).await?;
+            PaperRepo::new(&pool)
+                .update_tldr(&paper.id, &r.tldr, &r.key_findings).await?;
+            Ok(())
+        }
+    }).await
 }
