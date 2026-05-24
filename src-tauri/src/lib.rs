@@ -78,6 +78,7 @@ pub fn run() {
             commands::prepare_doi_draft,
             commands::prepare_arxiv_draft,
             commands::paper_save_with_pdf,
+            commands::paper_attach_pdf,
             commands::llm_get_config,
             commands::llm_save_config,
             commands::llm_test,
