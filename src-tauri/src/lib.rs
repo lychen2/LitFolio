@@ -74,6 +74,7 @@ pub fn run() {
             commands::topic_discover,
             commands::arxiv_list_category,
             commands::arxiv_add_draft,
+            commands::arxiv_add_with_pdf,
             commands::llm_get_config,
             commands::llm_save_config,
             commands::llm_test,
