@@ -165,6 +165,26 @@ impl<'a> PaperRepo<'a> {
         Ok(())
     }
 
+    pub async fn update_pdf_path(&self, id: &str, pdf_path: &str) -> Result<()> {
+        if pdf_path.is_empty() {
+            return Err(anyhow::anyhow!("pdf_path must not be empty"));
+        }
+        let now = Utc::now().timestamp();
+        let res = sqlx::query(
+            "UPDATE papers SET pdf_path = ?1, updated_at = ?2 WHERE id = ?3",
+        )
+        .bind(pdf_path)
+        .bind(now)
+        .bind(id)
+        .execute(self.pool)
+        .await
+        .context("update pdf_path")?;
+        if res.rows_affected() == 0 {
+            return Err(anyhow::anyhow!("paper {id} not found"));
+        }
+        Ok(())
+    }
+
     pub async fn delete(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM papers WHERE id = ?1")
             .bind(id)
@@ -345,6 +365,20 @@ mod tests {
         assert_eq!(p.abstract_translated.as_deref(), Some("摘要内容"));
         assert_eq!(p.translate_target_lang.as_deref(), Some("Chinese"));
         assert!(p.translated_at.is_some());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn update_pdf_path_swaps_path_and_rejects_empty_or_missing() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        repo.insert(&sample("P")).await.unwrap();
+        repo.update_pdf_path("P", "/tmp/new-location.pdf").await.unwrap();
+        let p = repo.get("P").await.unwrap().unwrap();
+        assert_eq!(p.pdf_path.as_deref(), Some("/tmp/new-location.pdf"));
+
+        assert!(repo.update_pdf_path("P", "").await.is_err());
+        assert!(repo.update_pdf_path("does-not-exist", "/tmp/x.pdf").await.is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 }

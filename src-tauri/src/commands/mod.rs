@@ -88,7 +88,15 @@ pub async fn paper_delete(
     state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<(), String> {
-    PaperRepo::new(&state.pool).delete(&id).await.map_err(|e| e.to_string())
+    PaperRepo::new(&state.pool).delete(&id).await.map_err(|e| e.to_string())?;
+    // Best-effort: also remove the paper's directory (PDF + extracted text + any future
+    // sidecar files). Failure here must not roll the DB row back — the row is already gone
+    // and a leftover folder is recoverable; surfacing the error would only confuse users.
+    let dir = state.paths.paper_dir(&id);
+    if dir.exists() {
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    Ok(())
 }
 
 // ─── Tags ────────────────────────────────────────────────────────────────
@@ -412,6 +420,29 @@ pub async fn paper_save_with_pdf(
     paper.pdf_path = Some(dest.display().to_string());
     PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
     Ok(paper)
+}
+
+#[tauri::command]
+pub async fn paper_attach_pdf(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    source_pdf_path: String,
+) -> Result<Paper, String> {
+    let repo = PaperRepo::new(&state.pool);
+    if repo.get(&id).await.map_err(|e| e.to_string())?.is_none() {
+        return Err(format!("paper {id} not found"));
+    }
+    let dest = state.paths.paper_dir(&id).join("original.pdf");
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create paper dir: {e}"))?;
+    }
+    std::fs::copy(&source_pdf_path, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    let dest_str = dest.display().to_string();
+    repo.update_pdf_path(&id, &dest_str).await.map_err(|e| e.to_string())?;
+    repo.get(&id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper vanished after update".to_string())
 }
 
 // ─── LLM config ──────────────────────────────────────────────────────────
