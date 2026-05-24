@@ -39,5 +39,10 @@
     "category": "Productivity",
     "shortDescription": "Local-first literature manager with LLM summaries",
     "longDescription": "Litera is a desktop literature management library with LLM-powered TL;DR, structured extraction, smart tagging, RAG Q&A and Markdown notes."
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
   }
 }

@@ -88,11 +88,22 @@ pub fn save_config(paths: &LibraryPaths, cfg: &LlmConfig) -> Result<()> {
 }
 
 pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
-    let active = cfg.active.as_deref()
-        .or_else(|| cfg.profiles.first().map(|p| p.name.as_str()))
-        .ok_or_else(|| anyhow!("no LLM profile configured; add one in Settings"))?;
-    cfg.profiles.iter().find(|p| p.name == active)
-        .ok_or_else(|| anyhow!("active profile `{active}` not found in config"))
+    if cfg.profiles.is_empty() {
+        return Err(anyhow!("no LLM profile configured; add one in Settings"));
+    }
+    if let Some(name) = cfg.active.as_deref() {
+        if let Some(p) = cfg.profiles.iter().find(|p| p.name == name) {
+            return Ok(p);
+        }
+        // active points to a profile that no longer exists (e.g. renamed/deleted in Settings
+        // without updating `active`). Fall back to the first profile rather than dead-ending —
+        // a working translate beats a confusing error.
+        tracing::warn!(
+            "LLM config: active=`{name}` not found in {n} profile(s); falling back to first",
+            n = cfg.profiles.len()
+        );
+    }
+    Ok(&cfg.profiles[0])
 }
 
 pub fn active_profile_for_task<'a>(cfg: &'a LlmConfig, task: TaskKind) -> Result<&'a LlmProfile> {
@@ -192,5 +203,23 @@ mod tests {
         cfg.upsert(sample_profile("a"));
         cfg.task_assignments.translate = Some("nonexistent".into());
         assert!(active_profile_for_task(&cfg, TaskKind::Translate).is_err());
+    }
+
+    #[test]
+    fn active_profile_falls_back_when_active_name_missing() {
+        // Stale state: active points to a profile that was renamed or removed in Settings
+        // without `active` being updated. Should not dead-end — use the first profile.
+        let mut cfg = LlmConfig::default();
+        cfg.upsert(sample_profile("deepseek-flash"));
+        cfg.active = Some("deepseek-chat".into()); // typo / stale
+        let p = active_profile(&cfg).expect("should fall back to first profile");
+        assert_eq!(p.name, "deepseek-flash");
+    }
+
+    #[test]
+    fn active_profile_errors_when_no_profiles_at_all() {
+        let cfg = LlmConfig::default();
+        let err = active_profile(&cfg).expect_err("empty config should error");
+        assert!(err.to_string().contains("no LLM profile"));
     }
 }
