@@ -339,6 +339,44 @@ pub async fn arxiv_add_draft(
     Ok(paper)
 }
 
+async fn download_pdf(http: &reqwest::Client, url: &str, dest: &std::path::Path) -> anyhow::Result<u64> {
+    use std::io::Write;
+    let resp = http.get(url).send().await?;
+    if !resp.status().is_success() {
+        anyhow::bail!("PDF download returned {}", resp.status());
+    }
+    let bytes = resp.bytes().await?;
+    if bytes.len() < 1024 {
+        anyhow::bail!("PDF response too small ({} bytes), likely not a valid PDF", bytes.len());
+    }
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut f = std::fs::File::create(dest)?;
+    f.write_all(&bytes)?;
+    Ok(bytes.len() as u64)
+}
+
+#[tauri::command]
+pub async fn arxiv_add_with_pdf(
+    state: State<'_, Arc<AppState>>,
+    arxiv_id: String,
+) -> Result<Paper, String> {
+    let draft = fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())?;
+    let resolved_id = draft.arxiv_id.clone().unwrap_or(arxiv_id.clone());
+    let stripped = resolved_id.split('v').next().unwrap_or(&resolved_id).to_string();
+    let pdf_url = format!("https://arxiv.org/pdf/{stripped}.pdf");
+    let paper_id = Ulid::new().to_string();
+    let pdf_path = state.paths.paper_dir(&paper_id).join("original.pdf");
+    download_pdf(&state.http, &pdf_url, &pdf_path).await
+        .map_err(|e| format!("failed to download arXiv PDF: {e}"))?;
+    let mut paper = draft.into_paper();
+    paper.id = paper_id;
+    paper.pdf_path = Some(pdf_path.display().to_string());
+    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    Ok(paper)
+}
+
 // ─── LLM config ──────────────────────────────────────────────────────────
 
 #[tauri::command]

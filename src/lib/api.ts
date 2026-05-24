@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { open as openInSystem } from "@tauri-apps/plugin-shell";
 
 export interface Paper {
   id: string;
@@ -208,6 +209,8 @@ export const api = {
     invoke<ArxivDraft[]>("arxiv_list_category", { category, maxResults }),
   arxivAddDraft: (draft: ArxivDraft) =>
     invoke<Paper>("arxiv_add_draft", { draft }),
+  arxivAddWithPdf: (arxivId: string) =>
+    invoke<Paper>("arxiv_add_with_pdf", { arxivId }),
   llmGetConfig: () => invoke<LlmConfig>("llm_get_config"),
   llmSaveConfig: (config: LlmConfig) =>
     invoke<void>("llm_save_config", { config }),
@@ -238,4 +241,8 @@ export async function pickPdfFiles(): Promise<string[] | null> {
   });
   if (!selection) return null;
   return Array.isArray(selection) ? selection : [selection];
+}
+
+export async function openPdfInSystem(path: string): Promise<void> {
+  await openInSystem(path);
 }
