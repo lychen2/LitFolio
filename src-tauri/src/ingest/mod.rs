@@ -16,4 +16,4 @@ pub use bibtex::parse_bibtex;
 pub use paper_draft::PaperDraft;
 pub use pdf::{import_pdf_file, PdfImportResult};
 pub use search::{bulk_by_citations, search_semantic_scholar, SearchResult};
-pub use topic::{discover_topic, TopicReport, TopicRequest};
+pub use topic::{discover_topic, discover_topic_multi, TopicReport, TopicRequest};

@@ -7,6 +7,7 @@ mod client;
 mod summarize;
 mod translate;
 mod models;
+mod query_expand;
 
 pub use profile::{LlmProfile, LlmConfig, TaskAssignments, TaskKind,
                   load_config, save_config, active_profile, active_profile_for_task};
@@ -14,3 +15,4 @@ pub use client::{ChatMessage, ChatResponse, chat_complete};
 pub use summarize::{summarize_paper_text, quick_read_paper_text, TldrResult, QuickReadResult};
 pub use translate::{translate_paper_text, TranslationResult};
 pub use models::list_models;
+pub use query_expand::{expand_search_query, ExpandedQuery};

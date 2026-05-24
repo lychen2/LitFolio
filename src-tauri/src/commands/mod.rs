@@ -11,7 +11,7 @@ use crate::ai::{
     TaskKind, TldrResult,
 };
 use crate::ingest::{
-    discover_topic, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
+    discover_topic, discover_topic_multi, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
     search_semantic_scholar, PaperDraft, SearchResult, TopicReport, TopicRequest,
 };
 use crate::storage::{notes, Highlight, HighlightRepo, Paper, PaperRepo, ReadStatus, Tag, TagRepo, TagWithCount};
@@ -309,6 +309,7 @@ pub async fn add_many_from_search(
 pub async fn topic_discover(
     state: State<'_, Arc<AppState>>,
     query: String,
+    terms: Option<Vec<String>>,
     recent_limit: Option<u32>,
     classic_limit: Option<u32>,
     recent_window_years: Option<u32>,
@@ -318,9 +319,15 @@ pub async fn topic_discover(
         classic_limit: classic_limit.unwrap_or(20),
         recent_window_years: recent_window_years.unwrap_or(3),
     };
-    discover_topic(&state.http, &query, req)
-        .await
-        .map_err(|e| e.to_string())
+    if let Some(ts) = terms.as_ref().filter(|v| !v.is_empty()) {
+        discover_topic_multi(&state.http, ts, req)
+            .await
+            .map_err(|e| e.to_string())
+    } else {
+        discover_topic(&state.http, &query, req)
+            .await
+            .map_err(|e| e.to_string())
+    }
 }
 
 #[tauri::command]
