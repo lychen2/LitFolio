@@ -93,6 +93,13 @@ pub fn run() {
             commands::batch_quick_read,
             commands::batch_translate,
             commands::batch_cancel,
+            commands::highlight_create,
+            commands::highlight_list,
+            commands::highlight_update_note,
+            commands::highlight_delete,
+            commands::note_get,
+            commands::note_save,
+            commands::llm_list_models,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

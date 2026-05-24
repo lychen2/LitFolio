@@ -1,7 +1,10 @@
-//! OpenAI-compatible chat completion (non-streaming v1).
+//! OpenAI-compatible chat completion.
 //!
-//! Works with: OpenAI, Azure OpenAI (with proper base_url), Anthropic via gateway,
-//! DeepSeek, Together, Moonshot/Kimi, SiliconFlow, Ollama (`http://localhost:11434/v1`).
+//! Handles both shapes the wire actually returns:
+//!  1. Plain JSON (standard OpenAI / DeepSeek / Moonshot / Ollama when `stream: false`)
+//!  2. SSE (`data: {...}\n\ndata: [DONE]`) — some Chinese gateway proxies (new-api etc.)
+//!     ignore the `stream:false` flag and stream anyway. We must accumulate the deltas
+//!     ourselves or the response looks empty (0 output tokens).
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -23,7 +26,7 @@ struct ChatRequest<'a> {
     stream: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct ChatRawResponse {
     #[serde(default)]
     choices: Vec<Choice>,
@@ -31,15 +34,25 @@ struct ChatRawResponse {
     usage: Option<Usage>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct Choice {
     #[serde(default)]
     message: Option<ChatMessage>,
     #[serde(default)]
+    delta: Option<Delta>,
+    #[serde(default)]
     finish_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
+struct Delta {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    role: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default, Clone, Copy)]
 struct Usage {
     #[serde(default)]
     prompt_tokens: u32,
@@ -69,7 +82,13 @@ pub async fn chat_complete(
         messages,
         temperature: profile.temperature,
         max_tokens: profile.max_tokens,
-        stream: false,
+        // Always stream. Standard providers (OpenAI / DeepSeek / Moonshot / SiliconFlow / Ollama)
+        // all support stream:true and return SSE we know how to parse. Several Chinese gateway
+        // proxies (new-api/one-api) silently return an empty metadata-only frame when stream:false
+        // — gpt-5.4 via the songsongcard proxy was reproducible — so non-streaming is unreliable
+        // in practice. The parser handles a single-JSON response too if a provider ignores the flag
+        // and replies non-streaming anyway.
+        stream: true,
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {
@@ -81,25 +100,98 @@ pub async fn chat_complete(
     if !status.is_success() {
         return Err(anyhow!("LLM endpoint returned {status}: {}", truncate(&text, 800)));
     }
-    let parsed: ChatRawResponse = serde_json::from_str(&text)
-        .with_context(|| format!("decode chat response: {}", truncate(&text, 300)))?;
-    let choice = parsed.choices.into_iter().next()
-        .ok_or_else(|| anyhow!("LLM returned no choices"))?;
-    let msg = choice.message.ok_or_else(|| anyhow!("LLM choice missing message"))?;
-    let usage = parsed.usage.unwrap_or(Usage::default());
+    let parsed = parse_response(&text)
+        .with_context(|| format!("decode chat response: {}", truncate(&text, 500)))?;
     Ok(ChatResponse {
-        content: msg.content,
-        finish_reason: choice.finish_reason,
-        prompt_tokens: usage.prompt_tokens,
-        completion_tokens: usage.completion_tokens,
+        content: parsed.content,
+        finish_reason: parsed.finish_reason,
+        prompt_tokens: parsed.usage.prompt_tokens,
+        completion_tokens: parsed.usage.completion_tokens,
         model: profile.chat_model.clone(),
     })
 }
 
-impl Default for Usage {
-    fn default() -> Self {
-        Self { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+#[derive(Debug)]
+struct ParsedReply {
+    content: String,
+    finish_reason: Option<String>,
+    usage: Usage,
+}
+
+/// Parse either a plain chat-completion JSON or an SSE stream body.
+/// SSE detection: any line starts with `data:` — at that point we accumulate
+/// delta.content (or message.content) across all chunks until `[DONE]`.
+fn parse_response(text: &str) -> Result<ParsedReply> {
+    let trimmed = text.trim_start();
+    if trimmed.starts_with("data:") || trimmed.contains("\ndata:") {
+        return parse_sse(text);
     }
+    parse_plain(text)
+}
+
+fn parse_plain(text: &str) -> Result<ParsedReply> {
+    let parsed: ChatRawResponse = serde_json::from_str(text)
+        .with_context(|| "decode chat response as JSON")?;
+    let usage = parsed.usage.unwrap_or_default();
+    let choice = parsed.choices.into_iter().next()
+        .ok_or_else(|| anyhow!("LLM returned no choices"))?;
+    let content = choice.message
+        .and_then(|m| Some(m.content))
+        .or_else(|| choice.delta.as_ref().and_then(|d| d.content.clone()))
+        .ok_or_else(|| anyhow!("LLM choice missing content"))?;
+    Ok(ParsedReply { content, finish_reason: choice.finish_reason, usage })
+}
+
+fn parse_sse(text: &str) -> Result<ParsedReply> {
+    let mut content = String::new();
+    let mut finish_reason: Option<String> = None;
+    let mut usage = Usage::default();
+    let mut any_data = false;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if !line.starts_with("data:") {
+            continue;
+        }
+        any_data = true;
+        let payload = line[5..].trim();
+        if payload == "[DONE]" {
+            break;
+        }
+        if payload.is_empty() {
+            continue;
+        }
+        let chunk: ChatRawResponse = match serde_json::from_str(payload) {
+            Ok(c) => c,
+            Err(_) => continue, // skip frames we can't parse (proxy-injected metadata, comments)
+        };
+        if let Some(u) = chunk.usage {
+            usage = u;
+        }
+        for ch in chunk.choices {
+            if let Some(reason) = ch.finish_reason {
+                finish_reason = Some(reason);
+            }
+            // Streaming providers put text in delta.content; some send a fully-formed
+            // message in the first frame instead — handle both.
+            if let Some(d) = ch.delta {
+                if let Some(c) = d.content {
+                    content.push_str(&c);
+                }
+            }
+            if let Some(m) = ch.message {
+                content.push_str(&m.content);
+            }
+        }
+    }
+    if !any_data {
+        return Err(anyhow!("SSE body had no data: frames"));
+    }
+    if content.is_empty() && usage.completion_tokens == 0 && finish_reason.is_none() {
+        return Err(anyhow!(
+            "LLM stream returned no content (proxy may have rejected the request silently — check the model name and your account's allowed pool)"
+        ));
+    }
+    Ok(ParsedReply { content, finish_reason, usage })
 }
 
 fn endpoint(base_url: &str, path: &str) -> String {
@@ -130,5 +222,44 @@ mod tests {
     fn truncate_works() {
         assert_eq!(truncate("abc", 10), "abc");
         assert_eq!(truncate("abcdefghij", 5), "abcde…");
+    }
+
+    #[test]
+    fn parse_plain_json_response() {
+        let body = r#"{"id":"x","choices":[{"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}"#;
+        let r = parse_response(body).unwrap();
+        assert_eq!(r.content, "hello");
+        assert_eq!(r.finish_reason.as_deref(), Some("stop"));
+        assert_eq!(r.usage.completion_tokens, 1);
+    }
+
+    #[test]
+    fn parse_sse_concatenates_deltas() {
+        // shape new-api / OpenAI streams actually return
+        let body = "\
+data: {\"id\":\"r1\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"}}]}\n\
+\n\
+data: {\"id\":\"r1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hel\"}}]}\n\
+\n\
+data: {\"id\":\"r1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo\"},\"finish_reason\":\"stop\"}]}\n\
+\n\
+data: {\"id\":\"r1\",\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":2,\"total_tokens\":14}}\n\
+\n\
+data: [DONE]\n";
+        let r = parse_response(body).unwrap();
+        assert_eq!(r.content, "hello");
+        assert_eq!(r.finish_reason.as_deref(), Some("stop"));
+        assert_eq!(r.usage.prompt_tokens, 12);
+        assert_eq!(r.usage.completion_tokens, 2);
+    }
+
+    #[test]
+    fn parse_sse_with_only_empty_metadata_frames_errors() {
+        // The bug we shipped: proxy returns a metadata-only frame with empty choices
+        // and 0 tokens. We must surface this as an error, not silent success.
+        let body = "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":0,\"total_tokens\":15}}\n\ndata: [DONE]\n";
+        let err = parse_response(body).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("no content") || msg.contains("rejected"), "msg was: {msg}");
     }
 }
