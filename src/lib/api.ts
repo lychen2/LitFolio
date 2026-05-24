@@ -215,6 +215,8 @@ export const api = {
   prepareArxivDraft: (arxivId: string) => invoke<ArxivDraft>("prepare_arxiv_draft", { arxivId }),
   paperSaveWithPdf: (draft: ArxivDraft, sourcePdfPath: string) =>
     invoke<Paper>("paper_save_with_pdf", { draft, sourcePdfPath }),
+  paperAttachPdf: (id: string, sourcePdfPath: string) =>
+    invoke<Paper>("paper_attach_pdf", { id, sourcePdfPath }),
   llmGetConfig: () => invoke<LlmConfig>("llm_get_config"),
   llmSaveConfig: (config: LlmConfig) =>
     invoke<void>("llm_save_config", { config }),
