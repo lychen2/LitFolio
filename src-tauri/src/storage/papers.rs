@@ -19,6 +19,9 @@ impl<'a> PaperRepo<'a> {
     pub async fn insert(&self, p: &Paper) -> Result<()> {
         let authors_json = serde_json::to_string(&p.authors)?;
         let findings_json = serde_json::to_string(&p.key_findings)?;
+        if p.pdf_path.as_deref().map(str::is_empty).unwrap_or(true) {
+            return Err(anyhow::anyhow!("a paper must have a PDF file (pdf_path is required)"));
+        }
         sqlx::query(
             "INSERT INTO papers (id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                                   pdf_path, note_path, added_at, updated_at, read_status, tldr,
@@ -254,7 +257,7 @@ mod tests {
             doi: Some(format!("10.1234/{id}")),
             arxiv_id: Some(format!("1706.{id}")),
             abstract_text: Some("seq2seq with attention".into()),
-            pdf_path: None,
+            pdf_path: Some(format!("/tmp/test-{id}.pdf")),
             note_path: None,
             added_at: now,
             updated_at: now,

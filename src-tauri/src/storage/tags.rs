@@ -139,7 +139,7 @@ mod tests {
             title: "T".into(),
             authors: vec![],
             year: None, venue: None, doi: None, arxiv_id: None,
-            abstract_text: None, pdf_path: None, note_path: None,
+            abstract_text: None, pdf_path: Some("/tmp/test.pdf".into()), note_path: None,
             added_at: now, updated_at: now,
             read_status: ReadStatus::Unread,
             tldr: None, research_question: None, method: None, dataset: None,
