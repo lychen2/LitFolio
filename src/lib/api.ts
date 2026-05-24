@@ -152,6 +152,15 @@ export interface TagWithCount extends Tag {
 
 export type ReadStatus = "unread" | "reading" | "read" | "must";
 
+export interface ExpandedQuery {
+  original: string;
+  expanded: string;
+  terms: string[];
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
 export interface ArxivDraft {
   title: string;
   authors: string[];
@@ -221,8 +230,8 @@ export const api = {
       classicLimit: params.classicLimit,
       recentWindowYears: params.recentWindowYears,
     }),
-  arxivListCategory: (category: string, maxResults?: number) =>
-    invoke<ArxivDraft[]>("arxiv_list_category", { category, maxResults }),
+  arxivListCategory: (category: string, maxResults?: number, start?: number) =>
+    invoke<ArxivDraft[]>("arxiv_list_category", { category, maxResults, start }),
   arxivAddDraft: (draft: ArxivDraft) =>
     invoke<Paper>("arxiv_add_draft", { draft }),
   arxivAddWithPdf: (arxivId: string) =>
@@ -268,6 +277,8 @@ export const api = {
     invoke<void>("note_save", { paperId, content }),
   llmListModels: (profile: LlmProfile) =>
     invoke<string[]>("llm_list_models", { profile }),
+  searchExpandQuery: (raw: string) =>
+    invoke<ExpandedQuery>("search_expand_query", { raw }),
 };
 
 export async function pickPdfFiles(): Promise<string[] | null> {

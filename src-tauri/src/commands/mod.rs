@@ -6,8 +6,8 @@ use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
 
 use crate::ai::{
-    active_profile, active_profile_for_task, chat_complete, list_models, load_config, quick_read_paper_text,
-    save_config, summarize_paper_text, ChatMessage, LlmConfig, LlmProfile, QuickReadResult,
+    active_profile, active_profile_for_task, chat_complete, expand_search_query, list_models, load_config, quick_read_paper_text,
+    save_config, summarize_paper_text, ChatMessage, ExpandedQuery, LlmConfig, LlmProfile, QuickReadResult,
     TaskKind, TldrResult,
 };
 use crate::ingest::{
@@ -328,8 +328,9 @@ pub async fn arxiv_list_category(
     state: State<'_, Arc<AppState>>,
     category: String,
     max_results: Option<u32>,
+    start: Option<u32>,
 ) -> Result<Vec<PaperDraft>, String> {
-    fetch_arxiv_category(&state.http, &category, max_results.unwrap_or(50))
+    fetch_arxiv_category(&state.http, &category, max_results.unwrap_or(50), start.unwrap_or(0))
         .await
         .map_err(|e| e.to_string())
 }
@@ -938,4 +939,14 @@ pub async fn llm_list_models(
     profile: LlmProfile,
 ) -> Result<Vec<String>, String> {
     list_models(&state.http, &profile).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_expand_query(
+    state: State<'_, Arc<AppState>>,
+    raw: String,
+) -> Result<ExpandedQuery, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    expand_search_query(&state.http, &prof, &raw).await.map_err(|e| e.to_string())
 }
