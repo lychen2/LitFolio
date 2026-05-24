@@ -433,3 +433,24 @@ pub async fn paper_quick_read(
     .await.map_err(|e| e.to_string())?;
     Ok(result)
 }
+
+#[tauri::command]
+pub async fn paper_translate(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    target_lang: Option<String>,
+) -> Result<crate::ai::TranslationResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?.clone();
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper not found".to_string())?;
+    let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
+    let result = crate::ai::translate_paper_text(
+        &state.http, &prof, &paper.title, paper.abstract_text.as_deref(), &lang,
+    )
+    .await.map_err(|e| e.to_string())?;
+    repo.update_translation(&id, &result.title, &result.abstract_text, &result.target_lang)
+        .await.map_err(|e| e.to_string())?;
+    Ok(result)
+}

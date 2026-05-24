@@ -77,6 +77,7 @@ pub fn run() {
             commands::llm_test,
             commands::paper_tldr,
             commands::paper_quick_read,
+            commands::paper_translate,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
