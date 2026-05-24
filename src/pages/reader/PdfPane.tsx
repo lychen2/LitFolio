@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Highlighter } from "lucide-react";
+import { Loader2, Highlighter, Moon, Sun } from "lucide-react";
 import {
   PdfLoader, PdfHighlighter, Highlight as RphHighlight, Tip, Popup,
 } from "react-pdf-highlighter";
@@ -30,7 +30,15 @@ export function PdfPane({
   const qc = useQueryClient();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [dark, setDark] = useState<boolean>(() => {
+    try { return localStorage.getItem("litera.pdf.dark") === "1"; }
+    catch { return false; }
+  });
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("litera.pdf.dark", dark ? "1" : "0"); } catch { /* noop */ }
+  }, [dark]);
 
   // Read PDF bytes via Tauri IPC and turn into a Blob URL. We previously tried
   // Tauri's asset:// protocol (convertFileSrc), but on this host PdfLoader's
@@ -96,7 +104,15 @@ export function PdfPane({
   }
 
   return (
-    <div className="h-full w-full bg-litera-ink relative">
+    <div className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}>
+      <button
+        onClick={() => setDark((d) => !d)}
+        className="absolute top-2 right-2 z-20 litera-btn text-xs"
+        title={dark ? "切到亮色 PDF" : "切到深色 PDF (反色)"}
+      >
+        {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+        {dark ? "亮色" : "深色"}
+      </button>
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}

@@ -36,6 +36,19 @@
     margin: 8px auto;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   }
+
+  /* Dark-mode PDF: invert the canvas (white→black, black→white) and rotate the hue
+     so any embedded color photos / figures keep roughly the right tone instead of
+     becoming the photographic negative. The text layer is transparent so it doesn't
+     need inversion. Toggle the parent class .litera-pdf-dark on/off to control.
+     Use a descendant selector — PDF.js wraps the canvas in .canvasWrapper, so a
+     direct-child selector misses it. */
+  .litera-pdf-dark .pdfViewer .page {
+    background: #15131d;
+  }
+  .litera-pdf-dark .pdfViewer .page canvas {
+    filter: invert(0.92) hue-rotate(180deg);
+  }
 }
 
 @layer components {
