@@ -7,9 +7,12 @@ mod paths;
 mod papers;
 mod models;
 mod tags;
+mod highlights;
+pub mod notes;
 
 pub use db::{open_pool, run_migrations, Pool};
 pub use paths::{LibraryPaths, default_library_root};
 pub use models::{Paper, ReadStatus, Tag, Folder, Highlight};
 pub use papers::PaperRepo;
 pub use tags::{TagRepo, TagWithCount};
+pub use highlights::HighlightRepo;

@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
 
 use crate::ai::{
-    active_profile, active_profile_for_task, chat_complete, load_config, quick_read_paper_text,
+    active_profile, active_profile_for_task, chat_complete, list_models, load_config, quick_read_paper_text,
     save_config, summarize_paper_text, ChatMessage, LlmConfig, LlmProfile, QuickReadResult,
     TaskKind, TldrResult,
 };
@@ -14,7 +14,7 @@ use crate::ingest::{
     discover_topic, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
     search_semantic_scholar, PaperDraft, SearchResult, TopicReport, TopicRequest,
 };
-use crate::storage::{Paper, PaperRepo, ReadStatus, Tag, TagRepo, TagWithCount};
+use crate::storage::{notes, Highlight, HighlightRepo, Paper, PaperRepo, ReadStatus, Tag, TagRepo, TagWithCount};
 use crate::AppState;
 
 #[tauri::command]
@@ -841,4 +841,80 @@ pub fn batch_cancel(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
     }
     *g = None;
     Ok(false)
+}
+
+// ─── Reader: highlights + notes ──────────────────────────────────────────
+
+#[tauri::command]
+pub async fn highlight_create(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    page: i32,
+    rect: serde_json::Value,
+    text: String,
+    color: Option<String>,
+) -> Result<Highlight, String> {
+    HighlightRepo::new(&state.pool)
+        .insert(&paper_id, page, &rect, &text, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn highlight_list(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<Highlight>, String> {
+    HighlightRepo::new(&state.pool)
+        .list_by_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn highlight_update_note(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    note: Option<String>,
+) -> Result<(), String> {
+    HighlightRepo::new(&state.pool)
+        .update_note(&id, note.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn highlight_delete(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), String> {
+    HighlightRepo::new(&state.pool)
+        .delete(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_get(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<String, String> {
+    notes::read(&state.paths, &paper_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_save(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    content: String,
+) -> Result<(), String> {
+    notes::write(&state.paths, &paper_id, &content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn llm_list_models(
+    state: State<'_, Arc<AppState>>,
+    profile: LlmProfile,
+) -> Result<Vec<String>, String> {
+    list_models(&state.http, &profile).await.map_err(|e| e.to_string())
 }
