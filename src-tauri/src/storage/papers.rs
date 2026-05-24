@@ -148,6 +148,20 @@ impl<'a> PaperRepo<'a> {
         Ok(())
     }
 
+    pub async fn update_translation(
+        &self, id: &str, title_tx: &str, abstract_tx: &str, lang: &str,
+    ) -> Result<()> {
+        let now = Utc::now().timestamp();
+        sqlx::query(
+            "UPDATE papers SET title_translated = ?1, abstract_translated = ?2,
+                                translate_target_lang = ?3, translated_at = ?4,
+                                updated_at = ?4 WHERE id = ?5",
+        )
+        .bind(title_tx).bind(abstract_tx).bind(lang).bind(now).bind(id)
+        .execute(self.pool).await?;
+        Ok(())
+    }
+
     pub async fn delete(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM papers WHERE id = ?1")
             .bind(id)
@@ -315,5 +329,19 @@ mod tests {
         assert_eq!(escape_fts("   "), "");
         assert_eq!(escape_fts("foo bar"), "\"foo\"* AND \"bar\"*");
         assert_eq!(escape_fts("X(Y).Z"), "\"XYZ\"*");
+    }
+
+    #[tokio::test]
+    async fn update_translation_roundtrip() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        repo.insert(&sample("T")).await.unwrap();
+        repo.update_translation("T", "标题", "摘要内容", "Chinese").await.unwrap();
+        let p = repo.get("T").await.unwrap().unwrap();
+        assert_eq!(p.title_translated.as_deref(), Some("标题"));
+        assert_eq!(p.abstract_translated.as_deref(), Some("摘要内容"));
+        assert_eq!(p.translate_target_lang.as_deref(), Some("Chinese"));
+        assert!(p.translated_at.is_some());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
