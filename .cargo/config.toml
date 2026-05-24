@@ -1,0 +1,20 @@
+# All Chinese mirrors are flapping SSL right now; direct crates.io works.
+# If a mirror recovers, uncomment its source block above and add `replace-with = "<name>"`
+# under [source.crates-io].
+
+[source.sjtug]
+registry = "sparse+https://mirrors.sjtug.sjtu.edu.cn/crates.io-index/"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[source.ustc]
+registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
+
+[net]
+git-fetch-with-cli = true
+retry = 5
+
+[http]
+multiplexing = false
+timeout = 60

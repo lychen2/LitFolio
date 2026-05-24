@@ -1,0 +1,96 @@
+//! Litera backend entry. Wires plugins, state, and command handlers.
+
+mod commands;
+mod storage;
+mod ingest;
+mod ai;
+mod index;
+mod cluster;
+
+use anyhow::Result;
+use std::sync::Arc;
+use tauri::Manager;
+use tracing_subscriber::EnvFilter;
+
+use storage::{open_pool, run_migrations, LibraryPaths, default_library_root, Pool};
+
+pub struct AppState {
+    pub pool: Pool,
+    pub paths: LibraryPaths,
+    pub http: reqwest::Client,
+}
+
+async fn bootstrap_state() -> Result<Arc<AppState>> {
+    let root = default_library_root()?;
+    let paths = LibraryPaths::new(root);
+    paths.ensure()?;
+    let pool = open_pool(&paths.db_file()).await?;
+    run_migrations(&pool).await?;
+    let http = reqwest::Client::builder()
+        .user_agent("Litera/0.1")
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+    tracing::info!(root = %paths.root.display(), "library ready");
+    Ok(Arc::new(AppState { pool, paths, http }))
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::greet,
+            commands::app_version,
+            commands::library_root,
+            commands::papers_count,
+            commands::papers_recent,
+            commands::papers_search,
+            commands::paper_get,
+            commands::paper_set_read_status,
+            commands::paper_delete,
+            commands::tags_list,
+            commands::tag_create,
+            commands::tag_rename,
+            commands::tag_set_color,
+            commands::tag_delete,
+            commands::paper_attach_tag,
+            commands::paper_detach_tag,
+            commands::paper_tags,
+            commands::import_doi,
+            commands::import_arxiv,
+            commands::import_bibtex,
+            commands::import_pdf_files,
+            commands::search_papers,
+            commands::add_from_search,
+            commands::add_many_from_search,
+            commands::topic_discover,
+            commands::arxiv_list_category,
+            commands::arxiv_add_draft,
+            commands::llm_get_config,
+            commands::llm_save_config,
+            commands::llm_test,
+            commands::paper_tldr,
+            commands::paper_quick_read,
+        ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match bootstrap_state().await {
+                    Ok(state) => {
+                        handle.manage(state);
+                        tracing::info!("Litera backend booted");
+                    }
+                    Err(e) => tracing::error!(error = %e, "bootstrap failed"),
+                }
+            });
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running litera");
+}
