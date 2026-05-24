@@ -4,12 +4,12 @@ import { clsx } from "clsx";
 import type { ReactNode } from "react";
 
 const navItems = [
-  { to: "/library", label: "Library", icon: LibraryBig },
-  { to: "/import",  label: "Import",  icon: Inbox },
-  { to: "/browse",  label: "Browse",  icon: Atom },
-  { to: "/topic",   label: "Topic",   icon: Compass },
-  { to: "/ask",     label: "Ask",     icon: MessagesSquare },
-  { to: "/settings",label: "Settings",icon: Settings },
+  { to: "/library", label: "文献库", icon: LibraryBig },
+  { to: "/import",  label: "导入",   icon: Inbox },
+  { to: "/browse",  label: "arXiv 浏览", icon: Atom },
+  { to: "/topic",   label: "主题发现", icon: Compass },
+  { to: "/ask",     label: "提问",   icon: MessagesSquare },
+  { to: "/settings",label: "设置",   icon: Settings },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
