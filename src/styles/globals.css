@@ -23,6 +23,19 @@
     background-color: #15131d;
     color: #e9e6f3;
   }
+
+  /* PDF.js viewer pages render white (correct for PDFs) but the container background
+     and gaps between pages need explicit colors so they don't blend into the dark
+     app theme or stay transparent-white. Also force selectable text layer above
+     the canvas so highlight selection works. */
+  .pdfViewer {
+    background: #1f1a26;
+  }
+  .pdfViewer .page {
+    background: white;
+    margin: 8px auto;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
 }
 
 @layer components {

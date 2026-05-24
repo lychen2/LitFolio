@@ -7,6 +7,7 @@ import {
 } from "react-pdf-highlighter";
 import type { IHighlight, NewHighlight, ScaledPosition } from "react-pdf-highlighter";
 import "react-pdf-highlighter/dist/style.css";
+import "pdfjs-dist/web/pdf_viewer.css";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api, type Highlight as BackendHighlight } from "@/lib/api";
 
