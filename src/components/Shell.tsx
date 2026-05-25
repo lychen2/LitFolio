@@ -2,18 +2,22 @@ import { NavLink } from "react-router-dom";
 import { LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss } from "lucide-react";
 import { clsx } from "clsx";
 import type { ReactNode } from "react";
+import { useT } from "@/i18n/I18nProvider";
+import type { TKey } from "@/i18n/dict";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
-const navItems = [
-  { to: "/library", label: "文献库", icon: LibraryBig },
-  { to: "/import",  label: "导入",   icon: Inbox },
-  { to: "/browse",  label: "arXiv 浏览", icon: Atom },
-  { to: "/feeds",   label: "RSS 订阅", icon: Rss },
-  { to: "/topic",   label: "主题发现", icon: Compass },
-  { to: "/ask",     label: "提问",   icon: MessagesSquare },
-  { to: "/settings",label: "设置",   icon: Settings },
+const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
+  { to: "/library", labelKey: "nav.library", icon: LibraryBig },
+  { to: "/import",  labelKey: "nav.import",  icon: Inbox },
+  { to: "/browse",  labelKey: "nav.browse",  icon: Atom },
+  { to: "/feeds",   labelKey: "nav.feeds",   icon: Rss },
+  { to: "/topic",   labelKey: "nav.topic",   icon: Compass },
+  { to: "/ask",     labelKey: "nav.ask",     icon: MessagesSquare },
+  { to: "/settings",labelKey: "nav.settings",icon: Settings },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
+  const t = useT();
   return (
     <div className="flex h-full w-full overflow-hidden">
       <aside className="w-[210px] shrink-0 border-r border-litera-line bg-litera-paper/40 px-3 py-4 flex flex-col">
@@ -22,7 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <span className="font-serif text-lg tracking-tight">LitFolio</span>
         </div>
         <nav className="flex flex-col gap-0.5">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, labelKey, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -36,12 +40,13 @@ export function Shell({ children }: { children: ReactNode }) {
               }
             >
               <Icon className="h-4 w-4" />
-              {label}
+              {t(labelKey)}
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto px-2 text-xs text-litera-mute">
-          v0.1.0 · local-first
+        <div className="mt-auto px-2 flex flex-col gap-2">
+          <LanguageSwitcher />
+          <div className="text-xs text-litera-mute">{t("shell.footer")}</div>
         </div>
       </aside>
       <main className="flex-1 min-w-0 overflow-hidden">{children}</main>

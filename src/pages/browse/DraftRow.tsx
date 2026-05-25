@@ -4,6 +4,8 @@ import {
   CheckCircle2, ExternalLink, Languages, Loader2, Rocket,
 } from "lucide-react";
 import { api, type ArxivDraft, type Paper, type TranslationResult } from "@/lib/api";
+import { useI18n } from "@/i18n/I18nProvider";
+import { llmLanguageNameFor } from "@/i18n/dict";
 
 export function DraftRow({
   draft, rank, onOpen,
@@ -13,6 +15,7 @@ export function DraftRow({
   onOpen: () => void;
 }) {
   const qc = useQueryClient();
+  const { lang } = useI18n();
   const [saved, setSaved] = useState<Paper | null>(null);
   const [translation, setTranslation] = useState<TranslationResult | null>(null);
   const add = useMutation({
@@ -23,7 +26,7 @@ export function DraftRow({
     },
   });
   const translate = useMutation({
-    mutationFn: () => api.draftTranslate(draft, "Chinese"),
+    mutationFn: () => api.draftTranslate(draft, llmLanguageNameFor(lang)),
     onSuccess: (result) => setTranslation(result),
   });
 

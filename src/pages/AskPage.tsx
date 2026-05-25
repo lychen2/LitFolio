@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, MessagesSquare, Search, Send } from "lucide-react";
 import { api, type AskLibraryResult } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 const SOURCE_LIMIT = 8;
 
 export function AskPage() {
+  const t = useT();
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<AskLibraryResult | null>(null);
   const ask = useMutation({
@@ -23,10 +25,10 @@ export function AskPage() {
       <header className="border-b border-litera-line px-6 py-4">
         <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
           <MessagesSquare className="h-5 w-5 text-litera-accent" />
-          提问
+          {t("ask.title")}
         </h1>
         <p className="text-sm text-litera-mute">
-          先让模型把问题改写成精确检索词,在本地文献库 BM25 多路召回,再带着片段生成有引用的回答。
+          {t("ask.subtitle")}
         </p>
       </header>
 
@@ -54,6 +56,7 @@ function AskComposer({
   onQuestion: (value: string) => void;
   onSubmit: () => void;
 }) {
+  const t = useT();
   return (
     <div className="border-b border-litera-line px-6 py-5">
       <div className="max-w-4xl flex gap-2">
@@ -61,7 +64,7 @@ function AskComposer({
           value={question}
           onChange={(e) => onQuestion(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-          placeholder="例如:这些论文里哪几篇讨论了 chirped pulse amplification 的局限?"
+          placeholder={t("ask.placeholder")}
           className="litera-input flex-1"
         />
         <button
@@ -70,7 +73,7 @@ function AskComposer({
           className="litera-btn-primary disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          提问
+          {t("ask.submit")}
         </button>
       </div>
       {error && <div className="mt-3 text-sm text-red-400/90 break-all">✕ {error.message}</div>}

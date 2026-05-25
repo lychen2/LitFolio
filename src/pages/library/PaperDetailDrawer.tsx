@@ -4,6 +4,8 @@ import {
   BookOpen, ExternalLink, FileText, Languages, Loader2, X,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
+import { useI18n } from "@/i18n/I18nProvider";
+import { llmLanguageNameFor } from "@/i18n/dict";
 
 export function PaperDetailDrawer({
   paper, onClose,
@@ -12,8 +14,9 @@ export function PaperDetailDrawer({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const { lang } = useI18n();
   const translate = useMutation({
-    mutationFn: () => api.paperTranslate(paper.id),
+    mutationFn: () => api.paperTranslate(paper.id, llmLanguageNameFor(lang)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
       qc.invalidateQueries({ queryKey: ["paper", paper.id] });
