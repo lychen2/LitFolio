@@ -28,10 +28,12 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
     paths.ensure()?;
     let pool = open_pool(&paths.db_file()).await?;
     run_migrations(&pool).await?;
-    let seeded = storage::FeedRepo::new(&pool)
-        .seed_defaults_if_empty()
-        .await
-        .unwrap_or(0);
+    let feed_repo = storage::FeedRepo::new(&pool);
+    let repaired = feed_repo.repair_default_feed_urls().await.unwrap_or(0);
+    if repaired > 0 {
+        tracing::info!(repaired, "repaired legacy default RSS feed urls");
+    }
+    let seeded = feed_repo.seed_defaults_if_empty().await.unwrap_or(0);
     if seeded > 0 {
         tracing::info!(seeded, "seeded default RSS feeds");
     }

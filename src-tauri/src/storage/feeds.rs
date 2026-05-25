@@ -11,6 +11,7 @@ use sqlx::Row;
 use ulid::Ulid;
 
 use super::db::Pool;
+use super::feed_defaults::DEFAULT_FEEDS;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feed {
@@ -160,14 +161,12 @@ impl<'a> FeedRepo<'a> {
 
     pub async fn record_error(&self, id: i64, error: &str) -> Result<()> {
         let now = Utc::now().timestamp();
-        sqlx::query(
-            "UPDATE feeds SET last_error = ?2, last_fetched_at = ?3 WHERE id = ?1",
-        )
-        .bind(id)
-        .bind(error)
-        .bind(now)
-        .execute(self.pool)
-        .await?;
+        sqlx::query("UPDATE feeds SET last_error = ?2, last_fetched_at = ?3 WHERE id = ?1")
+            .bind(id)
+            .bind(error)
+            .bind(now)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
@@ -179,11 +178,10 @@ impl<'a> FeedRepo<'a> {
             return Ok(0);
         }
         let now = Utc::now().timestamp();
-        let before: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM feed_items WHERE feed_id = ?1")
-                .bind(feed_id)
-                .fetch_one(self.pool)
-                .await?;
+        let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feed_items WHERE feed_id = ?1")
+            .bind(feed_id)
+            .fetch_one(self.pool)
+            .await?;
         for item in items {
             let authors_json = serde_json::to_string(&item.authors)?;
             let id = Ulid::new().to_string();
@@ -211,11 +209,10 @@ impl<'a> FeedRepo<'a> {
                 )
             })?;
         }
-        let after: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM feed_items WHERE feed_id = ?1")
-                .bind(feed_id)
-                .fetch_one(self.pool)
-                .await?;
+        let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feed_items WHERE feed_id = ?1")
+            .bind(feed_id)
+            .fetch_one(self.pool)
+            .await?;
         Ok((after - before).max(0) as usize)
     }
 
@@ -282,6 +279,16 @@ impl<'a> FeedRepo<'a> {
         Ok(())
     }
 
+    pub async fn repair_default_feed_urls(&self) -> Result<usize> {
+        let mut repaired = 0usize;
+        for feed in DEFAULT_FEEDS {
+            for legacy_url in feed.legacy_urls {
+                repaired += self.repoint_feed_url(legacy_url, feed.url).await?;
+            }
+        }
+        Ok(repaired)
+    }
+
     /// On first launch the user has no feeds; seed a sensible default list of
     /// optics / photonics journal feeds. Only fires when the table is empty,
     /// so deleting a default and restarting doesn't bring it back.
@@ -292,26 +299,14 @@ impl<'a> FeedRepo<'a> {
         if count > 0 {
             return Ok(0);
         }
-        let defaults: &[(&str, &str)] = &[
-            ("Nature Photonics", "https://www.nature.com/nphoton.rss"),
-            ("Optica", "https://opg.optica.org/optica/rss.cfm"),
-            ("Optics Letters", "https://opg.optica.org/ol/rss.cfm"),
-            ("Optics Express", "https://opg.optica.org/oe/rss.cfm"),
-            ("Journal of the Optical Society of America B", "https://opg.optica.org/josab/rss.cfm"),
-            ("ACS Photonics", "https://pubs.acs.org/action/showFeed?type=etoc&feed=rss&jc=apchd5"),
-            ("Photonics Research", "https://opg.optica.org/prj/rss.cfm"),
-            ("Progress in Quantum Electronics", "https://rss.sciencedirect.com/publication/science/00796727"),
-            ("Applied Optics", "https://opg.optica.org/ao/rss.cfm"),
-            ("Journal of the Optical Society of America A", "https://opg.optica.org/josaa/rss.cfm"),
-        ];
         let now = Utc::now().timestamp();
         let mut inserted = 0usize;
-        for (title, url) in defaults {
+        for feed in DEFAULT_FEEDS {
             let res = sqlx::query(
                 "INSERT OR IGNORE INTO feeds (url, title, created_at) VALUES (?1, ?2, ?3)",
             )
-            .bind(url)
-            .bind(title)
+            .bind(feed.url)
+            .bind(feed.title)
             .bind(now)
             .execute(self.pool)
             .await?;
@@ -321,6 +316,40 @@ impl<'a> FeedRepo<'a> {
         }
         Ok(inserted)
     }
+
+    async fn repoint_feed_url(&self, old_url: &str, new_url: &str) -> Result<usize> {
+        let old_id = find_feed_id_by_url(self.pool, old_url).await?;
+        let Some(old_id) = old_id else {
+            return Ok(0);
+        };
+        let new_id = find_feed_id_by_url(self.pool, new_url).await?;
+        if let Some(new_id) = new_id {
+            sqlx::query("UPDATE OR IGNORE feed_items SET feed_id = ?1 WHERE feed_id = ?2")
+                .bind(new_id)
+                .bind(old_id)
+                .execute(self.pool)
+                .await?;
+            sqlx::query("DELETE FROM feeds WHERE id = ?1")
+                .bind(old_id)
+                .execute(self.pool)
+                .await?;
+            return Ok(1);
+        }
+        let result = sqlx::query("UPDATE feeds SET url = ?2 WHERE id = ?1")
+            .bind(old_id)
+            .bind(new_url)
+            .execute(self.pool)
+            .await?;
+        Ok(result.rows_affected() as usize)
+    }
+}
+
+async fn find_feed_id_by_url(pool: &Pool, url: &str) -> Result<Option<i64>> {
+    sqlx::query_scalar("SELECT id FROM feeds WHERE url = ?1")
+        .bind(url)
+        .fetch_optional(pool)
+        .await
+        .context("find feed by url")
 }
 
 fn row_to_feed(row: sqlx::sqlite::SqliteRow) -> Result<Feed> {
@@ -441,6 +470,40 @@ mod tests {
         let unread = repo.list_items(Some(feed.id), true, 10, 0).await.unwrap();
         assert_eq!(unread.len(), 1);
         assert_eq!(unread[0].title, "Second");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn repair_default_urls_repoints_legacy_optica_feeds() {
+        let (pool, dir) = temp().await;
+        let repo = FeedRepo::new(&pool);
+        let legacy_url = "https://opg.optica.org/optica/rss.cfm";
+        let current_url = "https://opg.optica.org/rss/optica_feed.xml";
+
+        let feed = repo.create(legacy_url, "Optica", None).await.unwrap();
+        let items = vec![NewFeedItem {
+            entry_id: "optica-1".into(),
+            title: "Newest article".into(),
+            link: Some("https://example.com/optica-1".into()),
+            summary: None,
+            authors: vec![],
+            published_at: Some(1_700_000_001),
+        }];
+        repo.upsert_items(feed.id, &items).await.unwrap();
+
+        let repaired = repo.repair_default_feed_urls().await.unwrap();
+        assert_eq!(repaired, 1);
+
+        let feeds = repo.list().await.unwrap();
+        assert_eq!(feeds.len(), 1);
+        assert_eq!(feeds[0].feed.url, current_url);
+        assert_eq!(feeds[0].total_items, 1);
+
+        let legacy_id = find_feed_id_by_url(&pool, legacy_url).await.unwrap();
+        let current_id = find_feed_id_by_url(&pool, current_url).await.unwrap();
+        assert!(legacy_id.is_none());
+        assert!(current_id.is_some());
 
         std::fs::remove_dir_all(&dir).ok();
     }
