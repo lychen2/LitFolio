@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, BookOpenText } from "lucide-react";
 import type { SurveySubareaResult } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 import { SurveyPaperRow } from "./SurveyPaperRow";
 
 interface Props {
@@ -9,10 +10,11 @@ interface Props {
 }
 
 export function SubareaCard({ subarea, initialOpen = true }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(initialOpen);
   const year = subarea.year_range
     ? `${subarea.year_range[0]}–${subarea.year_range[1]}`
-    : "未限定年份";
+    : t("topic.survey.noYearLimit");
   const mustCount = subarea.papers.filter((p) => p.must_read).length;
 
   return (
@@ -34,8 +36,10 @@ export function SubareaCard({ subarea, initialOpen = true }: Props) {
           <h3 className="font-serif text-lg leading-tight text-litera-text">{subarea.name}</h3>
           <div className="text-xs text-litera-mute mt-0.5 flex gap-3 flex-wrap">
             <span>📅 {year}</span>
-            <span>📚 {subarea.papers.length} 篇</span>
-            {mustCount > 0 && <span className="text-amber-400">⭐ {mustCount} 必读</span>}
+            <span>📚 {t("topic.survey.paperCount", { count: subarea.papers.length })}</span>
+            {mustCount > 0 && (
+              <span className="text-amber-400">⭐ {t("topic.survey.mustReadCount", { count: mustCount })}</span>
+            )}
           </div>
         </div>
       </header>
@@ -46,20 +50,20 @@ export function SubareaCard({ subarea, initialOpen = true }: Props) {
           </div>
           {subarea.search_terms.length > 0 && (
             <div className="px-5 pb-3 flex gap-1.5 flex-wrap text-[11px] items-center">
-              <span className="text-litera-mute">检索词:</span>
-              {subarea.search_terms.map((t) => (
+              <span className="text-litera-mute">{t("topic.survey.searchTerms")}</span>
+              {subarea.search_terms.map((term) => (
                 <span
-                  key={t}
+                  key={term}
                   className="font-mono px-1.5 py-0.5 rounded border border-litera-line text-litera-text/70 bg-litera-paper"
                 >
-                  {t}
+                  {term}
                 </span>
               ))}
             </div>
           )}
           {subarea.papers.length === 0 ? (
             <div className="px-5 py-6 text-sm text-litera-mute italic border-t border-litera-line/40">
-              Semantic Scholar 在此 subarea 没有命中。可能是检索词过窄或年代过老。
+              {t("topic.survey.noPapers")}
             </div>
           ) : (
             <ul className="divide-y divide-litera-line/40 border-t border-litera-line/40">

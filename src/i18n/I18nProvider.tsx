@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { dict, type Lang, type TKey } from "./dict";
+import { formatMessage, type I18nVars } from "./format";
 
 const STORAGE_KEY = "litfolio.lang";
 
 interface I18nValue {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: (key: TKey) => string;
+  t: (key: TKey, vars?: I18nVars) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -28,8 +29,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
     }
   }, [lang]);
-  function t(key: TKey): string {
-    return dict[lang][key] ?? dict.zh[key] ?? key;
+  function t(key: TKey, vars?: I18nVars): string {
+    const template = dict[lang][key] ?? dict.zh[key] ?? key;
+    return formatMessage(template, vars);
   }
   const value: I18nValue = { lang, setLang: setLangState, t };
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -41,6 +43,6 @@ export function useI18n(): I18nValue {
   return ctx;
 }
 
-export function useT(): (key: TKey) => string {
+export function useT(): (key: TKey, vars?: I18nVars) => string {
   return useI18n().t;
 }

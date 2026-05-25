@@ -80,7 +80,7 @@ export function SettingsPage() {
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between">
         <div>
           <h1 className="font-serif text-2xl tracking-tight">{t("settings.title")}</h1>
-          <p className="text-sm text-litera-mute">LLM 端点 · 任务分配</p>
+          <p className="text-sm text-litera-mute">{t("settings.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -89,7 +89,7 @@ export function SettingsPage() {
             className="litera-btn-primary disabled:opacity-50"
           >
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            保存
+            {t("common.save")}
           </button>
         </div>
       </header>
@@ -97,11 +97,9 @@ export function SettingsPage() {
       <div className="flex-1 overflow-auto p-6 max-w-4xl">
         <div className="mb-4">
           <h2 className="text-litera-text font-medium mb-2 flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-litera-accent" /> LLM 配置
+            <Cpu className="h-4 w-4 text-litera-accent" /> {t("settings.llmConfig")}
           </h2>
-          <p className="text-xs text-litera-mute">
-            任何兼容 OpenAI 协议的端点均可使用。先填 API 地址 + 密钥,然后点 📥 拉取 自动发现可用模型。
-          </p>
+          <p className="text-xs text-litera-mute">{t("settings.llmHint")}</p>
         </div>
 
         <div className="flex gap-2 flex-wrap mb-5">
@@ -117,12 +115,12 @@ export function SettingsPage() {
         </div>
 
         {isLoading ? (
-          <div className="text-litera-mute text-sm">加载中…</div>
+          <div className="text-litera-mute text-sm">{t("common.loading")}</div>
         ) : draft.profiles.length === 0 ? (
           <div className="litera-panel p-8 text-center">
             <KeyRound className="h-8 w-8 mx-auto mb-2 text-litera-mute" />
-            <p className="text-sm text-litera-text">还没有 LLM 配置。</p>
-            <p className="text-xs text-litera-mute mt-1">点击上方任意预设即可开始。</p>
+            <p className="text-sm text-litera-text">{t("settings.emptyTitle")}</p>
+            <p className="text-xs text-litera-mute mt-1">{t("settings.emptyHint")}</p>
           </div>
         ) : (
           <ul className="space-y-3">
@@ -141,14 +139,14 @@ export function SettingsPage() {
 
         {activeMissing && (
           <div className="mt-3 text-sm text-red-400/90">
-            当前 profile「{draft.active}」不存在。请在上方选择一个有效 profile 设为当前,然后保存。
+            {t("settings.activeMissing", { profile: draft.active })}
           </div>
         )}
 
         <TaskAssignments draft={draft} onChange={setDraft} />
 
         {save.error && <div className="text-sm text-red-400/90 mt-3">✕ {(save.error as Error).message}</div>}
-        {save.isSuccess && <div className="text-sm text-litera-accent mt-3">✓ 已保存。</div>}
+        {save.isSuccess && <div className="text-sm text-litera-accent mt-3">{t("settings.saved")}</div>}
       </div>
     </section>
   );
