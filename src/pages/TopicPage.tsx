@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { BookOpenText, Search } from "lucide-react";
 import { TopicSurveyView } from "./topic/TopicSurveyView";
 import { TopicSearchView } from "./topic/TopicSearchView";
+import { useT } from "@/i18n/I18nProvider";
 
 const TAB_KEY = "litera-topic-tab";
 type Tab = "survey" | "search";
 
 export function TopicPage() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>(() => {
     const saved = typeof localStorage !== "undefined" ? localStorage.getItem(TAB_KEY) : null;
     return saved === "search" ? "search" : "survey";
@@ -24,14 +26,14 @@ export function TopicPage() {
           onClick={() => setTab("survey")}
           icon={<BookOpenText className="h-4 w-4" />}
         >
-          📚 综述生成
+          📚 {t("topic.tab.survey")}
         </TabBtn>
         <TabBtn
           active={tab === "search"}
           onClick={() => setTab("search")}
           icon={<Search className="h-4 w-4" />}
         >
-          🔍 搜索召回
+          🔍 {t("topic.tab.search")}
         </TabBtn>
       </nav>
       <div className="flex-1 min-h-0">

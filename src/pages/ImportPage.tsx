@@ -9,6 +9,8 @@ import {
   api, pickPdfFiles, pickSinglePdf, type SearchHit, type ArxivDraft,
 } from "@/lib/api";
 
+import { useT } from "@/i18n/I18nProvider";
+
 type Tab = "pdf" | "arxiv_doi" | "search";
 
 interface ImportSource {
@@ -23,6 +25,7 @@ interface ImportSource {
 }
 
 export function ImportPage() {
+  const t = useT();
   const [params] = useSearchParams();
   const source: ImportSource = {
     fromFeedItem: params.get("fromFeedItem"),
@@ -36,18 +39,18 @@ export function ImportPage() {
     <section className="h-full flex flex-col">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-6">
         <div>
-          <h1 className="font-serif text-2xl tracking-tight">导入</h1>
+          <h1 className="font-serif text-2xl tracking-tight">{t("import.title")}</h1>
           <p className="text-sm text-litera-mute">
-            先取元数据,再绑定 PDF。每篇文献必须有 PDF。
+            {t("import.subtitle")}
           </p>
         </div>
         <LibraryStats />
       </header>
       <ImportSourceBanner source={source} />
       <nav className="px-6 pt-4 flex gap-1">
-        <TabButton on={tab === "arxiv_doi"} onClick={() => setTab("arxiv_doi")} icon={<Hash className="h-3.5 w-3.5" />} label="arXiv 或 DOI" />
-        <TabButton on={tab === "pdf"} onClick={() => setTab("pdf")} icon={<Upload className="h-3.5 w-3.5" />} label="PDF 文件" />
-        <TabButton on={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label="搜索" />
+        <TabButton on={tab === "arxiv_doi"} onClick={() => setTab("arxiv_doi")} icon={<Hash className="h-3.5 w-3.5" />} label={t("import.tab.arxivDoi")} />
+        <TabButton on={tab === "pdf"} onClick={() => setTab("pdf")} icon={<Upload className="h-3.5 w-3.5" />} label={t("import.tab.pdf")} />
+        <TabButton on={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label={t("import.tab.search")} />
       </nav>
       <div className="flex-1 overflow-auto p-6">
         {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}

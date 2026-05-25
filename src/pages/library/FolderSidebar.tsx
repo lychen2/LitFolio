@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderPlus, Loader2, Plus, Trash2 } from "lucide-react";
 import { api, type FolderWithCount } from "@/lib/api";
+import { useT, useI18n } from "@/i18n/I18nProvider";
 
 export function FolderSidebar({
   selectedId, onSelect,
@@ -9,6 +10,8 @@ export function FolderSidebar({
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
+  const t = useT();
+  const { lang } = useI18n();
   const qc = useQueryClient();
   const {
     data: folders = [],
@@ -39,31 +42,31 @@ export function FolderSidebar({
   return (
     <aside className="w-[230px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto flex flex-col">
       <div className="px-3 py-3 border-b border-litera-line flex items-center justify-between gap-2">
-        <div className="text-xs uppercase tracking-wider text-litera-mute">分类文件夹</div>
+        <div className="text-xs uppercase tracking-wider text-litera-mute">{t("folders.title")}</div>
         <CreateButton parentId={null} create={create} variant="header" />
       </div>
       <nav className="p-2 flex-1">
         <FolderButton
           active={selectedId == null}
-          label="全部文献"
+          label={t("folders.all")}
           count={null}
           depth={0}
           onClick={() => onSelect(null)}
         />
         {listError ? (
           <div className="mt-3 px-2 py-3 rounded border border-red-400/50 bg-red-500/10 text-[11px] text-red-300 leading-relaxed">
-            <div className="font-medium mb-1">分类加载失败</div>
+            <div className="font-medium mb-1">{t("folders.loadFailed")}</div>
             <div className="break-words text-red-200/80">{String((listError as Error).message ?? listError)}</div>
             <button
               onClick={() => refetch()}
               className="mt-2 text-[11px] underline hover:text-red-100"
             >
-              重试
+              {t("common.retry")}
             </button>
           </div>
         ) : isLoading ? (
           <div className="px-2 py-3 text-[11px] text-litera-mute flex items-center gap-1.5">
-            <Loader2 className="h-3 w-3 animate-spin" /> 加载中…
+            <Loader2 className="h-3 w-3 animate-spin" /> {t("common.loading")}
           </div>
         ) : folders.length === 0 ? (
           <EmptyState onCreate={(name) => create.mutate({ name, parentId: null })} pending={create.isPending} />
@@ -81,7 +84,9 @@ export function FolderSidebar({
       </nav>
       {folders.length > 0 && (
         <div className="px-3 py-2 border-t border-litera-line text-[10px] text-litera-mute">
-          {folders.length} 个分类 · 共 {totalCount} 篇分类条目
+          {lang === "en"
+            ? `${folders.length} folders · ${totalCount} papers tagged`
+            : `${folders.length} 个分类 · 共 ${totalCount} 篇分类条目`}
         </div>
       )}
       {create.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(create.error)}</div>}
@@ -96,24 +101,25 @@ function EmptyState({
   onCreate: (name: string) => void;
   pending: boolean;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   function submit() {
-    const t = name.trim();
-    if (!t) return;
-    onCreate(t);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onCreate(trimmed);
     setName("");
   }
   return (
     <div className="mt-3 px-2 py-3 rounded border border-dashed border-litera-line/70 text-[11px] text-litera-mute leading-relaxed">
-      <div className="mb-2 text-litera-text/80">还没有分类文件夹。</div>
-      <div className="mb-2">建一个就能把文献分到不同主题里(一篇可同时归入多个文件夹)。</div>
+      <div className="mb-2 text-litera-text/80">{t("folders.emptyTitle")}</div>
+      <div className="mb-2">{t("folders.emptyHint")}</div>
       <div className="flex gap-1">
         <input
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="例:超快激光"
+          placeholder={t("folders.namePlaceholder")}
           className="litera-input py-0.5 text-[11px] flex-1 min-w-0"
         />
         <button
@@ -121,7 +127,7 @@ function EmptyState({
           disabled={pending || !name.trim()}
           className="litera-btn-primary text-[11px] px-2 py-0.5 disabled:opacity-50 shrink-0"
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : "新建"}
+          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : t("common.create")}
         </button>
       </div>
     </div>

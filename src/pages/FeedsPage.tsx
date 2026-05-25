@@ -15,6 +15,8 @@ import {
   type FeedWithCounts,
   type TranslationResult,
 } from "@/lib/api";
+import { useI18n, useT } from "@/i18n/I18nProvider";
+import { llmLanguageNameFor } from "@/i18n/dict";
 
 /// RSS / Atom subscription page. Layout mirrors BrowsePage:
 ///   left  — feeds list + "+ 订阅" input
@@ -25,6 +27,7 @@ import {
 ///           ImportPage so the per-paper "must have a PDF" invariant is
 ///           enforced consistently.
 export function FeedsPage() {
+  const t = useT();
   const [selectedFeedId, setSelectedFeedId] = useState<number | null>(null);
   const [onlyUnread, setOnlyUnread] = useState(false);
 
@@ -58,11 +61,10 @@ export function FeedsPage() {
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-            <Rss className="h-5 w-5 text-litera-accent" /> RSS 订阅
+            <Rss className="h-5 w-5 text-litera-accent" /> {t("feeds.title")}
           </h1>
           <p className="text-sm text-litera-mute">
-            订阅 arXiv / 期刊 / 实验室博客的 RSS 或 Atom feed,新文章直接列在右侧。
-            点击 📥 入库 会跳转到「导入」页,绑定 PDF 后才入库。
+            {t("feeds.subtitle")}
           </p>
         </div>
         <RefreshAllButton refresh={refreshAll} />
@@ -137,6 +139,7 @@ function FeedListSidebar({
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const [url, setUrl] = useState("");
   const add = useMutation({
@@ -166,20 +169,20 @@ function FeedListSidebar({
   return (
     <aside className="w-[260px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto flex flex-col">
       <div className="px-3 py-3 border-b border-litera-line">
-        <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">订阅源</div>
+        <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("feeds.sourcesTitle")}</div>
         <div className="flex gap-1">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="https://… (RSS / Atom)"
+            placeholder={t("feeds.placeholder")}
             className="litera-input flex-1 min-w-0 py-1 text-[11px]"
           />
           <button
             onClick={submit}
             disabled={add.isPending || !url.trim()}
             className="litera-btn-primary text-[11px] px-2 py-1 disabled:opacity-50 shrink-0 flex items-center"
-            title="订阅"
+            title={t("feeds.subscribe")}
           >
             {add.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           </button>
@@ -191,7 +194,7 @@ function FeedListSidebar({
       <nav className="p-2 flex-1">
         <FeedItemBtn
           active={selectedId == null}
-          label="全部订阅"
+          label={t("feeds.allSubs")}
           unread={feeds.reduce((s, f) => s + f.unread_items, 0)}
           onClick={() => onSelect(null)}
         />
@@ -444,6 +447,7 @@ function ItemRow({
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { lang } = useI18n();
   const seen = useMutation({
     mutationFn: (s: boolean) => api.feedItemSetSeen(item.id, s),
     onSuccess: () => {
@@ -452,7 +456,7 @@ function ItemRow({
     },
   });
   const translate = useMutation({
-    mutationFn: () => api.draftTranslate(feedItemToDraft(item), "Chinese"),
+    mutationFn: () => api.draftTranslate(feedItemToDraft(item), llmLanguageNameFor(lang)),
     onSuccess: onTranslated,
   });
 
@@ -574,8 +578,9 @@ function FeedItemDetailDrawer({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const { lang } = useI18n();
   const translate = useMutation({
-    mutationFn: () => api.draftTranslate(feedItemToDraft(item), "Chinese"),
+    mutationFn: () => api.draftTranslate(feedItemToDraft(item), llmLanguageNameFor(lang)),
     onSuccess: onTranslated,
   });
   const draft = useMemo(() => feedItemToDraft(item), [item]);

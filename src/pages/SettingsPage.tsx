@@ -4,6 +4,7 @@ import { Plus, Save, Loader2, KeyRound, Cpu } from "lucide-react";
 import { api, type LlmConfig, type LlmProfile } from "@/lib/api";
 import { ProfileCard } from "./settings/ProfileCard";
 import { TaskAssignments } from "./settings/TaskAssignments";
+import { useT } from "@/i18n/I18nProvider";
 
 const PRESETS: { label: string; profile: Partial<LlmProfile> }[] = [
   { label: "OpenAI",      profile: { base_url: "https://api.openai.com/v1", chat_model: "gpt-4o-mini", embed_model: "text-embedding-3-small" } },
@@ -14,6 +15,7 @@ const PRESETS: { label: string; profile: Partial<LlmProfile> }[] = [
 ];
 
 export function SettingsPage() {
+  const t = useT();
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["llm", "config"],
     queryFn: api.llmGetConfig,
@@ -77,7 +79,7 @@ export function SettingsPage() {
     <section className="h-full flex flex-col overflow-hidden">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between">
         <div>
-          <h1 className="font-serif text-2xl tracking-tight">设置</h1>
+          <h1 className="font-serif text-2xl tracking-tight">{t("settings.title")}</h1>
           <p className="text-sm text-litera-mute">LLM 端点 · 任务分配</p>
         </div>
         <div className="flex gap-2">
@@ -100,20 +102,6 @@ export function SettingsPage() {
           <p className="text-xs text-litera-mute">
             任何兼容 OpenAI 协议的端点均可使用。先填 API 地址 + 密钥,然后点 📥 拉取 自动发现可用模型。
           </p>
-        </div>
-
-        <div className="litera-panel p-4 mb-5 max-w-xl">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-[11px] uppercase tracking-wider text-litera-mute">速读 / 深读输出语言</span>
-            <select
-              value={draft.output_language || "Chinese"}
-              onChange={(e) => setDraft((d) => ({ ...d, output_language: e.target.value }))}
-              className="litera-input w-48 text-sm"
-            >
-              <option value="Chinese">中文</option>
-              <option value="English">English</option>
-            </select>
-          </label>
         </div>
 
         <div className="flex gap-2 flex-wrap mb-5">

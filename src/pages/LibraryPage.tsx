@@ -10,6 +10,8 @@ import { api, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus }
 import { FolderPicker } from "./library/FolderPicker";
 import { FolderSidebar } from "./library/FolderSidebar";
 import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
+import { useI18n } from "@/i18n/I18nProvider";
+import { llmLanguageNameFor } from "@/i18n/dict";
 
 const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
@@ -24,6 +26,7 @@ export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
   const trimmed = search.trim();
+  const { t, lang } = useI18n();
 
   const { data: rawPapers, isLoading } = useQuery({
     queryKey: ["papers", "list", folderId, trimmed],
@@ -44,13 +47,17 @@ export function LibraryPage() {
     <section className="h-full flex flex-col">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-serif text-2xl tracking-tight">文献库</h1>
+          <h1 className="font-serif text-2xl tracking-tight">{t("library.title")}</h1>
           <p className="text-sm text-litera-mute">
             {trimmed
-              ? `“${trimmed}” 共 ${papers?.length ?? 0} 条结果`
+              ? lang === "en"
+                ? `"${trimmed}" — ${papers?.length ?? 0} results`
+                : `“${trimmed}” 共 ${papers?.length ?? 0} 条结果`
               : papers
-              ? `${papers.length} 篇最近文献`
-              : "加载中…"}
+              ? lang === "en"
+                ? `${papers.length} recent papers`
+                : `${papers.length} 篇最近文献`
+              : t("common.loading")}
           </p>
         </div>
         <div className="relative w-80 max-w-[40vw]">
@@ -58,7 +65,7 @@ export function LibraryPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索 标题 / 作者 / 摘要 / 速读…"
+            placeholder={t("library.searchPlaceholder")}
             className="litera-input pl-9 pr-8 w-full"
           />
           {search && (
@@ -138,12 +145,13 @@ function PaperRow({
   onQuickRead: () => void;
 }) {
   const qc = useQueryClient();
+  const { lang } = useI18n();
   const tldr = useMutation({
     mutationFn: () => api.paperTldr(p.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
   });
   const translate = useMutation({
-    mutationFn: () => api.paperTranslate(p.id),
+    mutationFn: () => api.paperTranslate(p.id, llmLanguageNameFor(lang)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
       qc.invalidateQueries({ queryKey: ["paper", p.id] });
