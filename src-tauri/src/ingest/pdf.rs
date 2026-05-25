@@ -21,7 +21,11 @@ pub struct PdfImportResult {
     pub sha256: String,
 }
 
-pub fn import_pdf_file(src: &Path, paper_id: &str, library: &LibraryPaths) -> Result<PdfImportResult> {
+pub fn import_pdf_file(
+    src: &Path,
+    paper_id: &str,
+    library: &LibraryPaths,
+) -> Result<PdfImportResult> {
     let bytes = std::fs::read(src).with_context(|| format!("read {}", src.display()))?;
     let sha256 = hash_hex(&bytes);
     let draft = extract_metadata(&bytes, src);
@@ -30,7 +34,11 @@ pub fn import_pdf_file(src: &Path, paper_id: &str, library: &LibraryPaths) -> Re
     let stored = paper_dir.join("original.pdf");
     std::fs::write(&stored, &bytes)?;
     write_sidecar(&paper_dir, &draft, &sha256)?;
-    Ok(PdfImportResult { draft, stored_path: stored, sha256 })
+    Ok(PdfImportResult {
+        draft,
+        stored_path: stored,
+        sha256,
+    })
 }
 
 fn write_sidecar(dir: &Path, draft: &PaperDraft, sha256: &str) -> Result<()> {
@@ -56,7 +64,11 @@ fn extract_metadata(bytes: &[u8], src: &Path) -> PaperDraft {
             if let Ok(info_ref) = info_id.as_reference() {
                 if let Ok(info_obj) = doc.get_object(info_ref) {
                     if let Ok(dict) = info_obj.as_dict() {
-                        draft.title = dict.get(b"Title").ok().and_then(decode_text).unwrap_or_default();
+                        draft.title = dict
+                            .get(b"Title")
+                            .ok()
+                            .and_then(decode_text)
+                            .unwrap_or_default();
                         if let Some(a) = dict.get(b"Author").ok().and_then(decode_text) {
                             draft.authors = split_authors(&a);
                         }
@@ -96,7 +108,9 @@ fn decode_text(obj: &lopdf::Object) -> Option<String> {
             // Try UTF-8 then UTF-16 BE (PDF text strings can be either).
             if let Ok(s) = std::str::from_utf8(bytes) {
                 let cleaned = s.trim().to_string();
-                if !cleaned.is_empty() { return Some(cleaned); }
+                if !cleaned.is_empty() {
+                    return Some(cleaned);
+                }
             }
             // UTF-16 BE with BOM
             if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
@@ -107,7 +121,9 @@ fn decode_text(obj: &lopdf::Object) -> Option<String> {
                     .collect();
                 let s = String::from_utf16_lossy(&utf16);
                 let cleaned = s.trim().to_string();
-                if !cleaned.is_empty() { return Some(cleaned); }
+                if !cleaned.is_empty() {
+                    return Some(cleaned);
+                }
             }
             None
         }
@@ -152,8 +168,14 @@ mod tests {
 
     #[test]
     fn doi_regex_finds_common_forms() {
-        assert_eq!(find_doi("see 10.1038/nature12345 in text").as_deref(), Some("10.1038/nature12345"));
-        assert_eq!(find_doi("https://doi.org/10.1109/ICCV.2017.123 ;").as_deref(), Some("10.1109/ICCV.2017.123"));
+        assert_eq!(
+            find_doi("see 10.1038/nature12345 in text").as_deref(),
+            Some("10.1038/nature12345")
+        );
+        assert_eq!(
+            find_doi("https://doi.org/10.1109/ICCV.2017.123 ;").as_deref(),
+            Some("10.1109/ICCV.2017.123")
+        );
         assert!(find_doi("nothing here").is_none());
     }
 

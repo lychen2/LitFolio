@@ -24,7 +24,10 @@ static LAST_BUCKET_RESET: AtomicU64 = AtomicU64::new(0);
 static REQUESTS_IN_WINDOW: AtomicU64 = AtomicU64::new(0);
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 fn check_rate_limit() -> Result<()> {
@@ -75,12 +78,16 @@ struct SearchHit {
 }
 
 #[derive(Debug, Deserialize)]
-struct HitAuthor { name: Option<String> }
+struct HitAuthor {
+    name: Option<String>,
+}
 
 #[derive(Debug, Deserialize)]
 struct ExternalIds {
-    #[serde(rename = "DOI")] doi: Option<String>,
-    #[serde(rename = "ArXiv")] arxiv: Option<String>,
+    #[serde(rename = "DOI")]
+    doi: Option<String>,
+    #[serde(rename = "ArXiv")]
+    arxiv: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,8 +127,15 @@ pub async fn search_semantic_scholar(
     }
     check_rate_limit()?;
     let limit = limit.clamp(1, 30);
-    let url = format!("{BASE}/search?query={}&limit={limit}&fields={FIELDS}", urlencode(query));
-    let resp = client.get(&url).send().await.with_context(|| format!("GET {url}"))?;
+    let url = format!(
+        "{BASE}/search?query={}&limit={limit}&fields={FIELDS}",
+        urlencode(query)
+    );
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
@@ -151,7 +165,11 @@ pub async fn bulk_by_citations(
     if let Some(y) = year_filter {
         url.push_str(&format!("&year={}", urlencode(y)));
     }
-    let resp = client.get(&url).send().await.with_context(|| format!("GET {url}"))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
@@ -160,7 +178,11 @@ pub async fn bulk_by_citations(
     let body: SearchResponse = resp.json().await.context("decode S2 bulk JSON")?;
     let mut out: Vec<SearchResult> = body.data.into_iter().map(SearchHit::into_result).collect();
     // The bulk endpoint sorts by citation count server-side but lets enforce explicitly.
-    out.sort_by(|a, b| b.citation_count.unwrap_or(0).cmp(&a.citation_count.unwrap_or(0)));
+    out.sort_by(|a, b| {
+        b.citation_count
+            .unwrap_or(0)
+            .cmp(&a.citation_count.unwrap_or(0))
+    });
     Ok(out)
 }
 
@@ -188,7 +210,9 @@ mod tests {
     fn rate_limit_caps_at_bucket() {
         LAST_BUCKET_RESET.store(now_secs(), Ordering::Relaxed);
         REQUESTS_IN_WINDOW.store(0, Ordering::Relaxed);
-        for _ in 0..BUCKET_CAP { check_rate_limit().unwrap(); }
+        for _ in 0..BUCKET_CAP {
+            check_rate_limit().unwrap();
+        }
         assert!(check_rate_limit().is_err());
     }
 }

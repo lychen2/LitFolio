@@ -1,25 +1,33 @@
 //! IPC command surface exposed to the React frontend.
 
+pub mod ask;
+pub mod feeds;
+pub mod survey;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
 
 use crate::ai::{
-    active_profile, active_profile_for_task, chat_complete, expand_search_query, list_models, load_config, quick_read_paper_text,
-    save_config, summarize_paper_text, ChatMessage, ExpandedQuery, LlmConfig, LlmProfile, QuickReadResult,
-    TaskKind, TldrResult,
+    active_profile, active_profile_for_task, chat_complete, expand_search_query, list_models,
+    load_config, quick_read_paper_text, save_config, summarize_paper_text, ChatMessage,
+    ExpandedQuery, LlmConfig, LlmProfile, QuickReadResult, TaskKind, TldrResult,
 };
 use crate::ingest::{
-    discover_topic, discover_topic_multi, fetch_arxiv, fetch_arxiv_category, fetch_doi, import_pdf_file, parse_bibtex,
-    search_semantic_scholar, PaperDraft, SearchResult, TopicReport, TopicRequest,
+    discover_topic, discover_topic_multi, fetch_arxiv, fetch_arxiv_category, fetch_doi,
+    import_pdf_file, parse_bibtex, search_semantic_scholar, PaperDraft, SearchResult, TopicReport,
+    TopicRequest,
 };
-use crate::storage::{notes, Highlight, HighlightRepo, Paper, PaperRepo, ReadStatus, Tag, TagRepo, TagWithCount};
+use crate::storage::{
+    notes, Folder, FolderRepo, FolderWithCount, Highlight, HighlightRepo, Paper, PaperRepo,
+    ReadStatus, Tag, TagRepo, TagWithCount,
+};
 use crate::AppState;
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {
-    format!("Hello, {name}, welcome to Litera.")
+    format!("Hello, {name}, welcome to LitFolio.")
 }
 
 #[tauri::command]
@@ -34,7 +42,10 @@ pub fn library_root(state: State<'_, Arc<AppState>>) -> String {
 
 #[tauri::command]
 pub async fn papers_count(state: State<'_, Arc<AppState>>) -> Result<i64, String> {
-    PaperRepo::new(&state.pool).count().await.map_err(|e| e.to_string())
+    PaperRepo::new(&state.pool)
+        .count()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -49,11 +60,26 @@ pub async fn papers_recent(
 }
 
 #[tauri::command]
+pub async fn papers_in_folder(
+    state: State<'_, Arc<AppState>>,
+    folder_id: i64,
+    limit: Option<i64>,
+) -> Result<Vec<Paper>, String> {
+    PaperRepo::new(&state.pool)
+        .list_by_folder(folder_id, limit.unwrap_or(200))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn paper_get(
     state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<Option<Paper>, String> {
-    PaperRepo::new(&state.pool).get(&id).await.map_err(|e| e.to_string())
+    PaperRepo::new(&state.pool)
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -80,15 +106,18 @@ pub async fn paper_set_read_status(
         "must" => ReadStatus::Must,
         _ => ReadStatus::Unread,
     };
-    PaperRepo::new(&state.pool).set_read_status(&id, s).await.map_err(|e| e.to_string())
+    PaperRepo::new(&state.pool)
+        .set_read_status(&id, s)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn paper_delete(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
-    PaperRepo::new(&state.pool).delete(&id).await.map_err(|e| e.to_string())?;
+pub async fn paper_delete(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    PaperRepo::new(&state.pool)
+        .delete(&id)
+        .await
+        .map_err(|e| e.to_string())?;
     // Best-effort: also remove the paper's directory (PDF + extracted text + any future
     // sidecar files). Failure here must not roll the DB row back — the row is already gone
     // and a leftover folder is recoverable; surfacing the error would only confuse users.
@@ -103,7 +132,10 @@ pub async fn paper_delete(
 
 #[tauri::command]
 pub async fn tags_list(state: State<'_, Arc<AppState>>) -> Result<Vec<TagWithCount>, String> {
-    TagRepo::new(&state.pool).list().await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .list()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -124,7 +156,10 @@ pub async fn tag_rename(
     id: i64,
     new_name: String,
 ) -> Result<(), String> {
-    TagRepo::new(&state.pool).rename(id, &new_name).await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .rename(id, &new_name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -141,7 +176,10 @@ pub async fn tag_set_color(
 
 #[tauri::command]
 pub async fn tag_delete(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
-    TagRepo::new(&state.pool).delete(id).await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -150,7 +188,10 @@ pub async fn paper_attach_tag(
     paper_id: String,
     tag_id: i64,
 ) -> Result<(), String> {
-    TagRepo::new(&state.pool).attach(&paper_id, tag_id).await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .attach(&paper_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -159,7 +200,10 @@ pub async fn paper_detach_tag(
     paper_id: String,
     tag_id: i64,
 ) -> Result<(), String> {
-    TagRepo::new(&state.pool).detach(&paper_id, tag_id).await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .detach(&paper_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -167,17 +211,107 @@ pub async fn paper_tags(
     state: State<'_, Arc<AppState>>,
     paper_id: String,
 ) -> Result<Vec<Tag>, String> {
-    TagRepo::new(&state.pool).for_paper(&paper_id).await.map_err(|e| e.to_string())
+    TagRepo::new(&state.pool)
+        .for_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Folders ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn folders_list(state: State<'_, Arc<AppState>>) -> Result<Vec<FolderWithCount>, String> {
+    FolderRepo::new(&state.pool)
+        .list()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn import_doi(
+pub async fn folder_create(
     state: State<'_, Arc<AppState>>,
-    doi: String,
-) -> Result<Paper, String> {
-    let draft = fetch_doi(&state.http, &doi).await.map_err(|e| e.to_string())?;
+    name: String,
+    parent_id: Option<i64>,
+) -> Result<Folder, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("folder name must not be empty".into());
+    }
+    FolderRepo::new(&state.pool)
+        .create(trimmed, parent_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn folder_rename(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+    name: String,
+) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("folder name must not be empty".into());
+    }
+    FolderRepo::new(&state.pool)
+        .rename(id, trimmed)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn folder_delete(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
+    FolderRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_attach_folder(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    folder_id: i64,
+) -> Result<(), String> {
+    FolderRepo::new(&state.pool)
+        .attach(&paper_id, folder_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_detach_folder(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    folder_id: i64,
+) -> Result<(), String> {
+    FolderRepo::new(&state.pool)
+        .detach(&paper_id, folder_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_folders(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<Folder>, String> {
+    FolderRepo::new(&state.pool)
+        .for_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_doi(state: State<'_, Arc<AppState>>, doi: String) -> Result<Paper, String> {
+    let draft = fetch_doi(&state.http, &doi)
+        .await
+        .map_err(|e| e.to_string())?;
     let paper = draft.into_paper();
-    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(paper)
 }
 
@@ -186,9 +320,14 @@ pub async fn import_arxiv(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
 ) -> Result<Paper, String> {
-    let draft = fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())?;
+    let draft = fetch_arxiv(&state.http, &arxiv_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let paper = draft.into_paper();
-    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(paper)
 }
 
@@ -246,12 +385,18 @@ pub async fn import_pdf_files(
                 paper.id = paper_id;
                 paper.pdf_path = Some(r.stored_path.display().to_string());
                 if let Err(e) = repo.insert(&paper).await {
-                    failed.push(PdfFailure { path: p, error: e.to_string() });
+                    failed.push(PdfFailure {
+                        path: p,
+                        error: e.to_string(),
+                    });
                 } else {
                     imported.push(paper);
                 }
             }
-            Err(e) => failed.push(PdfFailure { path: p, error: e.to_string() }),
+            Err(e) => failed.push(PdfFailure {
+                path: p,
+                error: e.to_string(),
+            }),
         }
     }
     Ok(PdfImportSummary { imported, failed })
@@ -337,9 +482,14 @@ pub async fn arxiv_list_category(
     max_results: Option<u32>,
     start: Option<u32>,
 ) -> Result<Vec<PaperDraft>, String> {
-    fetch_arxiv_category(&state.http, &category, max_results.unwrap_or(50), start.unwrap_or(0))
-        .await
-        .map_err(|e| e.to_string())
+    fetch_arxiv_category(
+        &state.http,
+        &category,
+        max_results.unwrap_or(50),
+        start.unwrap_or(0),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -355,7 +505,11 @@ pub async fn arxiv_add_draft(
     Ok(paper)
 }
 
-async fn download_pdf(http: &reqwest::Client, url: &str, dest: &std::path::Path) -> anyhow::Result<u64> {
+pub(crate) async fn download_pdf(
+    http: &reqwest::Client,
+    url: &str,
+    dest: &std::path::Path,
+) -> anyhow::Result<u64> {
     use std::io::Write;
     let resp = http.get(url).send().await?;
     if !resp.status().is_success() {
@@ -363,7 +517,10 @@ async fn download_pdf(http: &reqwest::Client, url: &str, dest: &std::path::Path)
     }
     let bytes = resp.bytes().await?;
     if bytes.len() < 1024 {
-        anyhow::bail!("PDF response too small ({} bytes), likely not a valid PDF", bytes.len());
+        anyhow::bail!(
+            "PDF response too small ({} bytes), likely not a valid PDF",
+            bytes.len()
+        );
     }
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
@@ -378,18 +535,28 @@ pub async fn arxiv_add_with_pdf(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
 ) -> Result<Paper, String> {
-    let draft = fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())?;
+    let draft = fetch_arxiv(&state.http, &arxiv_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let resolved_id = draft.arxiv_id.clone().unwrap_or(arxiv_id.clone());
-    let stripped = resolved_id.split('v').next().unwrap_or(&resolved_id).to_string();
+    let stripped = resolved_id
+        .split('v')
+        .next()
+        .unwrap_or(&resolved_id)
+        .to_string();
     let pdf_url = format!("https://arxiv.org/pdf/{stripped}.pdf");
     let paper_id = Ulid::new().to_string();
     let pdf_path = state.paths.paper_dir(&paper_id).join("original.pdf");
-    download_pdf(&state.http, &pdf_url, &pdf_path).await
+    download_pdf(&state.http, &pdf_url, &pdf_path)
+        .await
         .map_err(|e| format!("failed to download arXiv PDF: {e}"))?;
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(pdf_path.display().to_string());
-    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(paper)
 }
 
@@ -400,7 +567,9 @@ pub async fn prepare_doi_draft(
     state: State<'_, Arc<AppState>>,
     doi: String,
 ) -> Result<PaperDraft, String> {
-    fetch_doi(&state.http, &doi).await.map_err(|e| e.to_string())
+    fetch_doi(&state.http, &doi)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -408,7 +577,9 @@ pub async fn prepare_arxiv_draft(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
 ) -> Result<PaperDraft, String> {
-    fetch_arxiv(&state.http, &arxiv_id).await.map_err(|e| e.to_string())
+    fetch_arxiv(&state.http, &arxiv_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -426,7 +597,10 @@ pub async fn paper_save_with_pdf(
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(dest.display().to_string());
-    PaperRepo::new(&state.pool).insert(&paper).await.map_err(|e| e.to_string())?;
+    PaperRepo::new(&state.pool)
+        .insert(&paper)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(paper)
 }
 
@@ -446,7 +620,9 @@ pub async fn paper_attach_pdf(
     }
     std::fs::copy(&source_pdf_path, &dest).map_err(|e| format!("copy PDF: {e}"))?;
     let dest_str = dest.display().to_string();
-    repo.update_pdf_path(&id, &dest_str).await.map_err(|e| e.to_string())?;
+    repo.update_pdf_path(&id, &dest_str)
+        .await
+        .map_err(|e| e.to_string())?;
     repo.get(&id)
         .await
         .map_err(|e| e.to_string())?
@@ -459,10 +635,7 @@ pub async fn paper_attach_pdf(
 /// leaves the UI looking dead. Spawning ourselves at least validates the binary exists
 /// and the path is openable; the viewer takes over from there.
 #[tauri::command]
-pub async fn paper_open_pdf(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn paper_open_pdf(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     let paper = PaperRepo::new(&state.pool)
         .get(&id)
         .await
@@ -543,26 +716,39 @@ pub async fn llm_test(
         &state.http,
         &profile,
         &[
-            ChatMessage { role: "system".into(), content: "Reply with the single word: pong".into() },
-            ChatMessage { role: "user".into(), content: "ping".into() },
+            ChatMessage {
+                role: "system".into(),
+                content: "Reply with the single word: pong".into(),
+            },
+            ChatMessage {
+                role: "user".into(),
+                content: "ping".into(),
+            },
         ],
     )
     .await
     .map_err(|e| e.to_string())?;
-    Ok(LlmTestResult { ok: !resp.content.trim().is_empty(), model: resp.model, reply: resp.content })
+    Ok(LlmTestResult {
+        ok: !resp.content.trim().is_empty(),
+        model: resp.model,
+        reply: resp.content,
+    })
 }
 
 // ─── Paper summarization ─────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn paper_tldr(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<TldrResult, String> {
+pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<TldrResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?.clone();
+    let output_language = cfg.output_language.as_str();
+    let prof = active_profile_for_task(&cfg, TaskKind::Tldr)
+        .map_err(|e| e.to_string())?
+        .clone();
     let repo = PaperRepo::new(&state.pool);
-    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+    let paper = repo
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let result = summarize_paper_text(
         &state.http,
@@ -573,11 +759,13 @@ pub async fn paper_tldr(
         paper.year,
         paper.abstract_text.as_deref(),
         None,
+        output_language,
     )
     .await
     .map_err(|e| e.to_string())?;
     repo.update_tldr(&id, &result.tldr, &result.key_findings)
-        .await.map_err(|e| e.to_string())?;
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(result)
 }
 
@@ -587,9 +775,15 @@ pub async fn paper_quick_read(
     id: String,
 ) -> Result<QuickReadResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead).map_err(|e| e.to_string())?.clone();
+    let output_language = cfg.output_language.as_str();
+    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead)
+        .map_err(|e| e.to_string())?
+        .clone();
     let repo = PaperRepo::new(&state.pool);
-    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+    let paper = repo
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let result = quick_read_paper_text(
         &state.http,
@@ -600,13 +794,19 @@ pub async fn paper_quick_read(
         paper.year,
         paper.abstract_text.as_deref(),
         None,
+        output_language,
     )
     .await
     .map_err(|e| e.to_string())?;
     repo.update_quick_read(
-        &id, &result.problem, &result.method, &result.comparison, &result.limitations,
+        &id,
+        &result.problem,
+        &result.method,
+        &result.comparison,
+        &result.limitations,
     )
-    .await.map_err(|e| e.to_string())?;
+    .await
+    .map_err(|e| e.to_string())?;
     Ok(result)
 }
 
@@ -617,18 +817,54 @@ pub async fn paper_translate(
     target_lang: Option<String>,
 ) -> Result<crate::ai::TranslationResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate)
+        .map_err(|e| e.to_string())?
+        .clone();
     let repo = PaperRepo::new(&state.pool);
-    let paper = repo.get(&id).await.map_err(|e| e.to_string())?
+    let paper = repo
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
     let result = crate::ai::translate_paper_text(
-        &state.http, &prof, &paper.title, paper.abstract_text.as_deref(), &lang,
+        &state.http,
+        &prof,
+        &paper.title,
+        paper.abstract_text.as_deref(),
+        &lang,
     )
-    .await.map_err(|e| e.to_string())?;
-    repo.update_translation(&id, &result.title, &result.abstract_text, &result.target_lang)
-        .await.map_err(|e| e.to_string())?;
+    .await
+    .map_err(|e| e.to_string())?;
+    repo.update_translation(
+        &id,
+        &result.title,
+        &result.abstract_text,
+        &result.target_lang,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn draft_translate(
+    state: State<'_, Arc<AppState>>,
+    draft: PaperDraft,
+    target_lang: Option<String>,
+) -> Result<crate::ai::TranslationResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
+    let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
+    crate::ai::translate_paper_text(
+        &state.http,
+        &prof,
+        &draft.title,
+        draft.abstract_text.as_deref(),
+        &lang,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 // ─── Batch primitives ────────────────────────────────────────────────────
@@ -665,7 +901,9 @@ fn install_cancel_token(state: &AppState) -> Result<CancellationToken, String> {
 }
 
 fn clear_cancel_token(state: &AppState) {
-    if let Ok(mut g) = state.batch_cancel.lock() { *g = None; }
+    if let Ok(mut g) = state.batch_cancel.lock() {
+        *g = None;
+    }
 }
 
 // ─── Batch commands (synchronous, no AI) ─────────────────────────────────
@@ -673,12 +911,15 @@ fn clear_cancel_token(state: &AppState) {
 #[tauri::command]
 pub async fn batch_attach_tag(
     state: State<'_, Arc<AppState>>,
-    ids: Vec<String>, tag_id: i64,
+    ids: Vec<String>,
+    tag_id: i64,
 ) -> Result<usize, String> {
     let repo = TagRepo::new(&state.pool);
     let mut ok = 0;
     for id in ids {
-        if repo.attach(&id, tag_id).await.is_ok() { ok += 1; }
+        if repo.attach(&id, tag_id).await.is_ok() {
+            ok += 1;
+        }
     }
     Ok(ok)
 }
@@ -686,7 +927,8 @@ pub async fn batch_attach_tag(
 #[tauri::command]
 pub async fn batch_set_status(
     state: State<'_, Arc<AppState>>,
-    ids: Vec<String>, status: String,
+    ids: Vec<String>,
+    status: String,
 ) -> Result<usize, String> {
     let s = match status.as_str() {
         "reading" => ReadStatus::Reading,
@@ -697,7 +939,9 @@ pub async fn batch_set_status(
     let repo = PaperRepo::new(&state.pool);
     let mut ok = 0;
     for id in ids {
-        if repo.set_read_status(&id, s).await.is_ok() { ok += 1; }
+        if repo.set_read_status(&id, s).await.is_ok() {
+            ok += 1;
+        }
     }
     Ok(ok)
 }
@@ -710,7 +954,9 @@ pub async fn batch_delete(
     let repo = PaperRepo::new(&state.pool);
     let mut ok = 0;
     for id in ids {
-        if repo.delete(&id).await.is_ok() { ok += 1; }
+        if repo.delete(&id).await.is_ok() {
+            ok += 1;
+        }
     }
     Ok(ok)
 }
@@ -735,7 +981,9 @@ where
     let repo = PaperRepo::new(&state.pool);
 
     for id in ids {
-        if token.is_cancelled() { break; }
+        if token.is_cancelled() {
+            break;
+        }
         let paper = match repo.get(&id).await.map_err(|e| e.to_string())? {
             Some(p) => p,
             None => {
@@ -747,17 +995,23 @@ where
                 continue;
             }
         };
-        let _ = app.emit("batch-progress", serde_json::json!({
-            "kind": kind, "done": ok + errors.len(), "total": total,
-            "current_id": paper.id, "current_title": paper.title, "phase": "start",
-        }));
+        let _ = app.emit(
+            "batch-progress",
+            serde_json::json!({
+                "kind": kind, "done": ok + errors.len(), "total": total,
+                "current_id": paper.id, "current_title": paper.title, "phase": "start",
+            }),
+        );
         match op(paper.clone()).await {
             Ok(()) => {
                 ok += 1;
-                let _ = app.emit("batch-progress", serde_json::json!({
-                    "kind": kind, "done": ok + errors.len(), "total": total,
-                    "current_id": paper.id, "current_title": paper.title, "phase": "ok",
-                }));
+                let _ = app.emit(
+                    "batch-progress",
+                    serde_json::json!({
+                        "kind": kind, "done": ok + errors.len(), "total": total,
+                        "current_id": paper.id, "current_title": paper.title, "phase": "ok",
+                    }),
+                );
             }
             Err(e) => {
                 let msg = e.to_string();
@@ -766,11 +1020,14 @@ where
                     title: paper.title.clone(),
                     message: msg.clone(),
                 });
-                let _ = app.emit("batch-progress", serde_json::json!({
-                    "kind": kind, "done": ok + errors.len(), "total": total,
-                    "current_id": paper.id, "current_title": paper.title,
-                    "phase": "fail", "error": msg,
-                }));
+                let _ = app.emit(
+                    "batch-progress",
+                    serde_json::json!({
+                        "kind": kind, "done": ok + errors.len(), "total": total,
+                        "current_id": paper.id, "current_title": paper.title,
+                        "phase": "fail", "error": msg,
+                    }),
+                );
             }
         }
     }
@@ -778,7 +1035,11 @@ where
     clear_cancel_token(&state);
     let summary = BatchSummary {
         kind: kind.to_string(),
-        total, ok, failed: errors.len(), cancelled, errors,
+        total,
+        ok,
+        failed: errors.len(),
+        cancelled,
+        errors,
     };
     let _ = app.emit("batch-done", &summary);
     Ok(summary)
@@ -791,57 +1052,96 @@ pub async fn batch_tldr(
     ids: Vec<String>,
 ) -> Result<BatchSummary, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?.clone();
+    let output_language = cfg.output_language.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::Tldr)
+        .map_err(|e| e.to_string())?
+        .clone();
     let http = state.http.clone();
     let pool = state.pool.clone();
     run_ai_batch(app, state, "tldr", ids, move |paper| {
         let http = http.clone();
         let prof = prof.clone();
         let pool = pool.clone();
+        let output_language = output_language.clone();
         async move {
             let r = summarize_paper_text(
-                &http, &prof, &paper.title, &paper.authors, paper.venue.as_deref(),
-                paper.year, paper.abstract_text.as_deref(), None,
-            ).await?;
+                &http,
+                &prof,
+                &paper.title,
+                &paper.authors,
+                paper.venue.as_deref(),
+                paper.year,
+                paper.abstract_text.as_deref(),
+                None,
+                &output_language,
+            )
+            .await?;
             PaperRepo::new(&pool)
-                .update_tldr(&paper.id, &r.tldr, &r.key_findings).await?;
+                .update_tldr(&paper.id, &r.tldr, &r.key_findings)
+                .await?;
             Ok(())
         }
-    }).await
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn batch_quick_read(
-    app: AppHandle, state: State<'_, Arc<AppState>>, ids: Vec<String>,
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    ids: Vec<String>,
 ) -> Result<BatchSummary, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead).map_err(|e| e.to_string())?.clone();
+    let output_language = cfg.output_language.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead)
+        .map_err(|e| e.to_string())?
+        .clone();
     let http = state.http.clone();
     let pool = state.pool.clone();
     run_ai_batch(app, state, "quick_read", ids, move |paper| {
         let http = http.clone();
         let prof = prof.clone();
         let pool = pool.clone();
+        let output_language = output_language.clone();
         async move {
             let r = quick_read_paper_text(
-                &http, &prof, &paper.title, &paper.authors, paper.venue.as_deref(),
-                paper.year, paper.abstract_text.as_deref(), None,
-            ).await?;
-            PaperRepo::new(&pool).update_quick_read(
-                &paper.id, &r.problem, &r.method, &r.comparison, &r.limitations,
-            ).await?;
+                &http,
+                &prof,
+                &paper.title,
+                &paper.authors,
+                paper.venue.as_deref(),
+                paper.year,
+                paper.abstract_text.as_deref(),
+                None,
+                &output_language,
+            )
+            .await?;
+            PaperRepo::new(&pool)
+                .update_quick_read(
+                    &paper.id,
+                    &r.problem,
+                    &r.method,
+                    &r.comparison,
+                    &r.limitations,
+                )
+                .await?;
             Ok(())
         }
-    }).await
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn batch_translate(
-    app: AppHandle, state: State<'_, Arc<AppState>>,
-    ids: Vec<String>, target_lang: Option<String>,
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    ids: Vec<String>,
+    target_lang: Option<String>,
 ) -> Result<BatchSummary, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?.clone();
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate)
+        .map_err(|e| e.to_string())?
+        .clone();
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
     let http = state.http.clone();
     let pool = state.pool.clone();
@@ -852,13 +1152,20 @@ pub async fn batch_translate(
         let lang = lang.clone();
         async move {
             let r = crate::ai::translate_paper_text(
-                &http, &prof, &paper.title, paper.abstract_text.as_deref(), &lang,
-            ).await?;
+                &http,
+                &prof,
+                &paper.title,
+                paper.abstract_text.as_deref(),
+                &lang,
+            )
+            .await?;
             PaperRepo::new(&pool)
-                .update_translation(&paper.id, &r.title, &r.abstract_text, &r.target_lang).await?;
+                .update_translation(&paper.id, &r.title, &r.abstract_text, &r.target_lang)
+                .await?;
             Ok(())
         }
-    }).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -913,10 +1220,7 @@ pub async fn highlight_update_note(
 }
 
 #[tauri::command]
-pub async fn highlight_delete(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn highlight_delete(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     HighlightRepo::new(&state.pool)
         .delete(&id)
         .await
@@ -924,10 +1228,7 @@ pub async fn highlight_delete(
 }
 
 #[tauri::command]
-pub async fn note_get(
-    state: State<'_, Arc<AppState>>,
-    paper_id: String,
-) -> Result<String, String> {
+pub async fn note_get(state: State<'_, Arc<AppState>>, paper_id: String) -> Result<String, String> {
     notes::read(&state.paths, &paper_id).map_err(|e| e.to_string())
 }
 
@@ -945,7 +1246,9 @@ pub async fn llm_list_models(
     state: State<'_, Arc<AppState>>,
     profile: LlmProfile,
 ) -> Result<Vec<String>, String> {
-    list_models(&state.http, &profile).await.map_err(|e| e.to_string())
+    list_models(&state.http, &profile)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -955,5 +1258,7 @@ pub async fn search_expand_query(
 ) -> Result<ExpandedQuery, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let prof = active_profile(&cfg).map_err(|e| e.to_string())?.clone();
-    expand_search_query(&state.http, &prof, &raw).await.map_err(|e| e.to_string())
+    expand_search_query(&state.http, &prof, &raw)
+        .await
+        .map_err(|e| e.to_string())
 }

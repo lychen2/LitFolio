@@ -21,8 +21,12 @@ pub struct LlmProfile {
     pub temperature: f32,
 }
 
-fn default_max_tokens() -> u32 { 1024 }
-fn default_temperature() -> f32 { 0.3 }
+fn default_max_tokens() -> u32 {
+    1024
+}
+fn default_temperature() -> f32 {
+    0.3
+}
 
 /// A per-task LLM binding. `profile` selects the endpoint+key+params, `model` optionally
 /// overrides `profile.chat_model` — so one profile (one key) can serve many tasks with
@@ -44,10 +48,17 @@ impl<'de> Deserialize<'de> for TaskBinding {
         #[serde(untagged)]
         enum Either {
             Bare(String),
-            Pair { profile: String, #[serde(default)] model: Option<String> },
+            Pair {
+                profile: String,
+                #[serde(default)]
+                model: Option<String>,
+            },
         }
         match Either::deserialize(d)? {
-            Either::Bare(profile) => Ok(TaskBinding { profile, model: None }),
+            Either::Bare(profile) => Ok(TaskBinding {
+                profile,
+                model: None,
+            }),
             Either::Pair { profile, model } => Ok(TaskBinding { profile, model }),
         }
     }
@@ -61,19 +72,42 @@ pub struct LlmConfig {
     pub active: Option<String>,
     #[serde(default)]
     pub task_assignments: TaskAssignments,
+    #[serde(default = "default_output_language")]
+    pub output_language: String,
+}
+
+fn default_output_language() -> String {
+    "Chinese".into()
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskAssignments {
-    #[serde(default)] pub tldr: Option<TaskBinding>,
-    #[serde(default)] pub quick_read: Option<TaskBinding>,
-    #[serde(default)] pub translate: Option<TaskBinding>,
-    #[serde(default)] pub tag: Option<TaskBinding>,
-    #[serde(default)] pub link: Option<TaskBinding>,
+    #[serde(default)]
+    pub tldr: Option<TaskBinding>,
+    #[serde(default)]
+    pub quick_read: Option<TaskBinding>,
+    #[serde(default)]
+    pub translate: Option<TaskBinding>,
+    #[serde(default)]
+    pub tag: Option<TaskBinding>,
+    #[serde(default)]
+    pub link: Option<TaskBinding>,
+    #[serde(default)]
+    pub topic_survey: Option<TaskBinding>,
+    #[serde(default)]
+    pub ask: Option<TaskBinding>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum TaskKind { Tldr, QuickRead, Translate, Tag, Link }
+pub enum TaskKind {
+    Tldr,
+    QuickRead,
+    Translate,
+    Tag,
+    Link,
+    TopicSurvey,
+    Ask,
+}
 
 impl LlmConfig {
     pub fn upsert(&mut self, p: LlmProfile) {
@@ -101,16 +135,17 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
     if !path.exists() {
         return Ok(LlmConfig::default());
     }
-    let raw = std::fs::read_to_string(&path)
-        .with_context(|| format!("read {}", path.display()))?;
-    let cfg: LlmConfig = serde_json::from_str(&raw)
-        .with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let cfg: LlmConfig =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     Ok(cfg)
 }
 
 pub fn save_config(paths: &LibraryPaths, cfg: &LlmConfig) -> Result<()> {
     let path = config_file(paths);
-    if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let body = serde_json::to_vec_pretty(cfg)?;
     std::fs::write(&path, body)?;
     Ok(())
@@ -120,13 +155,14 @@ pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
     if cfg.profiles.is_empty() {
         return Err(anyhow!("no LLM profile configured; add one in Settings"));
     }
-    if let Some(name) = cfg.active.as_deref() {
+    if let Some(name) = cfg.active.as_deref().filter(|s| !s.is_empty()) {
         if let Some(p) = cfg.profiles.iter().find(|p| p.name == name) {
             return Ok(p);
         }
         tracing::warn!(
-            "LLM config: active=`{name}` not found in {n} profile(s); falling back to first",
-            n = cfg.profiles.len()
+            active = name,
+            fallback = cfg.profiles[0].name,
+            "active LLM profile is missing; using first configured profile"
         );
     }
     Ok(&cfg.profiles[0])
@@ -137,16 +173,26 @@ pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
 /// just use `profile.chat_model` as before and don't need to know about the override.
 pub fn active_profile_for_task(cfg: &LlmConfig, task: TaskKind) -> Result<LlmProfile> {
     let binding: Option<&TaskBinding> = match task {
-        TaskKind::Tldr      => cfg.task_assignments.tldr.as_ref(),
+        TaskKind::Tldr => cfg.task_assignments.tldr.as_ref(),
         TaskKind::QuickRead => cfg.task_assignments.quick_read.as_ref(),
         TaskKind::Translate => cfg.task_assignments.translate.as_ref(),
-        TaskKind::Tag       => cfg.task_assignments.tag.as_ref(),
-        TaskKind::Link      => cfg.task_assignments.link.as_ref(),
+        TaskKind::Tag => cfg.task_assignments.tag.as_ref(),
+        TaskKind::Link => cfg.task_assignments.link.as_ref(),
+        TaskKind::TopicSurvey => cfg.task_assignments.topic_survey.as_ref(),
+        TaskKind::Ask => cfg.task_assignments.ask.as_ref(),
     };
     if let Some(b) = binding {
-        let mut p = cfg.profiles.iter().find(|x| x.name == b.profile)
-            .ok_or_else(|| anyhow!("profile `{}` not in config", b.profile))?
-            .clone();
+        let mut p = match cfg.profiles.iter().find(|x| x.name == b.profile) {
+            Some(profile) => profile.clone(),
+            None => {
+                tracing::warn!(
+                    bound = b.profile,
+                    fallback = cfg.profiles.first().map(|p| p.name.as_str()).unwrap_or(""),
+                    "task binding profile is missing; using default profile"
+                );
+                active_profile(cfg)?.clone()
+            }
+        };
         if let Some(m) = b.model.as_deref().filter(|s| !s.is_empty()) {
             p.chat_model = m.to_string();
         }
@@ -203,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn active_falls_back_to_first() {
+    fn active_uses_first_when_unset() {
         let mut cfg = LlmConfig::default();
         cfg.upsert(sample_profile("only"));
         let a = active_profile(&cfg).unwrap();
@@ -216,9 +262,18 @@ mod tests {
         let mut cfg = LlmConfig::default();
         cfg.upsert(sample_profile("proxy"));
         cfg.active = Some("proxy".into());
-        cfg.task_assignments.tldr      = Some(TaskBinding { profile: "proxy".into(), model: Some("gpt-5.4".into()) });
-        cfg.task_assignments.quick_read = Some(TaskBinding { profile: "proxy".into(), model: Some("gpt-5.5".into()) });
-        cfg.task_assignments.translate = Some(TaskBinding { profile: "proxy".into(), model: None }); // no override → profile default
+        cfg.task_assignments.tldr = Some(TaskBinding {
+            profile: "proxy".into(),
+            model: Some("gpt-5.4".into()),
+        });
+        cfg.task_assignments.quick_read = Some(TaskBinding {
+            profile: "proxy".into(),
+            model: Some("gpt-5.5".into()),
+        });
+        cfg.task_assignments.translate = Some(TaskBinding {
+            profile: "proxy".into(),
+            model: None,
+        }); // no override → profile default
 
         let p1 = active_profile_for_task(&cfg, TaskKind::Tldr).unwrap();
         assert_eq!(p1.chat_model, "gpt-5.4");
@@ -237,11 +292,15 @@ mod tests {
     }
 
     #[test]
-    fn task_binding_errors_when_profile_missing() {
+    fn task_binding_uses_default_when_profile_missing() {
         let mut cfg = LlmConfig::default();
         cfg.upsert(sample_profile("a"));
-        cfg.task_assignments.translate = Some(TaskBinding { profile: "ghost".into(), model: None });
-        assert!(active_profile_for_task(&cfg, TaskKind::Translate).is_err());
+        cfg.task_assignments.translate = Some(TaskBinding {
+            profile: "ghost".into(),
+            model: None,
+        });
+        let p = active_profile_for_task(&cfg, TaskKind::Translate).unwrap();
+        assert_eq!(p.name, "a");
     }
 
     #[test]
@@ -254,7 +313,11 @@ mod tests {
             "task_assignments": { "tldr": "fast", "quick_read": null }
         }"#;
         let cfg: LlmConfig = serde_json::from_str(raw).unwrap();
-        let b = cfg.task_assignments.tldr.as_ref().expect("tldr should bind");
+        let b = cfg
+            .task_assignments
+            .tldr
+            .as_ref()
+            .expect("tldr should bind");
         assert_eq!(b.profile, "fast");
         assert!(b.model.is_none());
         let p = active_profile_for_task(&cfg, TaskKind::Tldr).unwrap();
@@ -262,11 +325,11 @@ mod tests {
     }
 
     #[test]
-    fn active_profile_falls_back_when_active_name_missing() {
+    fn active_profile_uses_first_when_active_name_missing() {
         let mut cfg = LlmConfig::default();
         cfg.upsert(sample_profile("deepseek-flash"));
         cfg.active = Some("deepseek-chat".into());
-        let p = active_profile(&cfg).expect("should fall back to first profile");
+        let p = active_profile(&cfg).expect("stale active profile should use first");
         assert_eq!(p.name, "deepseek-flash");
     }
 

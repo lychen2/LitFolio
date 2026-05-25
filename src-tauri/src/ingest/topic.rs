@@ -31,7 +31,11 @@ pub struct TopicRequest {
 
 impl Default for TopicRequest {
     fn default() -> Self {
-        Self { recent_limit: 20, classic_limit: 20, recent_window_years: 3 }
+        Self {
+            recent_limit: 20,
+            classic_limit: 20,
+            recent_window_years: 3,
+        }
     }
 }
 
@@ -78,8 +82,12 @@ pub async fn discover_topic_multi(
     // term for the same `recent_limit` would balloon the response.
     let per_term = req.recent_limit.max(req.classic_limit);
 
-    let recent_futs = terms.iter().map(|t| bulk_by_citations(client, t, Some(&year_filter), per_term));
-    let classic_futs = terms.iter().map(|t| bulk_by_citations(client, t, None, per_term));
+    let recent_futs = terms
+        .iter()
+        .map(|t| bulk_by_citations(client, t, Some(&year_filter), per_term));
+    let classic_futs = terms
+        .iter()
+        .map(|t| bulk_by_citations(client, t, None, per_term));
     let recent_results = futures_join_all(recent_futs).await?;
     let classic_results = futures_join_all(classic_futs).await?;
 
@@ -119,10 +127,14 @@ where
 /// with the highest citation_count), then sort by citation_count descending
 /// and take the top N.
 fn merge_dedupe_top(buckets: Vec<Vec<SearchResult>>, top_n: usize) -> Vec<SearchResult> {
-    let mut seen: std::collections::HashMap<String, SearchResult> = std::collections::HashMap::new();
+    let mut seen: std::collections::HashMap<String, SearchResult> =
+        std::collections::HashMap::new();
     for bucket in buckets {
         for hit in bucket {
-            let key = hit.paper_id.clone().unwrap_or_else(|| format!("noid:{}", hit.draft.title));
+            let key = hit
+                .paper_id
+                .clone()
+                .unwrap_or_else(|| format!("noid:{}", hit.draft.title));
             seen.entry(key)
                 .and_modify(|existing| {
                     if hit.citation_count.unwrap_or(0) > existing.citation_count.unwrap_or(0) {
@@ -133,7 +145,11 @@ fn merge_dedupe_top(buckets: Vec<Vec<SearchResult>>, top_n: usize) -> Vec<Search
         }
     }
     let mut merged: Vec<SearchResult> = seen.into_values().collect();
-    merged.sort_by(|a, b| b.citation_count.unwrap_or(0).cmp(&a.citation_count.unwrap_or(0)));
+    merged.sort_by(|a, b| {
+        b.citation_count
+            .unwrap_or(0)
+            .cmp(&a.citation_count.unwrap_or(0))
+    });
     merged.truncate(top_n);
     merged
 }

@@ -22,7 +22,6 @@ struct ChatRequest<'a> {
     model: &'a str,
     messages: &'a [ChatMessage],
     temperature: f32,
-    max_tokens: u32,
     stream: bool,
 }
 
@@ -81,7 +80,6 @@ pub async fn chat_complete(
         model: &profile.chat_model,
         messages,
         temperature: profile.temperature,
-        max_tokens: profile.max_tokens,
         // Always stream. Standard providers (OpenAI / DeepSeek / Moonshot / SiliconFlow / Ollama)
         // all support stream:true and return SSE we know how to parse. Several Chinese gateway
         // proxies (new-api/one-api) silently return an empty metadata-only frame when stream:false
@@ -96,9 +94,28 @@ pub async fn chat_complete(
     }
     let resp = req.send().await.with_context(|| format!("POST {url}"))?;
     let status = resp.status();
-    let text = resp.text().await.unwrap_or_default();
+    let headers = resp.headers().clone();
+    let text = resp.text().await.with_context(|| {
+        format!(
+            "read LLM response body for model `{}` from {url}",
+            profile.chat_model
+        )
+    })?;
     if !status.is_success() {
-        return Err(anyhow!("LLM endpoint returned {status}: {}", truncate(&text, 800)));
+        return Err(anyhow!(
+            "LLM endpoint returned {status}: {}",
+            truncate(&text, 800)
+        ));
+    }
+    if text.trim().is_empty() {
+        return Err(anyhow!(
+            "LLM endpoint returned an empty response body for model `{}`; status={status}, url={}, stream=true, request_chars={}, content-type={}, content-length={}. The provider/proxy closed the request without JSON or SSE data",
+            profile.chat_model,
+            url,
+            request_chars(messages),
+            header_value(&headers, "content-type"),
+            header_value(&headers, "content-length"),
+        ));
     }
     let parsed = parse_response(&text)
         .with_context(|| format!("decode chat response: {}", truncate(&text, 500)))?;
@@ -109,6 +126,18 @@ pub async fn chat_complete(
         completion_tokens: parsed.usage.completion_tokens,
         model: profile.chat_model.clone(),
     })
+}
+
+fn request_chars(messages: &[ChatMessage]) -> usize {
+    messages.iter().map(|m| m.content.chars().count()).sum()
+}
+
+fn header_value(headers: &reqwest::header::HeaderMap, name: &str) -> String {
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("<missing>")
+        .to_string()
 }
 
 #[derive(Debug)]
@@ -130,16 +159,24 @@ fn parse_response(text: &str) -> Result<ParsedReply> {
 }
 
 fn parse_plain(text: &str) -> Result<ParsedReply> {
-    let parsed: ChatRawResponse = serde_json::from_str(text)
-        .with_context(|| "decode chat response as JSON")?;
+    let parsed: ChatRawResponse =
+        serde_json::from_str(text).with_context(|| "decode chat response as JSON")?;
     let usage = parsed.usage.unwrap_or_default();
-    let choice = parsed.choices.into_iter().next()
+    let choice = parsed
+        .choices
+        .into_iter()
+        .next()
         .ok_or_else(|| anyhow!("LLM returned no choices"))?;
-    let content = choice.message
+    let content = choice
+        .message
         .and_then(|m| Some(m.content))
         .or_else(|| choice.delta.as_ref().and_then(|d| d.content.clone()))
         .ok_or_else(|| anyhow!("LLM choice missing content"))?;
-    Ok(ParsedReply { content, finish_reason: choice.finish_reason, usage })
+    Ok(ParsedReply {
+        content,
+        finish_reason: choice.finish_reason,
+        usage,
+    })
 }
 
 fn parse_sse(text: &str) -> Result<ParsedReply> {
@@ -191,7 +228,11 @@ fn parse_sse(text: &str) -> Result<ParsedReply> {
             "LLM stream returned no content (proxy may have rejected the request silently — check the model name and your account's allowed pool)"
         ));
     }
-    Ok(ParsedReply { content, finish_reason, usage })
+    Ok(ParsedReply {
+        content,
+        finish_reason,
+        usage,
+    })
 }
 
 fn endpoint(base_url: &str, path: &str) -> String {
@@ -200,7 +241,9 @@ fn endpoint(base_url: &str, path: &str) -> String {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { return s.to_string(); }
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
     let mut out: String = s.chars().take(max).collect();
     out.push_str("…");
     out
@@ -212,16 +255,35 @@ mod tests {
 
     #[test]
     fn endpoint_joins_correctly() {
-        assert_eq!(endpoint("https://api.openai.com/v1", "/chat/completions"),
-                   "https://api.openai.com/v1/chat/completions");
-        assert_eq!(endpoint("http://localhost:11434/v1/", "/chat/completions"),
-                   "http://localhost:11434/v1/chat/completions");
+        assert_eq!(
+            endpoint("https://api.openai.com/v1", "/chat/completions"),
+            "https://api.openai.com/v1/chat/completions"
+        );
+        assert_eq!(
+            endpoint("http://localhost:11434/v1/", "/chat/completions"),
+            "http://localhost:11434/v1/chat/completions"
+        );
     }
 
     #[test]
     fn truncate_works() {
         assert_eq!(truncate("abc", 10), "abc");
         assert_eq!(truncate("abcdefghij", 5), "abcde…");
+    }
+
+    #[test]
+    fn request_chars_sums_message_content() {
+        let messages = vec![
+            ChatMessage {
+                role: "system".into(),
+                content: "abc".into(),
+            },
+            ChatMessage {
+                role: "user".into(),
+                content: "你好".into(),
+            },
+        ];
+        assert_eq!(request_chars(&messages), 5);
     }
 
     #[test]
@@ -260,6 +322,9 @@ data: [DONE]\n";
         let body = "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":0,\"total_tokens\":15}}\n\ndata: [DONE]\n";
         let err = parse_response(body).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("no content") || msg.contains("rejected"), "msg was: {msg}");
+        assert!(
+            msg.contains("no content") || msg.contains("rejected"),
+            "msg was: {msg}"
+        );
     }
 }

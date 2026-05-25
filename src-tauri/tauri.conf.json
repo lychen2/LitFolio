@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Litera",
+  "productName": "LitFolio",
   "version": "0.1.0",
   "identifier": "dev.litera.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Litera",
+        "title": "LitFolio",
         "width": 1320,
         "height": 860,
         "minWidth": 960,
@@ -42,7 +42,7 @@
     ],
     "category": "Productivity",
     "shortDescription": "Local-first literature manager with LLM summaries",
-    "longDescription": "Litera is a desktop literature management library with LLM-powered TL;DR, structured extraction, smart tagging, RAG Q&A and Markdown notes."
+    "longDescription": "LitFolio is a desktop literature management app with LLM-powered TL;DR, structured extraction, smart tagging, RAG Q&A, RSS subscriptions and Markdown notes."
   },
   "plugins": {
     "shell": {

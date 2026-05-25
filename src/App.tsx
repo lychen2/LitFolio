@@ -7,6 +7,7 @@ import { AskPage } from "@/pages/AskPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TopicPage } from "@/pages/TopicPage";
 import { BrowsePage } from "@/pages/BrowsePage";
+import { FeedsPage } from "@/pages/FeedsPage";
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
         <Route path="/import" element={<ImportPage />} />
         <Route path="/topic" element={<TopicPage />} />
         <Route path="/browse" element={<BrowsePage />} />
+        <Route path="/feeds" element={<FeedsPage />} />
         <Route path="/ask" element={<AskPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>

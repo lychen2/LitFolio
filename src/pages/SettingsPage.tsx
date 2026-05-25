@@ -21,7 +21,16 @@ export function SettingsPage() {
   const [draft, setDraft] = useState<LlmConfig>({
     profiles: [],
     active: null,
-    task_assignments: { tldr: null, quick_read: null, translate: null, tag: null, link: null },
+    output_language: "Chinese",
+    task_assignments: {
+      tldr: null,
+      quick_read: null,
+      translate: null,
+      tag: null,
+      link: null,
+      topic_survey: null,
+      ask: null,
+    },
   });
   useEffect(() => { if (data) setDraft(data); }, [data]);
 
@@ -34,7 +43,8 @@ export function SettingsPage() {
     setDraft((d) => {
       const profiles = d.profiles.filter((p) => p.name !== (originalName ?? profile.name));
       profiles.push(profile);
-      return { ...d, profiles, active: d.active ?? profile.name };
+      const active = d.active === originalName ? profile.name : (d.active ?? profile.name);
+      return { ...d, profiles, active };
     });
   }
   function remove(name: string) {
@@ -61,6 +71,7 @@ export function SettingsPage() {
       temperature: 0.3,
     };
   }
+  const activeMissing = draft.active && !draft.profiles.some((p) => p.name === draft.active);
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
@@ -89,6 +100,20 @@ export function SettingsPage() {
           <p className="text-xs text-litera-mute">
             任何兼容 OpenAI 协议的端点均可使用。先填 API 地址 + 密钥,然后点 📥 拉取 自动发现可用模型。
           </p>
+        </div>
+
+        <div className="litera-panel p-4 mb-5 max-w-xl">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[11px] uppercase tracking-wider text-litera-mute">速读 / 深读输出语言</span>
+            <select
+              value={draft.output_language || "Chinese"}
+              onChange={(e) => setDraft((d) => ({ ...d, output_language: e.target.value }))}
+              className="litera-input w-48 text-sm"
+            >
+              <option value="Chinese">中文</option>
+              <option value="English">English</option>
+            </select>
+          </label>
         </div>
 
         <div className="flex gap-2 flex-wrap mb-5">
@@ -124,6 +149,12 @@ export function SettingsPage() {
               />
             ))}
           </ul>
+        )}
+
+        {activeMissing && (
+          <div className="mt-3 text-sm text-red-400/90">
+            当前 profile「{draft.active}」不存在。请在上方选择一个有效 profile 设为当前,然后保存。
+          </div>
         )}
 
         <TaskAssignments draft={draft} onChange={setDraft} />

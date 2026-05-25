@@ -1,9 +1,39 @@
-# Litera
+# LitFolio
 
-Local-first literature management desktop app with LLM-powered TL;DR, structured
-extraction, smart tagging, RAG Q&A, and Markdown notes.
+Local-first literature manager for researchers: import papers, read them in-app
+with highlights + Markdown notes, ask questions across your library, and watch
+journal RSS feeds for new releases — all powered by a configurable LLM stack
+that talks to any OpenAI-compatible endpoint.
 
-**Stack:** Tauri 2 · React 18 · TypeScript · SQLite (sqlx) · Tantivy · sqlite-vec
+> Formerly known as Litera.
+
+## Features
+
+- **Library**: import via DOI / arXiv ID / BibTeX / local PDF / Semantic Scholar
+  search. Every paper carries a PDF. Filter by folder (a paper can live in many
+  folders) or by tag.
+- **Reader**: PDF.js viewer with react-pdf-highlighter, three-pane layout
+  (highlights · PDF · Markdown notes), dark-mode toggle.
+- **AI workflows**: TL;DR, four-section Quick Read (problem / method /
+  comparison / limitations), title + abstract translation. Each task can be
+  bound to a different model.
+- **Topic discovery**: LLM-rewritten English search terms → multi-query
+  Semantic Scholar fan-out → deduped, citation-ranked results. Optional
+  LLM-annotated literature survey skeleton (subareas + key PIs + must-reads).
+- **Library Q&A (RAG)**: LLM-rewrites your question into 2-4 English search
+  terms, fans them out across SQLite FTS5, merges results by term-match count,
+  enriches snippets with user highlights, and answers with inline `[N]`
+  citations.
+- **RSS subscriptions**: subscribe to journal RSS / Atom feeds (arXiv, Optica,
+  Nature, ACS Photonics, ScienceDirect…), conditional-GET refresh, click-through
+  detail drawer with one-tap title/abstract translation. 入库 jumps to the
+  Import page with the source link pre-filled.
+- **Local-first**: everything lives under `~/Litera-Library/`. The on-disk path
+  is preserved from the previous brand for backward compatibility.
+
+## Stack
+
+Tauri 2 · React 18 · TypeScript · SQLite (sqlx) · feed-rs · react-pdf-highlighter
 
 ## Quick start
 
@@ -12,28 +42,28 @@ pnpm install
 pnpm tauri dev
 ```
 
-## Plan
-
-The full work plan is at `../../.omc/plans/litera-desktop-plan.md` — milestones
-M0 (skeleton) → M9 (graph view). This repo currently implements M0.
+The first launch creates `~/Litera-Library/` and seeds a default set of optics /
+photonics journal RSS feeds. Configure your LLM profile in Settings → 模型配置
+before using any AI workflow.
 
 ## Layout
 
 ```
 src/                  React frontend
   components/         Shared UI (Shell, ...)
-  pages/              Top-level routes (Library, Reader, Import, Ask, Settings)
-  features/           Feature modules (library, reader, ai, settings, import)
-  lib/                Frontend utilities
+  pages/              Top-level routes (library / reader / import /
+                      browse / feeds / topic / ask / settings)
+  pages/<feature>/    Per-page subcomponents
+  lib/                Frontend API client + utils
   styles/             Tailwind globals
 
 src-tauri/            Rust backend
-  src/commands/       IPC surface
-  src/storage/        SQLite layer  (M1)
-  src/ingest/         Import pipeline (M2)
-  src/ai/             LLM client + workflows (M4-M5)
-  src/index/          Search / vector index (M6)
-  src/cluster/        Tag clustering (M5)
+  src/commands/       IPC surface (Tauri commands)
+  src/storage/        SQLite layer + sqlx migrations
+  src/ingest/         Import pipeline (DOI / arXiv / BibTeX / PDF / S2 / RSS)
+  src/ai/             LLM client, profile config, summarization / translation /
+                      query rewrite / RAG / topic survey
+  migrations/         Versioned SQL migrations
 ```
 
 ## License
