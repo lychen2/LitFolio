@@ -20,7 +20,9 @@ impl<'a> PaperRepo<'a> {
         let authors_json = serde_json::to_string(&p.authors)?;
         let findings_json = serde_json::to_string(&p.key_findings)?;
         if p.pdf_path.as_deref().map(str::is_empty).unwrap_or(true) {
-            return Err(anyhow::anyhow!("a paper must have a PDF file (pdf_path is required)"));
+            return Err(anyhow::anyhow!(
+                "a paper must have a PDF file (pdf_path is required)"
+            ));
         }
         sqlx::query(
             "INSERT INTO papers (id, title, authors_json, year, venue, doi, arxiv_id, abstract,
@@ -68,6 +70,20 @@ impl<'a> PaperRepo<'a> {
             .bind(limit)
             .fetch_all(self.pool)
             .await?;
+        rows.into_iter().map(row_to_paper).collect()
+    }
+
+    pub async fn list_by_folder(&self, folder_id: i64, limit: i64) -> Result<Vec<Paper>> {
+        let rows = sqlx::query(
+            "SELECT p.* FROM papers p
+             JOIN paper_folders pf ON pf.paper_id = p.id
+             WHERE pf.folder_id = ?1
+             ORDER BY p.added_at DESC LIMIT ?2",
+        )
+        .bind(folder_id)
+        .bind(limit)
+        .fetch_all(self.pool)
+        .await?;
         rows.into_iter().map(row_to_paper).collect()
     }
 
@@ -152,7 +168,11 @@ impl<'a> PaperRepo<'a> {
     }
 
     pub async fn update_translation(
-        &self, id: &str, title_tx: &str, abstract_tx: &str, lang: &str,
+        &self,
+        id: &str,
+        title_tx: &str,
+        abstract_tx: &str,
+        lang: &str,
     ) -> Result<()> {
         let now = Utc::now().timestamp();
         sqlx::query(
@@ -160,8 +180,13 @@ impl<'a> PaperRepo<'a> {
                                 translate_target_lang = ?3, translated_at = ?4,
                                 updated_at = ?4 WHERE id = ?5",
         )
-        .bind(title_tx).bind(abstract_tx).bind(lang).bind(now).bind(id)
-        .execute(self.pool).await?;
+        .bind(title_tx)
+        .bind(abstract_tx)
+        .bind(lang)
+        .bind(now)
+        .bind(id)
+        .execute(self.pool)
+        .await?;
         Ok(())
     }
 
@@ -170,15 +195,13 @@ impl<'a> PaperRepo<'a> {
             return Err(anyhow::anyhow!("pdf_path must not be empty"));
         }
         let now = Utc::now().timestamp();
-        let res = sqlx::query(
-            "UPDATE papers SET pdf_path = ?1, updated_at = ?2 WHERE id = ?3",
-        )
-        .bind(pdf_path)
-        .bind(now)
-        .bind(id)
-        .execute(self.pool)
-        .await
-        .context("update pdf_path")?;
+        let res = sqlx::query("UPDATE papers SET pdf_path = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(pdf_path)
+            .bind(now)
+            .bind(id)
+            .execute(self.pool)
+            .await
+            .context("update pdf_path")?;
         if res.rows_affected() == 0 {
             return Err(anyhow::anyhow!("paper {id} not found"));
         }
@@ -320,7 +343,9 @@ mod tests {
         let (pool, dir) = temp_pool().await;
         let repo = PaperRepo::new(&pool);
         repo.insert(&sample("Q")).await.unwrap();
-        repo.update_quick_read("Q", "P", "M", "C", "L").await.unwrap();
+        repo.update_quick_read("Q", "P", "M", "C", "L")
+            .await
+            .unwrap();
         let p = repo.get("Q").await.unwrap().unwrap();
         assert_eq!(p.research_question.as_deref(), Some("P"));
         assert_eq!(p.method.as_deref(), Some("M"));
@@ -359,7 +384,9 @@ mod tests {
         let (pool, dir) = temp_pool().await;
         let repo = PaperRepo::new(&pool);
         repo.insert(&sample("T")).await.unwrap();
-        repo.update_translation("T", "标题", "摘要内容", "Chinese").await.unwrap();
+        repo.update_translation("T", "标题", "摘要内容", "Chinese")
+            .await
+            .unwrap();
         let p = repo.get("T").await.unwrap().unwrap();
         assert_eq!(p.title_translated.as_deref(), Some("标题"));
         assert_eq!(p.abstract_translated.as_deref(), Some("摘要内容"));
@@ -373,12 +400,17 @@ mod tests {
         let (pool, dir) = temp_pool().await;
         let repo = PaperRepo::new(&pool);
         repo.insert(&sample("P")).await.unwrap();
-        repo.update_pdf_path("P", "/tmp/new-location.pdf").await.unwrap();
+        repo.update_pdf_path("P", "/tmp/new-location.pdf")
+            .await
+            .unwrap();
         let p = repo.get("P").await.unwrap().unwrap();
         assert_eq!(p.pdf_path.as_deref(), Some("/tmp/new-location.pdf"));
 
         assert!(repo.update_pdf_path("P", "").await.is_err());
-        assert!(repo.update_pdf_path("does-not-exist", "/tmp/x.pdf").await.is_err());
+        assert!(repo
+            .update_pdf_path("does-not-exist", "/tmp/x.pdf")
+            .await
+            .is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -35,15 +35,33 @@ pub async fn translate_paper_text(
         abstract_text.unwrap_or("(no abstract supplied)"),
     );
     let resp = chat_complete(
-        client, profile,
+        client,
+        profile,
         &[
-            ChatMessage { role: "system".into(), content: SYSTEM_PROMPT.into() },
-            ChatMessage { role: "user".into(), content: user_content },
+            ChatMessage {
+                role: "system".into(),
+                content: SYSTEM_PROMPT.into(),
+            },
+            ChatMessage {
+                role: "user".into(),
+                content: user_content,
+            },
         ],
-    ).await?;
+    )
+    .await?;
     let v = parse_json_lenient(&resp.content);
-    let title_tx = v.get("title").and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
-    let abstract_tx = v.get("abstract").and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+    let title_tx = v
+        .get("title")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let abstract_tx = v
+        .get("abstract")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     Ok(TranslationResult {
         title: title_tx,
         abstract_text: abstract_tx,

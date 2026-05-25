@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import { Workflow, Loader2, Download } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { api, type LlmConfig, type LlmProfile, type TaskBinding } from "@/lib/api";
+import {
+  api,
+  type LlmConfig,
+  type LlmProfile,
+  type TaskAssignments as TaskAssignmentsShape,
+  type TaskBinding,
+} from "@/lib/api";
 
-type TaskKey = "tldr" | "quick_read" | "translate";
+type TaskKey = keyof TaskAssignmentsShape;
 
 const TASK_LABELS: { key: TaskKey; label: string; hint: string }[] = [
   { key: "tldr",       label: "速读 (TL;DR)",  hint: "一句话摘要 + 关键发现" },
   { key: "quick_read", label: "深读",         hint: "问题 / 方法 / 不同 / 局限四段式" },
   { key: "translate",  label: "翻译",         hint: "标题 + 摘要译为中文" },
+  { key: "topic_survey", label: "综述生成",    hint: "拆解领域 + 标注必读" },
+  { key: "ask",        label: "RAG 提问",     hint: "基于文献库回答问题" },
+  { key: "tag",        label: "标签",         hint: "后续自动标签功能" },
+  { key: "link",       label: "关联",         hint: "后续论文关联功能" },
 ];
 
 export function TaskAssignments({
@@ -41,6 +51,7 @@ export function TaskAssignments({
         {TASK_LABELS.map(({ key, label, hint }) => (
           <TaskRow
             key={key}
+            taskKey={key}
             label={label}
             hint={hint}
             profiles={draft.profiles}
@@ -55,8 +66,9 @@ export function TaskAssignments({
 }
 
 function TaskRow({
-  label, hint, profiles, binding, activeProfile, onChange,
+  taskKey, label, hint, profiles, binding, activeProfile, onChange,
 }: {
+  taskKey: TaskKey;
   label: string;
   hint: string;
   profiles: LlmProfile[];
@@ -66,6 +78,7 @@ function TaskRow({
 }) {
   const selectedProfile = profiles.find((p) => p.name === binding?.profile);
   const [models, setModels] = useState<string[] | null>(null);
+  const modelListId = `task-models-${taskKey}`;
   // Re-prime the model dropdown when the bound profile changes
   useEffect(() => { setModels(null); }, [binding?.profile]);
 
@@ -98,25 +111,21 @@ function TaskRow({
 
       {selectedProfile && (
         <>
-          <select
+          <input
+            list={modelListId}
             value={binding?.model ?? ""}
             onChange={(e) => {
               const v = e.target.value;
               onChange({ profile: selectedProfile.name, model: v || null });
             }}
             className="litera-input text-xs flex-1 min-w-[12rem] font-mono"
-          >
-            <option value="">默认 ({selectedProfile.chat_model})</option>
-            {models && !models.includes(selectedProfile.chat_model) && (
-              <option value={selectedProfile.chat_model}>{selectedProfile.chat_model} (profile 默认)</option>
-            )}
-            {models?.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-            {binding?.model && (!models || !models.includes(binding.model)) && (
-              <option value={binding.model}>{binding.model} (自填)</option>
-            )}
-          </select>
+            placeholder={`默认: ${selectedProfile.chat_model}`}
+            title="留空使用该 profile 的默认对话模型；也可以手填任意兼容模型名"
+          />
+          <datalist id={modelListId}>
+            <option value={selectedProfile.chat_model} />
+            {models?.map((m) => <option key={m} value={m} />)}
+          </datalist>
           <button
             onClick={() => listModels.mutate(selectedProfile)}
             disabled={listModels.isPending}

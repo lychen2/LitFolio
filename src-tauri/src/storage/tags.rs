@@ -43,34 +43,45 @@ impl<'a> TagRepo<'a> {
 
     pub async fn rename(&self, id: i64, new_name: &str) -> Result<()> {
         sqlx::query("UPDATE tags SET name = ?1 WHERE id = ?2")
-            .bind(new_name).bind(id)
-            .execute(self.pool).await?;
+            .bind(new_name)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
     pub async fn set_color(&self, id: i64, color: Option<&str>) -> Result<()> {
         sqlx::query("UPDATE tags SET color = ?1 WHERE id = ?2")
-            .bind(color).bind(id)
-            .execute(self.pool).await?;
+            .bind(color)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
     pub async fn delete(&self, id: i64) -> Result<()> {
-        sqlx::query("DELETE FROM tags WHERE id = ?1").bind(id).execute(self.pool).await?;
+        sqlx::query("DELETE FROM tags WHERE id = ?1")
+            .bind(id)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
     pub async fn attach(&self, paper_id: &str, tag_id: i64) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO paper_tags (paper_id, tag_id) VALUES (?1, ?2)")
-            .bind(paper_id).bind(tag_id)
-            .execute(self.pool).await?;
+            .bind(paper_id)
+            .bind(tag_id)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
     pub async fn detach(&self, paper_id: &str, tag_id: i64) -> Result<()> {
         sqlx::query("DELETE FROM paper_tags WHERE paper_id = ?1 AND tag_id = ?2")
-            .bind(paper_id).bind(tag_id)
-            .execute(self.pool).await?;
+            .bind(paper_id)
+            .bind(tag_id)
+            .execute(self.pool)
+            .await?;
         Ok(())
     }
 
@@ -119,8 +130,8 @@ fn row_to_tag(row: sqlx::sqlite::SqliteRow) -> Result<Tag> {
 mod tests {
     use super::*;
     use crate::storage::db::{open_pool, run_migrations};
-    use crate::storage::papers::PaperRepo;
     use crate::storage::models::{Paper, ReadStatus};
+    use crate::storage::papers::PaperRepo;
     use chrono::Utc;
     use std::path::PathBuf;
 
@@ -138,14 +149,27 @@ mod tests {
             id: id.into(),
             title: "T".into(),
             authors: vec![],
-            year: None, venue: None, doi: None, arxiv_id: None,
-            abstract_text: None, pdf_path: Some("/tmp/test.pdf".into()), note_path: None,
-            added_at: now, updated_at: now,
+            year: None,
+            venue: None,
+            doi: None,
+            arxiv_id: None,
+            abstract_text: None,
+            pdf_path: Some("/tmp/test.pdf".into()),
+            note_path: None,
+            added_at: now,
+            updated_at: now,
             read_status: ReadStatus::Unread,
-            tldr: None, research_question: None, method: None, dataset: None,
-            key_findings: vec![], limitations: None, comparison: None,
-            title_translated: None, abstract_translated: None,
-            translate_target_lang: None, translated_at: None,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
         }
     }
 

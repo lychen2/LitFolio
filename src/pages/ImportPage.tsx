@@ -1,16 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen,
+  ExternalLink, Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen, Rss,
 } from "lucide-react";
+import { open as openInBrowser } from "@tauri-apps/plugin-shell";
 import {
   api, pickPdfFiles, pickSinglePdf, type SearchHit, type ArxivDraft,
 } from "@/lib/api";
 
 type Tab = "pdf" | "arxiv_doi" | "search";
 
+interface ImportSource {
+  /** Original feed item id, sent back via feed_item_link_paper after save. */
+  fromFeedItem: string | null;
+  /** Source URL (arXiv abs page, DOI link, journal page, …). Used for one-click 在浏览器打开. */
+  link: string | null;
+  /** Optional title hint surfaced as the source banner subtitle. */
+  title: string | null;
+  /** Extracted identifier if we recognise the link (arXiv ID or DOI). Pre-fills the arXiv/DOI tab input. */
+  prefill: string | null;
+}
+
 export function ImportPage() {
-  const [tab, setTab] = useState<Tab>("arxiv_doi");
+  const [params] = useSearchParams();
+  const source: ImportSource = {
+    fromFeedItem: params.get("fromFeedItem"),
+    link: params.get("link"),
+    title: params.get("title"),
+    prefill: params.get("link") ? extractIdentifier(params.get("link")!) : null,
+  };
+  const [tab, setTab] = useState<Tab>(source.prefill ? "arxiv_doi" : "arxiv_doi");
+
   return (
     <section className="h-full flex flex-col">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-6">
@@ -22,18 +43,77 @@ export function ImportPage() {
         </div>
         <LibraryStats />
       </header>
+      <ImportSourceBanner source={source} />
       <nav className="px-6 pt-4 flex gap-1">
         <TabButton on={tab === "arxiv_doi"} onClick={() => setTab("arxiv_doi")} icon={<Hash className="h-3.5 w-3.5" />} label="arXiv 或 DOI" />
         <TabButton on={tab === "pdf"} onClick={() => setTab("pdf")} icon={<Upload className="h-3.5 w-3.5" />} label="PDF 文件" />
         <TabButton on={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label="搜索" />
       </nav>
       <div className="flex-1 overflow-auto p-6">
-        {tab === "arxiv_doi" && <ArxivDoiTab />}
+        {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}
         {tab === "pdf" && <PdfTab />}
         {tab === "search" && <SearchTab />}
       </div>
     </section>
   );
+}
+
+/// Surface the inbound link prominently so the user can: 1) see *why* they're
+/// on this page (来自 RSS 订阅), 2) one-click open the source page in their
+/// browser to grab the PDF when arXiv auto-download isn't an option (DOIs etc).
+function ImportSourceBanner({ source }: { source: ImportSource }) {
+  if (!source.link && !source.fromFeedItem) return null;
+  function open() {
+    if (source.link) openInBrowser(source.link).catch(() => undefined);
+  }
+  return (
+    <div className="border-b border-litera-line px-6 py-3 bg-litera-accent/5 flex items-center gap-3">
+      {source.fromFeedItem ? (
+        <Rss className="h-4 w-4 text-litera-accent shrink-0" />
+      ) : (
+        <ExternalLink className="h-4 w-4 text-litera-accent shrink-0" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-xs uppercase tracking-wider text-litera-mute">
+          {source.fromFeedItem ? "来自 RSS 订阅" : "来源"}
+        </div>
+        {source.title && (
+          <div className="text-sm text-litera-text truncate" title={source.title}>
+            {source.title}
+          </div>
+        )}
+        {source.link && (
+          <button
+            onClick={open}
+            className="mt-0.5 font-mono text-[11px] text-litera-accent hover:underline truncate max-w-full block text-left"
+            title="在浏览器打开原文页(可在那里下载 PDF)"
+          >
+            {source.link}
+          </button>
+        )}
+      </div>
+      {source.link && (
+        <button
+          onClick={open}
+          className="litera-btn text-xs flex items-center gap-1.5 shrink-0"
+          title="在浏览器打开原文,便于复制 DOI 或下载 PDF"
+        >
+          <ExternalLink className="h-3.5 w-3.5" /> 打开原文
+        </button>
+      )}
+    </div>
+  );
+}
+
+/// Best-effort pull an arXiv ID or DOI out of the source link so the user
+/// doesn't have to paste it. Anything we don't recognise leaves the input
+/// blank and the user can type the identifier by hand.
+function extractIdentifier(url: string): string | null {
+  const arxiv = url.match(/arxiv\.org\/(?:abs|pdf|html|format)\/([\w\-./]+?)(?:v\d+)?(?:\.pdf)?(?:[?#].*)?$/i);
+  if (arxiv) return arxiv[1];
+  const doi = url.match(/doi\.org\/(10\.\d{4,9}\/[^\s?#]+)/i);
+  if (doi) return doi[1];
+  return null;
 }
 
 function TabButton({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
@@ -63,28 +143,54 @@ function LibraryStats() {
   );
 }
 
-function ArxivDoiTab() {
+function ArxivDoiTab({ source }: { source: ImportSource }) {
   const qc = useQueryClient();
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(source.prefill ?? "");
   const [draft, setDraft] = useState<ArxivDraft | null>(null);
   const [sourceKind, setSourceKind] = useState<"arxiv" | "doi" | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Auto-fetch metadata on mount when arriving with a prefilled identifier
+  // (e.g. clicked 入库 on a feed item). Saves the user one click.
+  useEffect(() => {
+    if (source.prefill) {
+      setValue(source.prefill);
+      fetchMeta.mutate(source.prefill);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source.prefill]);
+
   const trimmed = value.trim();
   const isArxiv = /^\d{4}\.\d{4,5}/.test(trimmed) || trimmed.toLowerCase().includes("arxiv");
   const isDoi = !isArxiv && (/^10\./.test(trimmed) || trimmed.includes("doi.org"));
 
+  async function linkBackToFeed(paperId: string) {
+    if (!source.fromFeedItem) return;
+    try {
+      await api.feedItemLinkPaper(source.fromFeedItem, paperId);
+      qc.invalidateQueries({ queryKey: ["feeds"] });
+      qc.invalidateQueries({ queryKey: ["feed-items"] });
+    } catch {
+      // Best-effort — paper is already saved, link-back is a UX nicety.
+    }
+  }
+
   const fetchMeta = useMutation({
     mutationFn: async (v: string): Promise<{ draft: ArxivDraft; kind: "arxiv" | "doi" }> => {
-      if (isArxiv) {
+      const looksArxiv = /^\d{4}\.\d{4,5}/.test(v) || v.toLowerCase().includes("arxiv");
+      const looksDoi = !looksArxiv && (/^10\./.test(v) || v.includes("doi.org"));
+      if (looksArxiv) {
         const id = v.replace(/^arxiv:/i, "").trim();
         const d = await api.prepareArxivDraft(id);
         return { draft: d, kind: "arxiv" };
       }
-      const d = await api.prepareDoiDraft(v);
-      return { draft: d, kind: "doi" };
+      if (looksDoi) {
+        const d = await api.prepareDoiDraft(v);
+        return { draft: d, kind: "doi" };
+      }
+      throw new Error("请输入 arXiv ID(例如 1706.03762)或 DOI(例如 10.1234/xyz)。");
     },
     onSuccess: ({ draft, kind }) => {
       setDraft(draft);
@@ -100,8 +206,9 @@ function ArxivDoiTab() {
       if (!draft || !selectedPdf) throw new Error("缺少元数据或 PDF 路径");
       return api.paperSaveWithPdf(draft, selectedPdf);
     },
-    onSuccess: (p) => {
+    onSuccess: async (p) => {
       setSuccess(`✓ 已保存:${p.title}`);
+      await linkBackToFeed(p.id);
       reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
     },
@@ -113,8 +220,9 @@ function ArxivDoiTab() {
       const id = draft?.arxiv_id ?? trimmed.replace(/^arxiv:/i, "").trim();
       return api.arxivAddWithPdf(id);
     },
-    onSuccess: (p) => {
+    onSuccess: async (p) => {
       setSuccess(`✓ 已下载并保存:${p.title}`);
+      await linkBackToFeed(p.id);
       reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
     },

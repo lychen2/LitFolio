@@ -13,13 +13,27 @@ impl LibraryPaths {
         Self { root: root.into() }
     }
 
-    pub fn db_file(&self) -> PathBuf { self.root.join("library.db") }
-    pub fn papers_dir(&self) -> PathBuf { self.root.join("papers") }
-    pub fn notes_dir(&self) -> PathBuf { self.root.join("notes") }
-    pub fn vectors_dir(&self) -> PathBuf { self.root.join("vectors") }
-    pub fn attachments_dir(&self) -> PathBuf { self.root.join("attachments") }
-    pub fn backups_dir(&self) -> PathBuf { self.root.join("backups") }
-    pub fn config_file(&self) -> PathBuf { self.root.join("litera.config.json") }
+    pub fn db_file(&self) -> PathBuf {
+        self.root.join("library.db")
+    }
+    pub fn papers_dir(&self) -> PathBuf {
+        self.root.join("papers")
+    }
+    pub fn notes_dir(&self) -> PathBuf {
+        self.root.join("notes")
+    }
+    pub fn vectors_dir(&self) -> PathBuf {
+        self.root.join("vectors")
+    }
+    pub fn attachments_dir(&self) -> PathBuf {
+        self.root.join("attachments")
+    }
+    pub fn backups_dir(&self) -> PathBuf {
+        self.root.join("backups")
+    }
+    pub fn config_file(&self) -> PathBuf {
+        self.root.join("litera.config.json")
+    }
 
     pub fn paper_dir(&self, paper_id: &str) -> PathBuf {
         self.papers_dir().join(paper_id)

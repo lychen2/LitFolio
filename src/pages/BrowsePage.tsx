@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
-  Atom, Loader2, RefreshCw, ExternalLink, Search, ChevronDown, ChevronRight,
-  Rocket, CheckCircle2, ChevronsDown,
+  Atom, Loader2, RefreshCw, Search, ChevronDown, ChevronRight,
+  ChevronsDown,
 } from "lucide-react";
-import { api, type ArxivDraft, type Paper } from "@/lib/api";
+import { api, type ArxivDraft } from "@/lib/api";
 import { ARXIV_GROUPS, findCategoryLabel } from "@/lib/arxiv-categories";
+import { DraftDetailDrawer } from "./browse/DraftDetailDrawer";
+import { DraftRow } from "./browse/DraftRow";
 
 const DEFAULT_CATEGORY = "physics.optics";
 const PAGE_SIZE = 50;
@@ -19,6 +21,7 @@ export function BrowsePage() {
   // arxiv `start` offset. arXiv's API caps a single request at 200 entries, so this
   // is how we get past that ceiling.
   const [drafts, setDrafts] = useState<ArxivDraft[]>([]);
+  const [preview, setPreview] = useState<ArxivDraft | null>(null);
   const [exhausted, setExhausted] = useState(false);
   const [firstLoadErr, setFirstLoadErr] = useState<string | null>(null);
 
@@ -170,7 +173,12 @@ export function BrowsePage() {
             <>
               <ul className="divide-y divide-litera-line">
                 {filtered.map((d, i) => (
-                  <DraftRow key={(d.arxiv_id ?? "") + i} draft={d} rank={i + 1} />
+                  <DraftRow
+                    key={(d.arxiv_id ?? "") + i}
+                    draft={d}
+                    rank={i + 1}
+                    onOpen={() => setPreview(d)}
+                  />
                 ))}
               </ul>
               <div className="p-4 flex items-center justify-center gap-3">
@@ -195,71 +203,7 @@ export function BrowsePage() {
         </div>
       </div>
       </div>
+      {preview && <DraftDetailDrawer draft={preview} onClose={() => setPreview(null)} />}
     </section>
-  );
-}
-
-function DraftRow({ draft, rank }: { draft: ArxivDraft; rank: number }) {
-  const qc = useQueryClient();
-  const [saved, setSaved] = useState<Paper | null>(null);
-  const add = useMutation({
-    mutationFn: () => api.arxivAddWithPdf(draft.arxiv_id!),
-    onSuccess: (p) => {
-      setSaved(p);
-      qc.invalidateQueries({ queryKey: ["papers"] });
-    },
-  });
-  return (
-    <li className="px-6 py-3.5 hover:bg-litera-panel/40 transition-colors group">
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 w-7 text-right font-mono text-[11px] tabular-nums text-litera-mute">
-          #{rank}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-litera-text leading-snug">{draft.title}</div>
-          <div className="text-xs text-litera-mute mt-1 flex items-center gap-2 flex-wrap">
-            <span className="truncate max-w-[480px]">
-              {draft.authors.slice(0, 4).join(", ")}{draft.authors.length > 4 ? " et al." : ""}
-            </span>
-            {draft.year && <span>· {draft.year}</span>}
-            {draft.arxiv_id && (
-              <a
-                href={`https://arxiv.org/abs/${draft.arxiv_id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono text-litera-accent2 hover:underline inline-flex items-center gap-0.5"
-              >
-                arXiv:{draft.arxiv_id} <ExternalLink className="h-2.5 w-2.5" />
-              </a>
-            )}
-          </div>
-          {draft.abstract_text && (
-            <p className="text-xs text-litera-text/70 mt-1.5 line-clamp-2 leading-relaxed">
-              {draft.abstract_text}
-            </p>
-          )}
-          {add.error && (
-            <div className="mt-1.5 text-xs text-red-400/90">✕ {(add.error as Error).message}</div>
-          )}
-        </div>
-        <div className="shrink-0">
-          {saved ? (
-            <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
-              <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
-            </span>
-          ) : (
-            <button
-              onClick={() => add.mutate()}
-              disabled={add.isPending || !draft.arxiv_id}
-              className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-              title="从 arxiv.org 下载 PDF 并入库"
-            >
-              {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-              下载并入库
-            </button>
-          )}
-        </div>
-      </div>
-    </li>
   );
 }

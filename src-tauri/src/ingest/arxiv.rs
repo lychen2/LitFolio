@@ -16,7 +16,11 @@ const ARXIV_BASE: &str = "https://export.arxiv.org/api/query";
 pub async fn fetch_arxiv(client: &reqwest::Client, arxiv_id: &str) -> Result<PaperDraft> {
     let id = normalize_arxiv(arxiv_id)?;
     let url = format!("{ARXIV_BASE}?id_list={id}");
-    let resp = client.get(&url).send().await.with_context(|| format!("GET {url}"))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
     if !resp.status().is_success() {
         return Err(anyhow!("arXiv returned {}", resp.status()));
     }
@@ -52,7 +56,11 @@ pub async fn fetch_arxiv_category(
         "{ARXIV_BASE}?search_query=cat:{}&sortBy=submittedDate&sortOrder=descending&max_results={max}&start={start}",
         urlencode(cat),
     );
-    let resp = client.get(&url).send().await.with_context(|| format!("GET {url}"))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
     if !resp.status().is_success() {
         return Err(anyhow!("arXiv returned {}", resp.status()));
     }
@@ -61,8 +69,13 @@ pub async fn fetch_arxiv_category(
 }
 
 fn normalize_arxiv(s: &str) -> Result<String> {
-    let t = s.trim().trim_start_matches("arXiv:").trim_start_matches("arxiv:");
-    let t = t.trim_start_matches("https://arxiv.org/abs/").trim_start_matches("http://arxiv.org/abs/");
+    let t = s
+        .trim()
+        .trim_start_matches("arXiv:")
+        .trim_start_matches("arxiv:");
+    let t = t
+        .trim_start_matches("https://arxiv.org/abs/")
+        .trim_start_matches("http://arxiv.org/abs/");
     let re = regex::Regex::new(r"^\d{4}\.\d{4,5}(v\d+)?$").unwrap();
     let legacy = regex::Regex::new(r"^[a-zA-Z][\w\-\.]*/\d{7}$").unwrap();
     if re.is_match(t) || legacy.is_match(t) {
@@ -73,10 +86,12 @@ fn normalize_arxiv(s: &str) -> Result<String> {
 }
 
 fn urlencode(s: &str) -> String {
-    s.chars().map(|c| match c {
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' | '/' | ':' => c.to_string(),
-        _ => format!("%{:02X}", c as u32),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' | '/' | ':' => c.to_string(),
+            _ => format!("%{:02X}", c as u32),
+        })
+        .collect()
 }
 
 fn extract(haystack: &str, tag: &str) -> Option<String> {
@@ -111,7 +126,10 @@ fn extract_arxiv_id_from_entry(entry: &str) -> Option<String> {
 }
 
 fn collapse_whitespace(s: &str) -> String {
-    s.replace('\n', " ").split_whitespace().collect::<Vec<_>>().join(" ")
+    s.replace('\n', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Parse all entries in an arXiv Atom feed.
@@ -123,7 +141,9 @@ pub(crate) fn parse_atom_entries(xml: &str) -> Vec<PaperDraft> {
             Some(end) => &raw[..end],
             None => raw,
         };
-        let title = extract(entry, "title").map(|t| collapse_whitespace(&t)).unwrap_or_else(|| "(untitled)".to_string());
+        let title = extract(entry, "title")
+            .map(|t| collapse_whitespace(&t))
+            .unwrap_or_else(|| "(untitled)".to_string());
         let abstract_text = extract(entry, "summary").map(|s| collapse_whitespace(&s));
         let authors: Vec<String> = extract_all(entry, "author")
             .into_iter()

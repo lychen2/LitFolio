@@ -56,8 +56,14 @@ pub async fn expand_search_query(
         return Err(anyhow::anyhow!("empty query"));
     }
     let messages = vec![
-        ChatMessage { role: "system".into(), content: SYSTEM_PROMPT.into() },
-        ChatMessage { role: "user".into(), content: trimmed.into() },
+        ChatMessage {
+            role: "system".into(),
+            content: SYSTEM_PROMPT.into(),
+        },
+        ChatMessage {
+            role: "user".into(),
+            content: trimmed.into(),
+        },
     ];
     let resp = chat_complete(client, profile, &messages).await?;
     let parsed = parse_terms(&resp.content)
@@ -91,11 +97,17 @@ fn parse_terms(content: &str) -> Result<Vec<String>> {
     // Last resort: split by commas / newlines so the user still gets something useful
     let fallback: Vec<String> = content
         .split(|c: char| c == ',' || c == '\n' || c == ';')
-        .map(|s| s.trim().trim_matches(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-').to_string())
+        .map(|s| {
+            s.trim()
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-')
+                .to_string()
+        })
         .filter(|s| !s.is_empty() && s.len() < 80)
         .collect();
     if fallback.is_empty() {
-        return Err(anyhow::anyhow!("could not extract any search terms from LLM reply"));
+        return Err(anyhow::anyhow!(
+            "could not extract any search terms from LLM reply"
+        ));
     }
     Ok(clean_terms(fallback))
 }
@@ -110,7 +122,9 @@ fn clean_terms(terms: Vec<String>) -> Vec<String> {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { return s.into(); }
+    if s.chars().count() <= n {
+        return s.into();
+    }
     let mut out: String = s.chars().take(n).collect();
     out.push('…');
     out

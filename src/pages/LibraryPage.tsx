@@ -7,6 +7,9 @@ import {
   Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw,
 } from "lucide-react";
 import { api, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
+import { FolderPicker } from "./library/FolderPicker";
+import { FolderSidebar } from "./library/FolderSidebar";
+import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
 
 const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
@@ -19,16 +22,23 @@ const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
 
 export function LibraryPage() {
   const [search, setSearch] = useState("");
+  const [folderId, setFolderId] = useState<number | null>(null);
   const trimmed = search.trim();
 
-  const { data: papers, isLoading } = useQuery({
-    queryKey: ["papers", "list", trimmed],
-    queryFn: () =>
-      trimmed ? api.papersSearch(trimmed, 200) : api.papersRecent(200),
+  const { data: rawPapers, isLoading } = useQuery({
+    queryKey: ["papers", "list", folderId, trimmed],
+    queryFn: () => {
+      if (folderId != null) return api.papersInFolder(folderId, 500);
+      return trimmed ? api.papersSearch(trimmed, 200) : api.papersRecent(200);
+    },
     refetchInterval: 8000,
   });
+  const papers = folderId == null || !trimmed
+    ? rawPapers
+    : rawPapers?.filter((paper) => matchesPaper(paper, trimmed));
 
   const [reading, setReading] = useState<Paper | null>(null);
+  const [preview, setPreview] = useState<Paper | null>(null);
 
   return (
     <section className="h-full flex flex-col">
@@ -61,21 +71,40 @@ export function LibraryPage() {
           )}
         </div>
       </header>
-      <div className="flex-1 overflow-auto">
-        {isLoading ? (
-          <div className="grid place-items-center h-full text-litera-mute text-sm">加载中…</div>
-        ) : !papers || papers.length === 0 ? (
-          trimmed ? <NoResults q={trimmed} /> : <Empty />
-        ) : (
-          <ul className="divide-y divide-litera-line">
-            {papers.map((p) => (
-              <PaperRow key={p.id} p={p} onQuickRead={() => setReading(p)} />
-            ))}
-          </ul>
-        )}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <FolderSidebar selectedId={folderId} onSelect={setFolderId} />
+        <div className="flex-1 overflow-auto">
+          {isLoading ? (
+            <div className="grid place-items-center h-full text-litera-mute text-sm">加载中…</div>
+          ) : !papers || papers.length === 0 ? (
+            trimmed ? <NoResults q={trimmed} /> : <Empty />
+          ) : (
+            <ul className="divide-y divide-litera-line">
+              {papers.map((p) => (
+                <PaperRow
+                  key={p.id}
+                  p={p}
+                  onInspect={() => setPreview(p)}
+                  onQuickRead={() => setReading(p)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       {reading && <QuickReadDrawer paper={reading} onClose={() => setReading(null)} />}
+      {preview && <PaperDetailDrawer paper={preview} onClose={() => setPreview(null)} />}
     </section>
+  );
+}
+
+function matchesPaper(paper: Paper, query: string): boolean {
+  const needle = query.toLowerCase();
+  return (
+    paper.title.toLowerCase().includes(needle) ||
+    paper.authors.some((author) => author.toLowerCase().includes(needle)) ||
+    (paper.abstract_text ?? "").toLowerCase().includes(needle) ||
+    (paper.tldr ?? "").toLowerCase().includes(needle)
   );
 }
 
@@ -101,7 +130,13 @@ function NoResults({ q }: { q: string }) {
   );
 }
 
-function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
+function PaperRow({
+  p, onInspect, onQuickRead,
+}: {
+  p: Paper;
+  onInspect: () => void;
+  onQuickRead: () => void;
+}) {
   const qc = useQueryClient();
   const tldr = useMutation({
     mutationFn: () => api.paperTldr(p.id),
@@ -155,7 +190,12 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
         <StatusToggle paper={p} />
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-litera-text leading-snug">{p.title}</div>
+          <button
+            onClick={onInspect}
+            className="font-medium text-litera-text leading-snug text-left hover:text-litera-accent"
+          >
+            {p.title}
+          </button>
           {p.title_translated && (
             <div className="text-xs text-litera-accent/90 mt-0.5 italic flex items-start gap-1.5">
               <Languages className="h-3 w-3 mt-0.5 shrink-0" />
@@ -191,6 +231,7 @@ function PaperRow({ p, onQuickRead }: { p: Paper; onQuickRead: () => void }) {
             </div>
           )}
           <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
+          <FolderPicker paperId={p.id} />
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
           {canOpenPdf ? (
