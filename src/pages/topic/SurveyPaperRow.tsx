@@ -1,5 +1,6 @@
 import { Star, Download, ExternalLink, Sparkles } from "lucide-react";
 import type { SurveyPaper } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props {
   paper: SurveyPaper;
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function SurveyPaperRow({ paper, rank }: Props) {
+  const t = useT();
   const cc = paper.citation_count;
   const icc = paper.influential_citation_count;
   return (
@@ -18,7 +20,7 @@ export function SurveyPaperRow({ paper, rank }: Props) {
         <div className="shrink-0 w-12 text-right">
           <div className="font-mono text-xs tabular-nums text-litera-mute">#{rank}</div>
           {paper.must_read && (
-            <Star className="h-4 w-4 mt-1 text-amber-400 fill-amber-400 inline" aria-label="必读" />
+            <Star className="h-4 w-4 mt-1 text-amber-400 fill-amber-400 inline" aria-label={t("topic.survey.mustReadAria")} />
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -43,8 +45,8 @@ export function SurveyPaperRow({ paper, rank }: Props) {
             </p>
           )}
           <div className="mt-1.5 flex items-center gap-2 text-[11px] flex-wrap">
-            {cc != null && <CiteStat label="cites" value={cc.toLocaleString()} />}
-            {icc != null && <CiteStat label="influential" value={icc.toLocaleString()} dim />}
+            {cc != null && <CiteStat label={t("topic.search.cites")} value={cc.toLocaleString()} />}
+            {icc != null && <CiteStat label={t("topic.search.influential")} value={icc.toLocaleString()} dim />}
             {paper.doi && (
               <ExtLink href={`https://doi.org/${paper.doi}`} label="doi" text={paper.doi} />
             )}
@@ -56,11 +58,11 @@ export function SurveyPaperRow({ paper, rank }: Props) {
         <div className="shrink-0">
           <button
             disabled
-            title="入库需要 Unpaywall 集成获取 PDF 直链(见 STATUS §4 Phase 2,目前不可用)"
+            title={t("topic.survey.importDisabledTitle")}
             className="litera-btn text-xs whitespace-nowrap opacity-40 cursor-not-allowed inline-flex items-center gap-1"
           >
             <Download className="h-3.5 w-3.5" />
-            入库
+            {t("topic.survey.importDisabled")}
           </button>
         </div>
       </div>

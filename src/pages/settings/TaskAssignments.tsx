@@ -8,17 +8,19 @@ import {
   type TaskAssignments as TaskAssignmentsShape,
   type TaskBinding,
 } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
+import type { TKey } from "@/i18n/dict";
 
 type TaskKey = keyof TaskAssignmentsShape;
 
-const TASK_LABELS: { key: TaskKey; label: string; hint: string }[] = [
-  { key: "tldr",       label: "速读 (TL;DR)",  hint: "一句话摘要 + 关键发现" },
-  { key: "quick_read", label: "深读",         hint: "问题 / 方法 / 不同 / 局限四段式" },
-  { key: "translate",  label: "翻译",         hint: "标题 + 摘要译为中文" },
-  { key: "topic_survey", label: "综述生成",    hint: "拆解领域 + 标注必读" },
-  { key: "ask",        label: "RAG 提问",     hint: "基于文献库回答问题" },
-  { key: "tag",        label: "标签",         hint: "后续自动标签功能" },
-  { key: "link",       label: "关联",         hint: "后续论文关联功能" },
+const TASK_LABELS: { key: TaskKey; labelKey: TKey; hintKey: TKey }[] = [
+  { key: "tldr", labelKey: "settings.tasks.tldr", hintKey: "settings.tasks.tldrHint" },
+  { key: "quick_read", labelKey: "settings.tasks.quickRead", hintKey: "settings.tasks.quickReadHint" },
+  { key: "translate", labelKey: "settings.tasks.translate", hintKey: "settings.tasks.translateHint" },
+  { key: "topic_survey", labelKey: "settings.tasks.topicSurvey", hintKey: "settings.tasks.topicSurveyHint" },
+  { key: "ask", labelKey: "settings.tasks.ask", hintKey: "settings.tasks.askHint" },
+  { key: "tag", labelKey: "settings.tasks.tag", hintKey: "settings.tasks.tagHint" },
+  { key: "link", labelKey: "settings.tasks.link", hintKey: "settings.tasks.linkHint" },
 ];
 
 export function TaskAssignments({
@@ -27,6 +29,7 @@ export function TaskAssignments({
   draft: LlmConfig;
   onChange: (next: LlmConfig) => void;
 }) {
+  const t = useT();
   if (draft.profiles.length === 0) return null;
 
   function update(task: TaskKey, value: TaskBinding | null) {
@@ -40,20 +43,17 @@ export function TaskAssignments({
     <div className="mt-8">
       <div className="mb-3">
         <h2 className="text-litera-text font-medium flex items-center gap-2">
-          <Workflow className="h-4 w-4 text-litera-accent" /> 任务分配
+          <Workflow className="h-4 w-4 text-litera-accent" /> {t("settings.tasks.title")}
         </h2>
-        <p className="text-xs text-litera-mute mt-1">
-          每个任务可绑定 (配置, 模型) 二元组 — 同一个配置(同一个 key)可以选择不同模型,
-          不用为每个模型都建一个 profile。留空时回退到「当前」profile 的默认模型。
-        </p>
+        <p className="text-xs text-litera-mute mt-1">{t("settings.tasks.hint")}</p>
       </div>
       <ul className="litera-panel divide-y divide-litera-line">
-        {TASK_LABELS.map(({ key, label, hint }) => (
+        {TASK_LABELS.map(({ key, labelKey, hintKey }) => (
           <TaskRow
             key={key}
             taskKey={key}
-            label={label}
-            hint={hint}
+            label={t(labelKey)}
+            hint={t(hintKey)}
             profiles={draft.profiles}
             binding={draft.task_assignments[key]}
             activeProfile={draft.active}
@@ -76,6 +76,7 @@ function TaskRow({
   activeProfile: string | null;
   onChange: (b: TaskBinding | null) => void;
 }) {
+  const t = useT();
   const selectedProfile = profiles.find((p) => p.name === binding?.profile);
   const [models, setModels] = useState<string[] | null>(null);
   const modelListId = `task-models-${taskKey}`;
@@ -103,7 +104,7 @@ function TaskRow({
         }}
         className="litera-input text-xs w-44 font-mono shrink-0"
       >
-        <option value="">— 用「当前」 ({activeProfile ?? "无"}) —</option>
+        <option value="">{t("settings.tasks.useCurrent", { profile: activeProfile ?? t("common.none") })}</option>
         {profiles.map((p) => (
           <option key={p.name} value={p.name}>{p.name}</option>
         ))}
@@ -119,8 +120,8 @@ function TaskRow({
               onChange({ profile: selectedProfile.name, model: v || null });
             }}
             className="litera-input text-xs flex-1 min-w-[12rem] font-mono"
-            placeholder={`默认: ${selectedProfile.chat_model}`}
-            title="留空使用该 profile 的默认对话模型；也可以手填任意兼容模型名"
+            placeholder={t("settings.tasks.modelPlaceholder", { model: selectedProfile.chat_model })}
+            title={t("settings.tasks.modelTitle")}
           />
           <datalist id={modelListId}>
             <option value={selectedProfile.chat_model} />
@@ -130,7 +131,7 @@ function TaskRow({
             onClick={() => listModels.mutate(selectedProfile)}
             disabled={listModels.isPending}
             className="litera-btn text-xs shrink-0 disabled:opacity-50"
-            title="GET /v1/models 拉取该配置下可用模型"
+            title={t("settings.tasks.fetchModelsTitle")}
           >
             {listModels.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             📥

@@ -10,21 +10,21 @@ import {
   type TopicSurvey,
   type TopicSurveyProgress,
 } from "@/lib/api";
+import { useI18n, useT } from "@/i18n/I18nProvider";
 import { SubareaCard } from "./SubareaCard";
 import { KeyPiList } from "./KeyPiList";
 import { MustReadShortlist } from "./MustReadShortlist";
-
-const SAVED_SURVEYS_KEY = "litera.topic.surveys";
-const CURRENT_SURVEY_KEY = "litera.topic.current";
-
-interface SavedSurvey {
-  id: string;
-  topic: string;
-  savedAt: number;
-  survey: TopicSurvey;
-}
+import {
+  loadCurrentSurvey,
+  loadSavedSurveys,
+  persistSavedSurveys,
+  saveCurrentSurvey,
+  type SavedSurvey,
+  upsertSavedSurvey,
+} from "./surveyStorage";
 
 export function TopicSurveyView() {
+  const t = useT();
   const [topic, setTopic] = useState("");
   const [annotate, setAnnotate] = useState(true);
   const [survey, setSurvey] = useState<TopicSurvey | null>(null);
@@ -89,22 +89,20 @@ export function TopicSurveyView() {
       <header className="border-b border-litera-line px-6 py-4">
         <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2 mb-1">
           <BookOpenText className="h-5 w-5 text-litera-accent" />
-          综述生成
+          {t("topic.survey.heading")}
         </h1>
-        <p className="text-sm text-litera-mute">
-          LLM 拆解领域结构 → Semantic Scholar 取真实文献 → LLM 标注必读。所有论文均为真实命中,无 DOI 幻觉。
-        </p>
+        <p className="text-sm text-litera-mute">{t("topic.survey.subtitle")}</p>
       </header>
 
       <div className="px-6 py-5 border-b border-litera-line">
         <div className="litera-panel p-5 max-w-4xl">
-          <label className="text-xs uppercase tracking-wider text-litera-mute">主题</label>
+          <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.survey.label")}</label>
           <div className="flex gap-2 mt-2">
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="例如:极端超短脉冲激光"
+              placeholder={t("topic.survey.placeholder")}
               className="litera-input flex-1"
             />
             <label className="flex items-center gap-1.5 text-sm text-litera-mute border border-litera-line rounded-md px-2.5 cursor-pointer bg-litera-paper">
@@ -114,7 +112,7 @@ export function TopicSurveyView() {
                 onChange={(e) => setAnnotate(e.target.checked)}
                 className="cursor-pointer accent-litera-accent"
               />
-              <Sparkles className="h-3.5 w-3.5" /> 标注必读
+              <Sparkles className="h-3.5 w-3.5" /> {t("topic.survey.annotate")}
             </label>
             <button
               onClick={submit}
@@ -124,7 +122,7 @@ export function TopicSurveyView() {
               {run.isPending
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <Compass className="h-4 w-4" />}
-              {survey ? "重新生成" : "生成综述"}
+              {survey ? t("topic.survey.regenerate") : t("topic.survey.generate")}
             </button>
           </div>
           {run.error && (
@@ -175,10 +173,12 @@ function SavedSurveyBar({
   onRestore: (item: SavedSurvey) => void;
   onDelete: (id: string) => void;
 }) {
+  const { lang } = useI18n();
+  const t = useT();
   return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
       <button onClick={onSave} disabled={!canSave} className="litera-btn text-xs disabled:opacity-50">
-        <Save className="h-3.5 w-3.5" /> 保存本次综述
+        <Save className="h-3.5 w-3.5" /> {t("topic.survey.save")}
       </button>
       {saved.length > 0 && (
         <select
@@ -189,10 +189,10 @@ function SavedSurveyBar({
           }}
           className="litera-input text-xs w-56"
         >
-          <option value="">恢复已保存综述...</option>
+          <option value="">{t("topic.survey.restorePlaceholder")}</option>
           {saved.map((item) => (
             <option key={item.id} value={item.id}>
-              {item.topic} · {new Date(item.savedAt).toLocaleString()}
+              {item.topic} · {new Date(item.savedAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
             </option>
           ))}
         </select>
@@ -202,49 +202,13 @@ function SavedSurveyBar({
           key={item.id}
           onClick={() => onDelete(item.id)}
           className="p-1 text-litera-mute hover:text-red-400"
-          title={`删除 ${item.topic}`}
+          title={t("topic.survey.deleteSaved", { topic: item.topic })}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       ))}
     </div>
   );
-}
-
-function loadCurrentSurvey(): TopicSurvey | null {
-  try {
-    const raw = localStorage.getItem(CURRENT_SURVEY_KEY);
-    return raw ? JSON.parse(raw) as TopicSurvey : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveCurrentSurvey(survey: TopicSurvey) {
-  localStorage.setItem(CURRENT_SURVEY_KEY, JSON.stringify(survey));
-}
-
-function loadSavedSurveys(): SavedSurvey[] {
-  try {
-    const raw = localStorage.getItem(SAVED_SURVEYS_KEY);
-    return raw ? JSON.parse(raw) as SavedSurvey[] : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistSavedSurveys(items: SavedSurvey[]) {
-  localStorage.setItem(SAVED_SURVEYS_KEY, JSON.stringify(items));
-}
-
-function upsertSavedSurvey(items: SavedSurvey[], survey: TopicSurvey): SavedSurvey[] {
-  const entry: SavedSurvey = {
-    id: `${Date.now()}`,
-    topic: survey.topic,
-    savedAt: Date.now(),
-    survey,
-  };
-  return [entry, ...items].slice(0, 20);
 }
 
 function errorMessage(error: unknown): string {
@@ -258,11 +222,17 @@ function errorMessage(error: unknown): string {
 }
 
 function ProgressStepper({ progress }: { progress: TopicSurveyProgress }) {
+  const t = useT();
   const steps = [
-    { phase: "planning", label: "正在让 LLM 拆解领域结构…" },
-    { phase: "grounding", label: `正在 Semantic Scholar 取真实文献…${progress.subarea_total ? ` (共 ${progress.subarea_total} 个 subarea)` : ""}` },
-    { phase: "annotating", label: "正在让 LLM 标注每篇论文 + 选必读…" },
-    { phase: "done", label: "完成" },
+    { phase: "planning", label: t("topic.survey.progress.planning") },
+    {
+      phase: "grounding",
+      label: progress.subarea_total
+        ? t("topic.survey.progress.groundingCount", { count: progress.subarea_total })
+        : t("topic.survey.progress.grounding"),
+    },
+    { phase: "annotating", label: t("topic.survey.progress.annotating") },
+    { phase: "done", label: t("topic.survey.progress.done") },
   ] as const;
   const activeIdx = steps.findIndex((s) => s.phase === progress.phase);
   return (
@@ -281,6 +251,7 @@ function ProgressStepper({ progress }: { progress: TopicSurveyProgress }) {
 }
 
 function EmptyState({ pending }: { pending: boolean }) {
+  const t = useT();
   if (pending) {
     return (
       <div className="p-12 text-center text-sm text-litera-mute">
@@ -291,19 +262,20 @@ function EmptyState({ pending }: { pending: boolean }) {
   return (
     <div className="p-12 text-center text-sm text-litera-mute max-w-md mx-auto">
       <Compass className="h-12 w-12 mx-auto mb-4 opacity-30" />
-      <p className="mb-2">输入研究主题,生成结构化综述。</p>
-      <p className="text-xs opacity-70">中文输入也可以——会先翻译再检索。整个流程 30–60 秒。</p>
+      <p className="mb-2">{t("topic.survey.emptyTitle")}</p>
+      <p className="text-xs opacity-70">{t("topic.survey.emptyHint")}</p>
     </div>
   );
 }
 
 function SurveyFooter({ survey }: { survey: TopicSurvey }) {
+  const t = useT();
   return (
     <footer className="mt-6 p-3 border-t border-litera-line text-xs text-litera-mute flex flex-wrap gap-4">
-      <span>计划: {survey.plan_model} · {survey.plan_tokens} tk</span>
+      <span>{t("topic.survey.planStats", { model: survey.plan_model, tokens: survey.plan_tokens })}</span>
       {survey.annotated && survey.annotate_model
-        ? <span>标注: {survey.annotate_model} · {survey.annotate_tokens} tk</span>
-        : <span className="italic">本次未标注 — 标注 LLM 调用失败或被关闭</span>}
+        ? <span>{t("topic.survey.annotateStats", { model: survey.annotate_model, tokens: survey.annotate_tokens })}</span>
+        : <span className="italic">{t("topic.survey.annotateSkipped")}</span>}
     </footer>
   );
 }

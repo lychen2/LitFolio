@@ -1,17 +1,19 @@
 import { Star } from "lucide-react";
 import type { SurveyPaper } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props {
   papers: SurveyPaper[];
 }
 
 export function MustReadShortlist({ papers }: Props) {
+  const t = useT();
   if (papers.length === 0) return null;
   return (
     <div className="litera-panel mb-4 px-4 py-3 border-l-4 border-l-amber-400">
       <h3 className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-2">
         <Star className="h-4 w-4 fill-amber-400" />
-        必读 {papers.length} 篇
+        {t("topic.survey.mustRead", { count: papers.length })}
       </h3>
       <ol className="flex flex-wrap gap-2">
         {papers.map((p, i) => (

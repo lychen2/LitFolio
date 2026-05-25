@@ -37,7 +37,7 @@ export function LanguageSwitcher() {
         }
         title={t("lang.zh")}
       >
-        中
+        ZH
       </button>
       <button
         onClick={() => switchTo("en")}

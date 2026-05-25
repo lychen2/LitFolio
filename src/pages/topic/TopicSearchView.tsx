@@ -5,8 +5,10 @@ import {
   Calendar, Rocket, CheckCircle2, Wand2,
 } from "lucide-react";
 import { api, type SearchHit, type TopicReport, type Paper } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 export function TopicSearchView() {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [window, setWindow] = useState(3);
   const [report, setReport] = useState<TopicReport | null>(null);
@@ -46,46 +48,44 @@ export function TopicSearchView() {
         <div>
           <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
             <Compass className="h-5 w-5 text-litera-accent" />
-            搜索召回
+            {t("topic.search.heading")}
           </h1>
-          <p className="text-sm text-litera-mute">
-            扫描主题内最新重要文献和经典之作(按引用排序)。
-          </p>
+          <p className="text-sm text-litera-mute">{t("topic.search.subtitle")}</p>
         </div>
       </header>
 
       <div className="px-6 py-5 border-b border-litera-line">
         <div className="litera-panel p-5 max-w-4xl">
-          <label className="text-xs uppercase tracking-wider text-litera-mute">主题</label>
+          <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.search.label")}</label>
           <div className="flex gap-2 mt-2">
             <input
               value={query}
               onChange={(e) => { setQuery(e.target.value); setExpandedTerms(null); }}
               onKeyDown={(e) => e.key === "Enter" && query.trim() && discover.mutate(query.trim())}
-              placeholder="例如:retrieval augmented generation · 或粘贴中文,点 ✨ 让 LLM 改写"
+              placeholder={t("topic.search.placeholder")}
               className="litera-input flex-1"
             />
             <button
               onClick={() => query.trim() && expand.mutate(query.trim())}
               disabled={expand.isPending || !query.trim()}
               className="litera-btn text-sm disabled:opacity-50"
-              title="让 LLM 把当前输入改写成精确的英文检索词(支持中文输入)"
+              title={t("topic.search.expandTitle")}
             >
               {expand.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-              ✨ 扩写
+              {t("topic.search.expand")}
             </button>
             <div className="flex items-center gap-1.5 text-sm text-litera-mute border border-litera-line rounded-md px-2.5 bg-litera-paper">
               <Calendar className="h-3.5 w-3.5" />
-              <span>最近 =</span>
+              <span>{t("topic.search.recentEquals")}</span>
               <select
                 value={window}
                 onChange={(e) => setWindow(parseInt(e.target.value))}
                 className="bg-transparent text-litera-text outline-none py-1.5"
               >
-                <option value="1">近 1 年</option>
-                <option value="2">近 2 年</option>
-                <option value="3">近 3 年</option>
-                <option value="5">近 5 年</option>
+                <option value="1">{t("topic.search.window.1")}</option>
+                <option value="2">{t("topic.search.window.2")}</option>
+                <option value="3">{t("topic.search.window.3")}</option>
+                <option value="5">{t("topic.search.window.5")}</option>
               </select>
             </div>
             <button
@@ -94,26 +94,28 @@ export function TopicSearchView() {
               className="litera-btn-primary disabled:opacity-50"
             >
               {discover.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              发现
+              {t("topic.search.discover")}
             </button>
           </div>
           {expandedTerms && expandedTerms.length > 0 && (
             <div className="mt-2 text-xs text-litera-mute flex items-start gap-1.5 flex-wrap">
-              <span className="text-litera-accent2/90">✨ 已扩写为:</span>
+              <span className="text-litera-accent2/90">{t("topic.search.expandResult")}</span>
               {expandedTerms.map((t) => (
                 <span key={t} className="px-1.5 py-0.5 rounded border border-litera-accent2/30 bg-litera-accent2/5 text-litera-accent2 font-mono text-[11px]">
                   {t}
                 </span>
               ))}
-              <span className="text-litera-mute italic">— 不满意可直接编辑上方输入框</span>
+              <span className="text-litera-mute italic">- {t("topic.search.expandHint")}</span>
             </div>
           )}
           {expand.error && (
-            <div className="mt-2 text-xs text-red-400/90">✕ 扩写失败:{(expand.error as Error).message}</div>
+            <div className="mt-2 text-xs text-red-400/90">
+              ✕ {t("topic.search.expandFailed", { message: (expand.error as Error).message })}
+            </div>
           )}
           {!report && (
             <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-litera-mute">试试:</span>
+              <span className="text-litera-mute">{t("topic.search.try")}</span>
               {examples.map((e) => (
                 <button
                   key={e}
@@ -134,16 +136,18 @@ export function TopicSearchView() {
       <div className="flex-1 overflow-hidden grid grid-cols-2 gap-px bg-litera-line">
         <Column
           icon={<Sparkles className="h-4 w-4" />}
-          title={report ? `最新重要 (${report.recent_year_from}–${report.recent_year_to})` : "最新重要"}
-          subtitle="按窗口期内引用数排序"
+          title={report
+            ? t("topic.search.recentTitleRange", { from: report.recent_year_from, to: report.recent_year_to })
+            : t("topic.search.recentTitle")}
+          subtitle={t("topic.search.recentSubtitle")}
           hits={report?.recent ?? []}
           loading={discover.isPending}
           kind="recent"
         />
         <Column
           icon={<Quote className="h-4 w-4" />}
-          title="经典"
-          subtitle="该主题历史引用最高的文献"
+          title={t("topic.search.classicTitle")}
+          subtitle={t("topic.search.classicSubtitle")}
           hits={report?.classic ?? []}
           loading={discover.isPending}
           kind="classic"
@@ -163,6 +167,7 @@ function Column({
   loading: boolean;
   kind: "recent" | "classic";
 }) {
+  const t = useT();
   return (
     <div className="bg-litera-ink flex flex-col min-h-0">
       <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b border-litera-line bg-litera-ink/95 backdrop-blur">
@@ -171,18 +176,18 @@ function Column({
             <span className={kind === "recent" ? "text-litera-accent" : "text-litera-accent2"}>{icon}</span>
             {title}
           </div>
-          <div className="text-xs text-litera-mute">{subtitle} · 共 {hits.length} 篇</div>
+          <div className="text-xs text-litera-mute">{t("topic.search.count", { subtitle, count: hits.length })}</div>
         </div>
       </div>
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="p-8 text-center text-sm text-litera-mute flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> 正在查询 Semantic Scholar…
+            <Loader2 className="h-4 w-4 animate-spin" /> {t("topic.search.loading")}
           </div>
         ) : hits.length === 0 ? (
           <div className="p-8 text-center text-sm text-litera-mute">
             <FlaskConical className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            还没有结果。上方运行一次发现。
+            {t("topic.search.empty")}
           </div>
         ) : (
           <ul className="divide-y divide-litera-line">
@@ -201,6 +206,7 @@ function HitRow({
 }: {
   h: SearchHit; rank: number; kind: "recent" | "classic";
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const [saved, setSaved] = useState<Paper | null>(null);
   const add = useMutation({
@@ -232,8 +238,8 @@ function HitRow({
             {h.draft.venue && <span className="truncate">· {h.draft.venue}</span>}
           </div>
           <div className="mt-1.5 flex items-center gap-2 text-[11px] flex-wrap">
-            {cc != null && <Stat label="cites" value={cc.toLocaleString()} dim={false} />}
-            {icc != null && <Stat label="influential" value={icc.toLocaleString()} dim />}
+            {cc != null && <Stat label={t("topic.search.cites")} value={cc.toLocaleString()} dim={false} />}
+            {icc != null && <Stat label={t("topic.search.influential")} value={icc.toLocaleString()} dim />}
             {h.draft.doi && <span className="font-mono text-litera-mute">doi:{h.draft.doi}</span>}
             {h.draft.arxiv_id && <span className="font-mono text-litera-mute">arXiv:{h.draft.arxiv_id}</span>}
           </div>
@@ -249,24 +255,24 @@ function HitRow({
         <div className="shrink-0">
           {saved ? (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap">
-              <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t("topic.search.saved")}
             </span>
           ) : canAdd ? (
             <button
               onClick={() => add.mutate()}
               disabled={add.isPending}
               className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-              title="从 arxiv.org 下载 PDF 并入库"
+              title={t("topic.search.downloadAndImportTitle")}
             >
               {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-              下载并入库
+              {t("topic.search.downloadAndImport")}
             </button>
           ) : (
             <span
               className="text-xs text-litera-mute italic whitespace-nowrap"
-              title="非 arXiv 来源,暂不支持自动下载,请到导入页手动绑定 PDF"
+              title={t("topic.search.manualOnlyTitle")}
             >
-              非 arXiv · 需手动
+              {t("topic.search.manualOnly")}
             </span>
           )}
         </div>

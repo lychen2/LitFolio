@@ -4,6 +4,7 @@ import {
   Trash2, Loader2, Globe, Eye, EyeOff, CheckCircle2, XCircle, Download,
 } from "lucide-react";
 import { api, type LlmProfile } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 export function ProfileCard({
   profile, isActive, onChange, onRemove, onActivate,
@@ -14,6 +15,7 @@ export function ProfileCard({
   onRemove: () => void;
   onActivate: () => void;
 }) {
+  const t = useT();
   const [local, setLocal] = useState(profile);
   const [showKey, setShowKey] = useState(false);
   const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
@@ -45,11 +47,11 @@ export function ProfileCard({
           />
           {isActive ? (
             <span className="px-2 py-0.5 text-[11px] rounded border border-litera-accent/40 bg-litera-accent/10 text-litera-accent">
-              当前
+              {t("settings.profile.current")}
             </span>
           ) : (
             <button onClick={onActivate} className="text-[11px] text-litera-mute hover:text-litera-text">
-              设为当前
+              {t("settings.profile.setCurrent")}
             </button>
           )}
         </div>
@@ -60,7 +62,7 @@ export function ProfileCard({
             className="litera-btn text-xs disabled:opacity-50"
           >
             {test.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-            测试连接
+            {t("settings.profile.test")}
           </button>
           <button onClick={onRemove} className="litera-btn text-xs text-red-400/80 hover:text-red-400">
             <Trash2 className="h-3.5 w-3.5" />
@@ -69,11 +71,11 @@ export function ProfileCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <Field label="API 地址">
+        <Field label={t("settings.profile.apiBaseUrl")}>
           <input value={local.base_url} onChange={(e) => field("base_url", e.target.value)}
             className="litera-input w-full font-mono text-xs" placeholder="https://api.openai.com/v1" />
         </Field>
-        <Field label="密钥">
+        <Field label={t("settings.profile.apiKey")}>
           <div className="relative">
             <input value={local.api_key} onChange={(e) => field("api_key", e.target.value)}
               type={showKey ? "text" : "password"}
@@ -84,7 +86,7 @@ export function ProfileCard({
             </button>
           </div>
         </Field>
-        <Field label="对话模型">
+        <Field label={t("settings.profile.chatModel")}>
           <div className="space-y-1.5">
             <div className="flex gap-2">
               <input
@@ -92,7 +94,7 @@ export function ProfileCard({
                 onChange={(e) => field("chat_model", e.target.value)}
                 list={`models-${profile.name}`}
                 className="litera-input w-full font-mono text-xs"
-                placeholder="点右侧 📥 拉取 自动获取可用模型"
+                placeholder={t("settings.profile.chatModelPlaceholder")}
               />
               <datalist id={`models-${profile.name}`}>
                 {fetchedModels?.map((m) => <option key={m} value={m} />)}
@@ -101,10 +103,10 @@ export function ProfileCard({
                 onClick={() => listModels.mutate(local)}
                 disabled={listModels.isPending}
                 className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-                title="GET /v1/models — 询问服务端有哪些可用模型"
+                title={t("settings.profile.fetchModelsTitle")}
               >
                 {listModels.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                📥 拉取
+                {t("settings.profile.fetchModels")}
               </button>
             </div>
             {listModels.error && (
@@ -113,19 +115,19 @@ export function ProfileCard({
             {fetchedModels && (
               <div className="text-[11px] text-litera-mute">
                 {fetchedModels.length === 0
-                  ? "服务端返回空 — 这个 key 可能没有可用模型"
-                  : `已发现 ${fetchedModels.length} 个可用模型`}
+                  ? t("settings.profile.modelsEmpty")
+                  : t("settings.profile.modelsFound", { count: fetchedModels.length })}
               </div>
             )}
           </div>
         </Field>
-        <Field label="向量模型 (可选)">
+        <Field label={t("settings.profile.embedModel")}>
           <input value={local.embed_model ?? ""}
             onChange={(e) => field("embed_model", e.target.value || null)}
             className="litera-input w-full font-mono text-xs"
             placeholder="text-embedding-3-small" />
         </Field>
-        <Field label="采样温度">
+        <Field label={t("settings.profile.temperature")}>
           <input type="number" step="0.1" value={local.temperature}
             onChange={(e) => field("temperature", parseFloat(e.target.value || "0"))}
             className="litera-input w-full" min={0} max={2} />
@@ -135,7 +137,10 @@ export function ProfileCard({
       {test.isSuccess && (
         <div className="mt-3 text-xs flex items-center gap-2 text-litera-accent">
           <CheckCircle2 className="h-4 w-4" />
-          {test.data.model} 回复:"{test.data.reply.trim()}"
+          {t("settings.profile.testReply", {
+            model: test.data.model,
+            reply: test.data.reply.trim(),
+          })}
         </div>
       )}
       {test.isError && (

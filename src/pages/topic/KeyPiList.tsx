@@ -1,17 +1,19 @@
 import { Users, Info } from "lucide-react";
 import type { SurveyKeyPi } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props {
   keyPis: SurveyKeyPi[];
 }
 
 export function KeyPiList({ keyPis }: Props) {
+  const t = useT();
   if (keyPis.length === 0) return null;
   return (
     <aside className="litera-panel p-4 sticky top-4 self-start">
       <h3 className="flex items-center gap-2 text-sm font-medium text-litera-text mb-3">
         <Users className="h-4 w-4 text-litera-accent2" />
-        关键学者 ({keyPis.length})
+        {t("topic.survey.keyPis", { count: keyPis.length })}
       </h3>
       <ul className="space-y-3 text-sm">
         {keyPis.map((pi) => (
