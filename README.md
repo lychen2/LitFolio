@@ -1,11 +1,11 @@
 # LitFolio
 
+[English](./README.md) · [中文](./README.zh-CN.md)
+
 Local-first literature manager for researchers: import papers, read them in-app
 with highlights + Markdown notes, ask questions across your library, and watch
 journal RSS feeds for new releases — all powered by a configurable LLM stack
 that talks to any OpenAI-compatible endpoint.
-
-> Formerly known as Litera.
 
 ## Features
 
@@ -20,7 +20,7 @@ that talks to any OpenAI-compatible endpoint.
 - **Topic discovery**: LLM-rewritten English search terms → multi-query
   Semantic Scholar fan-out → deduped, citation-ranked results. Optional
   LLM-annotated literature survey skeleton (subareas + key PIs + must-reads).
-- **Library Q&A (RAG)**: LLM-rewrites your question into 2-4 English search
+- **Library Q&A (RAG)**: LLM rewrites your question into 2–4 English search
   terms, fans them out across SQLite FTS5, merges results by term-match count,
   enriches snippets with user highlights, and answers with inline `[N]`
   citations.
@@ -28,8 +28,7 @@ that talks to any OpenAI-compatible endpoint.
   Nature, ACS Photonics, ScienceDirect…), conditional-GET refresh, click-through
   detail drawer with one-tap title/abstract translation. 入库 jumps to the
   Import page with the source link pre-filled.
-- **Local-first**: everything lives under `~/Litera-Library/`. The on-disk path
-  is preserved from the previous brand for backward compatibility.
+- **Local-first**: everything lives under `~/Litera-Library/`.
 
 ## Stack
 
@@ -68,4 +67,4 @@ src-tauri/            Rust backend
 
 ## License
 
-MIT
+GPL-3.0-or-later — see [`LICENSE`](./LICENSE).
