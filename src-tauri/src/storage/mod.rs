@@ -3,6 +3,7 @@
 #![allow(dead_code, unused_imports)]
 
 mod db;
+mod feed_defaults;
 pub mod feeds;
 mod folders;
 mod highlights;
