@@ -9,7 +9,7 @@ use serde::Deserialize;
 use super::paper_draft::PaperDraft;
 
 const CROSSREF_BASE: &str = "https://api.crossref.org/works";
-const USER_AGENT: &str = "Litera/0.1 (mailto:litera@example.com)";
+const USER_AGENT: &str = "LitFolio/0.1 (mailto:litfolio@example.com)";
 
 #[derive(Debug, Deserialize)]
 struct CrossRefResponse {
@@ -54,7 +54,9 @@ struct CrossRefDate {
 
 impl CrossRefAuthor {
     fn display(&self) -> Option<String> {
-        if let Some(n) = &self.name { return Some(n.clone()); }
+        if let Some(n) = &self.name {
+            return Some(n.clone());
+        }
         match (&self.given, &self.family) {
             (Some(g), Some(f)) => Some(format!("{g} {f}")),
             (None, Some(f)) => Some(f.clone()),
@@ -94,7 +96,11 @@ pub async fn fetch_doi(client: &reqwest::Client, doi_or_url: &str) -> Result<Pap
     }
     let body: CrossRefResponse = resp.json().await.context("decode CrossRef JSON")?;
     let m = body.message;
-    let title = m.title.first().cloned().unwrap_or_else(|| "(untitled)".into());
+    let title = m
+        .title
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "(untitled)".into());
     let authors: Vec<String> = m.author.iter().filter_map(|a| a.display()).collect();
     let venue = m.container_title.first().cloned();
     let year = first_year(&m);
@@ -138,9 +144,15 @@ mod tests {
 
     #[test]
     fn normalize_strips_known_prefixes() {
-        assert_eq!(normalize_doi("10.1038/nature12345").unwrap(), "10.1038/nature12345");
+        assert_eq!(
+            normalize_doi("10.1038/nature12345").unwrap(),
+            "10.1038/nature12345"
+        );
         assert_eq!(normalize_doi("doi:10.1038/x").unwrap(), "10.1038/x");
-        assert_eq!(normalize_doi("https://doi.org/10.1038/x").unwrap(), "10.1038/x");
+        assert_eq!(
+            normalize_doi("https://doi.org/10.1038/x").unwrap(),
+            "10.1038/x"
+        );
         assert!(normalize_doi("not-a-doi").is_err());
     }
 

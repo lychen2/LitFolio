@@ -128,8 +128,8 @@ fn row_to_highlight(row: sqlx::sqlite::SqliteRow) -> Result<Highlight> {
 mod tests {
     use super::*;
     use crate::storage::db::{open_pool, run_migrations};
-    use crate::storage::papers::PaperRepo;
     use crate::storage::models::{Paper, ReadStatus};
+    use crate::storage::papers::PaperRepo;
     use std::path::PathBuf;
 
     async fn temp_pool() -> (Pool, PathBuf) {
@@ -177,8 +177,14 @@ mod tests {
         seed_paper(&pool, "A").await;
         let repo = HighlightRepo::new(&pool);
         let rect = serde_json::json!({"x":10,"y":20,"w":100,"h":15});
-        let h1 = repo.insert("A", 1, &rect, "hello world", None).await.unwrap();
-        let h2 = repo.insert("A", 2, &rect, "second hl", Some("green")).await.unwrap();
+        let h1 = repo
+            .insert("A", 1, &rect, "hello world", None)
+            .await
+            .unwrap();
+        let h2 = repo
+            .insert("A", 2, &rect, "second hl", Some("green"))
+            .await
+            .unwrap();
         let list = repo.list_by_paper("A").await.unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].page, 1);

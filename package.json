@@ -1,9 +1,9 @@
 {
-  "name": "litera-desktop",
+  "name": "litfolio-desktop",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Litera — local-first literature management with LLM-powered summarization",
+  "description": "LitFolio — local-first literature management with LLM-powered summarization",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

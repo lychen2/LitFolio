@@ -1,19 +1,23 @@
-//! Ingest pipeline: PDF / BibTeX / RIS / DOI / arXiv / web search / topic.
+//! Ingest pipeline: PDF / BibTeX / RIS / DOI / arXiv / web search / topic / RSS.
 
 #![allow(dead_code, unused_imports)]
 
-mod doi;
 mod arxiv;
 mod bibtex;
+mod doi;
 mod paper_draft;
 mod pdf;
+mod rss;
 mod search;
 mod topic;
+mod topic_survey_retrieval;
 
-pub use doi::fetch_doi;
 pub use arxiv::{fetch_arxiv, fetch_arxiv_category};
 pub use bibtex::parse_bibtex;
+pub use doi::fetch_doi;
 pub use paper_draft::PaperDraft;
 pub use pdf::{import_pdf_file, PdfImportResult};
+pub use rss::{fetch_feed, FetchedFeed};
 pub use search::{bulk_by_citations, search_semantic_scholar, SearchResult};
 pub use topic::{discover_topic, discover_topic_multi, TopicReport, TopicRequest};
+pub use topic_survey_retrieval::{ground_survey, GroundedSubarea};

@@ -53,11 +53,12 @@ mod tests {
     async fn migrations_apply_to_memory_db() {
         let pool = mem_pool().await;
         run_migrations(&pool).await.expect("migrations run");
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='papers'")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='papers'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(count.0, 1);
     }
 }

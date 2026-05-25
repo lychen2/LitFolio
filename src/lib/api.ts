@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { open as openInSystem } from "@tauri-apps/plugin-shell";
 
@@ -76,6 +77,7 @@ export interface LlmConfig {
   profiles: LlmProfile[];
   active: string | null;
   task_assignments: TaskAssignments;
+  output_language: string;
 }
 
 export interface TranslationResult {
@@ -113,6 +115,8 @@ export interface TaskAssignments {
   translate: TaskBinding | null;
   tag: TaskBinding | null;
   link: TaskBinding | null;
+  topic_survey: TaskBinding | null;
+  ask: TaskBinding | null;
 }
 
 export interface LlmTestResult {
@@ -150,6 +154,16 @@ export interface TagWithCount extends Tag {
   paper_count: number;
 }
 
+export interface Folder {
+  id: number;
+  name: string;
+  parent_id: number | null;
+}
+
+export interface FolderWithCount extends Folder {
+  paper_count: number;
+}
+
 export type ReadStatus = "unread" | "reading" | "read" | "must";
 
 export interface ExpandedQuery {
@@ -161,6 +175,54 @@ export interface ExpandedQuery {
   completion_tokens: number;
 }
 
+// ─── Topic Survey (§4) ─────────────────────────────────────────────────────
+
+export interface SurveyPaper {
+  id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  venue: string | null;
+  doi: string | null;
+  arxiv_id: string | null;
+  abstract_text: string | null;
+  citation_count: number | null;
+  influential_citation_count: number | null;
+  why_important: string | null;
+  must_read: boolean;
+}
+
+export interface SurveySubareaResult {
+  name: string;
+  year_range: [number, number] | null;
+  summary: string;
+  search_terms: string[];
+  papers: SurveyPaper[];
+}
+
+export interface SurveyKeyPi {
+  name: string;
+  why_central: string;
+}
+
+export interface TopicSurvey {
+  topic: string;
+  subareas: SurveySubareaResult[];
+  key_pis: SurveyKeyPi[];
+  must_read_ids: string[];
+  annotated: boolean;
+  plan_model: string;
+  plan_tokens: number;
+  annotate_model: string | null;
+  annotate_tokens: number;
+}
+
+export type TopicSurveyPhase = "planning" | "grounding" | "annotating" | "done";
+export interface TopicSurveyProgress {
+  phase: TopicSurveyPhase;
+  subarea_total?: number;
+}
+
 export interface ArxivDraft {
   title: string;
   authors: string[];
@@ -169,6 +231,26 @@ export interface ArxivDraft {
   doi: string | null;
   arxiv_id: string | null;
   abstract_text: string | null;
+}
+
+export interface AskSource {
+  paper_id: string;
+  title: string;
+  year: number | null;
+  authors: string[];
+  snippet: string;
+}
+
+export interface AskLibraryResult {
+  answer: string;
+  sources: AskSource[];
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  /** LLM-rewritten search terms (or [raw question] if rewrite was skipped/failed). */
+  terms: string[];
+  /** Distinct papers actually fed to the LLM as sources. */
+  retrieved_count: number;
 }
 
 export interface Highlight {
@@ -187,6 +269,8 @@ export const api = {
   libraryRoot: () => invoke<string>("library_root"),
   papersCount: () => invoke<number>("papers_count"),
   papersRecent: (limit?: number) => invoke<Paper[]>("papers_recent", { limit }),
+  papersInFolder: (folderId: number, limit?: number) =>
+    invoke<Paper[]>("papers_in_folder", { folderId, limit }),
   papersSearch: (query: string, limit?: number) =>
     invoke<Paper[]>("papers_search", { query, limit }),
   paperGet: (id: string) => invoke<Paper | null>("paper_get", { id }),
@@ -207,6 +291,18 @@ export const api = {
     invoke<void>("paper_detach_tag", { paperId, tagId }),
   paperTags: (paperId: string) =>
     invoke<Tag[]>("paper_tags", { paperId }),
+  foldersList: () => invoke<FolderWithCount[]>("folders_list"),
+  folderCreate: (name: string, parentId?: number | null) =>
+    invoke<Folder>("folder_create", { name, parentId: parentId ?? null }),
+  folderRename: (id: number, name: string) =>
+    invoke<void>("folder_rename", { id, name }),
+  folderDelete: (id: number) => invoke<void>("folder_delete", { id }),
+  paperAttachFolder: (paperId: string, folderId: number) =>
+    invoke<void>("paper_attach_folder", { paperId, folderId }),
+  paperDetachFolder: (paperId: string, folderId: number) =>
+    invoke<void>("paper_detach_folder", { paperId, folderId }),
+  paperFolders: (paperId: string) =>
+    invoke<Folder[]>("paper_folders", { paperId }),
   importDoi: (doi: string) => invoke<Paper>("import_doi", { doi }),
   importArxiv: (arxivId: string) => invoke<Paper>("import_arxiv", { arxivId }),
   importBibtex: (text: string) => invoke<Paper[]>("import_bibtex", { text }),
@@ -257,6 +353,10 @@ export const api = {
     invoke<QuickReadResult>("paper_quick_read", { id }),
   paperTranslate: (id: string, targetLang?: string) =>
     invoke<TranslationResult>("paper_translate", { id, targetLang: targetLang ?? "Chinese" }),
+  draftTranslate: (draft: ArxivDraft, targetLang?: string) =>
+    invoke<TranslationResult>("draft_translate", { draft, targetLang: targetLang ?? "Chinese" }),
+  libraryAsk: (question: string, limit?: number) =>
+    invoke<AskLibraryResult>("library_ask", { question, limit: limit ?? null }),
   batchTldr: (ids: string[]) => invoke<BatchSummary>("batch_tldr", { ids }),
   batchQuickRead: (ids: string[]) => invoke<BatchSummary>("batch_quick_read", { ids }),
   batchTranslate: (ids: string[], targetLang?: string) =>
@@ -281,7 +381,93 @@ export const api = {
     invoke<string[]>("llm_list_models", { profile }),
   searchExpandQuery: (raw: string) =>
     invoke<ExpandedQuery>("search_expand_query", { raw }),
+  topicSurvey: (params: {
+    topic: string;
+    annotate?: boolean;
+    perSubareaTopk?: number;
+  }) =>
+    invoke<TopicSurvey>("topic_survey", {
+      topic: params.topic,
+      annotate: params.annotate ?? null,
+      perSubareaTopk: params.perSubareaTopk ?? null,
+    }),
+  feedsList: () => invoke<FeedWithCounts[]>("feeds_list"),
+  feedAdd: (url: string) => invoke<FeedWithCounts>("feed_add", { url }),
+  feedRemove: (id: number) => invoke<void>("feed_remove", { id }),
+  feedRefresh: (id: number) => invoke<FeedRefreshResult>("feed_refresh", { id }),
+  feedRefreshAll: () => invoke<FeedRefreshAllSummary>("feed_refresh_all"),
+  feedItemsList: (params: {
+    feedId?: number | null;
+    onlyUnread?: boolean;
+    limit?: number;
+    offset?: number;
+  }) =>
+    invoke<FeedItem[]>("feed_items_list", {
+      feedId: params.feedId ?? null,
+      onlyUnread: params.onlyUnread ?? null,
+      limit: params.limit ?? null,
+      offset: params.offset ?? null,
+    }),
+  feedItemSetSeen: (itemId: string, seen: boolean) =>
+    invoke<void>("feed_item_set_seen", { itemId, seen }),
+  feedMarkAllSeen: (feedId: number) =>
+    invoke<void>("feed_mark_all_seen", { feedId }),
+  feedItemLinkPaper: (itemId: string, paperId: string) =>
+    invoke<void>("feed_item_link_paper", { itemId, paperId }),
 };
+
+export interface Feed {
+  id: number;
+  url: string;
+  title: string;
+  description: string | null;
+  etag: string | null;
+  last_modified: string | null;
+  last_fetched_at: number | null;
+  last_error: string | null;
+  created_at: number;
+}
+
+export interface FeedWithCounts extends Feed {
+  total_items: number;
+  unread_items: number;
+}
+
+export interface FeedItem {
+  id: string;
+  feed_id: number;
+  entry_id: string;
+  title: string;
+  link: string | null;
+  summary: string | null;
+  authors: string[];
+  published_at: number | null;
+  fetched_at: number;
+  seen: boolean;
+  imported_paper_id: string | null;
+}
+
+export interface FeedRefreshResult {
+  new_items: number;
+  not_modified: boolean;
+}
+
+export interface FeedRefreshAllSummary {
+  refreshed: number;
+  unchanged: number;
+  failed: number;
+  new_items: number;
+  errors: string[];
+}
+
+/// Subscribe to backend progress events for an in-flight `topic_survey` call.
+/// Returns the unlisten function — callers MUST call it on unmount or the
+/// listener leaks across page navigations.
+export async function subscribeTopicSurveyProgress(
+  cb: (p: TopicSurveyProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<TopicSurveyProgress>("topic-survey-progress", (e) => cb(e.payload));
+}
 
 export async function pickPdfFiles(): Promise<string[] | null> {
   const selection = await open({

@@ -87,25 +87,16 @@ export function ProfileCard({
         <Field label="对话模型">
           <div className="space-y-1.5">
             <div className="flex gap-2">
-              {fetchedModels && fetchedModels.length > 0 ? (
-                <select
-                  value={local.chat_model}
-                  onChange={(e) => field("chat_model", e.target.value)}
-                  className="litera-input w-full font-mono text-xs"
-                >
-                  {!fetchedModels.includes(local.chat_model) && (
-                    <option value={local.chat_model}>{local.chat_model} (自填)</option>
-                  )}
-                  {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              ) : (
-                <input
-                  value={local.chat_model}
-                  onChange={(e) => field("chat_model", e.target.value)}
-                  className="litera-input w-full font-mono text-xs"
-                  placeholder="点右侧 📥 拉取 自动获取可用模型"
-                />
-              )}
+              <input
+                value={local.chat_model}
+                onChange={(e) => field("chat_model", e.target.value)}
+                list={`models-${profile.name}`}
+                className="litera-input w-full font-mono text-xs"
+                placeholder="点右侧 📥 拉取 自动获取可用模型"
+              />
+              <datalist id={`models-${profile.name}`}>
+                {fetchedModels?.map((m) => <option key={m} value={m} />)}
+              </datalist>
               <button
                 onClick={() => listModels.mutate(local)}
                 disabled={listModels.isPending}
@@ -133,11 +124,6 @@ export function ProfileCard({
             onChange={(e) => field("embed_model", e.target.value || null)}
             className="litera-input w-full font-mono text-xs"
             placeholder="text-embedding-3-small" />
-        </Field>
-        <Field label="最大 token">
-          <input type="number" value={local.max_tokens}
-            onChange={(e) => field("max_tokens", parseInt(e.target.value || "0"))}
-            className="litera-input w-full" min={1} max={32000} />
         </Field>
         <Field label="采样温度">
           <input type="number" step="0.1" value={local.temperature}

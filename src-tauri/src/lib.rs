@@ -1,11 +1,11 @@
-//! Litera backend entry. Wires plugins, state, and command handlers.
+//! LitFolio backend entry. Wires plugins, state, and command handlers.
 
-mod commands;
-mod storage;
-mod ingest;
 mod ai;
-mod index;
 mod cluster;
+mod commands;
+mod index;
+mod ingest;
+mod storage;
 
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
@@ -13,7 +13,7 @@ use tauri::Manager;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
-use storage::{open_pool, run_migrations, LibraryPaths, default_library_root, Pool};
+use storage::{default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
 
 pub struct AppState {
     pub pool: Pool,
@@ -28,18 +28,31 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
     paths.ensure()?;
     let pool = open_pool(&paths.db_file()).await?;
     run_migrations(&pool).await?;
+    let seeded = storage::FeedRepo::new(&pool)
+        .seed_defaults_if_empty()
+        .await
+        .unwrap_or(0);
+    if seeded > 0 {
+        tracing::info!(seeded, "seeded default RSS feeds");
+    }
     let http = reqwest::Client::builder()
-        .user_agent("Litera/0.1")
-        .timeout(std::time::Duration::from_secs(30))
+        .user_agent("LitFolio/0.1")
         .build()?;
     tracing::info!(root = %paths.root.display(), "library ready");
-    Ok(Arc::new(AppState { pool, paths, http, batch_cancel: Mutex::new(None) }))
+    Ok(Arc::new(AppState {
+        pool,
+        paths,
+        http,
+        batch_cancel: Mutex::new(None),
+    }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     tauri::Builder::default()
@@ -52,6 +65,7 @@ pub fn run() {
             commands::library_root,
             commands::papers_count,
             commands::papers_recent,
+            commands::papers_in_folder,
             commands::papers_search,
             commands::paper_get,
             commands::paper_set_read_status,
@@ -64,6 +78,13 @@ pub fn run() {
             commands::paper_attach_tag,
             commands::paper_detach_tag,
             commands::paper_tags,
+            commands::folders_list,
+            commands::folder_create,
+            commands::folder_rename,
+            commands::folder_delete,
+            commands::paper_attach_folder,
+            commands::paper_detach_folder,
+            commands::paper_folders,
             commands::import_doi,
             commands::import_arxiv,
             commands::import_bibtex,
@@ -87,6 +108,7 @@ pub fn run() {
             commands::paper_tldr,
             commands::paper_quick_read,
             commands::paper_translate,
+            commands::draft_translate,
             commands::batch_attach_tag,
             commands::batch_set_status,
             commands::batch_delete,
@@ -102,6 +124,17 @@ pub fn run() {
             commands::note_save,
             commands::llm_list_models,
             commands::search_expand_query,
+            commands::survey::topic_survey,
+            commands::ask::library_ask,
+            commands::feeds::feeds_list,
+            commands::feeds::feed_add,
+            commands::feeds::feed_remove,
+            commands::feeds::feed_refresh,
+            commands::feeds::feed_refresh_all,
+            commands::feeds::feed_items_list,
+            commands::feeds::feed_item_set_seen,
+            commands::feeds::feed_mark_all_seen,
+            commands::feeds::feed_item_link_paper,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -109,7 +142,7 @@ pub fn run() {
                 match bootstrap_state().await {
                     Ok(state) => {
                         handle.manage(state);
-                        tracing::info!("Litera backend booted");
+                        tracing::info!("LitFolio backend booted");
                     }
                     Err(e) => tracing::error!(error = %e, "bootstrap failed"),
                 }
@@ -117,5 +150,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running litera");
+        .expect("error while running litfolio");
 }

@@ -12,7 +12,9 @@ pub fn parse_bibtex(text: &str) -> Vec<PaperDraft> {
             chars.next();
             // skip type (e.g. article)
             while let Some(&c2) = chars.peek() {
-                if c2 == '{' { break; }
+                if c2 == '{' {
+                    break;
+                }
                 chars.next();
             }
             if chars.peek() == Some(&'{') {
@@ -34,10 +36,15 @@ fn read_balanced_braces<I: Iterator<Item = char>>(it: &mut std::iter::Peekable<I
     let mut out = String::new();
     while let Some(c) = it.next() {
         match c {
-            '{' => { depth += 1; out.push(c); }
+            '{' => {
+                depth += 1;
+                out.push(c);
+            }
             '}' => {
                 depth -= 1;
-                if depth == 0 { return out; }
+                if depth == 0 {
+                    return out;
+                }
                 out.push(c);
             }
             _ => out.push(c),
@@ -59,14 +66,20 @@ fn parse_entry_body(body: &str) -> Option<PaperDraft> {
     let mut abstract_text: Option<String> = None;
     for f in fields {
         let f = f.trim();
-        if f.is_empty() { continue; }
+        if f.is_empty() {
+            continue;
+        }
         let mut eq = f.splitn(2, '=');
         let k = eq.next()?.trim().to_lowercase();
         let v = strip_value(eq.next()?.trim());
         match k.as_str() {
             "title" => title = v,
             "author" | "authors" => {
-                authors = v.split(" and ").map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                authors = v
+                    .split(" and ")
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
             }
             "year" => year = v.parse::<i32>().ok(),
             "journal" | "booktitle" | "publisher" => venue = Some(v),
@@ -78,8 +91,18 @@ fn parse_entry_body(body: &str) -> Option<PaperDraft> {
     if title.is_empty() && authors.is_empty() && doi.is_none() {
         return None;
     }
-    if title.is_empty() { title = "(untitled)".to_string(); }
-    Some(PaperDraft { title, authors, year, venue, doi, arxiv_id: None, abstract_text })
+    if title.is_empty() {
+        title = "(untitled)".to_string();
+    }
+    Some(PaperDraft {
+        title,
+        authors,
+        year,
+        venue,
+        doi,
+        arxiv_id: None,
+        abstract_text,
+    })
 }
 
 fn split_top_level_commas(s: &str) -> Vec<String> {
@@ -89,16 +112,27 @@ fn split_top_level_commas(s: &str) -> Vec<String> {
     let mut in_quote = false;
     for c in s.chars() {
         match c {
-            '{' => { depth += 1; buf.push(c); }
-            '}' => { depth -= 1; buf.push(c); }
-            '"' => { in_quote = !in_quote; buf.push(c); }
+            '{' => {
+                depth += 1;
+                buf.push(c);
+            }
+            '}' => {
+                depth -= 1;
+                buf.push(c);
+            }
+            '"' => {
+                in_quote = !in_quote;
+                buf.push(c);
+            }
             ',' if depth == 0 && !in_quote => {
                 out.push(std::mem::take(&mut buf));
             }
             _ => buf.push(c),
         }
     }
-    if !buf.trim().is_empty() { out.push(buf); }
+    if !buf.trim().is_empty() {
+        out.push(buf);
+    }
     out
 }
 
