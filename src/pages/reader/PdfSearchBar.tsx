@@ -139,7 +139,7 @@ export function PdfSearchBar({ containerRef, openSignal }: PdfSearchBarProps) {
   const goPrev = () => focusHit(activeIdx - 1);
 
   return (
-    <div className="absolute top-2 right-[5.25rem] z-20 litera-overlay flex items-center gap-1 px-2 py-1">
+    <div className="absolute top-2 right-[5.25rem] z-20 litera-overlay flex items-center gap-1 px-2 py-1 litera-scale-in">
       <Search className="h-3.5 w-3.5 text-litera-mute" />
       <input
         ref={inputRef}

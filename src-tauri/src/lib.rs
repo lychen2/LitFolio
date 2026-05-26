@@ -42,6 +42,8 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
     }
     let http = reqwest::Client::builder()
         .user_agent("LitFolio/0.1")
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(120))
         .build()?;
     tracing::info!(root = %paths.root.display(), "library ready");
     Ok(Arc::new(AppState {

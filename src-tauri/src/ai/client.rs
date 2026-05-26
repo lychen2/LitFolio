@@ -92,7 +92,13 @@ pub async fn chat_complete(
     if !profile.api_key.is_empty() {
         req = req.bearer_auth(&profile.api_key);
     }
-    let resp = req.send().await.with_context(|| format!("POST {url}"))?;
+    let resp = tokio::time::timeout(
+        std::time::Duration::from_secs(120),
+        req.send(),
+    )
+    .await
+    .map_err(|_| anyhow!("LLM request timed out after 120s (model `{}`, url={url})", profile.chat_model))?
+    .with_context(|| format!("POST {url}"))?;
     let status = resp.status();
     let headers = resp.headers().clone();
     let text = resp.text().await.with_context(|| {

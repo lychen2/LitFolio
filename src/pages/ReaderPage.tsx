@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { api } from "@/lib/api";
@@ -25,7 +25,6 @@ export function ReaderPage() {
   const t = useT();
   const { paperId } = useParams<{ paperId: string }>();
   const [activeTab, setActiveTab] = useState<ReaderWorkspaceTab>("notes");
-  const [selectionText, setSelectionText] = useState("");
   const paperQ = useQuery({
     queryKey: ["paper", paperId],
     queryFn: () => paperId ? api.paperGet(paperId) : Promise.resolve(null),
@@ -34,6 +33,23 @@ export function ReaderPage() {
   const scrollFn = useRef<((id: string) => void) | null>(null);
   const highlightsRef = useRef<Array<{ id: string }>>([]);
   const currentHighlightIdx = useRef<number>(-1);
+  // Workspace pane registers its setSelectionText here. Keeps selection state
+  // out of ReaderPage so a new selection doesn't cascade-rerender PdfPane.
+  const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
+
+  const handleScrollRef = useCallback((fn: (id: string) => void) => {
+    scrollFn.current = fn;
+  }, []);
+  const handleTranslateSelection = useCallback((text: string) => {
+    setSelectionTextRef.current?.(text);
+    setActiveTab("translate");
+  }, []);
+  const handleSelectionSetterReady = useCallback((setter: (text: string) => void) => {
+    setSelectionTextRef.current = setter;
+  }, []);
+  const handleJump = useCallback((h: { id: string }) => {
+    scrollFn.current?.(h.id);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -113,28 +129,25 @@ export function ReaderPage() {
           <Panel defaultSize={16} minSize={10} maxSize={24}>
             <HighlightList
               paperId={paperId}
-              onJump={(h) => scrollFn.current?.(h.id)}
+              onJump={handleJump}
               highlightsRef={highlightsRef}
             />
           </Panel>
-          <PanelResizeHandle className="w-px bg-litera-line hover:bg-litera-accent/40 transition-colors" />
+          <PanelResizeHandle className="w-2 relative group/handle cursor-col-resize"><div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-litera-line group-hover/handle:bg-litera-accent/40 transition-colors" /></PanelResizeHandle>
           <Panel defaultSize={52} minSize={30}>
             <PdfPane
               paperId={paperId}
-              scrollRefCb={(fn) => { scrollFn.current = fn; }}
-              onTranslateSelection={(text) => {
-                setSelectionText(text);
-                setActiveTab("translate");
-              }}
+              scrollRefCb={handleScrollRef}
+              onTranslateSelection={handleTranslateSelection}
             />
           </Panel>
-          <PanelResizeHandle className="w-px bg-litera-line hover:bg-litera-accent/40 transition-colors" />
+          <PanelResizeHandle className="w-2 relative group/handle cursor-col-resize"><div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-litera-line group-hover/handle:bg-litera-accent/40 transition-colors" /></PanelResizeHandle>
           <Panel defaultSize={28} minSize={15} maxSize={45}>
             <ReaderWorkspacePane
               paperId={paperId}
               activeTab={activeTab}
-              selectionText={selectionText}
               onTabChange={setActiveTab}
+              onSelectionSetterReady={handleSelectionSetterReady}
             />
           </Panel>
         </PanelGroup>

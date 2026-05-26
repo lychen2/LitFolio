@@ -19,7 +19,10 @@ export function DraftRow({
   const [saved, setSaved] = useState<Paper | null>(null);
   const [translation, setTranslation] = useState<TranslationResult | null>(null);
   const add = useMutation({
-    mutationFn: () => api.arxivAddWithPdf(draft.arxiv_id!),
+    mutationFn: () => {
+      if (!draft.arxiv_id) throw new Error("Missing arXiv ID");
+      return api.arxivAddWithPdf(draft.arxiv_id);
+    },
     onSuccess: (p) => {
       setSaved(p);
       qc.invalidateQueries({ queryKey: ["papers"] });

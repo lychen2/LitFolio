@@ -55,7 +55,7 @@ export function ImportPage() {
       </nav>
       <div className="flex-1 overflow-auto p-6">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0">
+          <div className="min-w-0 litera-fade-in" key={tab}>
             {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}
             {tab === "pdf" && <PdfTab />}
             {tab === "search" && <SearchTab />}
@@ -142,7 +142,7 @@ function TabButton({ on, onClick, icon, label }: { on: boolean; onClick: () => v
 
 function LibraryStats() {
   const t = useT();
-  const { data: count } = useQuery({ queryKey: ["papers", "count"], queryFn: api.papersCount, refetchInterval: 5000 });
+  const { data: count } = useQuery({ queryKey: ["papers", "count"], queryFn: api.papersCount });
   const { data: root } = useQuery({ queryKey: ["library", "root"], queryFn: api.libraryRoot });
   return (
     <div className="text-right text-xs text-litera-mute">
@@ -161,14 +161,6 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (source.prefill) {
-      setValue(source.prefill);
-      fetchMeta.mutate(source.prefill);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source.prefill]);
 
   const trimmed = value.trim();
   const isArxiv = /^\d{4}\.\d{4,5}/.test(trimmed) || trimmed.toLowerCase().includes("arxiv");
@@ -208,6 +200,17 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
     },
     onError: (e: Error) => setError(e.message),
   });
+
+  // Auto-fetch metadata when the page was opened with a prefilled ID (e.g.
+  // navigated in from a feed item). Pulling `mutate` out keeps the deps
+  // stable so eslint doesn't complain.
+  const { mutate: fetchMetaMutate } = fetchMeta;
+  useEffect(() => {
+    if (source.prefill) {
+      setValue(source.prefill);
+      fetchMetaMutate(source.prefill);
+    }
+  }, [source.prefill, fetchMetaMutate]);
 
   const saveWithPdf = useMutation({
     mutationFn: () => {
@@ -495,7 +498,10 @@ function SearchHitRow({ h }: { h: SearchHit }) {
   });
 
   const arxivAuto = useMutation({
-    mutationFn: () => api.arxivAddWithPdf(h.draft.arxiv_id!),
+    mutationFn: () => {
+      if (!h.draft.arxiv_id) throw new Error("Missing arXiv ID");
+      return api.arxivAddWithPdf(h.draft.arxiv_id);
+    },
     onSuccess: (p) => {
       setMsg({ kind: "ok", text: t("import.downloaded", { title: p.title }) });
       qc.invalidateQueries({ queryKey: ["papers"] });

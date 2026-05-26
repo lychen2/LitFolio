@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderPlus, Loader2, Plus, Trash2 } from "lucide-react";
 import { api, type FolderWithCount } from "@/lib/api";
-import { useT, useI18n } from "@/i18n/I18nProvider";
+import { useT } from "@/i18n/I18nProvider";
 
 export function FolderSidebar({
   selectedId, onSelect,
@@ -11,7 +11,6 @@ export function FolderSidebar({
   onSelect: (id: number | null) => void;
 }) {
   const t = useT();
-  const { lang } = useI18n();
   const qc = useQueryClient();
   const {
     data: folders = [],
@@ -84,9 +83,7 @@ export function FolderSidebar({
       </nav>
       {folders.length > 0 && (
         <div className="px-3 py-2 border-t border-litera-line text-[10px] text-litera-mute">
-          {lang === "en"
-            ? `${folders.length} folders · ${totalCount} papers tagged`
-            : `${folders.length} 个分类 · 共 ${totalCount} 篇分类条目`}
+          {t("folders.summaryText", { count: folders.length, papers: totalCount })}
         </div>
       )}
       {create.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(create.error)}</div>}
@@ -145,6 +142,7 @@ function FolderTree({
   onDelete: (id: number) => void;
   create: ReturnType<typeof useMutation<unknown, Error, { name: string; parentId: number | null }>>;
 }) {
+  const t = useT();
   // Loose equality: handles parent_id arriving as undefined / number / null without
   // mismatching against parentId === null.
   // Orphan rescue: if a folder's parent_id refers to a folder that doesn't exist
@@ -171,7 +169,7 @@ function FolderTree({
             <button
               onClick={() => onDelete(folder.id)}
               className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
-              title="删除文件夹"
+              title={t("folders.deleteFolder")}
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -223,6 +221,7 @@ function CreateButton({
   create: ReturnType<typeof useMutation<unknown, Error, { name: string; parentId: number | null }>>;
   variant: "header" | "row";
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   function submit() {
@@ -244,7 +243,7 @@ function CreateButton({
         }}
         onBlur={() => setOpen(false)}
         className="litera-input py-0.5 text-[11px] w-28"
-        placeholder={parentId == null ? "新分类名" : "子分类名"}
+        placeholder={parentId == null ? t("folders.rootNamePlaceholder") : t("folders.childNamePlaceholder")}
       />
     );
   }
@@ -254,14 +253,14 @@ function CreateButton({
         onClick={() => setOpen(true)}
         disabled={create.isPending}
         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-litera-text/80 hover:text-litera-accent hover:bg-litera-panel"
-        title="新建根分类"
+        title={t("folders.newRootTitle")}
       >
         {create.isPending ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : (
           <>
             <FolderPlus className="h-3 w-3" />
-            新建
+            {t("common.create")}
           </>
         )}
       </button>
@@ -272,7 +271,7 @@ function CreateButton({
       onClick={() => setOpen(true)}
       disabled={create.isPending}
       className="p-1 text-litera-mute hover:text-litera-text opacity-0 group-hover:opacity-100"
-      title="新建子分类"
+      title={t("folders.createChild")}
     >
       {create.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
     </button>

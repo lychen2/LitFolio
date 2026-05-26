@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Highlighter, Moon, Sun } from "lucide-react";
 import {
@@ -28,7 +28,7 @@ import { PdfSearchBar } from "./PdfSearchBar";
  *   `PdfTermsOverlay`.
  * - Ctrl+F (or the search button) opens an in-document text find.
  */
-export function PdfPane({
+export const PdfPane = memo(function PdfPane({
   paperId, scrollRefCb, onTranslateSelection,
 }: {
   paperId: string;
@@ -118,12 +118,20 @@ export function PdfPane({
     onSuccess: () => qc.invalidateQueries({ queryKey: ["paper-terms", paperId] }),
   });
 
-  const highlights: IHighlight[] = (highlightsQ.data ?? []).map((h: BackendHighlight) => ({
-    id: h.id,
-    position: h.rect as ScaledPosition,
-    content: { text: h.text },
-    comment: { text: h.note ?? "", emoji: "" },
-  }));
+  // Memoize the IHighlight[] derivation so PdfHighlighter's prop reference
+  // stays stable across renders that don't actually change the highlight set.
+  // Without this, every parent re-render forced PdfHighlighter to diff the
+  // array from scratch.
+  const highlights: IHighlight[] = useMemo(
+    () =>
+      (highlightsQ.data ?? []).map((h: BackendHighlight) => ({
+        id: h.id,
+        position: h.rect as ScaledPosition,
+        content: { text: h.text },
+        comment: { text: h.note ?? "", emoji: "" },
+      })),
+    [highlightsQ.data],
+  );
 
   useEffect(() => {
     if (!scrollRefCb) return;
@@ -238,7 +246,7 @@ export function PdfPane({
       )}
     </div>
   );
-}
+});
 
 function SelectionActions({
   onHighlight,
@@ -253,7 +261,7 @@ function SelectionActions({
 }) {
   const t = useT();
   return (
-    <div className="litera-overlay p-1.5 flex items-center gap-1.5">
+    <div className="litera-overlay p-1.5 flex items-center gap-1.5 litera-slide-up">
       <button onClick={onHighlight} className="litera-btn-primary text-xs px-2 py-1">
         {t("reader.addHighlight")}
       </button>

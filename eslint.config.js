@@ -3,6 +3,7 @@ import tseslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
 
 export default [
   js.configs.recommended,
@@ -11,7 +12,9 @@ export default [
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2022, sourceType: "module", ecmaFeatures: { jsx: true } },
-      globals: { window: "readonly", document: "readonly", console: "readonly" },
+      // Browser DOM globals + React (used as `React.ReactNode` in a few places
+      // even with the new JSX transform — eslint can't see it as a value).
+      globals: { ...globals.browser, React: "readonly" },
     },
     plugins: {
       "@typescript-eslint": tseslint,

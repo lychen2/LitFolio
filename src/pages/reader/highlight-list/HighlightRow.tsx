@@ -98,7 +98,7 @@ export function HighlightRow({
           </button>
         </div>
       ) : (
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="opacity-0 group-hover:opacity-100 transition-all duration-150 translate-y-0.5 group-hover:translate-y-0" style={{ transitionTimingFunction: "var(--ease-out-quart)" }}>
         <ActionRow
           canSummarize={canSummarize}
           editing={editing}

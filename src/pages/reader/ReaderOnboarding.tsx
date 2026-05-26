@@ -25,7 +25,7 @@ export function ReaderOnboarding() {
 
   return (
     <div className="fixed inset-0 z-50 bg-litera-ink/60 backdrop-blur-sm grid place-items-center p-4" onClick={dismiss}>
-      <div className="litera-panel p-6 max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="litera-panel p-6 max-w-md space-y-4 litera-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 text-litera-accent">
           <BookOpen className="h-5 w-5" />
           <h2 className="font-serif text-lg">{t("reader.onboard.title")}</h2>
