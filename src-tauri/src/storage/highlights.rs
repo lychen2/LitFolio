@@ -12,6 +12,19 @@ pub struct HighlightRepo<'a> {
     pool: &'a Pool,
 }
 
+pub struct HighlightTranslationUpdate<'a> {
+    pub text: &'a str,
+    pub target_lang: &'a str,
+    pub model: &'a str,
+    pub translated_at: i64,
+}
+
+pub struct HighlightSummaryUpdate<'a> {
+    pub text: &'a str,
+    pub model: &'a str,
+    pub summarized_at: i64,
+}
+
 impl<'a> HighlightRepo<'a> {
     pub fn new(pool: &'a Pool) -> Self {
         Self { pool }
@@ -51,13 +64,23 @@ impl<'a> HighlightRepo<'a> {
             color: color.into(),
             text: text.into(),
             note: None,
+            summary_text: None,
+            summary_model: None,
+            summarized_at: None,
+            translation_text: None,
+            translation_target_lang: None,
+            translation_model: None,
+            translated_at: None,
             created_at,
         })
     }
 
     pub async fn list_by_paper(&self, paper_id: &str) -> Result<Vec<Highlight>> {
         let rows = sqlx::query(
-            "SELECT id, paper_id, page, rect_json, color, text, note, created_at
+            "SELECT id, paper_id, page, rect_json, color, text, note,
+                    summary_text, summary_model, summarized_at,
+                    translation_text, translation_target_lang, translation_model, translated_at,
+                    created_at
              FROM highlights WHERE paper_id = ?1 ORDER BY page ASC, created_at ASC",
         )
         .bind(paper_id)
@@ -65,6 +88,21 @@ impl<'a> HighlightRepo<'a> {
         .await
         .context("list highlights")?;
         rows.into_iter().map(row_to_highlight).collect()
+    }
+
+    pub async fn get(&self, id: &str) -> Result<Option<Highlight>> {
+        let row = sqlx::query(
+            "SELECT id, paper_id, page, rect_json, color, text, note,
+                    summary_text, summary_model, summarized_at,
+                    translation_text, translation_target_lang, translation_model, translated_at,
+                    created_at
+             FROM highlights WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(self.pool)
+        .await
+        .context("get highlight")?;
+        row.map(row_to_highlight).transpose()
     }
 
     pub async fn update_note(&self, id: &str, note: Option<&str>) -> Result<()> {
@@ -102,6 +140,58 @@ impl<'a> HighlightRepo<'a> {
             .context("delete highlight")?;
         Ok(())
     }
+
+    pub async fn update_translation(
+        &self,
+        id: &str,
+        payload: &HighlightTranslationUpdate<'_>,
+    ) -> Result<()> {
+        let result = sqlx::query(
+            "UPDATE highlights
+             SET translation_text = ?1,
+                 translation_target_lang = ?2,
+                 translation_model = ?3,
+                 translated_at = ?4
+             WHERE id = ?5",
+        )
+        .bind(payload.text)
+        .bind(payload.target_lang)
+        .bind(payload.model)
+        .bind(payload.translated_at)
+        .bind(id)
+        .execute(self.pool)
+        .await
+        .context("update highlight translation")?;
+        if result.rows_affected() == 0 {
+            return Err(anyhow::anyhow!("highlight {id} not found"));
+        }
+        Ok(())
+    }
+
+    pub async fn update_summary(
+        &self,
+        id: &str,
+        payload: &HighlightSummaryUpdate<'_>,
+    ) -> Result<()> {
+        let result = sqlx::query(
+            "UPDATE highlights
+             SET summary_text = ?1,
+                 summary_model = ?2,
+                 summarized_at = ?3
+             WHERE id = ?4",
+        )
+        .bind(payload.text)
+        .bind(payload.model)
+        .bind(payload.summarized_at)
+        .bind(id)
+        .execute(self.pool)
+        .await
+        .context("update highlight summary")?;
+        if result.rows_affected() == 0 {
+            return Err(anyhow::anyhow!("highlight {id} not found"));
+        }
+        Ok(())
+    }
 }
 
 fn row_to_highlight(row: sqlx::sqlite::SqliteRow) -> Result<Highlight> {
@@ -120,6 +210,13 @@ fn row_to_highlight(row: sqlx::sqlite::SqliteRow) -> Result<Highlight> {
         color: row.try_get("color")?,
         text: row.try_get("text")?,
         note,
+        summary_text: row.try_get("summary_text").unwrap_or(None),
+        summary_model: row.try_get("summary_model").unwrap_or(None),
+        summarized_at: row.try_get("summarized_at").unwrap_or(None),
+        translation_text: row.try_get("translation_text").unwrap_or(None),
+        translation_target_lang: row.try_get("translation_target_lang").unwrap_or(None),
+        translation_model: row.try_get("translation_model").unwrap_or(None),
+        translated_at: row.try_get("translated_at").unwrap_or(None),
         created_at: row.try_get("created_at")?,
     })
 }
@@ -199,10 +296,69 @@ mod tests {
         let list = repo.list_by_paper("A").await.unwrap();
         assert!(list[0].note.is_none());
 
+        repo
+            .update_translation(
+                &h1.id,
+                &HighlightTranslationUpdate {
+                    text: "你好",
+                    target_lang: "Chinese",
+                    model: "test-model",
+                    translated_at: 42,
+                },
+            )
+            .await
+            .unwrap();
+        let translated = repo.get(&h1.id).await.unwrap().unwrap();
+        assert_eq!(translated.translation_text.as_deref(), Some("你好"));
+        assert_eq!(translated.translation_target_lang.as_deref(), Some("Chinese"));
+        assert_eq!(translated.translation_model.as_deref(), Some("test-model"));
+        assert_eq!(translated.translated_at, Some(42));
+
+        repo
+            .update_summary(
+                &h1.id,
+                &HighlightSummaryUpdate {
+                    text: "一句话总结",
+                    model: "summary-model",
+                    summarized_at: 99,
+                },
+            )
+            .await
+            .unwrap();
+        let summarized = repo.get(&h1.id).await.unwrap().unwrap();
+        assert_eq!(summarized.summary_text.as_deref(), Some("一句话总结"));
+        assert_eq!(summarized.summary_model.as_deref(), Some("summary-model"));
+        assert_eq!(summarized.summarized_at, Some(99));
+
         repo.delete(&h2.id).await.unwrap();
         assert_eq!(repo.list_by_paper("A").await.unwrap().len(), 1);
 
         assert!(repo.update_note("nonexistent", Some("x")).await.is_err());
+        assert!(
+            repo.update_translation(
+                "nonexistent",
+                &HighlightTranslationUpdate {
+                    text: "x",
+                    target_lang: "Chinese",
+                    model: "m",
+                    translated_at: 1,
+                },
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            repo.update_summary(
+                "nonexistent",
+                &HighlightSummaryUpdate {
+                    text: "x",
+                    model: "m",
+                    summarized_at: 1,
+                },
+            )
+            .await
+            .is_err()
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 

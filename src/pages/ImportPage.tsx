@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 
 import { useT } from "@/i18n/I18nProvider";
+import { ImportSidebar } from "./import/ImportSidebar";
 
 type Tab = "pdf" | "arxiv_doi" | "search";
 
@@ -53,9 +54,14 @@ export function ImportPage() {
         <TabButton on={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label={t("import.tab.search")} />
       </nav>
       <div className="flex-1 overflow-auto p-6">
-        {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}
-        {tab === "pdf" && <PdfTab />}
-        {tab === "search" && <SearchTab />}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
+            {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}
+            {tab === "pdf" && <PdfTab />}
+            {tab === "search" && <SearchTab />}
+          </div>
+          <ImportSidebar />
+        </div>
       </div>
     </section>
   );
@@ -65,6 +71,7 @@ export function ImportPage() {
 /// on this page (来自 RSS 订阅), 2) one-click open the source page in their
 /// browser to grab the PDF when arXiv auto-download isn't an option (DOIs etc).
 function ImportSourceBanner({ source }: { source: ImportSource }) {
+  const t = useT();
   if (!source.link && !source.fromFeedItem) return null;
   function open() {
     if (source.link) openInBrowser(source.link).catch(() => undefined);
@@ -78,7 +85,7 @@ function ImportSourceBanner({ source }: { source: ImportSource }) {
       )}
       <div className="min-w-0 flex-1">
         <div className="text-xs uppercase tracking-wider text-litera-mute">
-          {source.fromFeedItem ? "来自 RSS 订阅" : "来源"}
+          {source.fromFeedItem ? t("import.fromFeed") : t("import.source")}
         </div>
         {source.title && (
           <div className="text-sm text-litera-text truncate" title={source.title}>
@@ -89,7 +96,6 @@ function ImportSourceBanner({ source }: { source: ImportSource }) {
           <button
             onClick={open}
             className="mt-0.5 font-mono text-[11px] text-litera-accent hover:underline truncate max-w-full block text-left"
-            title="在浏览器打开原文页(可在那里下载 PDF)"
           >
             {source.link}
           </button>
@@ -99,9 +105,8 @@ function ImportSourceBanner({ source }: { source: ImportSource }) {
         <button
           onClick={open}
           className="litera-btn text-xs flex items-center gap-1.5 shrink-0"
-          title="在浏览器打开原文,便于复制 DOI 或下载 PDF"
         >
-          <ExternalLink className="h-3.5 w-3.5" /> 打开原文
+          <ExternalLink className="h-3.5 w-3.5" /> {t("import.openOrigin")}
         </button>
       )}
     </div>
@@ -136,17 +141,19 @@ function TabButton({ on, onClick, icon, label }: { on: boolean; onClick: () => v
 }
 
 function LibraryStats() {
+  const t = useT();
   const { data: count } = useQuery({ queryKey: ["papers", "count"], queryFn: api.papersCount, refetchInterval: 5000 });
   const { data: root } = useQuery({ queryKey: ["library", "root"], queryFn: api.libraryRoot });
   return (
     <div className="text-right text-xs text-litera-mute">
-      <div>文献库目前 <span className="text-litera-text">{count ?? "—"}</span> 篇</div>
+      <div>{t("import.stats.count", { count: String(count ?? "—") })}</div>
       <div className="font-mono mt-0.5 max-w-[420px] truncate">{root ?? ""}</div>
     </div>
   );
 }
 
 function ArxivDoiTab({ source }: { source: ImportSource }) {
+  const t = useT();
   const qc = useQueryClient();
   const [value, setValue] = useState(source.prefill ?? "");
   const [draft, setDraft] = useState<ArxivDraft | null>(null);
@@ -155,8 +162,6 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Auto-fetch metadata on mount when arriving with a prefilled identifier
-  // (e.g. clicked 入库 on a feed item). Saves the user one click.
   useEffect(() => {
     if (source.prefill) {
       setValue(source.prefill);
@@ -176,7 +181,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
       qc.invalidateQueries({ queryKey: ["feeds"] });
       qc.invalidateQueries({ queryKey: ["feed-items"] });
     } catch {
-      // Best-effort — paper is already saved, link-back is a UX nicety.
+      // Best-effort
     }
   }
 
@@ -193,7 +198,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
         const d = await api.prepareDoiDraft(v);
         return { draft: d, kind: "doi" };
       }
-      throw new Error("请输入 arXiv ID(例如 1706.03762)或 DOI(例如 10.1234/xyz)。");
+      throw new Error(t("import.error.invalidId"));
     },
     onSuccess: ({ draft, kind }) => {
       setDraft(draft);
@@ -206,11 +211,11 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
 
   const saveWithPdf = useMutation({
     mutationFn: () => {
-      if (!draft || !selectedPdf) throw new Error("缺少元数据或 PDF 路径");
+      if (!draft || !selectedPdf) throw new Error(t("import.error.missingMeta"));
       return api.paperSaveWithPdf(draft, selectedPdf);
     },
     onSuccess: async (p) => {
-      setSuccess(`✓ 已保存:${p.title}`);
+      setSuccess(t("import.saved", { title: p.title }));
       await linkBackToFeed(p.id);
       reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
@@ -224,7 +229,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
       return api.arxivAddWithPdf(id);
     },
     onSuccess: async (p) => {
-      setSuccess(`✓ 已下载并保存:${p.title}`);
+      setSuccess(t("import.downloadedSaved", { title: p.title }));
       await linkBackToFeed(p.id);
       reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
@@ -242,7 +247,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
   function submit() {
     if (!trimmed) return;
     if (!isArxiv && !isDoi) {
-      setError("请输入 arXiv ID(例如 1706.03762)或 DOI(例如 10.1234/xyz)。");
+      setError(t("import.error.invalidId"));
       return;
     }
     setError(null);
@@ -265,23 +270,21 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="litera-panel p-5">
-        <label className="text-xs uppercase tracking-wider text-litera-mute">第 1 步 · 粘贴 arXiv ID 或 DOI</label>
+        <label className="text-xs uppercase tracking-wider text-litera-mute">{t("import.step1.label")}</label>
         <div className="flex gap-2 mt-2">
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="1706.03762  ·  arXiv:2310.06825  ·  10.1145/3530819"
+            placeholder={t("import.step1.placeholder")}
             className="litera-input flex-1 font-mono"
           />
           <button onClick={submit} disabled={fetching || !trimmed} className="litera-btn-primary disabled:opacity-50">
             {fetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            查询元数据
+            {t("import.step1.fetch")}
           </button>
         </div>
-        <div className="mt-2 text-xs text-litera-mute">
-          arXiv 可一键自动下载 PDF · DOI 来源需要本地选择 PDF 文件。
-        </div>
+        <div className="mt-2 text-xs text-litera-mute">{t("import.step1.hint")}</div>
         {error && <div className="mt-3 text-sm text-red-400/90">✕ {error}</div>}
         {success && <div className="mt-3 text-sm text-litera-accent">{success}</div>}
       </div>
@@ -289,7 +292,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
       {draft && (
         <div className="litera-panel p-5 space-y-4">
           <div>
-            <div className="text-xs uppercase tracking-wider text-litera-mute mb-1.5">第 2 步 · 元数据预览</div>
+            <div className="text-xs uppercase tracking-wider text-litera-mute mb-1.5">{t("import.step2.label")}</div>
             <div className="font-serif text-lg leading-snug text-litera-text">{draft.title}</div>
             <div className="text-xs text-litera-mute mt-1 flex items-center gap-2 flex-wrap">
               {draft.authors.length > 0 && (
@@ -308,20 +311,20 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
           </div>
 
           <div className="border-t border-litera-line pt-4">
-            <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">第 3 步 · 绑定 PDF</div>
+            <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("import.step3.label")}</div>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={pickPdf} disabled={saving} className="litera-btn text-sm disabled:opacity-50">
-                <FolderOpen className="h-4 w-4" /> 选择本地 PDF 文件…
+                <FolderOpen className="h-4 w-4" /> {t("import.step3.pickPdf")}
               </button>
               {sourceKind === "arxiv" && (
                 <button
                   onClick={() => autoDownload.mutate()}
                   disabled={saving}
                   className="litera-btn text-sm disabled:opacity-50"
-                  title="从 arxiv.org/pdf 直接下载"
+                  title={t("import.step3.autoDownloadTitle")}
                 >
                   {autoDownload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-                  🚀 自动下载 PDF
+                  {t("import.step3.autoDownload")}
                 </button>
               )}
               <button
@@ -330,19 +333,19 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
                 className="litera-btn-primary text-sm disabled:opacity-50"
               >
                 {saveWithPdf.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                💾 保存到库
+                {t("import.step3.save")}
               </button>
               <button onClick={reset} disabled={saving} className="litera-btn text-xs ml-auto disabled:opacity-50">
-                取消
+                {t("import.step3.cancel")}
               </button>
             </div>
             <div className="mt-2 text-xs">
               {selectedPdf ? (
                 <span className="text-litera-accent">
-                  已选: <span className="font-mono text-[11px] text-litera-text/80">{selectedPdf}</span>
+                  {t("import.step3.selected", { path: "" })} <span className="font-mono text-[11px] text-litera-text/80">{selectedPdf}</span>
                 </span>
               ) : (
-                <span className="text-litera-mute italic">还未选择 PDF</span>
+                <span className="text-litera-mute italic">{t("import.step3.notSelected")}</span>
               )}
             </div>
           </div>
@@ -353,6 +356,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
 }
 
 function PdfTab() {
+  const t = useT();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<string[]>([]);
   const [result, setResult] = useState<{ ok: number; failed: { path: string; error: string }[] } | null>(null);
@@ -376,16 +380,13 @@ function PdfTab() {
     <div className="max-w-3xl space-y-4">
       <div className="litera-panel p-8 text-center">
         <Upload className="h-10 w-10 mx-auto mb-3 text-litera-mute" />
-        <p className="text-sm text-litera-text">
-          选择本地 PDF 文件加入文献库。
-        </p>
+        <p className="text-sm text-litera-text">{t("import.pdfTab.desc")}</p>
         <p className="text-xs text-litera-mute mt-1">
-          会从首页提取标题 / 作者 / DOI 等元数据,文件复制到{" "}
-          <span className="font-mono">papers/&lt;id&gt;/original.pdf</span>。
+          {t("import.pdfTab.hint", { path: "papers/<id>/original.pdf" })}
         </p>
         <div className="mt-4 flex items-center justify-center gap-2">
           <button onClick={pick} className="litera-btn">
-            <Upload className="h-4 w-4" /> 选择 PDF 文件…
+            <Upload className="h-4 w-4" /> {t("import.pdfTab.pick")}
           </button>
           {picked.length > 0 && (
             <button
@@ -394,7 +395,7 @@ function PdfTab() {
               className="litera-btn-primary disabled:opacity-50"
             >
               {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-              导入 {picked.length} 篇
+              {t("import.pdfTab.importBtn", { count: String(picked.length) })}
             </button>
           )}
         </div>
@@ -405,10 +406,15 @@ function PdfTab() {
             ))}
           </div>
         )}
+        <p className="mt-4 text-xs text-litera-mute">{t("import.pdfTab.dragHint")}</p>
       </div>
       {result && (
         <div className="litera-panel p-4 text-sm space-y-2">
-          <div className="text-litera-text">✓ 已导入 {result.ok} 篇{result.failed.length ? `,${result.failed.length} 篇失败` : ""}。</div>
+          <div className="text-litera-text">
+            {result.failed.length === 0
+              ? t("import.pdfTab.done", { ok: String(result.ok) })
+              : t("import.pdfTab.doneWithFail", { ok: String(result.ok), fail: String(result.failed.length) })}
+          </div>
           {result.failed.map((f, i) => (
             <div key={i} className="text-xs text-red-400/90 font-mono">
               ✕ <span className="text-litera-mute">{f.path}</span> — {f.error}
@@ -421,6 +427,7 @@ function PdfTab() {
 }
 
 function SearchTab() {
+  const t = useT();
   const [q, setQ] = useState("");
   const [submitted, setSubmitted] = useState("");
   const { data, isFetching, error } = useQuery({
@@ -431,13 +438,13 @@ function SearchTab() {
   return (
     <div className="max-w-3xl space-y-4">
       <div className="litera-panel p-5">
-        <label className="text-xs uppercase tracking-wider text-litera-mute">搜索 Semantic Scholar</label>
+        <label className="text-xs uppercase tracking-wider text-litera-mute">{t("import.search.label")}</label>
         <div className="flex gap-2 mt-2">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && setSubmitted(q.trim())}
-            placeholder="例如:attention is all you need"
+            placeholder={t("import.search.placeholder")}
             className="litera-input flex-1"
           />
           <button
@@ -445,15 +452,13 @@ function SearchTab() {
             disabled={!q.trim()}
             className="litera-btn-primary disabled:opacity-50"
           >
-            <Search className="h-4 w-4" /> 搜索
+            <Search className="h-4 w-4" /> {t("common.search")}
           </button>
         </div>
-        <p className="mt-2 text-xs text-litera-mute">
-          搜索结果只显示元数据 · 入库需要绑定本地 PDF · arXiv 条目可尝试自动下载。
-        </p>
+        <p className="mt-2 text-xs text-litera-mute">{t("import.search.hint")}</p>
       </div>
       {error && <div className="text-sm text-red-400/90">✕ {(error as Error).message}</div>}
-      {isFetching && <div className="text-sm text-litera-mute flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 搜索中…</div>}
+      {isFetching && <div className="text-sm text-litera-mute flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("import.search.searching")}</div>}
       {data && data.length > 0 && (
         <ul className="divide-y divide-litera-line border border-litera-line rounded-md overflow-hidden">
           {data.map((h, i) => (
@@ -462,13 +467,14 @@ function SearchTab() {
         </ul>
       )}
       {submitted && !isFetching && data && data.length === 0 && (
-        <div className="text-sm text-litera-mute">未找到结果。</div>
+        <div className="text-sm text-litera-mute">{t("import.search.empty")}</div>
       )}
     </div>
   );
 }
 
 function SearchHitRow({ h }: { h: SearchHit }) {
+  const t = useT();
   const qc = useQueryClient();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -481,7 +487,7 @@ function SearchHitRow({ h }: { h: SearchHit }) {
     },
     onSuccess: (p) => {
       if (p) {
-        setMsg({ kind: "ok", text: `✓ 已保存:${p.title}` });
+        setMsg({ kind: "ok", text: t("import.saved", { title: p.title }) });
         qc.invalidateQueries({ queryKey: ["papers"] });
       }
     },
@@ -491,7 +497,7 @@ function SearchHitRow({ h }: { h: SearchHit }) {
   const arxivAuto = useMutation({
     mutationFn: () => api.arxivAddWithPdf(h.draft.arxiv_id!),
     onSuccess: (p) => {
-      setMsg({ kind: "ok", text: `✓ 已下载:${p.title}` });
+      setMsg({ kind: "ok", text: t("import.downloaded", { title: p.title }) });
       qc.invalidateQueries({ queryKey: ["papers"] });
     },
     onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
@@ -522,20 +528,20 @@ function SearchHitRow({ h }: { h: SearchHit }) {
             onClick={() => savePdf.mutate()}
             disabled={savePdf.isPending}
             className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-            title="选择本地 PDF 后入库"
+            title={t("import.search.pickSaveTitle")}
           >
             {savePdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
-            选择 PDF 后保存
+            {t("import.search.pickSave")}
           </button>
           {h.draft.arxiv_id && (
             <button
               onClick={() => arxivAuto.mutate()}
               disabled={arxivAuto.isPending}
               className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-              title="从 arxiv.org 直接下载 PDF"
+              title={t("import.search.arxivAutoTitle")}
             >
               {arxivAuto.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-              🚀 尝试 arXiv 自动下载
+              {t("import.search.arxivAuto")}
             </button>
           )}
         </div>

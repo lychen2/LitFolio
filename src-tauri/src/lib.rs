@@ -5,11 +5,13 @@ mod cluster;
 mod commands;
 mod index;
 mod ingest;
+mod library_sync;
 mod storage;
 
 use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex as StdMutex};
 use tauri::Manager;
+use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
@@ -19,7 +21,8 @@ pub struct AppState {
     pub pool: Pool,
     pub paths: LibraryPaths,
     pub http: reqwest::Client,
-    pub batch_cancel: Mutex<Option<CancellationToken>>,
+    pub batch_cancel: StdMutex<Option<CancellationToken>>,
+    pub sync_lock: AsyncMutex<()>,
 }
 
 async fn bootstrap_state() -> Result<Arc<AppState>> {
@@ -45,7 +48,8 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
         pool,
         paths,
         http,
-        batch_cancel: Mutex::new(None),
+        batch_cancel: StdMutex::new(None),
+        sync_lock: AsyncMutex::new(()),
     }))
 }
 
@@ -107,6 +111,11 @@ pub fn run() {
             commands::llm_get_config,
             commands::llm_save_config,
             commands::llm_test,
+            commands::sync::sync_get_config,
+            commands::sync::sync_save_config,
+            commands::sync::sync_test,
+            commands::sync::sync_push_library,
+            commands::sync::sync_pull_library,
             commands::paper_tldr,
             commands::paper_quick_read,
             commands::paper_translate,
@@ -122,12 +131,21 @@ pub fn run() {
             commands::highlight_list,
             commands::highlight_update_note,
             commands::highlight_delete,
+            commands::reader_terms::paper_terms_list,
+            commands::reader_terms::paper_terms_generate,
+            commands::reader_terms::paper_term_add,
+            commands::reader_terms::paper_term_delete,
+            commands::reader_terms::paper_set_pdf_text,
+            commands::reader_translate::highlight_summarize,
+            commands::reader_translate::highlight_translate,
             commands::note_get,
             commands::note_save,
+            commands::reader_translate::reader_translate_selection,
             commands::llm_list_models,
             commands::search_expand_query,
             commands::survey::topic_survey,
             commands::ask::library_ask,
+            commands::ask::ask_save_as_note,
             commands::feeds::feeds_list,
             commands::feeds::feed_add,
             commands::feeds::feed_remove,

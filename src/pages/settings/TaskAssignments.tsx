@@ -134,7 +134,6 @@ function TaskRow({
             title={t("settings.tasks.fetchModelsTitle")}
           >
             {listModels.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            📥
           </button>
         </>
       )}

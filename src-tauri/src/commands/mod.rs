@@ -2,7 +2,11 @@
 
 pub mod ask;
 pub mod feeds;
+pub mod reader_terms;
+pub mod reader_translate;
 pub mod survey;
+pub mod sync;
+pub mod term_filter;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -365,6 +369,7 @@ pub async fn import_pdf_files(
     paths: Vec<String>,
 ) -> Result<PdfImportSummary, String> {
     let library = state.paths.clone();
+    let http = state.http.clone();
     let repo = PaperRepo::new(&state.pool);
     let mut imported = Vec::new();
     let mut failed = Vec::new();
@@ -381,7 +386,29 @@ pub async fn import_pdf_files(
         .map_err(|e| e.to_string())?;
         match result {
             Ok(r) => {
-                let mut paper = r.draft.into_paper();
+                let mut draft = r.draft;
+                // If DOI was extracted from the PDF text, fetch full metadata from CrossRef.
+                if let Some(ref doi) = draft.doi {
+                    if let Ok(crossref) = fetch_doi(&http, doi).await {
+                        // CrossRef fields are more reliable — use them when available.
+                        if !crossref.title.is_empty() && crossref.title != "(untitled)" {
+                            draft.title = crossref.title;
+                        }
+                        if !crossref.authors.is_empty() {
+                            draft.authors = crossref.authors;
+                        }
+                        if crossref.year.is_some() {
+                            draft.year = crossref.year;
+                        }
+                        if crossref.venue.is_some() {
+                            draft.venue = crossref.venue;
+                        }
+                        if crossref.abstract_text.is_some() {
+                            draft.abstract_text = crossref.abstract_text;
+                        }
+                    }
+                }
+                let mut paper = draft.into_paper();
                 paper.id = paper_id;
                 paper.pdf_path = Some(r.stored_path.display().to_string());
                 if let Err(e) = repo.insert(&paper).await {

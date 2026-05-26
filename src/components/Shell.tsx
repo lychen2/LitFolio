@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useFileDrop } from "@/hooks/useFileDrop";
+import { DropZoneOverlay } from "@/components/DropZoneOverlay";
 
 const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
   { to: "/library", labelKey: "nav.library", icon: LibraryBig },
@@ -18,8 +20,15 @@ const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
 
 export function Shell({ children }: { children: ReactNode }) {
   const t = useT();
+  const { isDragging, importing, result, clearResult } = useFileDrop();
   return (
     <div className="flex h-full w-full overflow-hidden">
+      <DropZoneOverlay
+        isDragging={isDragging}
+        importing={importing}
+        result={result}
+        onDismiss={clearResult}
+      />
       <aside className="w-[210px] shrink-0 border-r border-litera-line bg-litera-paper/40 px-3 py-4 flex flex-col">
         <div className="flex items-center gap-2 px-2 mb-6">
           <BookOpenText className="h-5 w-5 text-litera-accent" />

@@ -96,9 +96,8 @@ pub async fn answer_library_question(
         return Ok(empty_result(terms.to_vec()));
     }
     let context = build_context(&sources);
-    let user = format!(
-        "Question:\n{trimmed}\n\nSources (numbered, cite by these numbers):\n{context}"
-    );
+    let user =
+        format!("Question:\n{trimmed}\n\nSources (numbered, cite by these numbers):\n{context}");
     let resp = chat_complete(
         client,
         profile,
@@ -126,10 +125,7 @@ pub async fn answer_library_question(
     })
 }
 
-fn build_sources(
-    papers: &[Paper],
-    highlights: &HashMap<String, Vec<Highlight>>,
-) -> Vec<AskSource> {
+fn build_sources(papers: &[Paper], highlights: &HashMap<String, Vec<Highlight>>) -> Vec<AskSource> {
     papers
         .iter()
         .filter_map(|p| {
@@ -265,6 +261,13 @@ mod tests {
             color: "yellow".into(),
             text: text.into(),
             note: None,
+            summary_text: None,
+            summary_model: None,
+            summarized_at: None,
+            translation_text: None,
+            translation_target_lang: None,
+            translation_model: None,
+            translated_at: None,
             created_at: 0,
         }
     }

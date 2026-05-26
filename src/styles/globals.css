@@ -49,11 +49,22 @@
   .litera-pdf-dark .pdfViewer .page canvas {
     filter: invert(0.92) hue-rotate(180deg);
   }
+  .litera-pdf-dark .textLayer ::selection {
+    background: rgba(86, 208, 255, 0.5);
+  }
+  .litera-pdf-dark .textLayer .highlight.selected,
+  .litera-pdf-dark .textLayer .highlight.appended {
+    background: rgba(86, 208, 255, 0.38);
+    box-shadow: 0 0 0 1px rgba(168, 236, 255, 0.88);
+  }
 }
 
 @layer components {
   .litera-panel {
-    @apply bg-litera-panel/80 border border-litera-line rounded-[var(--litera-radius)] backdrop-blur;
+    @apply bg-litera-panel/80 border border-litera-line rounded-[var(--litera-radius)];
+  }
+  .litera-overlay {
+    @apply litera-panel backdrop-blur shadow-2xl;
   }
   .litera-btn {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
@@ -61,11 +72,54 @@
            transition-colors duration-150 text-litera-text;
   }
   .litera-btn-primary {
-    @apply litera-btn bg-litera-accent/90 hover:bg-litera-accent text-zinc-950 border-litera-accent;
+    @apply litera-btn bg-litera-accent/90 hover:bg-litera-accent border-litera-accent;
+    color: #0a0a0f;
   }
   .litera-input {
     @apply bg-litera-paper border border-litera-line rounded-md px-2.5 py-1.5
            text-sm text-litera-text placeholder:text-litera-mute
            focus:outline-none focus:ring-2 focus:ring-litera-accent/40;
+  }
+
+  /* Per-page overlay container for term decorations. Sits on top of the
+     canvas/textLayer but is pointer-events:none so PDF selection passes
+     through. Individual overlays inherit that — hover detection uses
+     elementsFromPoint to find them anyway. */
+  .litera-term-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .litera-term-overlay {
+    position: absolute;
+    border-bottom: 1px dotted rgba(167, 139, 250, 0.85);
+    background-color: rgba(167, 139, 250, 0.08);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  /* Floating term tooltip — positioned by JS via inline left/top. Translate
+     centers the bubble horizontally on the underlined token and lifts it just
+     above the line. */
+  .litera-term-tooltip {
+    position: absolute;
+    z-index: 30;
+    max-width: 22rem;
+    min-width: 12rem;
+    transform: translate(-50%, calc(-100% - 10px));
+    @apply litera-overlay px-3 py-2 text-xs leading-relaxed;
+  }
+
+  /* In-document search hits: a soft outline so it stays readable against any
+     PDF background, plus a stronger ring on the currently-active hit. */
+  .litera-pdf-find-hit {
+    background-color: rgba(245, 196, 24, 0.45);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  .litera-pdf-find-active {
+    background-color: rgba(245, 196, 24, 0.85);
+    outline: 2px solid rgba(245, 196, 24, 0.95);
   }
 }
