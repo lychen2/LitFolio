@@ -229,4 +229,3 @@ pub struct FeedRefreshAllSummary {
     pub new_items: i64,
     pub errors: Vec<String>,
 }
-

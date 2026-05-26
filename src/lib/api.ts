@@ -253,6 +253,66 @@ export interface AskLibraryResult {
   retrieved_count: number;
 }
 
+export interface SaveAskNoteInput {
+  question: string;
+  answer: string;
+  terms: string[];
+  sources: AskSource[];
+  model: string;
+}
+
+export interface SaveAskNoteResult {
+  path: string;
+}
+
+export interface LinkedPaper {
+  paper_id: string;
+  title: string;
+  year: number | null;
+  relation: string;
+  snippet: string;
+}
+
+export interface TermInsight {
+  term: string;
+  local_definition: string;
+  local_evidence: string;
+  linked_papers: LinkedPaper[];
+}
+
+export interface ReaderTranslateResult {
+  translation: string;
+  terms: TermInsight[];
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+export interface PaperTerm {
+  id: number;
+  paper_id: string;
+  term: string;
+  normalized_term: string;
+  local_definition: string;
+  local_evidence: string;
+  score: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RelatedPaperTerm {
+  paper_id: string;
+  paper_title: string;
+  paper_year: number | null;
+  term: string;
+  local_definition: string;
+}
+
+export interface ReaderPaperTerm {
+  term: PaperTerm;
+  related: RelatedPaperTerm[];
+}
+
 export interface Highlight {
   id: string;
   paper_id: string;
@@ -261,6 +321,13 @@ export interface Highlight {
   color: string;
   text: string;
   note: string | null;
+  summary_text: string | null;
+  summary_model: string | null;
+  summarized_at: number | null;
+  translation_text: string | null;
+  translation_target_lang: string | null;
+  translation_model: string | null;
+  translated_at: number | null;
   created_at: number;
 }
 
@@ -357,6 +424,8 @@ export const api = {
     invoke<TranslationResult>("draft_translate", { draft, targetLang: targetLang ?? "Chinese" }),
   libraryAsk: (question: string, limit?: number) =>
     invoke<AskLibraryResult>("library_ask", { question, limit: limit ?? null }),
+  askSaveAsNote: (input: SaveAskNoteInput) =>
+    invoke<SaveAskNoteResult>("ask_save_as_note", { input }),
   batchTldr: (ids: string[]) => invoke<BatchSummary>("batch_tldr", { ids }),
   batchQuickRead: (ids: string[]) => invoke<BatchSummary>("batch_quick_read", { ids }),
   batchTranslate: (ids: string[], targetLang?: string) =>
@@ -373,10 +442,40 @@ export const api = {
     invoke<Highlight[]>("highlight_list", { paperId }),
   highlightUpdateNote: (id: string, note: string | null) =>
     invoke<void>("highlight_update_note", { id, note }),
+  highlightSummarize: (id: string) =>
+    invoke<Highlight>("highlight_summarize", { highlightId: id }),
+  highlightTranslate: (id: string, targetLang?: string) =>
+    invoke<Highlight>("highlight_translate", { highlightId: id, targetLang: targetLang ?? "Chinese" }),
   highlightDelete: (id: string) => invoke<void>("highlight_delete", { id }),
   noteGet: (paperId: string) => invoke<string>("note_get", { paperId }),
   noteSave: (paperId: string, content: string) =>
     invoke<void>("note_save", { paperId, content }),
+  readerTranslateSelection: (paperId: string, selection: string, targetLang?: string) =>
+    invoke<ReaderTranslateResult>("reader_translate_selection", {
+      paperId,
+      selection,
+      targetLang: targetLang ?? "Chinese",
+    }),
+  paperTermsList: (paperId: string) =>
+    invoke<ReaderPaperTerm[]>("paper_terms_list", { paperId }),
+  paperTermsGenerate: (paperId: string) =>
+    invoke<ReaderPaperTerm[]>("paper_terms_generate", { paperId }),
+  paperTermAdd: (
+    paperId: string,
+    term: string,
+    definition?: string | null,
+    evidence?: string | null,
+  ) =>
+    invoke<ReaderPaperTerm>("paper_term_add", {
+      paperId,
+      term,
+      definition: definition ?? null,
+      evidence: evidence ?? null,
+    }),
+  paperTermDelete: (paperId: string, termId: number) =>
+    invoke<void>("paper_term_delete", { paperId, termId }),
+  paperSetPdfText: (paperId: string, text: string) =>
+    invoke<void>("paper_set_pdf_text", { paperId, text }),
   llmListModels: (profile: LlmProfile) =>
     invoke<string[]>("llm_list_models", { profile }),
   searchExpandQuery: (raw: string) =>

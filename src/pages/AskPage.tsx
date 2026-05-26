@@ -1,35 +1,61 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, MessagesSquare, Search, Send } from "lucide-react";
-import { api, type AskLibraryResult } from "@/lib/api";
+import {
+  BookMarked, Check, FileText, LibraryBig, Loader2, MessagesSquare, Search, Send,
+} from "lucide-react";
+import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { WorkflowCard } from "./ask/WorkflowCard";
 
 const SOURCE_LIMIT = 8;
 
 export function AskPage() {
   const t = useT();
   const [question, setQuestion] = useState("");
+  const [askedQuestion, setAskedQuestion] = useState("");
   const [result, setResult] = useState<AskLibraryResult | null>(null);
+
   const ask = useMutation({
-    mutationFn: (q: string) => api.libraryAsk(q, SOURCE_LIMIT),
-    onSuccess: (r) => setResult(r),
+    mutationFn: (nextQuestion: string) => api.libraryAsk(nextQuestion, SOURCE_LIMIT),
+    onSuccess: (nextResult, nextQuestion) => {
+      setAskedQuestion(nextQuestion);
+      setResult(nextResult);
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: (nextResult: AskLibraryResult) =>
+      api.askSaveAsNote({
+        question: askedQuestion,
+        answer: nextResult.answer,
+        terms: nextResult.terms,
+        sources: nextResult.sources,
+        model: nextResult.model,
+      }),
   });
 
   function submit() {
-    const q = question.trim();
-    if (q) ask.mutate(q);
+    const nextQuestion = question.trim();
+    if (!nextQuestion) return;
+    save.reset();
+    ask.mutate(nextQuestion);
+  }
+
+  function saveNote() {
+    if (!result || !askedQuestion) return;
+    save.mutate(result);
   }
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4">
-        <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-          <MessagesSquare className="h-5 w-5 text-litera-accent" />
-          {t("ask.title")}
-        </h1>
-        <p className="text-sm text-litera-mute">
-          {t("ask.subtitle")}
-        </p>
+      <header className="border-b border-litera-line px-6 py-5">
+        <div className="max-w-6xl">
+          <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
+            <MessagesSquare className="h-5 w-5 text-litera-accent" />
+            {t("ask.title")}
+          </h1>
+          <p className="mt-1 text-sm text-litera-mute">{t("ask.subtitle")}</p>
+        </div>
       </header>
 
       <AskComposer
@@ -41,14 +67,26 @@ export function AskPage() {
       />
 
       <div className="flex-1 overflow-auto px-6 py-5">
-        <AskBody pending={ask.isPending} result={result} />
+        <AskBody
+          askedQuestion={askedQuestion}
+          pending={ask.isPending}
+          result={result}
+          saveError={save.error as Error | null}
+          savePath={save.data?.path ?? null}
+          saving={save.isPending}
+          onSave={saveNote}
+        />
       </div>
     </section>
   );
 }
 
 function AskComposer({
-  question, pending, error, onQuestion, onSubmit,
+  question,
+  pending,
+  error,
+  onQuestion,
+  onSubmit,
 }: {
   question: string;
   pending: boolean;
@@ -59,120 +97,201 @@ function AskComposer({
   const t = useT();
   return (
     <div className="border-b border-litera-line px-6 py-5">
-      <div className="max-w-4xl flex gap-2">
-        <input
-          value={question}
-          onChange={(e) => onQuestion(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-          placeholder={t("ask.placeholder")}
-          className="litera-input flex-1"
-        />
-        <button
-          onClick={onSubmit}
-          disabled={pending || !question.trim()}
-          className="litera-btn-primary disabled:opacity-50"
-        >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {t("ask.submit")}
-        </button>
+      <div className="max-w-6xl">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+          <label className="litera-panel p-3">
+            <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">
+              {t("ask.inputLabel")}
+            </div>
+            <textarea
+              value={question}
+              onChange={(e) => onQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit();
+              }}
+              placeholder={t("ask.placeholder")}
+              className="min-h-28 w-full resize-none bg-transparent text-sm leading-relaxed text-litera-text outline-none placeholder:text-litera-mute"
+            />
+            <div className="mt-2 text-[11px] text-litera-mute">{t("ask.inputHint")}</div>
+          </label>
+          <div className="litera-panel p-3 flex flex-col justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">
+                {t("ask.workflowTitle")}
+              </div>
+              <p className="text-sm text-litera-text/85 leading-relaxed">
+                {t("ask.workflowBody")}
+              </p>
+            </div>
+            <button
+              onClick={onSubmit}
+              disabled={pending || !question.trim()}
+              className="litera-btn-primary justify-center disabled:opacity-50"
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {t("ask.submit")}
+            </button>
+          </div>
+        </div>
+        {error && <div className="mt-3 text-sm text-red-400/90 break-all">✕ {error.message}</div>}
       </div>
-      {error && <div className="mt-3 text-sm text-red-400/90 break-all">✕ {error.message}</div>}
     </div>
   );
 }
 
 function AskBody({
-  pending, result,
+  askedQuestion,
+  pending,
+  result,
+  saving,
+  saveError,
+  savePath,
+  onSave,
 }: {
+  askedQuestion: string;
   pending: boolean;
   result: AskLibraryResult | null;
+  saving: boolean;
+  saveError: Error | null;
+  savePath: string | null;
+  onSave: () => void;
 }) {
+  const t = useT();
   if (pending) {
     return (
       <div className="text-sm text-litera-mute flex items-center gap-2">
         <Loader2 className="h-4 w-4 animate-spin" />
-        正在让模型改写检索词、召回相关论文并生成回答…
+        {t("ask.searching")}
       </div>
     );
   }
-  if (result) return <Answer result={result} />;
-  return <EmptyState />;
-}
-
-function EmptyState() {
+  if (result) {
+    return (
+      <AnswerPanel
+        askedQuestion={askedQuestion}
+        result={result}
+        saveError={saveError}
+        savePath={savePath}
+        saving={saving}
+        onSave={onSave}
+      />
+    );
+  }
   return (
-    <div className="h-64 grid place-items-center text-sm text-litera-mute">
-      <div className="text-center max-w-md">
-        <Search className="h-9 w-9 mx-auto mb-3 opacity-40" />
-        <p>输入问题后会先让 LLM 把问题改写成 2-4 个英文检索词,</p>
-        <p>在 SQLite FTS5 多路召回并按命中数 + 年份排序,</p>
-        <p>再把命中的 TL;DR / 摘要 / 高亮交给模型回答并标注 [N] 引用。</p>
+    <div className="h-full grid place-items-center">
+      <div className="max-w-3xl grid gap-4 lg:grid-cols-2">
+        <WorkflowCard variant="wide" icon={<Search className="h-5 w-5" />} title={t("ask.empty.card1Title")} body={t("ask.empty.card1Body")} />
+        <WorkflowCard icon={<LibraryBig className="h-5 w-5" />} title={t("ask.empty.card2Title")} body={t("ask.empty.card2Body")} />
+        <WorkflowCard icon={<BookMarked className="h-5 w-5" />} title={t("ask.empty.card3Title")} body={t("ask.empty.card3Body")} />
       </div>
     </div>
   );
 }
 
-function RetrievalSummary({ result }: { result: AskLibraryResult }) {
-  if (!result.terms.length && result.retrieved_count === 0) return null;
+function AnswerPanel({
+  askedQuestion,
+  result,
+  saving,
+  saveError,
+  savePath,
+  onSave,
+}: {
+  askedQuestion: string;
+  result: AskLibraryResult;
+  saving: boolean;
+  saveError: Error | null;
+  savePath: string | null;
+  onSave: () => void;
+}) {
+  const t = useT();
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-litera-mute">检索词</span>
-      {result.terms.map((t) => (
-        <span
-          key={t}
-          className="px-2 py-0.5 rounded-full border border-litera-line text-litera-text/80 bg-litera-line/20"
-        >
-          {t}
-        </span>
-      ))}
-      <span className="ml-auto text-litera-mute">
-        召回 {result.retrieved_count} 篇 · {result.model || "—"}
-      </span>
+    <div className="max-w-6xl grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <article className="min-w-0 space-y-4">
+        <section className="litera-panel p-4">
+          <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("ask.questionTitle")}</div>
+          <p className="text-sm text-litera-text leading-relaxed">{askedQuestion}</p>
+        </section>
+        <section className="litera-panel p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="text-xs uppercase tracking-wider text-litera-mute">{t("ask.answerTitle")}</div>
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="litera-btn text-xs disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              {t("ask.save")}
+            </button>
+          </div>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">{result.answer}</div>
+          <footer className="mt-4 pt-3 border-t border-litera-line text-xs text-litera-mute">
+            {result.model || "—"} · {result.prompt_tokens + result.completion_tokens} tk · {t("ask.citationCount", { count: result.sources.length })}
+          </footer>
+          {savePath && (
+            <div className="mt-3 text-xs text-emerald-300 flex items-start gap-1.5 break-all">
+              <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              {t("ask.savedTo", { path: savePath })}
+            </div>
+          )}
+          {saveError && <div className="mt-3 text-xs text-red-400/90 break-all">✕ {saveError.message}</div>}
+        </section>
+      </article>
+      <aside className="space-y-4">
+        <EvidenceSummary result={result} />
+        <EvidenceList sources={result.sources} />
+      </aside>
     </div>
   );
 }
 
-function Answer({ result }: { result: AskLibraryResult }) {
-  const empty = result.sources.length === 0;
+function EvidenceSummary({ result }: { result: AskLibraryResult }) {
+  const t = useT();
   return (
-    <div className="max-w-6xl">
-      <RetrievalSummary result={result} />
-      {empty ? (
-        <div className="rounded-md border border-litera-line/70 bg-litera-line/10 p-4 text-sm whitespace-pre-wrap leading-relaxed text-litera-text/85">
-          {result.answer}
-        </div>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-6">
-          <article className="min-w-0">
-            <div className="whitespace-pre-wrap leading-relaxed text-sm text-litera-text">
-              {result.answer}
-            </div>
-            <footer className="mt-5 pt-3 border-t border-litera-line text-xs text-litera-mute">
-              {result.model} · {result.prompt_tokens + result.completion_tokens} tk · 引用 {result.sources.length} 篇
-            </footer>
-          </article>
-          <aside className="border-l border-litera-line pl-4">
-            <h2 className="text-xs uppercase tracking-wider text-litera-mute mb-2">来源</h2>
-            <ol className="space-y-3">
-              {result.sources.map((source, idx) => (
-                <li key={source.paper_id} className="text-xs">
-                  <div className="font-medium text-litera-text leading-snug">
-                    [{idx + 1}] {source.title}
-                  </div>
-                  <div className="text-litera-mute mt-0.5">
-                    {source.authors.slice(0, 3).join(", ")}
-                    {source.authors.length > 3 ? " et al." : ""}
-                    {source.year ? ` · ${source.year}` : ""}
-                  </div>
-                  <p className="text-litera-text/65 mt-1 line-clamp-3 leading-relaxed">
-                    {source.snippet}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </aside>
-        </div>
-      )}
-    </div>
+    <section className="litera-panel p-4">
+      <div className="text-xs uppercase tracking-wider text-litera-mute mb-3">{t("ask.evidenceTitle")}</div>
+      <div className="flex flex-wrap gap-2">
+        {result.terms.map((term) => (
+          <span
+            key={term}
+            className="px-2 py-0.5 rounded-full border border-litera-line bg-litera-line/20 text-xs text-litera-text/80"
+          >
+            {term}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 text-xs text-litera-mute">
+        {t("ask.retrievedCount", { count: result.retrieved_count })}
+      </div>
+    </section>
   );
+}
+
+function EvidenceList({ sources }: { sources: AskSource[] }) {
+  const t = useT();
+  return (
+    <section className="litera-panel p-4">
+      <div className="text-xs uppercase tracking-wider text-litera-mute mb-3">{t("ask.sources")}</div>
+      <ol className="space-y-4">
+        {sources.map((source, index) => (
+          <li key={`${source.paper_id}-${index}`} className="text-xs">
+            <div className="font-medium text-litera-text leading-snug">
+              [{index + 1}] {source.title}
+            </div>
+            <div className="mt-1 text-litera-mute leading-relaxed">
+              {formatSourceMeta(source)}
+            </div>
+            <p className="mt-2 whitespace-pre-wrap leading-relaxed text-litera-text/70">
+              {source.snippet}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function formatSourceMeta(source: AskSource): string {
+  const authors = source.authors.slice(0, 3).join(", ");
+  const authorLabel = source.authors.length > 3 ? `${authors} et al.` : authors;
+  return [authorLabel, source.year ?? null].filter(Boolean).join(" · ");
 }

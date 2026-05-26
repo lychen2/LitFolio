@@ -18,8 +18,9 @@ export function ProfileCard({
   const t = useT();
   const [local, setLocal] = useState(profile);
   const [showKey, setShowKey] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
-  useEffect(() => { setLocal(profile); setFetchedModels(null); }, [profile.name]);
+  useEffect(() => { setLocal(profile); setFetchedModels(null); setConfirmingDelete(false); }, [profile.name]);
 
   const test = useMutation({ mutationFn: (p: LlmProfile) => api.llmTest(p) });
   const listModels = useMutation({
@@ -64,9 +65,17 @@ export function ProfileCard({
             {test.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
             {t("settings.profile.test")}
           </button>
-          <button onClick={onRemove} className="litera-btn text-xs text-red-400/80 hover:text-red-400">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {confirmingDelete ? (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-red-400/90">{t("settings.profile.deleteConfirm")}</span>
+              <button onClick={() => { onRemove(); setConfirmingDelete(false); }} className="litera-btn-primary text-[11px] px-2 py-0.5">{t("settings.profile.confirm")}</button>
+              <button onClick={() => setConfirmingDelete(false)} className="litera-btn text-[11px] px-2 py-0.5">{t("common.cancel")}</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingDelete(true)} className="litera-btn text-xs text-red-400/80 hover:text-red-400">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

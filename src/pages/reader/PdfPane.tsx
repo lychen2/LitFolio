@@ -1,32 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Highlighter, Moon, Sun } from "lucide-react";
 import {
-  PdfLoader, PdfHighlighter, Highlight as RphHighlight, Tip, Popup,
+  PdfLoader, PdfHighlighter,
 } from "react-pdf-highlighter";
 import type { IHighlight, NewHighlight, ScaledPosition } from "react-pdf-highlighter";
 import "react-pdf-highlighter/dist/style.css";
 import "pdfjs-dist/web/pdf_viewer.css";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api, type Highlight as BackendHighlight } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
+import { PdfTextHighlight } from "./PdfTextHighlight";
+import { PdfTermsOverlay, type PdfTermEntry } from "./PdfTermsOverlay";
+import { PdfSearchBar } from "./PdfSearchBar";
 
 /**
- * The middle pane: renders the bound PDF and lets the user highlight text.
+ * The middle pane: renders the bound PDF and lets the user highlight, search,
+ * translate, and mark terms inside the document.
  *
  * - Reads the PDF bytes via Tauri's fs plugin (works around webview CSP that
  *   blocks file:// URLs) and feeds them to PDF.js as a blob URL.
  * - Existing highlights are pulled from highlight_list and rendered as
  *   yellow text overlays. Backend stores the full ScaledPosition JSON in
  *   `rect_json` so we can map round-trip without losing precision.
- * - Selecting text → 添加高亮 popup → highlight_create.
- * - Exposes a scroll-to-highlight function to the parent via scrollRefCb.
+ * - Selecting text → 添加高亮 / 翻译选段 / 添加术语 popup.
+ * - Stored terms get an underlined inline mark + hover tooltip via
+ *   `PdfTermsOverlay`.
+ * - Ctrl+F (or the search button) opens an in-document text find.
  */
 export function PdfPane({
-  paperId, scrollRefCb,
+  paperId, scrollRefCb, onTranslateSelection,
 }: {
   paperId: string;
   scrollRefCb?: (fn: (id: string) => void) => void;
+  onTranslateSelection?: (text: string) => void;
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -34,17 +43,15 @@ export function PdfPane({
     try { return localStorage.getItem("litera.pdf.dark") === "1"; }
     catch { return false; }
   });
+  const [searchSignal, setSearchSignal] = useState(0);
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const textPushedRef = useRef<string | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem("litera.pdf.dark", dark ? "1" : "0"); } catch { /* noop */ }
   }, [dark]);
 
-  // Read PDF bytes via Tauri IPC and turn into a Blob URL. We previously tried
-  // Tauri's asset:// protocol (convertFileSrc), but on this host PdfLoader's
-  // request to that URL silently hangs — no error, no completion. The IPC byte
-  // round-trip is slower for very large PDFs (one transfer at open time) but is
-  // deterministic and works regardless of capability scope.
   useEffect(() => {
     let cancelled = false;
     let revoke: string | null = null;
@@ -54,7 +61,6 @@ export function PdfPane({
       try {
         const bytes = await api.paperReadPdfBytes(paperId);
         if (cancelled) return;
-        // Tauri IPC returns number[] for Vec<u8>; convert to Uint8Array.
         const arr = new Uint8Array(bytes);
         const blob = new Blob([arr], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
@@ -67,10 +73,38 @@ export function PdfPane({
     return () => { cancelled = true; if (revoke) URL.revokeObjectURL(revoke); };
   }, [paperId]);
 
+  // Ctrl+F → open the search bar. Only fires when the PDF pane has the
+  // intent (i.e. the keystroke happened inside our container, not while
+  // typing in the notes pane).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        const target = e.target as Node | null;
+        if (target && containerRef.current?.contains(target)) {
+          e.preventDefault();
+          setSearchSignal((n) => n + 1);
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const highlightsQ = useQuery({
     queryKey: ["highlights", paperId],
     queryFn: () => api.highlightList(paperId),
   });
+
+  const termsQ = useQuery({
+    queryKey: ["paper-terms", paperId],
+    queryFn: () => api.paperTermsList(paperId),
+  });
+
+  const termEntries: PdfTermEntry[] = useMemo(() => {
+    return (termsQ.data ?? [])
+      .map((row) => ({ term: row.term.term, definition: row.term.local_definition }))
+      .filter((t) => t.term.trim().length >= 2);
+  }, [termsQ.data]);
 
   const create = useMutation({
     mutationFn: (h: NewHighlight) =>
@@ -78,8 +112,12 @@ export function PdfPane({
     onSuccess: () => qc.invalidateQueries({ queryKey: ["highlights", paperId] }),
   });
 
-  // Map backend rows → library shape. The backend stores the ScaledPosition under `rect`,
-  // so the round-trip is just JSON pass-through.
+  const addTerm = useMutation({
+    mutationFn: (input: { term: string }) =>
+      api.paperTermAdd(paperId, input.term, null, null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["paper-terms", paperId] }),
+  });
+
   const highlights: IHighlight[] = (highlightsQ.data ?? []).map((h: BackendHighlight) => ({
     id: h.id,
     position: h.rect as ScaledPosition,
@@ -87,7 +125,6 @@ export function PdfPane({
     comment: { text: h.note ?? "", emoji: "" },
   }));
 
-  // Wire the parent's onJump → react-pdf-highlighter's internal scroll-to.
   useEffect(() => {
     if (!scrollRefCb) return;
     scrollRefCb((id: string) => {
@@ -96,81 +133,141 @@ export function PdfPane({
     });
   }, [scrollRefCb, highlights]);
 
-  if (loadErr) {
-    return <Center>✕ 加载 PDF 失败:{loadErr}</Center>;
-  }
+  if (loadErr) return <Center><PdfLoadError error={new Error(loadErr)} onRetry={() => { setLoadErr(null); setPdfUrl(null); }} /></Center>;
   if (!pdfUrl) {
-    return <Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> 加载 PDF…</Center>;
+    return <Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.loadingPdf")}</Center>;
   }
 
   return (
-    <div className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}>
+    <div
+      ref={containerRef}
+      className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}
+      tabIndex={-1}
+    >
+      <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
       <button
         onClick={() => setDark((d) => !d)}
         className="absolute top-2 right-2 z-20 litera-btn text-xs"
-        title={dark ? "切到亮色 PDF" : "切到深色 PDF (反色)"}
+        title={dark ? t("reader.lightModeTitle") : t("reader.darkModeTitle")}
       >
         {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-        {dark ? "亮色" : "深色"}
+        {dark ? t("reader.lightMode") : t("reader.darkMode")}
       </button>
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}
-        beforeLoad={<Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> 渲染中…</Center>}
+        beforeLoad={<Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.renderingPdf")}</Center>}
         errorMessage={<PdfLoadError />}
         onError={(e) => { console.error("[PdfLoader] getDocument failed", e); }}
       >
-        {(pdfDocument) => (
-          <PdfHighlighter
-            pdfDocument={pdfDocument}
-            highlights={highlights}
-            enableAreaSelection={(e) => e.altKey}
-            pdfScaleValue="page-width"
-            onScrollChange={() => { /* noop — could clear URL hash here */ }}
-            scrollRef={(fn) => { scrollFnRef.current = fn; }}
-            onSelectionFinished={(position, content, hideTipAndSelection) => (
-              <Tip
-                onOpen={() => { /* show comment box if you want comment-on-create */ }}
-                onConfirm={() => {
-                  create.mutate({
-                    position,
-                    content,
-                    comment: { text: "", emoji: "" },
-                  });
-                  hideTipAndSelection();
-                }}
-              />
-            )}
-            highlightTransform={(highlight, _idx, _setTip, _hideTip, _vToScaled, _shot, isScrolledTo) => (
-              <Popup
-                popupContent={highlight.comment.text
-                  ? <div className="bg-litera-paper border border-litera-line rounded px-2 py-1.5 max-w-[18rem] text-xs text-litera-text leading-relaxed">{highlight.comment.text}</div>
-                  : <div />}
-                onMouseOver={(c) => c}
-                onMouseOut={() => undefined}
-                key={highlight.id}
-              >
-                <RphHighlight
-                  isScrolledTo={isScrolledTo}
-                  position={highlight.position}
-                  comment={highlight.comment}
+        {(pdfDocument) => {
+          // pdfjs gives us reliable body text. lopdf in the backend chokes on
+          // many modern academic PDFs (CMap fonts, font subsets), so we push
+          // the renderer's extraction up to the backend cache once per paper
+          // load. The text feeds the term extractor's corpus so acronyms that
+          // only live in the body (LSF / RAG / CST / …) get picked up.
+          if (textPushedRef.current !== paperId) {
+            textPushedRef.current = paperId;
+            extractPdfText(pdfDocument)
+              .then((text) => {
+                if (!text) return;
+                return api.paperSetPdfText(paperId, text);
+              })
+              .catch((err) => console.warn("[PdfPane] push pdf text failed", err));
+          }
+          return (
+            <PdfHighlighter
+              pdfDocument={pdfDocument}
+              highlights={highlights}
+              enableAreaSelection={(e) => e.altKey}
+              pdfScaleValue="page-width"
+              onScrollChange={() => { /* noop */ }}
+              scrollRef={(fn) => { scrollFnRef.current = fn; }}
+              onSelectionFinished={(position, content, hideTipAndSelection) => (
+                <SelectionActions
+                  onHighlight={() => {
+                    create.mutate({ position, content, comment: { text: "", emoji: "" } });
+                    hideTipAndSelection();
+                  }}
+                  onTranslate={() => {
+                    const text = content.text?.trim();
+                    if (text) onTranslateSelection?.(text);
+                    hideTipAndSelection();
+                  }}
+                  onAddTerm={() => {
+                    const text = content.text?.trim();
+                    if (text) addTerm.mutate({ term: text });
+                    hideTipAndSelection();
+                  }}
+                  pending={addTerm.isPending}
                 />
-              </Popup>
-            )}
-          />
-        )}
+              )}
+              highlightTransform={(highlight, _idx, _setTip, _hideTip, _vToScaled, _shot, isScrolledTo) => (
+                <PdfTextHighlight
+                  key={highlight.id}
+                  rects={highlight.position.rects}
+                  dark={dark}
+                  isScrolledTo={isScrolledTo}
+                />
+              )}
+            />
+          );
+        }}
       </PdfLoader>
-      {create.error && (
-        <div className="absolute top-2 right-2 text-xs text-red-400/90 bg-litera-paper border border-red-400/30 rounded px-2 py-1 max-w-[24rem]">
-          ✕ 创建高亮失败:{(create.error as Error).message}
+      <PdfTermsOverlay containerRef={containerRef} terms={termEntries} />
+      {(create.error || addTerm.error) && (
+        <div className="absolute top-2 right-2 text-xs text-red-400/90 bg-litera-paper border border-red-400/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
+          <span>✕ {(create.error as Error | undefined)?.message || (addTerm.error as Error | undefined)?.message}</span>
+          <button
+            onClick={() => { if (create.error) create.reset(); if (addTerm.error) addTerm.reset(); }}
+            className="text-litera-mute hover:text-litera-text transition-colors"
+          >
+            {t("common.retry")}
+          </button>
         </div>
       )}
       {highlightsQ.data && (
-        <div className="absolute bottom-2 left-2 text-[11px] text-litera-mute bg-litera-paper/80 border border-litera-line rounded px-2 py-0.5 inline-flex items-center gap-1 pointer-events-none">
-          <Highlighter className="h-3 w-3 text-amber-400" />
-          {highlightsQ.data.length} 条高亮 · 选中文字后点 ✓ 添加 · Alt+拖拽 区域高亮
+        <div className="absolute bottom-2 left-2 text-[11px] text-litera-mute bg-litera-paper/80 border border-litera-line rounded px-2 py-0.5 inline-flex items-center gap-2 pointer-events-none">
+          <span className="inline-flex items-center gap-1">
+            <Highlighter className="h-3 w-3 text-amber-400" />
+            {highlightsQ.data.length} {t("reader.highlights")}
+          </span>
+          <span>·</span>
+          <span>{termEntries.length} {t("reader.terms")}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function SelectionActions({
+  onHighlight,
+  onTranslate,
+  onAddTerm,
+  pending,
+}: {
+  onHighlight: () => void;
+  onTranslate: () => void;
+  onAddTerm: () => void;
+  pending: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className="litera-overlay p-1.5 flex items-center gap-1.5">
+      <button onClick={onHighlight} className="litera-btn-primary text-xs px-2 py-1">
+        {t("reader.addHighlight")}
+      </button>
+      <button onClick={onTranslate} className="litera-btn text-xs px-2 py-1">
+        {t("reader.translateSelection")}
+      </button>
+      <button
+        onClick={onAddTerm}
+        disabled={pending}
+        className="litera-btn text-xs px-2 py-1"
+      >
+        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        {t("reader.addTerm")}
+      </button>
     </div>
   );
 }
@@ -183,21 +280,48 @@ function Center({ children }: { children: React.ReactNode }) {
   );
 }
 
-// RPH's PdfLoader silently returns null on getDocument failure if you don't pass
-// errorMessage — that's how this component appeared to "hang at black screen".
-// React.cloneElement injects { error } so we can display the actual cause.
-function PdfLoadError({ error }: { error?: Error }) {
+function PdfLoadError({ error, onRetry }: { error?: Error; onRetry?: () => void }) {
+  const t = useT();
   return (
     <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
       <div>
-        <div className="font-medium mb-1">✕ PDF 渲染失败</div>
+        <div className="font-medium mb-1">✕ {t("reader.pdfRenderFailed")}</div>
         <div className="text-xs text-litera-mute font-mono break-all">
-          {error?.message || String(error) || "未知错误"}
+          {error?.message || String(error) || t("reader.unknownError")}
         </div>
+        {onRetry && (
+          <button onClick={onRetry} className="litera-btn text-xs px-3 py-1 mt-3">
+            {t("common.retry")}
+          </button>
+        )}
         <div className="text-[11px] text-litera-mute mt-2">
-          打开浏览器开发者工具 (F12) 看 console 拿完整错误堆栈。
+          {t("reader.openConsole")}
         </div>
       </div>
     </div>
   );
+}
+
+/** Walk every page and concatenate its text via pdfjs's getTextContent API. */
+async function extractPdfText(pdfDocument: {
+  numPages: number;
+  getPage(n: number): Promise<unknown>;
+}): Promise<string> {
+  const out: string[] = [];
+  for (let i = 1; i <= pdfDocument.numPages; i++) {
+    try {
+      const page = (await pdfDocument.getPage(i)) as { getTextContent(): Promise<{ items: unknown[] }> };
+      const content = await page.getTextContent();
+      const buf: string[] = [];
+      for (const raw of content.items) {
+        const item = raw as { str?: string; hasEOL?: boolean };
+        if (typeof item.str === "string") buf.push(item.str);
+        if (item.hasEOL) buf.push("\n");
+      }
+      out.push(buf.join(" "));
+    } catch (err) {
+      console.warn(`[PdfPane] getTextContent page ${i} failed`, err);
+    }
+  }
+  return out.join("\n\n");
 }

@@ -32,17 +32,17 @@ pub async fn fetch_feed(
     let mut req = client
         .get(url)
         .header("User-Agent", "LitFolio/0.1 feed-rs")
-        .header("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5");
+        .header(
+            "Accept",
+            "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+        );
     if let Some(tag) = etag {
         req = req.header(IF_NONE_MATCH, tag);
     }
     if let Some(lm) = last_modified {
         req = req.header(IF_MODIFIED_SINCE, lm);
     }
-    let resp = req
-        .send()
-        .await
-        .with_context(|| format!("GET {url}"))?;
+    let resp = req.send().await.with_context(|| format!("GET {url}"))?;
 
     if resp.status() == reqwest::StatusCode::NOT_MODIFIED {
         return Ok(FetchedFeed {
@@ -92,17 +92,19 @@ pub async fn fetch_feed(
                 .summary
                 .as_ref()
                 .map(|s| strip_html(&s.content))
-                .or_else(|| e.content.as_ref().and_then(|c| c.body.as_ref()).map(|b| strip_html(b)));
+                .or_else(|| {
+                    e.content
+                        .as_ref()
+                        .and_then(|c| c.body.as_ref())
+                        .map(|b| strip_html(b))
+                });
             let authors = e
                 .authors
                 .iter()
                 .map(|p| p.name.clone())
                 .filter(|n| !n.is_empty())
                 .collect();
-            let published_at = e
-                .published
-                .or(e.updated)
-                .map(|dt| dt.timestamp());
+            let published_at = e.published.or(e.updated).map(|dt| dt.timestamp());
             NewFeedItem {
                 entry_id,
                 title,

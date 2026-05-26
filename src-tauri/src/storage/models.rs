@@ -82,5 +82,34 @@ pub struct Highlight {
     pub color: String,
     pub text: String,
     pub note: Option<String>,
+    pub summary_text: Option<String>,
+    pub summary_model: Option<String>,
+    pub summarized_at: Option<i64>,
+    pub translation_text: Option<String>,
+    pub translation_target_lang: Option<String>,
+    pub translation_model: Option<String>,
+    pub translated_at: Option<i64>,
     pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaperTerm {
+    pub id: i64,
+    pub paper_id: String,
+    pub term: String,
+    pub normalized_term: String,
+    pub local_definition: String,
+    pub local_evidence: String,
+    pub score: f64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelatedPaperTerm {
+    pub paper_id: String,
+    pub paper_title: String,
+    pub paper_year: Option<i32>,
+    pub term: String,
+    pub local_definition: String,
 }

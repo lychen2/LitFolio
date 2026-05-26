@@ -470,7 +470,7 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
     : m.data ?? null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col">
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
