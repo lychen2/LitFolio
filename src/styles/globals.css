@@ -5,6 +5,8 @@
 @layer base {
   :root {
     --litera-radius: 10px;
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   }
   html, body, #root { height: 100%; }
   body {
@@ -12,6 +14,14 @@
     background: radial-gradient(1200px 800px at 12% -10%, #1b1623 0%, #0a0a0f 55%) fixed;
   }
   ::selection { background: rgba(167, 139, 250, 0.35); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 
   /* <select> dropdown items: browsers ignore parent CSS for the popup, so without
      this rule every <option> renders white-on-white in the dark theme. The select
@@ -57,6 +67,19 @@
     background: rgba(86, 208, 255, 0.38);
     box-shadow: 0 0 0 1px rgba(168, 236, 255, 0.88);
   }
+
+  @keyframes litera-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes litera-slide-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes litera-scale-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
 }
 
 @layer components {
@@ -70,6 +93,10 @@
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
            border border-litera-line bg-litera-paper hover:bg-litera-panel
            transition-colors duration-150 text-litera-text;
+    transition-timing-function: var(--ease-out-quart);
+  }
+  .litera-btn:active {
+    transform: scale(0.97);
   }
   .litera-btn-primary {
     @apply litera-btn bg-litera-accent/90 hover:bg-litera-accent border-litera-accent;
@@ -78,7 +105,30 @@
   .litera-input {
     @apply bg-litera-paper border border-litera-line rounded-md px-2.5 py-1.5
            text-sm text-litera-text placeholder:text-litera-mute
-           focus:outline-none focus:ring-2 focus:ring-litera-accent/40;
+           focus:outline-none focus:ring-2 focus:ring-litera-accent/40
+           transition-all duration-150;
+    transition-timing-function: var(--ease-out-quart);
+  }
+  .litera-input:focus {
+    border-color: rgba(167, 139, 250, 0.3);
+  }
+  .litera-btn:focus-visible,
+  .litera-btn-primary:focus-visible {
+    outline: 2px solid rgba(167, 139, 250, 0.6);
+    outline-offset: 2px;
+  }
+
+  .litera-fade-in {
+    animation: litera-fade-in 200ms var(--ease-out-quart) both;
+  }
+  .litera-slide-up {
+    animation: litera-slide-up 250ms var(--ease-out-quart) both;
+  }
+  .litera-scale-in {
+    animation: litera-scale-in 200ms var(--ease-out-quart) both;
+  }
+  .litera-skeleton {
+    @apply bg-litera-panel/50 rounded animate-pulse;
   }
 
   /* Per-page overlay container for term decorations. Sits on top of the
@@ -109,6 +159,7 @@
     min-width: 12rem;
     transform: translate(-50%, calc(-100% - 10px));
     @apply litera-overlay px-3 py-2 text-xs leading-relaxed;
+    animation: litera-fade-in 150ms var(--ease-out-quart) both;
   }
 
   /* In-document search hits: a soft outline so it stays readable against any

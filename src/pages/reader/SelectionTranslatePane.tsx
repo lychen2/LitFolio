@@ -16,6 +16,7 @@ export function SelectionTranslatePane({
   const lastRequested = useRef("");
   const translate = useMutation({
     mutationFn: (text: string) => api.readerTranslateSelection(paperId, text),
+    retry: false,
   });
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function SelectionTranslatePane({
     }
     lastRequested.current = trimmed;
     translate.mutate(trimmed);
-  }, [selectionText, translate]);
+  }, [selectionText]);
 
   if (!selectionText.trim()) {
     return (

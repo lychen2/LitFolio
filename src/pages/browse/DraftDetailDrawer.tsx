@@ -22,7 +22,10 @@ export function DraftDetailDrawer({
     onSuccess: setTranslation,
   });
   const add = useMutation({
-    mutationFn: () => api.arxivAddWithPdf(draft.arxiv_id!),
+    mutationFn: () => {
+      if (!draft.arxiv_id) throw new Error("Missing arXiv ID");
+      return api.arxivAddWithPdf(draft.arxiv_id);
+    },
     onSuccess: (paper) => {
       setSaved(paper);
       qc.invalidateQueries({ queryKey: ["papers"] });

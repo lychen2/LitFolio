@@ -41,7 +41,7 @@ export function Shell({ children }: { children: ReactNode }) {
               to={to}
               className={({ isActive }) =>
                 clsx(
-                  "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors",
+                  "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors duration-150",
                   isActive
                     ? "bg-litera-accent/15 text-litera-accent"
                     : "text-litera-text/80 hover:bg-litera-panel hover:text-litera-text",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,11 +13,11 @@ import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 
-const STATUS_META: Record<ReadStatus, { label: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
-  unread:  { label: "未读",  icon: Circle,      tone: "text-litera-mute" },
-  reading: { label: "在读", icon: CircleDot,   tone: "text-litera-accent2" },
-  read:    { label: "已读",    icon: CircleCheck, tone: "text-emerald-400" },
-  must:    { label: "必读",    icon: Star,        tone: "text-amber-400" },
+const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
+  unread:  { labelKey: "common.unread",  icon: Circle,      tone: "text-litera-mute" },
+  reading: { labelKey: "common.reading", icon: CircleDot,   tone: "text-litera-accent2" },
+  read:    { labelKey: "common.read",    icon: CircleCheck,  tone: "text-emerald-400" },
+  must:    { labelKey: "library.mustRead", icon: Star,        tone: "text-amber-400" },
 };
 
 const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
@@ -26,7 +26,7 @@ export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
   const trimmed = search.trim();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   const { data: rawPapers, isLoading } = useQuery({
     queryKey: ["papers", "list", folderId, trimmed],
@@ -34,7 +34,6 @@ export function LibraryPage() {
       if (folderId != null) return api.papersInFolder(folderId, 500);
       return trimmed ? api.papersSearch(trimmed, 200) : api.papersRecent(200);
     },
-    refetchInterval: 8000,
   });
   const papers = folderId == null || !trimmed
     ? rawPapers
@@ -50,13 +49,9 @@ export function LibraryPage() {
           <h1 className="font-serif text-2xl tracking-tight">{t("library.title")}</h1>
           <p className="text-sm text-litera-mute">
             {trimmed
-              ? lang === "en"
-                ? `"${trimmed}" — ${papers?.length ?? 0} results`
-                : `“${trimmed}” 共 ${papers?.length ?? 0} 条结果`
+              ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
               : papers
-              ? lang === "en"
-                ? `${papers.length} recent papers`
-                : `${papers.length} 篇最近文献`
+              ? t("library.recentPapers", { count: String(papers.length) })
               : t("common.loading")}
           </p>
         </div>
@@ -82,7 +77,7 @@ export function LibraryPage() {
         <FolderSidebar selectedId={folderId} onSelect={setFolderId} />
         <div className="flex-1 overflow-auto">
           {isLoading ? (
-            <div className="grid place-items-center h-full text-litera-mute text-sm">加载中…</div>
+            <LibrarySkeleton />
           ) : !papers || papers.length === 0 ? (
             trimmed ? <NoResults q={trimmed} /> : <Empty />
           ) : (
@@ -91,8 +86,8 @@ export function LibraryPage() {
                 <PaperRow
                   key={p.id}
                   p={p}
-                  onInspect={() => setPreview(p)}
-                  onQuickRead={() => setReading(p)}
+                  onInspect={setPreview}
+                  onQuickRead={setReading}
                 />
               ))}
             </ul>
@@ -115,37 +110,63 @@ function matchesPaper(paper: Paper, query: string): boolean {
   );
 }
 
-function Empty() {
+function LibrarySkeleton() {
   return (
-    <div className="grid place-items-center h-full text-litera-mute">
+    <ul className="divide-y divide-litera-line">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li key={i} className="px-6 py-3.5">
+          <div className="flex items-start gap-3">
+            <div className="h-4 w-4 mt-0.5 rounded litera-skeleton shrink-0" />
+            <div className="h-4 w-4 mt-0.5 rounded litera-skeleton shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-3/4 rounded litera-skeleton" />
+              <div className="h-3 w-1/2 rounded litera-skeleton" />
+              <div className="h-3 w-2/3 rounded litera-skeleton" />
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Empty() {
+  const t = useI18n().t;
+  return (
+    <div className="grid place-items-center h-full text-litera-mute litera-fade-in">
       <div className="text-center">
         <LibraryBig className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-sm">还没有文献。拖入 PDF 文件开始。</p>
+        <p className="text-sm">{t("library.empty")}</p>
       </div>
     </div>
   );
 }
 
 function NoResults({ q }: { q: string }) {
+  const { t } = useI18n();
   return (
-    <div className="grid place-items-center h-full text-litera-mute">
+    <div className="grid place-items-center h-full text-litera-mute litera-fade-in">
       <div className="text-center">
         <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">没有匹配 <span className="font-mono">{q}</span> 的文献。</p>
+        <p className="text-sm">{t("library.noResults", { query: q })}</p>
       </div>
     </div>
   );
 }
 
-function PaperRow({
+// Memoized so search-box keystrokes (which re-render LibraryPage on every
+// character) don't rebuild every visible row's mutations and queries. Each
+// row keeps its own react-query state; only papers whose `p` reference
+// actually changes will re-render.
+const PaperRow = memo(function PaperRow({
   p, onInspect, onQuickRead,
 }: {
   p: Paper;
-  onInspect: () => void;
-  onQuickRead: () => void;
+  onInspect: (p: Paper) => void;
+  onQuickRead: (p: Paper) => void;
 }) {
   const qc = useQueryClient();
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const tldr = useMutation({
     mutationFn: () => api.paperTldr(p.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
@@ -181,15 +202,10 @@ function PaperRow({
 
   const canOpenPdf = !!p.pdf_path;
   const openMut = useMutation({ mutationFn: () => api.paperOpenPdf(p.id) });
+  const [confirming, setConfirming] = useState(false);
   function openPdf() {
     if (!p.pdf_path) return;
     openMut.mutate();
-  }
-
-  function confirmDelete() {
-    if (confirm(`确定从库中删除「${p.title}」吗?\n\n会同时删除 papers/${p.id}/ 目录里的 PDF 等文件。`)) {
-      del.mutate();
-    }
   }
 
   return (
@@ -199,7 +215,7 @@ function PaperRow({
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
         <div className="min-w-0 flex-1">
           <button
-            onClick={onInspect}
+            onClick={() => onInspect(p)}
             className="font-medium text-litera-text leading-snug text-left hover:text-litera-accent"
           >
             {p.title}
@@ -220,7 +236,7 @@ function PaperRow({
             {p.venue && <span className="truncate">· {p.venue}</span>}
             {p.doi && <span className="font-mono">· {p.doi}</span>}
             {p.arxiv_id && <span className="font-mono">· arXiv:{p.arxiv_id}</span>}
-            {!p.pdf_path && <span className="text-amber-400/80">· 无 PDF</span>}
+            {!p.pdf_path && <span className="text-amber-400/80">· {t("library.noPdf")}</span>}
           </div>
           {p.tldr && (
             <div className="text-xs text-litera-text/80 mt-1.5 leading-relaxed flex items-start gap-1.5">
@@ -235,7 +251,7 @@ function PaperRow({
           )}
           {(p.research_question || p.method) && (
             <div className="mt-1.5 text-[11px] flex items-center gap-2 text-litera-accent2">
-              <BookOpen className="h-3 w-3" /> 已有深读结果
+              <BookOpen className="h-3 w-3" /> {t("library.hasDeepRead")}
             </div>
           )}
           <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
@@ -247,52 +263,52 @@ function PaperRow({
               onClick={openPdf}
               disabled={openMut.isPending}
               className="litera-btn text-xs whitespace-nowrap disabled:opacity-60"
-              title="在系统 PDF 阅读器中打开"
+              title={t("library.openPdfTitle")}
             >
               {openMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              📄 打开
+              {t("library.openPdf")}
             </button>
           ) : (
             <button
               onClick={() => attachPdf.mutate()}
               disabled={attachPdf.isPending}
               className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
-              title="选择本地 PDF 文件绑定到此文献"
+              title={t("library.attachPdfTitle")}
             >
               {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-              📎 添加 PDF
+              {t("library.attachPdf")}
             </button>
           )}
           <button
             onClick={() => translate.mutate()}
             disabled={translate.isPending}
             className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
-            title={p.title_translated ? "重新翻译标题 + 摘要" : "将标题 + 摘要翻译为中文"}
+            title={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
           >
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            🌐 翻译
+            {t("library.translateBtn")}
           </button>
           {canOpenPdf && (
             <Link
               to={`/reader/${p.id}`}
               className="litera-btn text-xs whitespace-nowrap"
-              title="在内置 PDF 阅读器中打开,可高亮 + 写笔记"
+              title={t("library.readPdfTitle")}
             >
-              <BookOpen className="h-3.5 w-3.5" /> 📖 阅读
+              <BookOpen className="h-3.5 w-3.5" /> {t("library.readPdf")}
             </Link>
           )}
           <button
             onClick={() => tldr.mutate()}
             disabled={tldr.isPending}
             className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
-            title="生成一句话摘要 + 关键发现"
+            title={t("library.tldrTitle")}
           >
             {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            速读
+            {t("library.quickRead")}
           </button>
-          <button onClick={onQuickRead} className="litera-btn text-xs whitespace-nowrap"
-            title="深读:问题 / 方法 / 不同 / 局限">
-            <BookOpen className="h-3.5 w-3.5" /> 深读
+          <button onClick={() => onQuickRead(p)} className="litera-btn text-xs whitespace-nowrap"
+            title={t("library.deepReadTitle")}>
+            <BookOpen className="h-3.5 w-3.5" /> {t("library.deepRead")}
           </button>
           <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {canOpenPdf && (
@@ -300,19 +316,39 @@ function PaperRow({
                 onClick={() => attachPdf.mutate()}
                 disabled={attachPdf.isPending}
                 className="p-1 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50"
-                title="重新选择 PDF 文件(替换当前)"
+                title={t("library.attachPdfTitle")}
               >
                 {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               </button>
             )}
-            <button
-              onClick={confirmDelete}
-              disabled={del.isPending}
-              className="p-1 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-              title="从库中删除"
-            >
-              {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            </button>
+            {confirming ? (
+              <>
+                <button
+                  onClick={() => { setConfirming(false); del.mutate(); }}
+                  disabled={del.isPending}
+                  className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+                  title={t("library.confirmDelete", { title: p.title, id: p.id })}
+                >
+                  {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  {t("common.delete")}
+                </button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  className="px-1.5 py-0.5 rounded text-[10px] text-litera-mute hover:text-litera-text"
+                >
+                  {t("common.cancel")}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                disabled={del.isPending}
+                className="p-1 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                title={t("library.deleteTitle")}
+              >
+                {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -320,23 +356,24 @@ function PaperRow({
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {(tldr.error as Error).message}</div>
       )}
       {translate.error && (
-        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 翻译失败:{(translate.error as Error).message}</div>
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {t("library.translateFailed")}{(translate.error as Error).message}</div>
       )}
       {attachPdf.error && (
-        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 绑定 PDF 失败:{(attachPdf.error as Error).message}</div>
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {t("library.attachPdfFailed")}{(attachPdf.error as Error).message}</div>
       )}
       {del.error && (
-        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 删除失败:{(del.error as Error).message}</div>
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {t("library.deleteFailed")}{(del.error as Error).message}</div>
       )}
       {openMut.error && (
-        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ 打开失败:{(openMut.error as Error).message}</div>
+        <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {t("library.openFailed")}{(openMut.error as Error).message}</div>
       )}
     </li>
   );
-}
+});
 
 function StatusToggle({ paper }: { paper: Paper }) {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const m = useMutation({
     mutationFn: (next: ReadStatus) => api.paperSetReadStatus(paper.id, next),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
@@ -353,7 +390,7 @@ function StatusToggle({ paper }: { paper: Paper }) {
       onClick={cycle}
       disabled={m.isPending}
       className={"mt-0.5 shrink-0 p-0.5 rounded hover:bg-litera-panel transition-colors " + meta.tone}
-      title={`状态: ${meta.label} (点击切换)`}
+      title={t("library.statusToggle", { status: t(meta.labelKey as Parameters<typeof t>[0]) })}
     >
       {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
     </button>
@@ -435,6 +472,7 @@ function TagChipsRow({ paperId, tags }: { paperId: string; tags: { id: number; n
 
 function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void }) {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const { data: latest } = useQuery({
     queryKey: ["paper", paper.id],
     queryFn: () => api.paperGet(paper.id),
@@ -455,6 +493,7 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
       onClose();
     },
   });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const hasCached = !!current.research_question && !!current.method && !!current.comparison && !!current.limitations;
   const result: QuickReadResult | null = hasCached
@@ -475,12 +514,12 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-litera-accent2 flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" /> 深读
+              <BookOpen className="h-3.5 w-3.5" /> {t("library.deepRead")}
             </div>
             <div className="font-serif text-lg leading-snug mt-0.5">{current.title}</div>
             {current.title_translated && (
               <div className="text-xs text-litera-accent/90 mt-0.5 italic">
-                译: {current.title_translated}
+                {t("library.translatedPrefix")} {current.title_translated}
               </div>
             )}
             <div className="text-xs text-litera-mute mt-1 truncate">
@@ -496,20 +535,40 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
 
         <div className="px-5 py-3 border-b border-litera-line flex items-center justify-between gap-2">
           <div className="text-xs text-litera-mute">
-            {hasCached ? "显示缓存的深读结果。" : m.isPending ? "正在调用模型…" : "生成四段式深读。"}
+            {hasCached ? t("library.cachedResult") : m.isPending ? t("library.callingModel") : t("library.generateDeepRead")}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => { if (confirm("确定从库中删除这篇文献吗?")) del.mutate(); }}
-              disabled={del.isPending}
-              className="litera-btn text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50"
-              title="删除这篇文献"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            {confirmingDelete ? (
+              <>
+                <span className="text-[11px] text-red-400/90">{t("library.confirmDeletePaper")}</span>
+                <button
+                  onClick={() => { setConfirmingDelete(false); del.mutate(); }}
+                  disabled={del.isPending}
+                  className="litera-btn text-xs bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  {t("common.delete")}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="litera-btn text-xs"
+                >
+                  {t("common.cancel")}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                disabled={del.isPending}
+                className="litera-btn text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50"
+                title={t("library.deletePaperTitle")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button onClick={() => m.mutate()} disabled={m.isPending} className="litera-btn-primary text-xs disabled:opacity-50">
               {m.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {hasCached ? "重新生成" : "运行深读"}
+              {hasCached ? t("library.regenerate") : t("library.runDeepRead")}
             </button>
           </div>
         </div>
@@ -518,13 +577,13 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
           {!result && !m.isPending && (
             <div className="text-sm text-litera-mute text-center py-12">
               <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              暂无深读结果。点击 <span className="text-litera-text">运行深读</span>。
-              <div className="text-[11px] mt-2">需要在设置页配置 LLM 接口。</div>
+              {t("library.noDeepReadResult", { button: t("library.runDeepRead") })}
+              <div className="text-[11px] mt-2">{t("library.needLlmConfig")}</div>
             </div>
           )}
           {m.isPending && !result && (
             <div className="text-sm text-litera-mute flex items-center justify-center gap-2 py-12">
-              <Loader2 className="h-4 w-4 animate-spin" /> 正在生成四段式分析…
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("library.generatingDeepRead")}
             </div>
           )}
           {result && <ResultBody r={result} />}
@@ -540,12 +599,13 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
 }
 
 function ResultBody({ r }: { r: QuickReadResult }) {
+  const { t } = useI18n();
   return (
     <>
-      <Section icon={<Compass className="h-4 w-4" />} label="1 · 解决什么问题" body={r.problem} tone="accent" />
-      <Section icon={<Wrench className="h-4 w-4" />}  label="2 · 提出了什么方法" body={r.method} tone="accent" />
-      <Section icon={<Layers className="h-4 w-4" />}  label="3 · 和别人有什么不同" body={r.comparison} tone="accent2" />
-      <Section icon={<AlertTriangle className="h-4 w-4" />} label="4 · 局限与未解决的问题" body={r.limitations} tone="warn" />
+      <Section icon={<Compass className="h-4 w-4" />} label={t("library.resultProblem")} body={r.problem} tone="accent" />
+      <Section icon={<Wrench className="h-4 w-4" />}  label={t("library.resultMethod")} body={r.method} tone="accent" />
+      <Section icon={<Layers className="h-4 w-4" />}  label={t("library.resultComparison")} body={r.comparison} tone="accent2" />
+      <Section icon={<AlertTriangle className="h-4 w-4" />} label={t("library.resultLimitations")} body={r.limitations} tone="warn" />
       {r.model && r.model !== "(cached)" && (
         <div className="text-[11px] text-litera-mute pt-2 border-t border-litera-line">
           model: <span className="font-mono">{r.model}</span>

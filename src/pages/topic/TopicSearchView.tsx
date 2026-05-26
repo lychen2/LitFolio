@@ -210,7 +210,12 @@ function HitRow({
   const qc = useQueryClient();
   const [saved, setSaved] = useState<Paper | null>(null);
   const add = useMutation({
-    mutationFn: () => api.arxivAddWithPdf(h.draft.arxiv_id!),
+    mutationFn: () => {
+      // Guarded by `canAdd` below — UI only enables this button when the draft
+      // has an arXiv ID. Belt-and-braces check keeps the type narrow.
+      if (!h.draft.arxiv_id) throw new Error("Missing arXiv ID");
+      return api.arxivAddWithPdf(h.draft.arxiv_id);
+    },
     onSuccess: (p) => {
       setSaved(p);
       qc.invalidateQueries({ queryKey: ["papers"] });

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dict, type Lang, type TKey } from "./dict";
 import { formatMessage, type I18nVars } from "./format";
 
@@ -29,11 +29,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
     }
   }, [lang]);
-  function t(key: TKey, vars?: I18nVars): string {
+  const tRef = useRef<(key: TKey, vars?: I18nVars) => string>(() => "");
+  tRef.current = (key: TKey, vars?: I18nVars): string => {
     const template = dict[lang][key] ?? dict.zh[key] ?? key;
     return formatMessage(template, vars);
-  }
-  const value: I18nValue = { lang, setLang: setLangState, t };
+  };
+  const value = useMemo<I18nValue>(
+    () => ({ lang, setLang: setLangState, t: (key, vars) => tRef.current(key, vars) }),
+    [lang],
+  );
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

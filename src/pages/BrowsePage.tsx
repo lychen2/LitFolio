@@ -8,11 +8,13 @@ import { api, type ArxivDraft } from "@/lib/api";
 import { ARXIV_GROUPS, findCategoryLabel } from "@/lib/arxiv-categories";
 import { DraftDetailDrawer } from "./browse/DraftDetailDrawer";
 import { DraftRow } from "./browse/DraftRow";
+import { useT } from "@/i18n/I18nProvider";
 
 const DEFAULT_CATEGORY = "physics.optics";
 const PAGE_SIZE = 50;
 
 export function BrowsePage() {
+  const t = useT();
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [filter, setFilter] = useState("");
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(["Physics"]));
@@ -36,13 +38,15 @@ export function BrowsePage() {
   });
 
   // (Re)load from scratch whenever category changes.
+  // Pull `mutate` out so the effect deps stay stable — react-query guarantees
+  // the function reference doesn't change across renders.
+  const { mutate: triggerLoad } = loadMore;
   useEffect(() => {
     setDrafts([]);
     setExhausted(false);
     setFirstLoadErr(null);
-    loadMore.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+    triggerLoad();
+  }, [category, triggerLoad]);
 
   function refresh() {
     setDrafts([]);
@@ -84,7 +88,7 @@ export function BrowsePage() {
             placeholder="cs.LG, physics.optics, …"
             className="litera-input w-full text-xs font-mono"
           />
-          <p className="text-[10px] text-litera-mute mt-1.5">输入任意 arXiv 分类 ID</p>
+          <p className="text-[10px] text-litera-mute mt-1.5">{t("browse.categoryHint")}</p>
         </div>
         <nav className="px-2 py-2">
           {ARXIV_GROUPS.map((g) => {
@@ -135,7 +139,7 @@ export function BrowsePage() {
               <span className="text-litera-mute font-mono text-sm">/ {category}</span>
             </h1>
             <p className="text-xs text-litera-mute mt-0.5">
-              arXiv 最新提交 · 按投稿时间倒序
+              {t("browse.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -144,16 +148,16 @@ export function BrowsePage() {
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="过滤已加载…"
+                placeholder={t("browse.filterPlaceholder")}
                 className="litera-input pl-7 w-48 text-xs"
               />
             </div>
             <span className="text-[11px] text-litera-mute font-mono">
-              已加载 {drafts.length}{exhausted ? " (完)" : ""}
+              {t("browse.loaded", { count: drafts.length })}{exhausted ? ` ${t("browse.exhausted")}` : ""}
             </span>
             <button onClick={refresh} disabled={loadMore.isPending} className="litera-btn text-xs disabled:opacity-50">
               {loadMore.isPending && drafts.length === 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              刷新
+              {t("common.refresh")}
             </button>
           </div>
         </header>
@@ -161,13 +165,13 @@ export function BrowsePage() {
         <div className="flex-1 overflow-auto">
           {initialLoading ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
-              <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 正在获取 {category}…</div>
+              <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("browse.fetching", { category })}</div>
             </div>
           ) : firstLoadErr ? (
             <div className="p-6 text-sm text-red-400/90">✕ {firstLoadErr}</div>
           ) : filtered.length === 0 ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
-              {filter ? "过滤后无匹配,清空过滤或加载更多。" : "没有结果。换一个分类。"}
+              {filter ? t("browse.noMatchFiltered") : t("browse.noResults")}
             </div>
           ) : (
             <>
@@ -183,7 +187,7 @@ export function BrowsePage() {
               </ul>
               <div className="p-4 flex items-center justify-center gap-3">
                 {exhausted ? (
-                  <span className="text-xs text-litera-mute italic">已加载全部 {drafts.length} 条</span>
+                  <span className="text-xs text-litera-mute italic">{t("browse.loadedAll", { count: drafts.length })}</span>
                 ) : (
                   <button
                     onClick={() => loadMore.mutate()}
@@ -191,7 +195,7 @@ export function BrowsePage() {
                     className="litera-btn text-xs disabled:opacity-50"
                   >
                     {loadMore.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronsDown className="h-3.5 w-3.5" />}
-                    {loadMore.isPending ? "加载中…" : `加载更多 ${PAGE_SIZE} 条`}
+                    {loadMore.isPending ? t("common.loading") : t("browse.loadMore", { count: PAGE_SIZE })}
                   </button>
                 )}
                 {loadMore.error && drafts.length > 0 && (

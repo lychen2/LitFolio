@@ -110,6 +110,7 @@ export function SettingsPage() {
       </nav>
 
       <div className="flex-1 overflow-auto p-6 max-w-4xl">
+        <div key={tab} className="litera-fade-in">
         {tab === "profiles" && (
           <ProfilesTab
             draft={draft}
@@ -125,6 +126,7 @@ export function SettingsPage() {
 
         {save.error && <div className="text-sm text-red-400/90 mt-3">✕ {(save.error as Error).message}</div>}
         {save.isSuccess && <div className="text-sm text-litera-accent mt-3">{t("settings.saved")}</div>}
+        </div>
       </div>
     </section>
   );

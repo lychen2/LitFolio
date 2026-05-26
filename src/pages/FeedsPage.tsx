@@ -101,6 +101,7 @@ function RefreshAllButton({
 }: {
   refresh: ReturnType<typeof useMutation<FeedRefreshAllSummary, Error, void>>;
 }) {
+  const t = useT();
   const s = refresh.data;
   return (
     <div className="flex flex-col items-end gap-1">
@@ -114,11 +115,11 @@ function RefreshAllButton({
         ) : (
           <RefreshCw className="h-3.5 w-3.5" />
         )}
-        刷新全部
+        {t("common.refreshAll")}
       </button>
       {s && (
         <div className="text-[11px] text-litera-mute">
-          {s.new_items} 篇新文 · {s.unchanged} 已是最新 · {s.failed} 失败
+          {t("feeds.refreshSummary", { newItems: s.new_items, unchanged: s.unchanged, failed: s.failed })}
         </div>
       )}
       {refresh.error && (
@@ -142,6 +143,7 @@ function FeedListSidebar({
   const t = useT();
   const qc = useQueryClient();
   const [url, setUrl] = useState("");
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const add = useMutation({
     mutationFn: (u: string) => api.feedAdd(u),
     onSuccess: (f) => {
@@ -200,16 +202,16 @@ function FeedListSidebar({
         />
         {error ? (
           <div className="mt-3 px-2 py-3 rounded border border-red-400/40 bg-red-500/10 text-[11px] text-red-300">
-            加载失败:{error.message}
+            {t("feeds.loadFailedColon", { message: error.message })}
           </div>
         ) : isLoading ? (
           <div className="px-2 py-3 text-[11px] text-litera-mute flex items-center gap-1.5">
-            <Loader2 className="h-3 w-3 animate-spin" /> 加载中…
+            <Loader2 className="h-3 w-3 animate-spin" /> {t("common.loading")}
           </div>
         ) : feeds.length === 0 ? (
           <div className="mt-3 px-2 py-3 rounded border border-dashed border-litera-line/70 text-[11px] text-litera-mute leading-relaxed">
-            <div className="text-litera-text/80 mb-1">还没有订阅。</div>
-            <div>把 RSS / Atom 链接粘贴到上面 + 按钮即可。例如:</div>
+            <div className="text-litera-text/80 mb-1">{t("feeds.noSubs")}</div>
+            <div>{t("feeds.emptyHintBody")}</div>
             <div className="font-mono mt-1 text-[10px] break-all text-litera-text/60">
               http://arxiv.org/rss/physics.optics
             </div>
@@ -224,16 +226,34 @@ function FeedListSidebar({
                 error={!!f.last_error}
                 onClick={() => onSelect(f.id)}
               />
-              <button
-                onClick={() => {
-                  if (confirm(`移除订阅「${f.title || f.url}」?`)) remove.mutate(f.id);
-                }}
-                disabled={remove.isPending}
-                className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
-                title="取消订阅"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+              {confirmingId === f.id ? (
+                <>
+                  <button
+                    onClick={() => { setConfirmingId(null); remove.mutate(f.id); }}
+                    disabled={remove.isPending}
+                    className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+                    title={t("feeds.removeConfirm", { name: f.title || f.url })}
+                  >
+                    {remove.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    {t("common.delete")}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingId(null)}
+                    className="px-1.5 py-0.5 rounded text-[10px] text-litera-mute hover:text-litera-text"
+                  >
+                    {t("common.cancel")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setConfirmingId(f.id)}
+                  disabled={remove.isPending}
+                  className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
+                  title={t("feeds.unsubscribe")}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
             </div>
           ))
         )}
@@ -277,6 +297,7 @@ function ItemsToolbar({
   onOnlyUnread: (v: boolean) => void;
   selected: FeedWithCounts | null | undefined;
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const refresh = useMutation({
     mutationFn: (id: number) => api.feedRefresh(id),
@@ -304,7 +325,7 @@ function ItemsToolbar({
             : "border-litera-line text-litera-text/80 hover:bg-litera-panel")
         }
       >
-        {onlyUnread ? "只看未读" : "全部"}
+        {onlyUnread ? t("feeds.onlyUnread") : t("common.all")}
       </button>
       {selected && (
         <>
@@ -318,7 +339,7 @@ function ItemsToolbar({
             ) : (
               <RefreshCw className="h-3 w-3" />
             )}
-            刷新此订阅
+            {t("feeds.refreshThis")}
           </button>
           <button
             onClick={() => markAll.mutate(selected.id)}
@@ -326,14 +347,14 @@ function ItemsToolbar({
             className="text-xs px-2 py-1 rounded border border-litera-line text-litera-text/80 hover:bg-litera-panel flex items-center gap-1.5 disabled:opacity-60"
           >
             {markAll.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
-            全部标为已读
+            {t("feeds.markAllRead")}
           </button>
           <RefreshHint result={refresh.data} />
         </>
       )}
       {selected?.last_error && (
         <span className="ml-auto text-[11px] text-red-400/90 max-w-[420px] truncate" title={selected.last_error}>
-          上次出错:{selected.last_error}
+          {t("feeds.lastError")}:{selected.last_error}
         </span>
       )}
     </div>
@@ -341,10 +362,11 @@ function ItemsToolbar({
 }
 
 function RefreshHint({ result }: { result: FeedRefreshResult | undefined }) {
+  const t = useT();
   if (!result) return null;
   return (
     <span className="text-[11px] text-litera-mute">
-      {result.not_modified ? "已是最新" : `+${result.new_items} 篇新文`}
+      {result.not_modified ? t("feeds.upToDate") : t("feeds.newItemsCount", { count: result.new_items })}
     </span>
   );
 }
@@ -357,6 +379,7 @@ function ItemsList({
   error: Error | null;
   feeds: FeedWithCounts[];
 }) {
+  const t = useT();
   const feedMap = useMemo(() => new Map(feeds.map((f) => [f.id, f])), [feeds]);
   // Translation state lives at the list level so it persists across detail-drawer
   // open/close cycles within the same page view.
@@ -372,12 +395,12 @@ function ItemsList({
   }
 
   if (error) {
-    return <div className="p-6 text-sm text-red-400/90">条目加载失败:{error.message}</div>;
+    return <div className="p-6 text-sm text-red-400/90">{t("feeds.itemsLoadFailed", { message: error.message })}</div>;
   }
   if (isLoading) {
     return (
       <div className="p-6 text-sm text-litera-mute flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" /> 加载中…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}
       </div>
     );
   }
@@ -385,7 +408,7 @@ function ItemsList({
     return (
       <div className="p-12 text-center text-sm text-litera-mute">
         <Inbox className="h-9 w-9 mx-auto mb-3 opacity-40" />
-        没有可显示的条目。订阅一个 RSS,然后点 🔄 刷新。
+        {t("feeds.empty")}
       </div>
     );
   }
@@ -445,6 +468,7 @@ function ItemRow({
   onOpen: () => void;
   onTranslated: (t: TranslationResult) => void;
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { lang } = useI18n();
@@ -485,12 +509,12 @@ function ItemRow({
           <button
             onClick={onOpen}
             className="text-sm font-medium text-litera-text leading-snug text-left hover:text-litera-accent"
-            title="查看元数据 / 摘要"
+            title={t("feeds.viewMeta")}
           >
             {!item.seen && <span className="inline-block h-1.5 w-1.5 rounded-full bg-litera-accent mr-2 align-middle" />}
             {item.title}
             {item.imported_paper_id && (
-              <span className="ml-2 text-[10px] text-emerald-400/90 align-middle">✓ 已入库</span>
+              <span className="ml-2 text-[10px] text-emerald-400/90 align-middle">{t("feeds.imported")}</span>
             )}
           </button>
           {translation?.title && (
@@ -516,7 +540,7 @@ function ItemRow({
             </p>
           )}
           {translate.error && (
-            <div className="mt-1 text-[11px] text-red-400/90">✕ 翻译失败:{(translate.error as Error).message}</div>
+            <div className="mt-1 text-[11px] text-red-400/90">✕ {t("feeds.translateFailedPrefix", { message: (translate.error as Error).message })}</div>
           )}
         </div>
         <div className="shrink-0 flex items-center gap-1.5">
@@ -524,35 +548,35 @@ function ItemRow({
             onClick={() => translate.mutate()}
             disabled={translate.isPending}
             className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-            title="使用翻译任务绑定的模型翻译标题和摘要"
+            title={t("feeds.translateTooltip")}
           >
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            翻译
+            {t("common.translate")}
           </button>
           {item.link && (
             <button
               onClick={openExternal}
               className="litera-btn text-xs whitespace-nowrap"
-              title="在浏览器打开"
+              title={t("feeds.openExternal")}
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              打开
+              {t("common.open")}
             </button>
           )}
           {item.link && !item.imported_paper_id && (
             <button
               onClick={importToLibrary}
               className="litera-btn-primary text-xs whitespace-nowrap"
-              title="跳转到 📥 导入,绑定 PDF 后入库"
+              title={t("feeds.importGo")}
             >
-              📥 入库
+              {t("feeds.importBtn")}
             </button>
           )}
           <button
             onClick={() => seen.mutate(!item.seen)}
             disabled={seen.isPending}
             className="text-[11px] text-litera-mute hover:text-litera-text flex items-center gap-1 px-1 py-0.5"
-            title={item.seen ? "标为未读" : "标为已读"}
+            title={item.seen ? t("feeds.markUnread") : t("feeds.markRead")}
           >
             {seen.isPending ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -577,6 +601,7 @@ function FeedItemDetailDrawer({
   onTranslated: (t: TranslationResult) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const { lang } = useI18n();
   const translate = useMutation({
@@ -625,31 +650,31 @@ function FeedItemDetailDrawer({
             className="litera-btn text-xs disabled:opacity-50"
           >
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            翻译标题和摘要
+            {t("feeds.translateTitleAbstract")}
           </button>
           {item.link && (
             <button onClick={openExternal} className="litera-btn text-xs">
-              <ExternalLink className="h-3.5 w-3.5" /> 在浏览器打开
+              <ExternalLink className="h-3.5 w-3.5" /> {t("feeds.openExternal")}
             </button>
           )}
           {item.link && !item.imported_paper_id && (
             <button onClick={importToLibrary} className="litera-btn-primary text-xs">
-              📥 入库(去导入页绑定 PDF)
+              {t("feeds.importBtnLong")}
             </button>
           )}
           {item.imported_paper_id && (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
-              ✓ 已入库
+              {t("feeds.imported")}
             </span>
           )}
         </div>
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
           <Meta item={item} feedTitle={feedTitle} draft={draft} published={published} />
-          <Section title="摘要" body={item.summary || "(订阅源未提供摘要)"} />
-          {translation?.abstract_text && <Section title="摘要译文" body={translation.abstract_text} accent />}
+          <Section title={t("feeds.summarySection")} body={item.summary || t("feeds.noSummary")} />
+          {translation?.abstract_text && <Section title={t("feeds.summaryTranslationSection")} body={translation.abstract_text} accent />}
           {translate.error && (
-            <div className="text-sm text-red-400/90">✕ 翻译失败:{(translate.error as Error).message}</div>
+            <div className="text-sm text-red-400/90">✕ {t("feeds.translateFailedPrefix", { message: (translate.error as Error).message })}</div>
           )}
         </div>
       </div>
@@ -665,15 +690,16 @@ function Meta({
   draft: ArxivDraft;
   published: Date | null;
 }) {
+  const t = useT();
   return (
     <dl className="grid grid-cols-[92px_1fr] gap-x-3 gap-y-2 text-sm">
-      <dt className="text-litera-mute">订阅源</dt>
+      <dt className="text-litera-mute">{t("feeds.metaFeed")}</dt>
       <dd>{feedTitle || "—"}</dd>
-      <dt className="text-litera-mute">作者</dt>
-      <dd>{item.authors.join(", ") || "(unknown)"}</dd>
-      <dt className="text-litera-mute">发布时间</dt>
-      <dd>{published ? published.toISOString().slice(0, 10) : "(unknown)"}</dd>
-      <dt className="text-litera-mute">链接</dt>
+      <dt className="text-litera-mute">{t("feeds.metaAuthors")}</dt>
+      <dd>{item.authors.join(", ") || t("feeds.metaUnknown")}</dd>
+      <dt className="text-litera-mute">{t("feeds.metaPublished")}</dt>
+      <dd>{published ? published.toISOString().slice(0, 10) : t("feeds.metaUnknown")}</dd>
+      <dt className="text-litera-mute">{t("feeds.metaLink")}</dt>
       <dd className="font-mono break-all">
         {item.link ? (
           <a
@@ -686,7 +712,7 @@ function Meta({
           >
             {item.link} <ExternalLink className="h-3 w-3" />
           </a>
-        ) : "(none)"}
+        ) : t("feeds.metaNone")}
       </dd>
       {draft.arxiv_id && (
         <>

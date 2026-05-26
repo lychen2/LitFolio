@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FileText, Languages, Orbit } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 import { NotesPane } from "./NotesPane";
@@ -11,15 +11,25 @@ export type ReaderWorkspaceTab = "notes" | "translate" | "terms";
 export function ReaderWorkspacePane({
   paperId,
   activeTab,
-  selectionText,
   onTabChange,
+  onSelectionSetterReady,
 }: {
   paperId: string;
   activeTab: ReaderWorkspaceTab;
-  selectionText: string;
   onTabChange: (tab: ReaderWorkspaceTab) => void;
+  /// Called once on mount with this pane's setSelectionText. ReaderPage
+  /// stashes the setter in a ref so PdfPane can push selections in without
+  /// changing any prop on ReaderPage — keeping the PDF pane from re-rendering
+  /// every time the user selects text.
+  onSelectionSetterReady?: (setter: (text: string) => void) => void;
 }) {
   const t = useT();
+  const [selectionText, setSelectionText] = useState("");
+
+  useEffect(() => {
+    onSelectionSetterReady?.(setSelectionText);
+  }, [onSelectionSetterReady]);
+
   return (
     <div className="h-full flex flex-col bg-litera-paper/30">
       <div className="px-2 py-2 border-b border-litera-line flex items-center gap-1.5">
@@ -42,14 +52,16 @@ export function ReaderWorkspacePane({
           onClick={() => onTabChange("terms")}
         />
       </div>
-      <div className="flex-1 min-h-0">
-        {activeTab === "notes" ? (
+      <div className="flex-1 min-h-0 relative">
+        <div className={cn("h-full", activeTab !== "notes" && "hidden")}>
           <NotesPane paperId={paperId} />
-        ) : activeTab === "terms" ? (
-          <TermsPane paperId={paperId} />
-        ) : (
+        </div>
+        <div className={cn("h-full absolute inset-0", activeTab !== "translate" && "hidden")}>
           <SelectionTranslatePane paperId={paperId} selectionText={selectionText} />
-        )}
+        </div>
+        <div className={cn("h-full absolute inset-0", activeTab !== "terms" && "hidden")}>
+          <TermsPane paperId={paperId} />
+        </div>
       </div>
     </div>
   );
