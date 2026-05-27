@@ -74,6 +74,8 @@ pub struct LlmConfig {
     pub task_assignments: TaskAssignments,
     #[serde(default = "default_output_language")]
     pub output_language: String,
+    #[serde(default)]
+    pub export_dir: Option<String>,
 }
 
 fn default_output_language() -> String {
@@ -96,6 +98,8 @@ pub struct TaskAssignments {
     pub topic_survey: Option<TaskBinding>,
     #[serde(default)]
     pub ask: Option<TaskBinding>,
+    #[serde(default)]
+    pub lit_review: Option<TaskBinding>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -107,6 +111,7 @@ pub enum TaskKind {
     Link,
     TopicSurvey,
     Ask,
+    LitReview,
 }
 
 impl LlmConfig {
@@ -180,6 +185,7 @@ pub fn active_profile_for_task(cfg: &LlmConfig, task: TaskKind) -> Result<LlmPro
         TaskKind::Link => cfg.task_assignments.link.as_ref(),
         TaskKind::TopicSurvey => cfg.task_assignments.topic_survey.as_ref(),
         TaskKind::Ask => cfg.task_assignments.ask.as_ref(),
+        TaskKind::LitReview => cfg.task_assignments.lit_review.as_ref(),
     };
     if let Some(b) = binding {
         let mut p = match cfg.profiles.iter().find(|x| x.name == b.profile) {

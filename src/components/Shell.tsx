@@ -1,12 +1,15 @@
 import { NavLink } from "react-router-dom";
-import { LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss } from "lucide-react";
+import { LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss, Network } from "lucide-react";
 import { clsx } from "clsx";
-import type { ReactNode } from "react";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
+import { api } from "@/lib/api";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useFileDrop } from "@/hooks/useFileDrop";
 import { DropZoneOverlay } from "@/components/DropZoneOverlay";
+import { CommandPalette } from "@/components/CommandPalette";
 
 const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
   { to: "/library", labelKey: "nav.library", icon: LibraryBig },
@@ -15,13 +18,38 @@ const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
   { to: "/feeds",   labelKey: "nav.feeds",   icon: Rss },
   { to: "/topic",   labelKey: "nav.topic",   icon: Compass },
   { to: "/ask",     labelKey: "nav.ask",     icon: MessagesSquare },
+  { to: "/graph",   labelKey: "nav.graph",   icon: Network },
   { to: "/settings",labelKey: "nav.settings",icon: Settings },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
   const t = useT();
   const { isDragging, importing, result, clearResult } = useFileDrop();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const { data: unseenCount = 0 } = useQuery({
+    queryKey: ["topic-alert-unseen"],
+    queryFn: api.topicAlertUnseenCount,
+    refetchInterval: 60_000,
+  });
+
+  const handlePaletteToggle = useCallback(() => setPaletteOpen((o) => !o), []);
+  const handlePaletteClose = useCallback(() => setPaletteOpen(false), []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        handlePaletteToggle();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handlePaletteToggle]);
+
   return (
+    <>
+    <CommandPalette open={paletteOpen} onClose={handlePaletteClose} />
     <div className="flex h-full w-full overflow-hidden">
       <DropZoneOverlay
         isDragging={isDragging}
@@ -50,6 +78,11 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               <Icon className="h-4 w-4" />
               {t(labelKey)}
+              {to === "/topic" && unseenCount > 0 && (
+                <span className="ml-auto text-[10px] bg-litera-accent/20 text-litera-accent px-1.5 py-0.5 rounded-full">
+                  {unseenCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -60,5 +93,6 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
     </div>
+    </>
   );
 }

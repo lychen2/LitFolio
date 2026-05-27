@@ -28,8 +28,8 @@ impl<'a> PaperRepo<'a> {
             "INSERT INTO papers (id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                                   pdf_path, note_path, added_at, updated_at, read_status, tldr,
                                   research_question, method, dataset, key_findings_json, limitations,
-                                  comparison)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+                                  comparison, bibtex, last_exported_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
         )
         .bind(&p.id)
         .bind(&p.title)
@@ -51,6 +51,8 @@ impl<'a> PaperRepo<'a> {
         .bind(&findings_json)
         .bind(&p.limitations)
         .bind(&p.comparison)
+        .bind(&p.bibtex)
+        .bind(&p.last_exported_at)
         .execute(self.pool)
         .await
         .context("insert paper")?;
@@ -63,6 +65,13 @@ impl<'a> PaperRepo<'a> {
             .fetch_optional(self.pool)
             .await?;
         row.map(row_to_paper).transpose()
+    }
+
+    pub async fn list_all(&self) -> Result<Vec<Paper>> {
+        let rows = sqlx::query("SELECT * FROM papers ORDER BY added_at DESC")
+            .fetch_all(self.pool)
+            .await?;
+        rows.into_iter().map(row_to_paper).collect()
     }
 
     pub async fn list_recent(&self, limit: i64) -> Result<Vec<Paper>> {
@@ -208,6 +217,54 @@ impl<'a> PaperRepo<'a> {
         Ok(())
     }
 
+    pub async fn update_bibtex(&self, id: &str, bibtex: &str) -> Result<()> {
+        let now = Utc::now().timestamp();
+        sqlx::query("UPDATE papers SET bibtex = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(bibtex)
+            .bind(now)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_title_venue(&self, id: &str, title: &str, venue: Option<&str>) -> Result<()> {
+        let now = Utc::now().timestamp();
+        sqlx::query("UPDATE papers SET title = ?1, venue = ?2, updated_at = ?3 WHERE id = ?4")
+            .bind(title)
+            .bind(venue)
+            .bind(now)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn list_needing_bibtex(&self) -> Result<Vec<Paper>> {
+        let rows = sqlx::query("SELECT * FROM papers WHERE bibtex IS NULL")
+            .fetch_all(self.pool)
+            .await?;
+        rows.into_iter().map(row_to_paper).collect()
+    }
+
+    pub async fn update_last_exported_at(&self, id: &str, ts: i64) -> Result<()> {
+        sqlx::query("UPDATE papers SET last_exported_at = ?1 WHERE id = ?2")
+            .bind(ts)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn list_needing_export(&self) -> Result<Vec<Paper>> {
+        let rows = sqlx::query(
+            "SELECT * FROM papers WHERE last_exported_at IS NULL OR updated_at > last_exported_at",
+        )
+        .fetch_all(self.pool)
+        .await?;
+        rows.into_iter().map(row_to_paper).collect()
+    }
+
     pub async fn delete(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM papers WHERE id = ?1")
             .bind(id)
@@ -234,7 +291,7 @@ fn escape_fts(input: &str) -> String {
     pieces.join(" AND ")
 }
 
-fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
+pub(super) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
     let authors_raw: Option<String> = row.try_get("authors_json").ok();
     let authors: Vec<String> = authors_raw
         .as_deref()
@@ -271,6 +328,8 @@ fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
         abstract_translated: row.try_get("abstract_translated").ok(),
         translate_target_lang: row.try_get("translate_target_lang").ok(),
         translated_at: row.try_get("translated_at").ok(),
+        bibtex: row.try_get("bibtex").ok(),
+        last_exported_at: row.try_get("last_exported_at").ok(),
     })
 }
 
@@ -316,6 +375,8 @@ mod tests {
             abstract_translated: None,
             translate_target_lang: None,
             translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
         }
     }
 

@@ -22,6 +22,19 @@ impl<'a> PaperTermRepo<'a> {
         Self { pool }
     }
 
+    pub async fn list_all(&self) -> Result<Vec<PaperTerm>> {
+        let rows = sqlx::query(
+            "SELECT id, paper_id, term, normalized_term, local_definition, local_evidence,
+                    score, created_at, updated_at
+             FROM paper_terms
+             ORDER BY score DESC",
+        )
+        .fetch_all(self.pool)
+        .await
+        .context("list all paper terms")?;
+        rows.into_iter().map(row_to_paper_term).collect()
+    }
+
     pub async fn list_by_paper(&self, paper_id: &str) -> Result<Vec<PaperTerm>> {
         let rows = sqlx::query(
             "SELECT id, paper_id, term, normalized_term, local_definition, local_evidence,

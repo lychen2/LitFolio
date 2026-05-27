@@ -3,7 +3,10 @@
 #![allow(dead_code, unused_imports)]
 
 mod client;
+mod concept_extract;
 mod library_qa;
+pub mod link_discover;
+pub mod lit_review;
 mod models;
 mod profile;
 mod query_expand;
@@ -13,7 +16,9 @@ mod topic_survey_annotate;
 mod translate;
 
 pub use client::{chat_complete, ChatMessage, ChatResponse};
+pub use concept_extract::{extract_concepts, ExtractedConcept, ExtractedRelation};
 pub use library_qa::{answer_library_question, empty_result, AskLibraryResult, AskSource};
+pub use link_discover::{discover_links, DiscoveredLink};
 pub use models::list_models;
 pub use profile::{
     active_profile, active_profile_for_task, load_config, save_config, LlmConfig, LlmProfile,
@@ -24,3 +29,4 @@ pub use summarize::{quick_read_paper_text, summarize_paper_text, QuickReadResult
 pub use topic_survey::{plan_survey, PiHint, SubareaSpec, SurveySkeleton};
 pub use topic_survey_annotate::{annotate_survey, AnnotateInputPaper, PaperNote, SurveyAnnotation};
 pub use translate::{translate_paper_text, TranslationResult};
+pub use lit_review::{generate_review, GroupingStrategy, LitReviewResult};

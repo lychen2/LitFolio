@@ -17,6 +17,8 @@ const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ de
 const TopicPage = lazy(() => import("@/pages/TopicPage").then((m) => ({ default: m.TopicPage })));
 const BrowsePage = lazy(() => import("@/pages/BrowsePage").then((m) => ({ default: m.BrowsePage })));
 const FeedsPage = lazy(() => import("@/pages/FeedsPage").then((m) => ({ default: m.FeedsPage })));
+const GraphPage = lazy(() => import("@/pages/GraphPage").then((m) => ({ default: m.GraphPage })));
+const ComparePage = lazy(() => import("@/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
 
 export function App() {
   return (
@@ -30,6 +32,8 @@ export function App() {
         <Route path="/browse" element={<RouteShell><BrowsePage /></RouteShell>} />
         <Route path="/feeds" element={<RouteShell><FeedsPage /></RouteShell>} />
         <Route path="/ask" element={<RouteShell><AskPage /></RouteShell>} />
+        <Route path="/graph" element={<RouteShell><GraphPage /></RouteShell>} />
+        <Route path="/compare" element={<RouteShell><ComparePage /></RouteShell>} />
         <Route path="/settings" element={<RouteShell><SettingsPage /></RouteShell>} />
       </Routes>
     </Shell>

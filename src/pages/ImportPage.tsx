@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ExternalLink, Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen, Rss,
+  ExternalLink, Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen, Rss, Folder,
 } from "lucide-react";
 import { open as openInBrowser } from "@tauri-apps/plugin-shell";
 import {
@@ -363,6 +363,7 @@ function PdfTab() {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<string[]>([]);
   const [result, setResult] = useState<{ ok: number; failed: { path: string; error: string }[] } | null>(null);
+  const [folderProgress, setFolderProgress] = useState<{ phase: string; done: number; total: number; current: string; failed: number } | null>(null);
 
   const m = useMutation({
     mutationFn: (paths: string[]) => api.importPdfFiles(paths),
@@ -374,9 +375,43 @@ function PdfTab() {
     onError: (e: Error) => setResult({ ok: 0, failed: [{ path: "(all)", error: e.message }] }),
   });
 
+  const folderMut = useMutation({
+    mutationFn: async (dirPath: string) => {
+      // Listen for progress events
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<any>("folder-import-progress", (e) => {
+        const p = e.payload;
+        setFolderProgress({ phase: p.phase, done: p.done, total: p.total, current: p.current_file, failed: p.failed });
+      });
+      try {
+        const summary = await api.importFolder(dirPath);
+        return summary;
+      } finally {
+        unlisten();
+      }
+    },
+    onSuccess: (s) => {
+      setResult({ ok: s.imported.length, failed: s.failed });
+      setFolderProgress(null);
+      qc.invalidateQueries({ queryKey: ["papers"] });
+    },
+    onError: (e: Error) => {
+      setResult({ ok: 0, failed: [{ path: "(folder)", error: e.message }] });
+      setFolderProgress(null);
+    },
+  });
+
   async function pick() {
     const files = await pickPdfFiles();
     if (files && files.length) setPicked(files);
+  }
+
+  async function pickFolder() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected === "string" && selected) {
+      folderMut.mutate(selected);
+    }
   }
 
   return (
@@ -391,6 +426,9 @@ function PdfTab() {
           <button onClick={pick} className="litera-btn">
             <Upload className="h-4 w-4" /> {t("import.pdfTab.pick")}
           </button>
+          <button onClick={pickFolder} disabled={folderMut.isPending} className="litera-btn disabled:opacity-50">
+            <Folder className="h-4 w-4" /> {t("import.pdfTab.pickFolder")}
+          </button>
           {picked.length > 0 && (
             <button
               onClick={() => m.mutate(picked)}
@@ -402,6 +440,24 @@ function PdfTab() {
             </button>
           )}
         </div>
+        {folderProgress && (
+          <div className="mt-3 text-xs text-litera-mute">
+            {folderProgress.phase === "scanning"
+              ? t("import.pdfTab.folderScanning")
+              : folderProgress.phase === "done"
+              ? t("import.pdfTab.done", { ok: String(folderProgress.done) })
+              : t("import.pdfTab.folderProgress", { done: String(folderProgress.done), total: String(folderProgress.total) })}
+            {folderProgress.current && <span className="ml-2 font-mono truncate">{folderProgress.current}</span>}
+            {folderProgress.total > 0 && folderProgress.phase !== "done" && (
+              <div className="mt-1 h-1.5 bg-litera-line rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-litera-accent rounded-full transition-all"
+                  style={{ width: `${(folderProgress.done / folderProgress.total) * 100}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
         {picked.length > 0 && (
           <div className="mt-4 text-left text-xs text-litera-mute font-mono max-h-40 overflow-auto border border-litera-line rounded p-2">
             {picked.map((p) => (

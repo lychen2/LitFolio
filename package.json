@@ -1,7 +1,7 @@
 {
   "name": "litfolio-desktop",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "LitFolio — local-first literature management with LLM-powered summarization",
   "scripts": {
@@ -18,6 +18,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-table": "^8.20.5",
+    "@tanstack/react-virtual": "^3.13.26",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.0.1",
     "@tauri-apps/plugin-fs": "^2.0.3",
@@ -27,6 +28,7 @@
     "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-force-graph-2d": "^1.29.1",
     "react-pdf-highlighter": "8.0.0-rc.0",
     "react-resizable-panels": "^2.1.7",
     "react-router-dom": "^6.28.0",

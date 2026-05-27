@@ -2,6 +2,7 @@
 
 pub mod ask;
 pub mod feeds;
+pub mod graph;
 pub mod reader_terms;
 pub mod reader_translate;
 pub mod survey;
@@ -16,7 +17,8 @@ use ulid::Ulid;
 use crate::ai::{
     active_profile, active_profile_for_task, chat_complete, expand_search_query, list_models,
     load_config, quick_read_paper_text, save_config, summarize_paper_text, ChatMessage,
-    ExpandedQuery, LlmConfig, LlmProfile, QuickReadResult, TaskKind, TldrResult,
+    ExpandedQuery, GroupingStrategy, LlmConfig, LlmProfile, LitReviewResult, QuickReadResult,
+    TaskKind, TldrResult,
 };
 use crate::ingest::{
     discover_topic, discover_topic_multi, fetch_arxiv, fetch_arxiv_category, fetch_doi,
@@ -24,9 +26,18 @@ use crate::ingest::{
     TopicRequest,
 };
 use crate::storage::{
-    notes, Folder, FolderRepo, FolderWithCount, Highlight, HighlightRepo, Paper, PaperRepo,
-    ReadStatus, Tag, TagRepo, TagWithCount,
+    dedup, notes, unified_search, ComparisonRepo, Concept, ConceptRelation, ConceptRepo,
+    CustomFieldDef, CustomFieldRepo, DuplicatePair, FilterRule, Folder, FolderRepo,
+    FolderWithCount, Highlight, HighlightRepo, NoteSection, NoteSectionRepo, Paper,
+    PaperComparison, PaperConcept, PaperCustomField, PaperRepo, QueueEntry, QueueRepo, ReadStatus,
+    SmartCollection, SmartCollectionRepo, Tag, TagRepo, TagWithCount, TopicAlert, TopicAlertRepo,
+    TopicAlertResult, UnifiedSearchResult,
 };
+use crate::bibtex::generate_bibtex;
+use crate::discovery::citations::{fetch_citations, CitationGraph};
+use crate::discovery::similar::{find_similar, Recommendation};
+use crate::export::citations::{export_bibtex, export_ris, format_citations, CitationStyle};
+use crate::export::markdown::{export_all_md, export_paper_md, ExportSummary};
 use crate::AppState;
 
 #[tauri::command]
@@ -94,6 +105,17 @@ pub async fn papers_search(
 ) -> Result<Vec<Paper>, String> {
     PaperRepo::new(&state.pool)
         .search(&query, limit.unwrap_or(100))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_unified(
+    state: State<'_, Arc<AppState>>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<UnifiedSearchResult>, String> {
+    unified_search(&state.pool, &query, limit.unwrap_or(50))
         .await
         .map_err(|e| e.to_string())
 }
@@ -311,7 +333,8 @@ pub async fn import_doi(state: State<'_, Arc<AppState>>, doi: String) -> Result<
     let draft = fetch_doi(&state.http, &doi)
         .await
         .map_err(|e| e.to_string())?;
-    let paper = draft.into_paper();
+    let mut paper = draft.into_paper();
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -327,7 +350,8 @@ pub async fn import_arxiv(
     let draft = fetch_arxiv(&state.http, &arxiv_id)
         .await
         .map_err(|e| e.to_string())?;
-    let paper = draft.into_paper();
+    let mut paper = draft.into_paper();
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -344,7 +368,8 @@ pub async fn import_bibtex(
     let repo = PaperRepo::new(&state.pool);
     let mut papers = Vec::with_capacity(drafts.len());
     for d in drafts {
-        let p = d.into_paper();
+        let mut p = d.into_paper();
+        p.bibtex = Some(generate_bibtex(&p));
         repo.insert(&p).await.map_err(|e| e.to_string())?;
         papers.push(p);
     }
@@ -411,6 +436,7 @@ pub async fn import_pdf_files(
                 let mut paper = draft.into_paper();
                 paper.id = paper_id;
                 paper.pdf_path = Some(r.stored_path.display().to_string());
+                paper.bibtex = Some(generate_bibtex(&paper));
                 if let Err(e) = repo.insert(&paper).await {
                     failed.push(PdfFailure {
                         path: p,
@@ -429,6 +455,201 @@ pub async fn import_pdf_files(
     Ok(PdfImportSummary { imported, failed })
 }
 
+// ─── Folder import (recursive, with progress) ─────────────────────────
+
+#[derive(serde::Serialize, Clone)]
+pub struct FolderImportProgress {
+    pub phase: String, // "scanning", "importing", "done"
+    pub done: usize,
+    pub total: usize,
+    pub current_file: String,
+    pub failed: usize,
+}
+
+#[tauri::command]
+pub async fn import_folder(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    dir_path: String,
+) -> Result<PdfImportSummary, String> {
+    let library = state.paths.clone();
+    let http = state.http.clone();
+    let repo = PaperRepo::new(&state.pool);
+
+    // 1. Scan directory recursively for PDFs
+    let _ = app.emit("folder-import-progress", FolderImportProgress {
+        phase: "scanning".into(),
+        done: 0,
+        total: 0,
+        current_file: String::new(),
+        failed: 0,
+    });
+
+    let dir = PathBuf::from(&dir_path);
+    let pdf_paths = walk_pdfs(&dir);
+    let total = pdf_paths.len();
+
+    if total == 0 {
+        return Ok(PdfImportSummary {
+            imported: Vec::new(),
+            failed: Vec::new(),
+        });
+    }
+
+    let mut imported = Vec::new();
+    let mut failed = Vec::new();
+
+    // 2. Import each PDF with progress events
+    for (i, path) in pdf_paths.iter().enumerate() {
+        let _ = app.emit("folder-import-progress", FolderImportProgress {
+            phase: "importing".into(),
+            done: i,
+            total,
+            current_file: path.file_name().unwrap_or_default().to_string_lossy().to_string(),
+            failed: failed.len(),
+        });
+
+        let paper_id = Ulid::new().to_string();
+        let library_clone = library.clone();
+        let path_clone = path.clone();
+        let id_clone = paper_id.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            import_pdf_file(&path_clone, &id_clone, &library_clone)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+        match result {
+            Ok(r) => {
+                let mut draft = r.draft;
+                // Apply filename heuristic if title is generic
+                if draft.title == "(untitled)" || draft.title.is_empty() {
+                    if let Some((h_title, h_authors, h_year)) = parse_filename_heuristic(path) {
+                        if h_title != "(untitled)" {
+                            draft.title = h_title;
+                        }
+                        if !h_authors.is_empty() && draft.authors.is_empty() {
+                            draft.authors = h_authors;
+                        }
+                        if h_year.is_some() && draft.year.is_none() {
+                            draft.year = h_year;
+                        }
+                    }
+                }
+                // Fetch CrossRef if DOI available
+                if let Some(ref doi) = draft.doi {
+                    if let Ok(crossref) = fetch_doi(&http, doi).await {
+                        if !crossref.title.is_empty() && crossref.title != "(untitled)" {
+                            draft.title = crossref.title;
+                        }
+                        if !crossref.authors.is_empty() {
+                            draft.authors = crossref.authors;
+                        }
+                        if crossref.year.is_some() {
+                            draft.year = crossref.year;
+                        }
+                        if crossref.venue.is_some() {
+                            draft.venue = crossref.venue;
+                        }
+                        if crossref.abstract_text.is_some() {
+                            draft.abstract_text = crossref.abstract_text;
+                        }
+                    }
+                }
+                let mut paper = draft.into_paper();
+                paper.id = paper_id;
+                paper.pdf_path = Some(r.stored_path.display().to_string());
+                paper.bibtex = Some(generate_bibtex(&paper));
+                if let Err(e) = repo.insert(&paper).await {
+                    failed.push(PdfFailure {
+                        path: path.display().to_string(),
+                        error: e.to_string(),
+                    });
+                } else {
+                    imported.push(paper);
+                }
+            }
+            Err(e) => failed.push(PdfFailure {
+                path: path.display().to_string(),
+                error: e.to_string(),
+            }),
+        }
+    }
+
+    let _ = app.emit("folder-import-progress", FolderImportProgress {
+        phase: "done".into(),
+        done: total,
+        total,
+        current_file: String::new(),
+        failed: failed.len(),
+    });
+
+    Ok(PdfImportSummary { imported, failed })
+}
+
+/// Recursively walk a directory and collect all .pdf file paths.
+fn walk_pdfs(dir: &PathBuf) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                result.extend(walk_pdfs(&path));
+            } else if path.extension().map_or(false, |e| e.eq_ignore_ascii_case("pdf")) {
+                result.push(path);
+            }
+        }
+    }
+    result
+}
+
+/// Try to extract metadata from a filename like `Author_Year_Title.pdf` or
+/// `Author - Year - Title.pdf` or `Author (Year) Title.pdf`.
+fn parse_filename_heuristic(path: &PathBuf) -> Option<(String, Vec<String>, Option<i32>)> {
+    let stem = path.file_stem()?.to_string_lossy().to_string();
+
+    // Pattern: Author_Year_Title  or  Author - Year - Title
+    let sep_re = regex::Regex::new(r"[_\s]*[-–]\s*|_").ok()?;
+    let parts: Vec<&str> = sep_re.splitn(&stem, 3).collect();
+    if parts.len() >= 3 {
+        let year = parts[1].trim().parse::<i32>().ok();
+        if year.is_some() {
+            let authors: Vec<String> = parts[0]
+                .split(|c: char| c == '&' || c == ',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let title = parts[2].replace('_', " ").trim().to_string();
+            return Some((title, authors, year));
+        }
+    }
+
+    // Pattern: Author (Year) Title
+    let paren_re = regex::Regex::new(r"^(.+?)\s*\((\d{4})\)\s*(.+)$").ok()?;
+    if let Some(caps) = paren_re.captures(&stem) {
+        let author_str = caps.get(1)?.as_str();
+        let year = caps.get(2)?.as_str().parse::<i32>().ok();
+        let title = caps.get(3)?.as_str().replace('_', " ").trim().to_string();
+        let authors: Vec<String> = author_str
+            .split(|c: char| c == '&' || c == ',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        return Some((title, authors, year));
+    }
+
+    // Pattern: Year_Title
+    let year_title_re = regex::Regex::new(r"^(\d{4})[_\s]+(.+)$").ok()?;
+    if let Some(caps) = year_title_re.captures(&stem) {
+        let year = caps.get(1)?.as_str().parse::<i32>().ok();
+        let title = caps.get(2)?.as_str().replace('_', " ").trim().to_string();
+        return Some((title, Vec::new(), year));
+    }
+
+    None
+}
+
 #[tauri::command]
 pub async fn search_papers(
     state: State<'_, Arc<AppState>>,
@@ -445,7 +666,8 @@ pub async fn add_from_search(
     state: State<'_, Arc<AppState>>,
     result: SearchResult,
 ) -> Result<Paper, String> {
-    let paper = result.draft.into_paper();
+    let mut paper = result.draft.into_paper();
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -468,7 +690,8 @@ pub async fn add_many_from_search(
     let mut imported = Vec::new();
     let mut skipped = Vec::new();
     for r in results {
-        let paper = r.draft.into_paper();
+        let mut paper = r.draft.into_paper();
+        paper.bibtex = Some(generate_bibtex(&paper));
         match repo.insert(&paper).await {
             Ok(()) => imported.push(paper),
             Err(e) => skipped.push(format!("{}: {}", paper.title, e)),
@@ -524,7 +747,8 @@ pub async fn arxiv_add_draft(
     state: State<'_, Arc<AppState>>,
     draft: PaperDraft,
 ) -> Result<Paper, String> {
-    let paper = draft.into_paper();
+    let mut paper = draft.into_paper();
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -580,6 +804,7 @@ pub async fn arxiv_add_with_pdf(
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(pdf_path.display().to_string());
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -624,6 +849,7 @@ pub async fn paper_save_with_pdf(
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(dest.display().to_string());
+    paper.bibtex = Some(generate_bibtex(&paper));
     PaperRepo::new(&state.pool)
         .insert(&paper)
         .await
@@ -1206,6 +1432,324 @@ pub fn batch_cancel(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
     Ok(false)
 }
 
+// ─── BibTeX backfill ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn bibtex_backfill(state: State<'_, Arc<AppState>>) -> Result<usize, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let papers = repo.list_needing_bibtex().await.map_err(|e| e.to_string())?;
+    let count = papers.len();
+    for p in &papers {
+        let bib = generate_bibtex(p);
+        repo.update_bibtex(&p.id, &bib)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(count)
+}
+
+// ─── Markdown Export ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn export_markdown_dir(state: State<'_, Arc<AppState>>) -> Result<Option<String>, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    Ok(cfg.export_dir)
+}
+
+#[tauri::command]
+pub fn export_markdown_set_dir(
+    state: State<'_, Arc<AppState>>,
+    dir: String,
+) -> Result<(), String> {
+    let mut cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    cfg.export_dir = Some(dir);
+    save_config(&state.paths, &cfg).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_markdown_all(
+    state: State<'_, Arc<AppState>>,
+    incremental: Option<bool>,
+) -> Result<ExportSummary, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let dir = cfg
+        .export_dir
+        .ok_or_else(|| "export directory not configured".to_string())?;
+    let export_path = std::path::PathBuf::from(&dir);
+    export_all_md(
+        &state.pool,
+        &state.paths,
+        &export_path,
+        incremental.unwrap_or(true),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_markdown_paper(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<String, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let dir = cfg
+        .export_dir
+        .ok_or_else(|| "export directory not configured".to_string())?;
+    let export_path = std::path::PathBuf::from(&dir);
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {paper_id} not found"))?;
+    let path = export_paper_md(&state.pool, &state.paths, &paper, &export_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[derive(serde::Deserialize)]
+pub struct ExportCitationsRequest {
+    pub paper_ids: Vec<String>,
+    pub format: String,       // "bibtex", "ris", "apa", "ieee", "gb/t7714", "chicago"
+}
+
+#[tauri::command]
+pub async fn export_citations(
+    state: State<'_, Arc<AppState>>,
+    request: ExportCitationsRequest,
+) -> Result<String, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let mut papers = Vec::new();
+    for id in &request.paper_ids {
+        if let Some(p) = repo.get(id).await.map_err(|e| e.to_string())? {
+            papers.push(p);
+        }
+    }
+    let output = match request.format.as_str() {
+        "ris" => export_ris(&papers),
+        "bibtex" => export_bibtex(&papers),
+        style => format_citations(&papers, CitationStyle::from_str(style)),
+    };
+    Ok(output)
+}
+
+// ─── Paper Comparisons ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn paper_comparisons_list(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<PaperComparison>, String> {
+    ComparisonRepo::new(&state.pool)
+        .list_all()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_comparison_get(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<Option<PaperComparison>, String> {
+    ComparisonRepo::new(&state.pool)
+        .get(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_comparison_create(
+    state: State<'_, Arc<AppState>>,
+    paper_ids: Vec<String>,
+    content: String,
+    model: String,
+) -> Result<i64, String> {
+    ComparisonRepo::new(&state.pool)
+        .insert(&paper_ids, &content, &model)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_comparison_update(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+    content: String,
+) -> Result<(), String> {
+    ComparisonRepo::new(&state.pool)
+        .update_content(id, &content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_comparison_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    ComparisonRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Note Sections (Structured Notes) ───────────────────────────────────
+
+#[tauri::command]
+pub async fn note_sections_get(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<NoteSection>, String> {
+    let repo = NoteSectionRepo::new(&state.pool);
+    repo.ensure_defaults(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    repo.list_by_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_sections_save(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    section_key: String,
+    content: String,
+    source: Option<String>,
+) -> Result<(), String> {
+    NoteSectionRepo::new(&state.pool)
+        .save(&paper_id, &section_key, &content, &source.unwrap_or_else(|| "user".into()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_sections_reorder(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    section_ids: Vec<i64>,
+) -> Result<(), String> {
+    NoteSectionRepo::new(&state.pool)
+        .reorder(&paper_id, &section_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_section_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    NoteSectionRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Similar Paper Recommendations ──────────────────────────────────────
+
+#[tauri::command]
+pub async fn paper_similar(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Vec<Recommendation>, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {id} not found"))?;
+    find_similar(
+        &state.pool,
+        &state.http,
+        &paper.id,
+        paper.doi.as_deref(),
+        paper.arxiv_id.as_deref(),
+        &paper.title,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+// ─── Citation Network ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn paper_citations(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<CitationGraph, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {id} not found"))?;
+    fetch_citations(
+        &state.pool,
+        &state.http,
+        &paper.id,
+        paper.doi.as_deref(),
+        paper.arxiv_id.as_deref(),
+        &paper.title,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+// ─── Reading Queue ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn queue_list(state: State<'_, Arc<AppState>>) -> Result<Vec<QueueEntry>, String> {
+    QueueRepo::new(&state.pool)
+        .list()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn queue_add(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    priority: Option<i32>,
+    target_date: Option<i64>,
+    note: Option<String>,
+) -> Result<(), String> {
+    QueueRepo::new(&state.pool)
+        .add(&paper_id, priority.unwrap_or(0), target_date, note.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn queue_remove(state: State<'_, Arc<AppState>>, paper_id: String) -> Result<(), String> {
+    QueueRepo::new(&state.pool)
+        .remove(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn queue_update(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    priority: i32,
+    target_date: Option<i64>,
+    note: Option<String>,
+) -> Result<(), String> {
+    QueueRepo::new(&state.pool)
+        .update(&paper_id, priority, target_date, note.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn queue_reorder(state: State<'_, Arc<AppState>>, paper_ids: Vec<String>) -> Result<(), String> {
+    QueueRepo::new(&state.pool)
+        .reorder(&paper_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ─── Reader: highlights + notes ──────────────────────────────────────────
 
 #[tauri::command]
@@ -1216,9 +1760,10 @@ pub async fn highlight_create(
     rect: serde_json::Value,
     text: String,
     color: Option<String>,
+    label: Option<String>,
 ) -> Result<Highlight, String> {
     HighlightRepo::new(&state.pool)
-        .insert(&paper_id, page, &rect, &text, color.as_deref())
+        .insert(&paper_id, page, &rect, &text, color.as_deref(), label.as_deref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -1242,6 +1787,18 @@ pub async fn highlight_update_note(
 ) -> Result<(), String> {
     HighlightRepo::new(&state.pool)
         .update_note(&id, note.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn highlight_update_label(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    label: Option<String>,
+) -> Result<(), String> {
+    HighlightRepo::new(&state.pool)
+        .update_label(&id, label.as_deref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -1288,4 +1845,557 @@ pub async fn search_expand_query(
     expand_search_query(&state.http, &prof, &raw)
         .await
         .map_err(|e| e.to_string())
+}
+
+// ─── Literature review generation ───────────────────────────────────────
+
+#[tauri::command]
+pub async fn generate_lit_review(
+    state: State<'_, Arc<AppState>>,
+    paper_ids: Vec<String>,
+    grouping: GroupingStrategy,
+) -> Result<LitReviewResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let output_language = cfg.output_language.as_str();
+    let prof = active_profile_for_task(&cfg, TaskKind::LitReview)
+        .map_err(|e| e.to_string())?
+        .clone();
+    let repo = PaperRepo::new(&state.pool);
+    let mut papers = Vec::new();
+    for id in &paper_ids {
+        match repo.get(id).await.map_err(|e| e.to_string())? {
+            Some(p) => papers.push(p),
+            None => return Err(format!("paper not found: {}", id)),
+        }
+    }
+    crate::ai::generate_review(&state.http, &prof, &papers, grouping, output_language)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Smart collections ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn smart_collections_list(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<SmartCollection>, String> {
+    let repo = SmartCollectionRepo::new(&state.pool);
+    repo.list().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn smart_collection_create(
+    state: State<'_, Arc<AppState>>,
+    name: String,
+    rules: FilterRule,
+) -> Result<i64, String> {
+    let repo = SmartCollectionRepo::new(&state.pool);
+    repo.create(&name, &rules).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn smart_collection_update(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+    name: String,
+    rules: FilterRule,
+) -> Result<(), String> {
+    let repo = SmartCollectionRepo::new(&state.pool);
+    repo.update(id, &name, &rules)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn smart_collection_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    let repo = SmartCollectionRepo::new(&state.pool);
+    repo.delete(id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn smart_collection_query_papers(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<Vec<Paper>, String> {
+    let repo = SmartCollectionRepo::new(&state.pool);
+    repo.query_papers(id).await.map_err(|e| e.to_string())
+}
+
+// ─── Paper deduplication ────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn paper_find_duplicate(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Option<Paper>, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper not found".to_string())?;
+    dedup::find_duplicate(&state.pool, &paper)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_scan_duplicates(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<DuplicatePair>, String> {
+    dedup::scan_all_duplicates(&state.pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_merge(
+    state: State<'_, Arc<AppState>>,
+    keep_id: String,
+    merge_id: String,
+) -> Result<(), String> {
+    dedup::merge_papers(&state.pool, &keep_id, &merge_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Custom metadata fields ─────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn custom_field_defs_list(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<CustomFieldDef>, String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    repo.list_defs().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn custom_field_def_create(
+    state: State<'_, Arc<AppState>>,
+    name: String,
+    field_type: String,
+    options: Option<Vec<String>>,
+) -> Result<i64, String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    let opts = options.as_deref();
+    repo.create_def(&name, &field_type, opts)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn custom_field_def_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    repo.delete_def(id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_custom_fields_get(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<PaperCustomField>, String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    repo.get_paper_fields(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_custom_field_set(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    field_id: i64,
+    value: String,
+) -> Result<(), String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    repo.set_paper_field(&paper_id, field_id, &value)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_custom_field_delete(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    field_id: i64,
+) -> Result<(), String> {
+    let repo = CustomFieldRepo::new(&state.pool);
+    repo.delete_paper_field(&paper_id, field_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Topic Alerts ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn topic_alerts_list(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<TopicAlert>, String> {
+    TopicAlertRepo::new(&state.pool)
+        .list()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_create(
+    state: State<'_, Arc<AppState>>,
+    query: String,
+    frequency: String,
+    target_folder_id: Option<i64>,
+    auto_import: bool,
+) -> Result<i64, String> {
+    TopicAlertRepo::new(&state.pool)
+        .create(&query, &frequency, target_folder_id, auto_import)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    TopicAlertRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_results_list(
+    state: State<'_, Arc<AppState>>,
+    alert_id: i64,
+    unseen_only: Option<bool>,
+) -> Result<Vec<TopicAlertResult>, String> {
+    TopicAlertRepo::new(&state.pool)
+        .list_results(alert_id, unseen_only.unwrap_or(false))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_result_mark_seen(
+    state: State<'_, Arc<AppState>>,
+    result_id: i64,
+) -> Result<(), String> {
+    TopicAlertRepo::new(&state.pool)
+        .mark_seen(result_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_mark_all_seen(
+    state: State<'_, Arc<AppState>>,
+    alert_id: i64,
+) -> Result<(), String> {
+    TopicAlertRepo::new(&state.pool)
+        .mark_all_seen(alert_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_unseen_count(
+    state: State<'_, Arc<AppState>>,
+) -> Result<i64, String> {
+    TopicAlertRepo::new(&state.pool)
+        .unseen_count()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn topic_alert_run(
+    state: State<'_, Arc<AppState>>,
+    alert_id: i64,
+) -> Result<usize, String> {
+    let repo = TopicAlertRepo::new(&state.pool);
+    let alerts = repo.list().await.map_err(|e| e.to_string())?;
+    let alert = alerts
+        .into_iter()
+        .find(|a| a.id == alert_id)
+        .ok_or_else(|| "alert not found".to_string())?;
+
+    let results = search_semantic_scholar(&state.http, &alert.query, 20)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut added = 0usize;
+
+    for r in &results {
+        let doi = r.draft.doi.as_deref();
+        let arxiv_id = r.draft.arxiv_id.as_deref();
+
+        if repo.result_exists(doi, arxiv_id).await.unwrap_or(false) {
+            continue;
+        }
+
+        let _ = repo
+            .add_result(
+                alert_id,
+                doi,
+                arxiv_id,
+                &r.draft.title,
+                Some(&r.draft.authors.join(", ")),
+                r.draft.year,
+                r.draft.abstract_text.as_deref(),
+            )
+            .await;
+        added += 1;
+    }
+
+    repo.update_last_run(alert_id).await.map_err(|e| e.to_string())?;
+    Ok(added)
+}
+
+#[tauri::command]
+pub async fn topic_alert_run_all(state: State<'_, Arc<AppState>>) -> Result<usize, String> {
+    let repo = TopicAlertRepo::new(&state.pool);
+    let pending = repo.pending_alerts().await.map_err(|e| e.to_string())?;
+    let mut total_added = 0usize;
+
+    for alert in pending {
+        let results = search_semantic_scholar(&state.http, &alert.query, 20)
+            .await
+            .unwrap_or_default();
+
+        for r in &results {
+            let doi = r.draft.doi.as_deref();
+            let arxiv_id = r.draft.arxiv_id.as_deref();
+
+            if repo.result_exists(doi, arxiv_id).await.unwrap_or(false) {
+                continue;
+            }
+
+            let _ = repo
+                .add_result(
+                    alert.id,
+                    doi,
+                    arxiv_id,
+                    &r.draft.title,
+                    Some(&r.draft.authors.join(", ")),
+                    r.draft.year,
+                    r.draft.abstract_text.as_deref(),
+                )
+                .await;
+            total_added += 1;
+        }
+
+        let _ = repo.update_last_run(alert.id).await;
+    }
+
+    Ok(total_added)
+}
+
+// ─── Concepts ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn concepts_list(state: State<'_, Arc<AppState>>) -> Result<Vec<Concept>, String> {
+    ConceptRepo::new(&state.pool)
+        .list_all()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_create(
+    state: State<'_, Arc<AppState>>,
+    name: String,
+    description: Option<String>,
+) -> Result<i64, String> {
+    ConceptRepo::new(&state.pool)
+        .create(&name, description.as_deref(), "user")
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_delete(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
+    ConceptRepo::new(&state.pool)
+        .delete(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_relations_list(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<ConceptRelation>, String> {
+    ConceptRepo::new(&state.pool)
+        .list_relations()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_relation_create(
+    state: State<'_, Arc<AppState>>,
+    source_id: i64,
+    target_id: i64,
+    relation: String,
+    evidence_paper_id: Option<String>,
+    snippet: Option<String>,
+) -> Result<i64, String> {
+    ConceptRepo::new(&state.pool)
+        .create_relation(
+            source_id,
+            target_id,
+            &relation,
+            evidence_paper_id.as_deref(),
+            snippet.as_deref(),
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_relation_delete(
+    state: State<'_, Arc<AppState>>,
+    id: i64,
+) -> Result<(), String> {
+    ConceptRepo::new(&state.pool)
+        .delete_relation(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_link_paper(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    concept_id: i64,
+    relevance: Option<f64>,
+) -> Result<(), String> {
+    ConceptRepo::new(&state.pool)
+        .link_paper(&paper_id, concept_id, relevance.unwrap_or(1.0))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_unlink_paper(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    concept_id: i64,
+) -> Result<(), String> {
+    ConceptRepo::new(&state.pool)
+        .unlink_paper(&paper_id, concept_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_for_paper(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<PaperConcept>, String> {
+    ConceptRepo::new(&state.pool)
+        .concepts_for_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_extract_from_paper(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<crate::ai::ExtractedConcept>, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {paper_id} not found"))?;
+
+    // Use abstract_text as the source for concept extraction
+    let text = paper
+        .abstract_text
+        .as_deref()
+        .or(paper.tldr.as_deref())
+        .unwrap_or("");
+
+    if text.is_empty() {
+        return Err("paper has no text content for concept extraction".into());
+    }
+
+    crate::ai::extract_concepts(&state.http, &state.paths, &paper.title, text)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn concept_extract_and_store(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<usize, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = repo
+        .get(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("paper {paper_id} not found"))?;
+
+    let text = paper
+        .abstract_text
+        .as_deref()
+        .or(paper.tldr.as_deref())
+        .unwrap_or("");
+
+    if text.is_empty() {
+        return Err("paper has no text content for concept extraction".into());
+    }
+
+    let extracted = crate::ai::extract_concepts(&state.http, &state.paths, &paper.title, text)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let concept_repo = ConceptRepo::new(&state.pool);
+    let mut count = 0usize;
+
+    for ec in &extracted {
+        // Create or get existing concept
+        let concept_id = match concept_repo.find_by_name(&ec.name).await.map_err(|e| e.to_string())? {
+            Some(c) => c.id,
+            None => {
+                concept_repo
+                    .create(&ec.name, Some(&ec.description), "ai")
+                    .await
+                    .map_err(|e| e.to_string())?
+            }
+        };
+
+        // Link paper to concept
+        concept_repo
+            .link_paper(&paper_id, concept_id, 1.0)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Create relations to other concepts
+        for rel in &ec.relations {
+            if let Some(target) = concept_repo.find_by_name(&rel.target).await.map_err(|e| e.to_string())? {
+                concept_repo
+                    .create_relation(
+                        concept_id,
+                        target.id,
+                        &rel.relation,
+                        Some(&paper_id),
+                        rel.snippet.as_deref(),
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
+        count += 1;
+    }
+
+    Ok(count)
 }

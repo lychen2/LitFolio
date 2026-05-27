@@ -13,6 +13,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { PdfTextHighlight } from "./PdfTextHighlight";
 import { PdfTermsOverlay, type PdfTermEntry } from "./PdfTermsOverlay";
 import { PdfSearchBar } from "./PdfSearchBar";
+import { FigureLinks } from "./FigureLinks";
 
 /**
  * The middle pane: renders the bound PDF and lets the user highlight, search,
@@ -184,41 +185,44 @@ export const PdfPane = memo(function PdfPane({
               .catch((err) => console.warn("[PdfPane] push pdf text failed", err));
           }
           return (
-            <PdfHighlighter
-              pdfDocument={pdfDocument}
-              highlights={highlights}
-              enableAreaSelection={(e) => e.altKey}
-              pdfScaleValue="page-width"
-              onScrollChange={() => { /* noop */ }}
-              scrollRef={(fn) => { scrollFnRef.current = fn; }}
-              onSelectionFinished={(position, content, hideTipAndSelection) => (
-                <SelectionActions
-                  onHighlight={() => {
-                    create.mutate({ position, content, comment: { text: "", emoji: "" } });
-                    hideTipAndSelection();
-                  }}
-                  onTranslate={() => {
-                    const text = content.text?.trim();
-                    if (text) onTranslateSelection?.(text);
-                    hideTipAndSelection();
-                  }}
-                  onAddTerm={() => {
-                    const text = content.text?.trim();
-                    if (text) addTerm.mutate({ term: text });
-                    hideTipAndSelection();
-                  }}
-                  pending={addTerm.isPending}
-                />
-              )}
-              highlightTransform={(highlight, _idx, _setTip, _hideTip, _vToScaled, _shot, isScrolledTo) => (
-                <PdfTextHighlight
-                  key={highlight.id}
-                  rects={highlight.position.rects}
-                  dark={dark}
-                  isScrolledTo={isScrolledTo}
-                />
-              )}
-            />
+            <>
+              <PdfHighlighter
+                pdfDocument={pdfDocument}
+                highlights={highlights}
+                enableAreaSelection={(e) => e.altKey}
+                pdfScaleValue="page-width"
+                onScrollChange={() => { /* noop */ }}
+                scrollRef={(fn) => { scrollFnRef.current = fn; }}
+                onSelectionFinished={(position, content, hideTipAndSelection) => (
+                  <SelectionActions
+                    onHighlight={() => {
+                      create.mutate({ position, content, comment: { text: "", emoji: "" } });
+                      hideTipAndSelection();
+                    }}
+                    onTranslate={() => {
+                      const text = content.text?.trim();
+                      if (text) onTranslateSelection?.(text);
+                      hideTipAndSelection();
+                    }}
+                    onAddTerm={() => {
+                      const text = content.text?.trim();
+                      if (text) addTerm.mutate({ term: text });
+                      hideTipAndSelection();
+                    }}
+                    pending={addTerm.isPending}
+                  />
+                )}
+                highlightTransform={(highlight, _idx, _setTip, _hideTip, _vToScaled, _shot, isScrolledTo) => (
+                  <PdfTextHighlight
+                    key={highlight.id}
+                    rects={highlight.position.rects}
+                    dark={dark}
+                    isScrolledTo={isScrolledTo}
+                  />
+                )}
+              />
+              <FigureLinks pdfDocument={pdfDocument} pdfUrl={pdfUrl} />
+            </>
           );
         }}
       </PdfLoader>

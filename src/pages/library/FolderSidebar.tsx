@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Folder, FolderPlus, Loader2, Plus, Trash2 } from "lucide-react";
-import { api, type FolderWithCount } from "@/lib/api";
+import { Folder, FolderPlus, Layers, Loader2, Plus, Trash2 } from "lucide-react";
+import { api, type FilterRule, type FolderWithCount } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { SmartCollectionEditor } from "@/components/SmartCollectionEditor";
 
 export function FolderSidebar({
-  selectedId, onSelect,
+  selectedId, onSelect, selectedSmartId, onSelectSmart,
 }: {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
+  selectedSmartId: number | null;
+  onSelectSmart: (id: number | null) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -37,6 +40,26 @@ export function FolderSidebar({
   });
 
   const totalCount = folders.reduce((sum, f) => sum + f.paper_count, 0);
+
+  // Smart collections
+  const { data: smartCollections = [] } = useQuery({
+    queryKey: ["smart-collections"],
+    queryFn: api.smartCollectionsList,
+  });
+  const createSmart = useMutation({
+    mutationFn: ({ name, rules }: { name: string; rules: FilterRule }) =>
+      api.smartCollectionCreate(name, rules),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["smart-collections"] }),
+  });
+  const deleteSmart = useMutation({
+    mutationFn: (id: number) => api.smartCollectionDelete(id),
+    onSuccess: () => {
+      onSelectSmart(null);
+      qc.invalidateQueries({ queryKey: ["smart-collections"] });
+      qc.invalidateQueries({ queryKey: ["papers"] });
+    },
+  });
+  const [editorOpen, setEditorOpen] = useState(false);
 
   return (
     <aside className="w-[230px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto flex flex-col">
@@ -86,8 +109,59 @@ export function FolderSidebar({
           {t("folders.summaryText", { count: folders.length, papers: totalCount })}
         </div>
       )}
+
+      {/* Smart Collections */}
+      <div className="px-3 py-2 border-t border-litera-line flex items-center justify-between gap-2">
+        <div className="text-xs uppercase tracking-wider text-litera-mute">{t("smartCollections.title")}</div>
+        <button
+          onClick={() => setEditorOpen(true)}
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-litera-text/80 hover:text-litera-accent hover:bg-litera-panel"
+          title={t("smartCollections.create")}
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      </div>
+      <div className="p-2">
+        {smartCollections.length === 0 ? (
+          <p className="px-2 py-2 text-[11px] text-litera-mute">{t("smartCollections.noRules")}</p>
+        ) : (
+          smartCollections.map((sc) => (
+            <div key={sc.id} className="group flex items-center gap-1">
+              <button
+                onClick={() => { onSelect(null); onSelectSmart(sc.id); }}
+                className={
+                  "flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-left " +
+                  (selectedSmartId === sc.id
+                    ? "bg-litera-accent/15 text-litera-accent"
+                    : "text-litera-text/75 hover:bg-litera-panel")
+                }
+              >
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{sc.name}</span>
+              </button>
+              <button
+                onClick={() => deleteSmart.mutate(sc.id)}
+                className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
+                title={t("smartCollections.remove")}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
       {create.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(create.error)}</div>}
       {del.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(del.error)}</div>}
+      {editorOpen && (
+        <SmartCollectionEditor
+          onSave={(name, rules) => {
+            createSmart.mutate({ name, rules });
+            setEditorOpen(false);
+          }}
+          onCancel={() => setEditorOpen(false)}
+        />
+      )}
     </aside>
   );
 }

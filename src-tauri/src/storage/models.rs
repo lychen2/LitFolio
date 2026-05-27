@@ -56,6 +56,8 @@ pub struct Paper {
     pub abstract_translated: Option<String>,
     pub translate_target_lang: Option<String>,
     pub translated_at: Option<i64>,
+    pub bibtex: Option<String>,
+    pub last_exported_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +82,7 @@ pub struct Highlight {
     pub page: i32,
     pub rect: serde_json::Value,
     pub color: String,
+    pub label: Option<String>,
     pub text: String,
     pub note: Option<String>,
     pub summary_text: Option<String>,
