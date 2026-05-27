@@ -21,10 +21,11 @@ use super::client::{chat_complete, ChatMessage};
 use super::profile::LlmProfile;
 use crate::storage::{Highlight, Paper};
 
-const MAX_CONTEXT_CHARS: usize = 14_000;
-const MAX_SNIPPET_CHARS: usize = 1_800;
+const MAX_CONTEXT_TOKENS: usize = 6_000;
+const MAX_SNIPPET_TOKENS: usize = 800;
 const MAX_HIGHLIGHTS_PER_PAPER: usize = 3;
 const MAX_HIGHLIGHT_TEXT_CHARS: usize = 240;
+const MAX_HISTORY_TURNS: usize = 6;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AskSource {
@@ -92,7 +93,7 @@ pub async fn answer_library_question(
     if trimmed.is_empty() {
         return Err(anyhow!("empty question"));
     }
-    let sources = build_sources(papers, highlights);
+    let sources = build_sources(papers, highlights, terms);
     if sources.is_empty() {
         return Ok(empty_result(terms.to_vec()));
     }
@@ -100,7 +101,7 @@ pub async fn answer_library_question(
     let user =
         format!("Question:\n{trimmed}\n\nSources (numbered, cite by these numbers):\n{context}");
 
-    // Build messages with conversation history
+    // Build messages with windowed conversation history
     let mut messages = vec![
         ChatMessage {
             role: "system".into(),
@@ -108,9 +109,23 @@ pub async fn answer_library_question(
         },
     ];
 
-    // Add conversation history (excluding the current question)
-    for msg in conversation_history {
-        messages.push(msg.clone());
+    // Window conversation history: keep last MAX_HISTORY_TURNS turns,
+    // summarize older turns into a condensed context message.
+    if conversation_history.len() > MAX_HISTORY_TURNS {
+        let split = conversation_history.len() - MAX_HISTORY_TURNS;
+        let (older, recent) = conversation_history.split_at(split);
+        let summary = summarize_history(older);
+        messages.push(ChatMessage {
+            role: "system".into(),
+            content: format!("Previous conversation summary:\n{summary}"),
+        });
+        for msg in recent {
+            messages.push(msg.clone());
+        }
+    } else {
+        for msg in conversation_history {
+            messages.push(msg.clone());
+        }
     }
 
     // Add current question with sources
@@ -137,12 +152,12 @@ pub async fn answer_library_question(
     })
 }
 
-fn build_sources(papers: &[Paper], highlights: &HashMap<String, Vec<Highlight>>) -> Vec<AskSource> {
+fn build_sources(papers: &[Paper], highlights: &HashMap<String, Vec<Highlight>>, terms: &[String]) -> Vec<AskSource> {
     papers
         .iter()
         .filter_map(|p| {
             let hl = highlights.get(&p.id).map(Vec::as_slice).unwrap_or(&[]);
-            let snippet = paper_snippet(p, hl);
+            let snippet = paper_snippet(p, hl, terms);
             if snippet.is_empty() {
                 return None;
             }
@@ -157,14 +172,19 @@ fn build_sources(papers: &[Paper], highlights: &HashMap<String, Vec<Highlight>>)
         .collect()
 }
 
-fn paper_snippet(p: &Paper, highlights: &[Highlight]) -> String {
+fn paper_snippet(p: &Paper, highlights: &[Highlight], terms: &[String]) -> String {
     let mut parts = Vec::new();
+    // Always include TL;DR and abstract — universally relevant.
     push_part(&mut parts, "TL;DR", p.tldr.as_deref());
     push_part(&mut parts, "Abstract", p.abstract_text.as_deref());
-    push_part(&mut parts, "Problem", p.research_question.as_deref());
-    push_part(&mut parts, "Method", p.method.as_deref());
-    push_part(&mut parts, "Comparison", p.comparison.as_deref());
-    push_part(&mut parts, "Limitations", p.limitations.as_deref());
+
+    // Conditionally include detailed sections only when query terms appear in them.
+    let terms_lower: Vec<String> = terms.iter().map(|t| t.to_lowercase()).collect();
+    push_if_relevant(&mut parts, "Problem", p.research_question.as_deref(), &terms_lower);
+    push_if_relevant(&mut parts, "Method", p.method.as_deref(), &terms_lower);
+    push_if_relevant(&mut parts, "Comparison", p.comparison.as_deref(), &terms_lower);
+    push_if_relevant(&mut parts, "Limitations", p.limitations.as_deref(), &terms_lower);
+
     if !p.key_findings.is_empty() {
         parts.push(format!("Key findings: {}", p.key_findings.join("; ")));
     }
@@ -183,13 +203,71 @@ fn paper_snippet(p: &Paper, highlights: &[Highlight]) -> String {
     if !quotes.is_empty() {
         parts.push(format!("User highlights: {}", quotes.join(" / ")));
     }
-    truncate(&parts.join("\n"), MAX_SNIPPET_CHARS)
+    truncate_to_tokens(&parts.join("\n"), MAX_SNIPPET_TOKENS)
 }
 
 fn push_part(parts: &mut Vec<String>, label: &str, value: Option<&str>) {
     if let Some(text) = value.map(str::trim).filter(|s| !s.is_empty()) {
         parts.push(format!("{label}: {text}"));
     }
+}
+
+fn push_if_relevant(parts: &mut Vec<String>, label: &str, value: Option<&str>, terms: &[String]) {
+    if let Some(text) = value.map(str::trim).filter(|s| !s.is_empty()) {
+        if terms.is_empty() {
+            parts.push(format!("{label}: {text}"));
+            return;
+        }
+        let text_lower = text.to_lowercase();
+        let has_overlap = terms.iter().any(|t| text_lower.contains(t.as_str()));
+        if has_overlap {
+            parts.push(format!("{label}: {text}"));
+        }
+    }
+}
+
+fn summarize_history(messages: &[ChatMessage]) -> String {
+    messages
+        .iter()
+        .map(|m| {
+            let prefix = if m.role == "user" { "Q" } else { "A" };
+            let content = truncate(&m.content, 200);
+            format!("{prefix}: {content}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Rough token estimate: CJK characters ~2 tokens each, ASCII ~0.25 tokens per char.
+/// Conservative heuristic for mixed CJK/English academic text.
+fn estimate_tokens(text: &str) -> usize {
+    let mut weighted_chars = 0usize;
+    for ch in text.chars() {
+        weighted_chars += if ch.is_ascii() { 1 } else { 2 };
+    }
+    // Average ~4 weighted chars per token for mixed content
+    (weighted_chars + 3) / 4
+}
+
+fn truncate_to_tokens(s: &str, max_tokens: usize) -> String {
+    if estimate_tokens(s) <= max_tokens {
+        return s.to_string();
+    }
+    let chars: Vec<char> = s.chars().collect();
+    let mut lo = 0;
+    let mut hi = chars.len();
+    while lo < hi {
+        let mid = (lo + hi + 1) / 2;
+        let candidate: String = chars[..mid].iter().collect();
+        if estimate_tokens(&candidate) <= max_tokens {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    let mut out: String = chars[..lo].iter().collect();
+    out.push_str("...");
+    out
 }
 
 fn build_context(sources: &[AskSource]) -> String {
@@ -212,7 +290,7 @@ fn build_context(sources: &[AskSource]) -> String {
             source.title,
             source.snippet,
         );
-        if out.chars().count() + block.chars().count() > MAX_CONTEXT_CHARS {
+        if estimate_tokens(&out) + estimate_tokens(&block) > MAX_CONTEXT_TOKENS {
             break;
         }
         out.push_str(&block);
@@ -290,7 +368,7 @@ mod tests {
     #[test]
     fn builds_source_snippet_with_no_highlights() {
         let highlights = HashMap::new();
-        let sources = build_sources(&[paper()], &highlights);
+        let sources = build_sources(&[paper()], &highlights, &[]);
         assert_eq!(sources.len(), 1);
         assert!(sources[0].snippet.contains("TL;DR"));
         assert!(sources[0].snippet.contains("Key findings"));
@@ -301,9 +379,19 @@ mod tests {
     fn includes_highlights_in_snippet() {
         let mut highlights = HashMap::new();
         highlights.insert("p1".into(), vec![highlight("important quoted passage")]);
-        let sources = build_sources(&[paper()], &highlights);
+        let sources = build_sources(&[paper()], &highlights, &[]);
         assert!(sources[0].snippet.contains("User highlights"));
         assert!(sources[0].snippet.contains("important quoted passage"));
+    }
+
+    #[test]
+    fn relevance_filter_skips_unrelated_sections() {
+        let highlights = HashMap::new();
+        // Query about "methods" should include Method but skip Limitations (which has no overlap)
+        let sources = build_sources(&[paper()], &highlights, &["methods".into()]);
+        assert_eq!(sources.len(), 1);
+        // Comparison contains "baseline" not "methods", so should be filtered out
+        assert!(!sources[0].snippet.contains("Comparison"));
     }
 
     #[test]

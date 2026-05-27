@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, ExternalLink, Languages, Loader2, Rocket,
@@ -6,6 +6,7 @@ import {
 import { api, type ArxivDraft, type Paper, type TranslationResult } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 
 export function DraftRow({
   draft, rank, onOpen,
@@ -18,6 +19,11 @@ export function DraftRow({
   const { lang } = useI18n();
   const [saved, setSaved] = useState<Paper | null>(null);
   const [translation, setTranslation] = useState<TranslationResult | null>(null);
+  const { data: importedIds } = useImportedArxivIds();
+  const alreadyImported = useMemo(
+    () => importedIds?.includes(draft.arxiv_id ?? "") ?? false,
+    [importedIds, draft.arxiv_id],
+  );
   const add = useMutation({
     mutationFn: () => {
       if (!draft.arxiv_id) throw new Error("Missing arXiv ID");
@@ -49,6 +55,7 @@ export function DraftRow({
         <DraftActions
           draft={draft}
           saved={saved}
+          alreadyImported={alreadyImported}
           addPending={add.isPending}
           translatePending={translate.isPending}
           onAdd={() => add.mutate()}
@@ -119,10 +126,11 @@ function DraftMeta({ draft }: { draft: ArxivDraft }) {
 }
 
 function DraftActions({
-  draft, saved, addPending, translatePending, onAdd, onTranslate,
+  draft, saved, alreadyImported, addPending, translatePending, onAdd, onTranslate,
 }: {
   draft: ArxivDraft;
   saved: Paper | null;
+  alreadyImported: boolean;
   addPending: boolean;
   translatePending: boolean;
   onAdd: () => void;
@@ -139,7 +147,7 @@ function DraftActions({
         {translatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
         翻译
       </button>
-      {saved ? <Saved /> : <AddButton draft={draft} pending={addPending} onClick={onAdd} />}
+      {saved || alreadyImported ? <Saved /> : <AddButton draft={draft} pending={addPending} onClick={onAdd} />}
     </div>
   );
 }

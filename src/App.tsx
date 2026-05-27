@@ -45,7 +45,9 @@ export function App() {
 function RouteShell({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary>
-      <Suspense fallback={<RouteFallback />}>{children}</Suspense>
+      <Suspense fallback={<RouteFallback />}>
+        <div className="h-full litera-fade-in">{children}</div>
+      </Suspense>
     </ErrorBoundary>
   );
 }

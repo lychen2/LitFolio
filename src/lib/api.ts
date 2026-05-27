@@ -468,6 +468,7 @@ export const api = {
     invoke<Paper[]>("papers_in_folder", { folderId, limit }),
   papersSearch: (query: string, limit?: number) =>
     invoke<Paper[]>("papers_search", { query, limit }),
+  papersAllArxivIds: () => invoke<string[]>("papers_all_arxiv_ids"),
   paperGet: (id: string) => invoke<Paper | null>("paper_get", { id }),
   paperSetReadStatus: (id: string, status: ReadStatus) =>
     invoke<void>("paper_set_read_status", { id, status }),

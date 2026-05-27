@@ -24,7 +24,7 @@ export function GraphLegend() {
       <div className="flex items-center gap-2">
         {/* Paper: small rounded rect */}
         <span className="h-2 w-2.5 rounded-[2px] bg-indigo-500" />
-        <span className="text-litera-mute">{t("graph.papers")}</span>
+        <span className="text-litera-mute">{t("graph.paperNodes")}</span>
       </div>
       <div className="flex items-center gap-2">
         {/* Concept: small hexagon via clip-path */}

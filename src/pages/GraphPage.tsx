@@ -112,10 +112,11 @@ export function GraphPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-3 pb-1">
-        <h1 className="text-base font-serif font-semibold text-litera-text">
+      <div className="border-b border-litera-line px-6 py-4">
+        <h1 className="font-serif text-2xl tracking-tight">
           {t("graph.title")}
         </h1>
+        <p className="text-sm text-litera-mute">{t("graph.subtitle")}</p>
       </div>
 
       <GraphToolbar

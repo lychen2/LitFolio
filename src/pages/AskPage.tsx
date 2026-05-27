@@ -81,7 +81,7 @@ export function AskPage() {
   return (
     <section className="h-full flex flex-col overflow-hidden">
       <header className="border-b border-litera-line px-6 py-5">
-        <div className="max-w-6xl flex items-center justify-between">
+        <div className="max-w-6xl flex items-center justify-between gap-4">
           <div>
             <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
               <MessagesSquare className="h-5 w-5 text-litera-accent" />
@@ -210,7 +210,7 @@ function EmptyState() {
   const t = useT();
   return (
     <div className="h-full grid place-items-center">
-      <div className="max-w-3xl grid gap-4 lg:grid-cols-2">
+      <div className="max-w-3xl grid gap-4 lg:grid-cols-2 litera-stagger">
         <WorkflowCard variant="wide" icon={<Search className="h-5 w-5" />} title={t("ask.empty.card1Title")} body={t("ask.empty.card1Body")} />
         <WorkflowCard icon={<LibraryBig className="h-5 w-5" />} title={t("ask.empty.card2Title")} body={t("ask.empty.card2Body")} />
         <WorkflowCard icon={<BookMarked className="h-5 w-5" />} title={t("ask.empty.card3Title")} body={t("ask.empty.card3Body")} />

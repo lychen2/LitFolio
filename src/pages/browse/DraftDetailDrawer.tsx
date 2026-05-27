@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, ExternalLink, Languages, Loader2, Rocket, X,
@@ -6,6 +6,7 @@ import {
 import { api, type ArxivDraft, type Paper, type TranslationResult } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 
 export function DraftDetailDrawer({
   draft, onClose,
@@ -17,6 +18,11 @@ export function DraftDetailDrawer({
   const { lang } = useI18n();
   const [saved, setSaved] = useState<Paper | null>(null);
   const [translation, setTranslation] = useState<TranslationResult | null>(null);
+  const { data: importedIds } = useImportedArxivIds();
+  const alreadyImported = useMemo(
+    () => importedIds?.includes(draft.arxiv_id ?? "") ?? false,
+    [importedIds, draft.arxiv_id],
+  );
   const translate = useMutation({
     mutationFn: () => api.draftTranslate(draft, llmLanguageNameFor(lang)),
     onSuccess: setTranslation,
@@ -33,10 +39,10 @@ export function DraftDetailDrawer({
   });
 
   return (
-    <div className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[760px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col"
+        className="w-[760px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter"
       >
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -58,7 +64,7 @@ export function DraftDetailDrawer({
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
             翻译标题和摘要
           </button>
-          {saved ? (
+          {saved || alreadyImported ? (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
               <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
             </span>

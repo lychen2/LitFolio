@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import ForceGraph2D from "react-force-graph-2d";
+import { forceCollide } from "d3-force-3d";
 import type { GraphData, GraphNode, GraphEdge } from "@/lib/api";
 
 /** Paper node: warm indigo-blue */
@@ -38,8 +39,13 @@ export function NetworkGraphView({ data, selectedNodeId, onSelectNode, width, he
 
   useEffect(() => {
     if (fgRef.current && data.nodes.length > 0) {
+      // Configure forces for stable, well-spaced layout
+      const fg = fgRef.current;
+      fg.d3Force("link")?.distance(150);
+      fg.d3Force("charge")?.strength(-450).distanceMax(500);
+      fg.d3Force("collide", forceCollide(30));
       const timer = setTimeout(() => {
-        fgRef.current?.zoomToFit(400, 40);
+        fg.zoomToFit(400, 60);
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -292,10 +298,10 @@ export function NetworkGraphView({ data, selectedNodeId, onSelectNode, width, he
       linkCanvasObject={linkCanvasObject}
       onNodeClick={handleNodeClick}
       onBackgroundClick={handleBackgroundClick}
-      d3AlphaDecay={0.02}
-      d3VelocityDecay={0.3}
-      warmupTicks={50}
-      cooldownTicks={100}
+      d3AlphaDecay={0.028}
+      d3VelocityDecay={0.4}
+      warmupTicks={100}
+      cooldownTicks={300}
       enableNodeDrag={true}
       enableZoomInteraction={true}
     />

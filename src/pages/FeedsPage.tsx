@@ -193,7 +193,7 @@ function FeedListSidebar({
           <div className="mt-1 text-[10px] text-red-400/90 break-words">{(add.error as Error).message}</div>
         )}
       </div>
-      <nav className="p-2 flex-1">
+      <nav className="p-2 flex-1 litera-stagger">
         <FeedItemBtn
           active={selectedId == null}
           label={t("feeds.allSubs")}
@@ -625,10 +625,10 @@ function FeedItemDetailDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[760px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col"
+        className="w-[760px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter"
       >
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
