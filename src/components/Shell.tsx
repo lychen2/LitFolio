@@ -32,6 +32,11 @@ export function Shell({ children }: { children: ReactNode }) {
     queryFn: api.topicAlertUnseenCount,
     refetchInterval: 60_000,
   });
+  const { data: appVersion } = useQuery({
+    queryKey: ["app-version"],
+    queryFn: api.appVersion,
+    staleTime: Infinity,
+  });
 
   const handlePaletteToggle = useCallback(() => setPaletteOpen((o) => !o), []);
   const handlePaletteClose = useCallback(() => setPaletteOpen(false), []);
@@ -88,7 +93,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
         <div className="mt-auto px-2 flex flex-col gap-2">
           <LanguageSwitcher />
-          <div className="text-xs text-litera-mute">{t("shell.footer")}</div>
+          <div className="text-xs text-litera-mute">{appVersion ? `v${appVersion}` : ""} {t("shell.footer")}</div>
         </div>
       </aside>
       <main className="flex-1 min-w-0 overflow-hidden">{children}</main>

@@ -19,8 +19,6 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 use storage::{default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
-use ingest::import_pdf_file;
-use bibtex::generate_bibtex;
 
 pub struct AppState {
     pub pool: Pool,
@@ -122,6 +120,7 @@ pub fn run() {
             commands::papers_recent,
             commands::papers_in_folder,
             commands::papers_search,
+            commands::papers_all_arxiv_ids,
             commands::paper_get,
             commands::paper_set_read_status,
             commands::paper_delete,

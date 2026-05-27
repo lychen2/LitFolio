@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ExternalLink, Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen, Rss, Folder,
+  CheckCircle2, ExternalLink, Loader2, FileText, Hash, Globe, Upload, Search, Save, Rocket, FolderOpen, Rss, Folder,
 } from "lucide-react";
 import { open as openInBrowser } from "@tauri-apps/plugin-shell";
 import {
@@ -10,7 +10,9 @@ import {
 } from "@/lib/api";
 
 import { useT } from "@/i18n/I18nProvider";
+import { TabButton } from "@/components/TabButton";
 import { ImportSidebar } from "./import/ImportSidebar";
+import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 
 type Tab = "pdf" | "arxiv_doi" | "search";
 
@@ -49,9 +51,9 @@ export function ImportPage() {
       </header>
       <ImportSourceBanner source={source} />
       <nav className="px-6 pt-4 flex gap-1">
-        <TabButton on={tab === "arxiv_doi"} onClick={() => setTab("arxiv_doi")} icon={<Hash className="h-3.5 w-3.5" />} label={t("import.tab.arxivDoi")} />
-        <TabButton on={tab === "pdf"} onClick={() => setTab("pdf")} icon={<Upload className="h-3.5 w-3.5" />} label={t("import.tab.pdf")} />
-        <TabButton on={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label={t("import.tab.search")} />
+        <TabButton active={tab === "arxiv_doi"} onClick={() => setTab("arxiv_doi")} icon={<Hash className="h-3.5 w-3.5" />} label={t("import.tab.arxivDoi")} />
+        <TabButton active={tab === "pdf"} onClick={() => setTab("pdf")} icon={<Upload className="h-3.5 w-3.5" />} label={t("import.tab.pdf")} />
+        <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Globe className="h-3.5 w-3.5" />} label={t("import.tab.search")} />
       </nav>
       <div className="flex-1 overflow-auto p-6">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -124,21 +126,6 @@ function extractIdentifier(url: string): string | null {
   return null;
 }
 
-function TabButton({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={
-        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors " +
-        (on
-          ? "border-litera-accent/40 bg-litera-accent/10 text-litera-accent"
-          : "border-litera-line text-litera-text/80 hover:bg-litera-panel")
-      }
-    >
-      {icon} {label}
-    </button>
-  );
-}
 
 function LibraryStats() {
   const t = useT();
@@ -536,6 +523,11 @@ function SearchHitRow({ h }: { h: SearchHit }) {
   const t = useT();
   const qc = useQueryClient();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const { data: importedIds } = useImportedArxivIds();
+  const alreadyImported = useMemo(
+    () => importedIds?.includes(h.draft.arxiv_id ?? "") ?? false,
+    [importedIds, h.draft.arxiv_id],
+  );
 
   const savePdf = useMutation({
     mutationFn: async () => {
@@ -586,25 +578,33 @@ function SearchHitRow({ h }: { h: SearchHit }) {
           )}
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1.5">
-          <button
-            onClick={() => savePdf.mutate()}
-            disabled={savePdf.isPending}
-            className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-            title={t("import.search.pickSaveTitle")}
-          >
-            {savePdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
-            {t("import.search.pickSave")}
-          </button>
-          {h.draft.arxiv_id && (
-            <button
-              onClick={() => arxivAuto.mutate()}
-              disabled={arxivAuto.isPending}
-              className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
-              title={t("import.search.arxivAutoTitle")}
-            >
-              {arxivAuto.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-              {t("import.search.arxivAuto")}
-            </button>
+          {alreadyImported ? (
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap">
+              <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
+            </span>
+          ) : (
+            <>
+              <button
+                onClick={() => savePdf.mutate()}
+                disabled={savePdf.isPending}
+                className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+                title={t("import.search.pickSaveTitle")}
+              >
+                {savePdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
+                {t("import.search.pickSave")}
+              </button>
+              {h.draft.arxiv_id && (
+                <button
+                  onClick={() => arxivAuto.mutate()}
+                  disabled={arxivAuto.isPending}
+                  className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+                  title={t("import.search.arxivAutoTitle")}
+                >
+                  {arxivAuto.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+                  {t("import.search.arxivAuto")}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

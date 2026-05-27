@@ -6,6 +6,7 @@ import { ProfileCard } from "./settings/ProfileCard";
 import { SyncPanel } from "./settings/SyncPanel";
 import { TaskAssignments } from "./settings/TaskAssignments";
 import { useT } from "@/i18n/I18nProvider";
+import { TabButton } from "@/components/TabButton";
 import type { TKey } from "@/i18n/dict";
 
 type SettingsTab = "profiles" | "tasks" | "sync" | "export" | "tools";
@@ -96,18 +97,13 @@ export function SettingsPage() {
 
       <nav className="px-6 pt-4 flex gap-1">
         {TAB_DEFS.map(({ key, labelKey, icon: Icon }) => (
-          <button
+          <TabButton
             key={key}
+            active={tab === key}
             onClick={() => setTab(key)}
-            className={
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors " +
-              (tab === key
-                ? "border-litera-accent/40 bg-litera-accent/10 text-litera-accent"
-                : "border-litera-line text-litera-text/80 hover:bg-litera-panel")
-            }
-          >
-            <Icon className="h-3.5 w-3.5" /> {t(labelKey)}
-          </button>
+            icon={<Icon className="h-3.5 w-3.5" />}
+            label={t(labelKey)}
+          />
         ))}
       </nav>
 
@@ -180,7 +176,7 @@ function ProfilesTab({
           <p className="text-xs text-litera-mute mt-1">{t("settings.emptyHint")}</p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3 litera-stagger">
           {draft.profiles.map((p) => (
             <ProfileCard
               key={p.name}
@@ -327,7 +323,7 @@ function DuplicatesPanel() {
         <h3 className="text-sm font-medium text-litera-text mb-1">{t("dedup.title")}</h3>
         <p className="text-xs text-litera-mute">
           {pairs === null
-            ? t("dedup.title")
+            ? t("dedup.description")
             : visiblePairs.length === 0
             ? t("dedup.noDuplicates")
             : t("dedup.found", { count: String(visiblePairs.length) })}
@@ -455,7 +451,7 @@ function CustomFieldsManager() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-litera-text">{t("customFields.title")}</h3>
-          <p className="text-xs text-litera-mute">{t("customFields.noFields")}</p>
+          <p className="text-xs text-litera-mute">{t("customFields.description")}</p>
         </div>
         <button onClick={() => setShowCreate(!showCreate)} className="litera-btn text-xs">
           <Plus className="h-3.5 w-3.5" /> {t("customFields.create")}
@@ -508,7 +504,7 @@ function CustomFieldsManager() {
       )}
 
       {defs.length === 0 && !showCreate ? (
-        <p className="text-xs text-litera-mute">{t("customFields.noFields")}</p>
+        <p className="text-xs text-litera-mute">{t("customFields.empty")}</p>
       ) : (
         <ul className="space-y-1">
           {defs.map((d) => (
@@ -592,7 +588,7 @@ function TopicAlertsPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-litera-text">{t("alerts.title")}</h3>
-          <p className="text-xs text-litera-mute">{t("alerts.noAlerts")}</p>
+          <p className="text-xs text-litera-mute">{t("alerts.description")}</p>
         </div>
         <div className="flex gap-2">
           {alerts.length > 0 && (
@@ -658,7 +654,7 @@ function TopicAlertsPanel() {
       )}
 
       {alerts.length === 0 && !showCreate ? (
-        <p className="text-xs text-litera-mute">{t("alerts.noAlerts")}</p>
+        <p className="text-xs text-litera-mute">{t("alerts.empty")}</p>
       ) : (
         <ul className="space-y-2">
           {alerts.map((alert) => (

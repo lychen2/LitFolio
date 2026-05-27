@@ -173,6 +173,7 @@ function ReaderSinglePane({
               onClick={() => navigator.clipboard.writeText(paper.bibtex!)}
               className="litera-btn text-xs shrink-0"
               title={t("reader.copyBibtex")}
+              aria-label={t("reader.copyBibtex")}
             >
               <ClipboardCopy className="h-3.5 w-3.5" />
             </button>
@@ -185,6 +186,7 @@ function ReaderSinglePane({
               }}
               className="litera-btn text-xs shrink-0"
               title={t("reader.splitView")}
+              aria-label={t("reader.splitView")}
             >
               <Columns2 className="h-3.5 w-3.5" />
             </button>
@@ -201,6 +203,7 @@ function ReaderSinglePane({
               onClick={() => navigator.clipboard.writeText(paper.bibtex!)}
               className="text-litera-mute hover:text-litera-text"
               title={t("reader.copyBibtex")}
+              aria-label={t("reader.copyBibtex")}
             >
               <ClipboardCopy className="h-3 w-3" />
             </button>

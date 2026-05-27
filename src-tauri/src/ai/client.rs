@@ -23,6 +23,8 @@ struct ChatRequest<'a> {
     messages: &'a [ChatMessage],
     temperature: f32,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -87,6 +89,7 @@ pub async fn chat_complete(
         // in practice. The parser handles a single-JSON response too if a provider ignores the flag
         // and replies non-streaming anyway.
         stream: true,
+        max_tokens: Some(profile.max_tokens),
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {

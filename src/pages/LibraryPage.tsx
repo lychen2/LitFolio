@@ -72,6 +72,7 @@ export function LibraryPage() {
             onClick={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
             className={`litera-btn text-xs ${viewMode === "queue" ? "bg-litera-accent/15 text-litera-accent border-litera-accent/30" : ""}`}
             title={t("queue.title")}
+            aria-label={t("queue.title")}
           >
             <Clock className="h-3.5 w-3.5" />
           </button>
@@ -80,6 +81,7 @@ export function LibraryPage() {
               onClick={() => setShowLitReview(true)}
               className="litera-btn text-xs"
               title={t("litReview.title")}
+              aria-label={t("litReview.title")}
             >
               <PenLine className="h-3.5 w-3.5" />
             </button>
@@ -98,6 +100,7 @@ export function LibraryPage() {
               <button
                 onClick={() => setSearch("")}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-litera-mute hover:text-litera-text"
+                aria-label={t("common.cancel")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -157,7 +160,7 @@ function matchesPaper(paper: Paper, query: string): boolean {
 
 function LibrarySkeleton() {
   return (
-    <ul className="divide-y divide-litera-line">
+    <ul className="divide-y divide-litera-line litera-stagger">
       {Array.from({ length: 6 }).map((_, i) => (
         <li key={i} className="px-6 py-3.5">
           <div className="flex items-start gap-3">
@@ -210,7 +213,7 @@ function VirtualPaperList({
   const virtualizer = useVirtualizer({
     count: papers.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 120,
+    estimateSize: () => 90,
     overscan: 5,
   });
 
@@ -299,7 +302,7 @@ const PaperRow = memo(function PaperRow({
   }
 
   return (
-    <li className="px-6 py-3.5 hover:bg-litera-panel/50 transition-colors group">
+    <li className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
       <div className="flex items-start gap-3">
         <StatusToggle paper={p} />
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
@@ -347,65 +350,71 @@ const PaperRow = memo(function PaperRow({
           <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
           <FolderPicker paperId={p.id} />
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
-          {canOpenPdf ? (
+        <div className="shrink-0 flex flex-col items-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+          {/* Primary row: Open/Attach + Read */}
+          <div className="flex items-center gap-1.5">
+            {canOpenPdf ? (
+              <button
+                onClick={openPdf}
+                disabled={openMut.isPending}
+                className="litera-btn text-xs whitespace-nowrap disabled:opacity-60"
+                title={t("library.openPdfTitle")}
+              >
+                {openMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                {t("library.openPdf")}
+              </button>
+            ) : (
+              <button
+                onClick={() => attachPdf.mutate()}
+                disabled={attachPdf.isPending}
+                className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
+                title={t("library.attachPdfTitle")}
+              >
+                {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                {t("library.attachPdf")}
+              </button>
+            )}
+            {canOpenPdf && (
+              <Link
+                to={`/reader/${p.id}`}
+                className="litera-btn text-xs whitespace-nowrap"
+                title={t("library.readPdfTitle")}
+              >
+                <BookOpen className="h-3.5 w-3.5" /> {t("library.readPdf")}
+              </Link>
+            )}
+          </div>
+          {/* Secondary row: compact icon-only buttons */}
+          <div className="flex items-center gap-0.5">
             <button
-              onClick={openPdf}
-              disabled={openMut.isPending}
-              className="litera-btn text-xs whitespace-nowrap disabled:opacity-60"
-              title={t("library.openPdfTitle")}
+              onClick={() => translate.mutate()}
+              disabled={translate.isPending}
+              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
+              title={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
             >
-              {openMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {t("library.openPdf")}
+              {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
             </button>
-          ) : (
             <button
-              onClick={() => attachPdf.mutate()}
-              disabled={attachPdf.isPending}
-              className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
-              title={t("library.attachPdfTitle")}
+              onClick={() => tldr.mutate()}
+              disabled={tldr.isPending}
+              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
+              title={t("library.tldrTitle")}
             >
-              {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-              {t("library.attachPdf")}
+              {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             </button>
-          )}
-          <button
-            onClick={() => translate.mutate()}
-            disabled={translate.isPending}
-            className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
-            title={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
-          >
-            {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            {t("library.translateBtn")}
-          </button>
-          {canOpenPdf && (
-            <Link
-              to={`/reader/${p.id}`}
-              className="litera-btn text-xs whitespace-nowrap"
-              title={t("library.readPdfTitle")}
+            <button
+              onClick={() => onQuickRead(p)}
+              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel transition-colors"
+              title={t("library.deepReadTitle")}
             >
-              <BookOpen className="h-3.5 w-3.5" /> {t("library.readPdf")}
-            </Link>
-          )}
-          <button
-            onClick={() => tldr.mutate()}
-            disabled={tldr.isPending}
-            className="litera-btn text-xs disabled:opacity-50 whitespace-nowrap"
-            title={t("library.tldrTitle")}
-          >
-            {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {t("library.quickRead")}
-          </button>
-          <button onClick={() => onQuickRead(p)} className="litera-btn text-xs whitespace-nowrap"
-            title={t("library.deepReadTitle")}>
-            <BookOpen className="h-3.5 w-3.5" /> {t("library.deepRead")}
-          </button>
-          <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <BookOpen className="h-3.5 w-3.5" />
+            </button>
+            {/* Hover-only actions */}
             {canOpenPdf && (
               <button
                 onClick={() => attachPdf.mutate()}
                 disabled={attachPdf.isPending}
-                className="p-1 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50"
+                className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
                 title={t("library.attachPdfTitle")}
               >
                 {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
@@ -433,7 +442,7 @@ const PaperRow = memo(function PaperRow({
               <button
                 onClick={() => setConfirming(true)}
                 disabled={del.isPending}
-                className="p-1 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                className="p-1.5 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
                 title={t("library.deleteTitle")}
               >
                 {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -481,6 +490,7 @@ function StatusToggle({ paper }: { paper: Paper }) {
       disabled={m.isPending}
       className={"mt-0.5 shrink-0 p-0.5 rounded hover:bg-litera-panel transition-colors " + meta.tone}
       title={t("library.statusToggle", { status: t(meta.labelKey as Parameters<typeof t>[0]) })}
+      aria-label={t("library.statusToggle", { status: t(meta.labelKey as Parameters<typeof t>[0]) })}
     >
       {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
     </button>
@@ -519,9 +529,9 @@ function TagChipsRow({ paperId, tags }: { paperId: string; tags: { id: number; n
           key={t.id}
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border"
           style={{
-            borderColor: t.color ?? "rgba(167,139,250,0.4)",
-            color: t.color ?? "#a78bfa",
-            backgroundColor: (t.color ?? "#a78bfa") + "1a",
+            borderColor: t.color ?? "color-mix(in srgb, var(--litera-accent) 40%, transparent)",
+            color: t.color ?? "var(--litera-accent)",
+            backgroundColor: t.color ?? "color-mix(in srgb, var(--litera-accent) 10%, transparent)",
           }}
         >
           <TagIcon className="h-2.5 w-2.5" />
@@ -599,8 +609,8 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
     : m.data ?? null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter">
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-litera-accent2 flex items-center gap-1.5">
@@ -618,7 +628,7 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
               {current.venue ? ` · ${current.venue}` : ""}
             </div>
           </div>
-          <button onClick={onClose} className="text-litera-mute hover:text-litera-text">
+          <button onClick={onClose} className="text-litera-mute hover:text-litera-text" aria-label={t("common.close")}>
             <X className="h-5 w-5" />
           </button>
         </header>

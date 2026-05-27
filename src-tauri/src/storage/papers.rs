@@ -67,6 +67,24 @@ impl<'a> PaperRepo<'a> {
         row.map(row_to_paper).transpose()
     }
 
+    pub async fn find_by_arxiv_id(&self, arxiv_id: &str) -> Result<Option<Paper>> {
+        let row = sqlx::query("SELECT * FROM papers WHERE arxiv_id = ?1")
+            .bind(arxiv_id)
+            .fetch_optional(self.pool)
+            .await?;
+        row.map(row_to_paper).transpose()
+    }
+
+    pub async fn list_all_arxiv_ids(&self) -> Result<Vec<String>> {
+        let rows = sqlx::query("SELECT arxiv_id FROM papers WHERE arxiv_id IS NOT NULL AND arxiv_id != ''")
+            .fetch_all(self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.try_get::<String, _>("arxiv_id").ok())
+            .collect())
+    }
+
     pub async fn list_all(&self) -> Result<Vec<Paper>> {
         let rows = sqlx::query("SELECT * FROM papers ORDER BY added_at DESC")
             .fetch_all(self.pool)

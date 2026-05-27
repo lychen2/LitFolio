@@ -5,15 +5,44 @@
 @layer base {
   :root {
     --litera-radius: 10px;
+    --litera-ink: #0a0a0f;
+    --litera-paper: #121218;
+    --litera-panel: #1a1a23;
+    --litera-line: #26262f;
+    --litera-mute: #8e8e9e;
+    --litera-text: #e8e8ee;
+    --litera-accent: #b49aff;
+    --litera-accent2: #8edcff;
+    --litera-success: #4ade80;
+    --litera-warn: #fbbf24;
+    --litera-error: #fb7185;
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --spring-smooth: cubic-bezier(0.22, 0.68, 0, 1.07);
   }
   html, body, #root { height: 100%; }
-  body {
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    background: radial-gradient(1200px 800px at 12% -10%, #1b1623 0%, #0a0a0f 55%) fixed;
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
-  ::selection { background: rgba(167, 139, 250, 0.35); }
+  body {
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "kern";
+    line-height: 1.6;
+    background: radial-gradient(1200px 800px at 12% -10%, var(--litera-panel) 0%, var(--litera-ink) 55%) fixed;
+  }
+  h1, h2, h3 {
+    font-family: "Cormorant Garamond", "Lora", ui-serif, Georgia, serif;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  code, pre, .font-mono {
+    font-feature-settings: "liga" 1, "calt" 1;
+  }
+  ::selection { background: color-mix(in srgb, var(--litera-accent) 35%, transparent); }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -30,8 +59,8 @@
     color-scheme: dark;
   }
   select option, select optgroup {
-    background-color: #15131d;
-    color: #e9e6f3;
+    background-color: var(--litera-paper);
+    color: var(--litera-text);
   }
 
   /* PDF.js viewer pages render white (correct for PDFs) but the container background
@@ -39,7 +68,7 @@
      app theme or stay transparent-white. Also force selectable text layer above
      the canvas so highlight selection works. */
   .pdfViewer {
-    background: #1f1a26;
+    background: var(--litera-panel);
   }
   .pdfViewer .page {
     background: white;
@@ -54,31 +83,55 @@
      Use a descendant selector — PDF.js wraps the canvas in .canvasWrapper, so a
      direct-child selector misses it. */
   .litera-pdf-dark .pdfViewer .page {
-    background: #15131d;
+    background: var(--litera-paper);
   }
   .litera-pdf-dark .pdfViewer .page canvas {
     filter: invert(0.92) hue-rotate(180deg);
   }
   .litera-pdf-dark .textLayer ::selection {
-    background: rgba(86, 208, 255, 0.5);
+    background: color-mix(in srgb, var(--litera-accent2) 50%, transparent);
   }
   .litera-pdf-dark .textLayer .highlight.selected,
   .litera-pdf-dark .textLayer .highlight.appended {
-    background: rgba(86, 208, 255, 0.38);
-    box-shadow: 0 0 0 1px rgba(168, 236, 255, 0.88);
+    background: color-mix(in srgb, var(--litera-accent2) 38%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--litera-accent2) 88%, transparent);
   }
 
   @keyframes litera-fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
+  @keyframes litera-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
   @keyframes litera-slide-up {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes litera-slide-down {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes litera-slide-in-right {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes litera-slide-in-left {
+    from { opacity: 0; transform: translateX(-24px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
   @keyframes litera-scale-in {
-    from { opacity: 0; transform: scale(0.97); }
+    from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes litera-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes litera-stagger-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }
 
@@ -92,43 +145,111 @@
   .litera-btn {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
            border border-litera-line bg-litera-paper hover:bg-litera-panel
-           transition-colors duration-150 text-litera-text;
-    transition-timing-function: var(--ease-out-quart);
+           text-litera-text;
+    transition: background-color 150ms var(--ease-out-quart),
+                border-color 150ms var(--ease-out-quart),
+                transform 120ms var(--spring-bounce),
+                box-shadow 150ms var(--ease-out-quart);
+  }
+  .litera-btn:hover {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   }
   .litera-btn:active {
     transform: scale(0.97);
+    box-shadow: none;
   }
   .litera-btn-primary {
-    @apply litera-btn bg-litera-accent/90 hover:bg-litera-accent border-litera-accent;
-    color: #0a0a0f;
+    @apply litera-btn bg-litera-accent/90 border-litera-accent;
+    color: var(--litera-ink);
+    transition: background-color 150ms var(--ease-out-quart),
+                transform 120ms var(--spring-bounce),
+                box-shadow 200ms var(--ease-out-quart);
+  }
+  .litera-btn-primary:hover {
+    background-color: var(--litera-accent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--litera-accent) 30%, transparent);
   }
   .litera-input {
     @apply bg-litera-paper border border-litera-line rounded-md px-2.5 py-1.5
            text-sm text-litera-text placeholder:text-litera-mute
-           focus:outline-none focus:ring-2 focus:ring-litera-accent/40
-           transition-all duration-150;
-    transition-timing-function: var(--ease-out-quart);
+           focus:outline-none focus:ring-2 focus:ring-litera-accent/40;
+    transition: border-color 200ms var(--ease-out-quart),
+                box-shadow 200ms var(--ease-out-quart),
+                background-color 150ms var(--ease-out-quart);
   }
   .litera-input:focus {
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: color-mix(in srgb, var(--litera-accent) 30%, transparent);
   }
   .litera-btn:focus-visible,
   .litera-btn-primary:focus-visible {
-    outline: 2px solid rgba(167, 139, 250, 0.6);
+    outline: 2px solid color-mix(in srgb, var(--litera-accent) 60%, transparent);
     outline-offset: 2px;
   }
 
   .litera-fade-in {
     animation: litera-fade-in 200ms var(--ease-out-quart) both;
   }
+  .litera-fade-out {
+    animation: litera-fade-out 140ms var(--ease-out-quart) both;
+  }
   .litera-slide-up {
-    animation: litera-slide-up 250ms var(--ease-out-quart) both;
+    animation: litera-slide-up 250ms var(--spring-smooth) both;
+  }
+  .litera-slide-down {
+    animation: litera-slide-down 250ms var(--spring-smooth) both;
+  }
+  .litera-slide-in-right {
+    animation: litera-slide-in-right 280ms var(--spring-smooth) both;
+  }
+  .litera-slide-in-left {
+    animation: litera-slide-in-left 280ms var(--spring-smooth) both;
   }
   .litera-scale-in {
-    animation: litera-scale-in 200ms var(--ease-out-quart) both;
+    animation: litera-scale-in 200ms var(--spring-bounce) both;
   }
   .litera-skeleton {
-    @apply bg-litera-panel/50 rounded animate-pulse;
+    @apply rounded;
+    background: linear-gradient(
+      90deg,
+      var(--litera-panel) 25%,
+      color-mix(in srgb, var(--litera-panel) 80%, var(--litera-line)) 50%,
+      var(--litera-panel) 75%
+    );
+    background-size: 200% 100%;
+    animation: litera-shimmer 1.8s ease-in-out infinite;
+  }
+  .litera-stagger > * {
+    animation: litera-stagger-in 250ms var(--spring-smooth) both;
+  }
+  .litera-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .litera-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .litera-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .litera-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .litera-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .litera-stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .litera-stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .litera-stagger > *:nth-child(8) { animation-delay: 280ms; }
+
+  /* Drawer: slides in from the right with spring easing */
+  .litera-drawer-enter {
+    animation: litera-slide-in-right 280ms var(--spring-smooth) both;
+  }
+  .litera-drawer-backdrop {
+    animation: litera-fade-in 200ms var(--ease-out-quart) both;
+  }
+
+  /* Modal: scales up from trigger with spring bounce */
+  .litera-modal-enter {
+    animation: litera-scale-in 220ms var(--spring-bounce) both;
+  }
+  .litera-modal-backdrop {
+    animation: litera-fade-in 180ms var(--ease-out-quart) both;
+  }
+
+  /* Page content: subtle fade+slide on route change */
+  .litera-page-enter {
+    animation: litera-fade-in 200ms var(--ease-out-quart) both,
+               litera-slide-up 250ms var(--spring-smooth) both;
   }
 
   /* Per-page overlay container for term decorations. Sits on top of the
@@ -143,8 +264,8 @@
   }
   .litera-term-overlay {
     position: absolute;
-    border-bottom: 1px dotted rgba(167, 139, 250, 0.85);
-    background-color: rgba(167, 139, 250, 0.08);
+    border-bottom: 1px dotted color-mix(in srgb, var(--litera-accent) 85%, transparent);
+    background-color: color-mix(in srgb, var(--litera-accent) 8%, transparent);
     border-radius: 2px;
     pointer-events: none;
   }

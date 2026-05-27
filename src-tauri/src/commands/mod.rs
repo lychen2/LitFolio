@@ -110,6 +110,16 @@ pub async fn papers_search(
 }
 
 #[tauri::command]
+pub async fn papers_all_arxiv_ids(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<String>, String> {
+    PaperRepo::new(&state.pool)
+        .list_all_arxiv_ids()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn search_unified(
     state: State<'_, Arc<AppState>>,
     query: String,
@@ -795,6 +805,11 @@ pub async fn arxiv_add_with_pdf(
         .next()
         .unwrap_or(&resolved_id)
         .to_string();
+    // Return existing paper if this arXiv ID is already in the library.
+    let repo = PaperRepo::new(&state.pool);
+    if let Some(existing) = repo.find_by_arxiv_id(&stripped).await.map_err(|e| e.to_string())? {
+        return Ok(existing);
+    }
     let pdf_url = format!("https://arxiv.org/pdf/{stripped}.pdf");
     let paper_id = Ulid::new().to_string();
     let pdf_path = state.paths.paper_dir(&paper_id).join("original.pdf");

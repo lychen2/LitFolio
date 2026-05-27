@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Compass, Loader2, Search, Sparkles, Quote, FlaskConical,
@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { api, type SearchHit, type TopicReport, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 
 export function TopicSearchView() {
   const t = useT();
@@ -209,6 +210,11 @@ function HitRow({
   const t = useT();
   const qc = useQueryClient();
   const [saved, setSaved] = useState<Paper | null>(null);
+  const { data: importedIds } = useImportedArxivIds();
+  const alreadyImported = useMemo(
+    () => importedIds?.includes(h.draft.arxiv_id ?? "") ?? false,
+    [importedIds, h.draft.arxiv_id],
+  );
   const add = useMutation({
     mutationFn: () => {
       // Guarded by `canAdd` below — UI only enables this button when the draft
@@ -258,7 +264,7 @@ function HitRow({
           )}
         </div>
         <div className="shrink-0">
-          {saved ? (
+          {saved || alreadyImported ? (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap">
               <CheckCircle2 className="h-3.5 w-3.5" /> {t("topic.search.saved")}
             </span>
