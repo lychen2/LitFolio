@@ -86,6 +86,7 @@ pub async fn answer_library_question(
     papers: &[Paper],
     highlights: &HashMap<String, Vec<Highlight>>,
     terms: &[String],
+    conversation_history: &[ChatMessage],
 ) -> Result<AskLibraryResult> {
     let trimmed = question.trim();
     if trimmed.is_empty() {
@@ -98,19 +99,30 @@ pub async fn answer_library_question(
     let context = build_context(&sources);
     let user =
         format!("Question:\n{trimmed}\n\nSources (numbered, cite by these numbers):\n{context}");
+
+    // Build messages with conversation history
+    let mut messages = vec![
+        ChatMessage {
+            role: "system".into(),
+            content: SYSTEM_PROMPT.into(),
+        },
+    ];
+
+    // Add conversation history (excluding the current question)
+    for msg in conversation_history {
+        messages.push(msg.clone());
+    }
+
+    // Add current question with sources
+    messages.push(ChatMessage {
+        role: "user".into(),
+        content: user,
+    });
+
     let resp = chat_complete(
         client,
         profile,
-        &[
-            ChatMessage {
-                role: "system".into(),
-                content: SYSTEM_PROMPT.into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user,
-            },
-        ],
+        &messages,
     )
     .await?;
     let retrieved_count = sources.len();
@@ -249,6 +261,8 @@ mod tests {
             abstract_translated: None,
             translate_target_lang: None,
             translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
         }
     }
 
@@ -259,6 +273,7 @@ mod tests {
             page: 1,
             rect: json!({}),
             color: "yellow".into(),
+            label: None,
             text: text.into(),
             note: None,
             summary_text: None,

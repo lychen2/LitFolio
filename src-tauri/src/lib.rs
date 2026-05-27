@@ -1,7 +1,10 @@
 //! LitFolio backend entry. Wires plugins, state, and command handlers.
 
 mod ai;
+mod bibtex;
 mod cluster;
+mod discovery;
+mod export;
 mod commands;
 mod index;
 mod ingest;
@@ -16,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 use storage::{default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
+use ingest::import_pdf_file;
+use bibtex::generate_bibtex;
 
 pub struct AppState {
     pub pool: Pool,
@@ -39,6 +44,48 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
     let seeded = feed_repo.seed_defaults_if_empty().await.unwrap_or(0);
     if seeded > 0 {
         tracing::info!(seeded, "seeded default RSS feeds");
+    }
+    // Seed default manual PDFs if the library is empty.
+    let paper_repo = storage::PaperRepo::new(&pool);
+    let paper_count = paper_repo.list_recent(1).await.unwrap_or_default().len();
+    if paper_count == 0 {
+        if let Ok(exe) = std::env::current_exe() {
+            let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
+            // macOS: Contents/MacOS/exe -> Contents/Resources
+            // Windows/Linux: same directory as exe
+            let res_dir = if cfg!(target_os = "macos") {
+                exe_dir.join("../Resources")
+            } else {
+                exe_dir.to_path_buf()
+            };
+            let manuals = [
+                ("manual.pdf", "LitFolio 用户手册 (中文版)", "LitFolio"),
+                ("manual-en.pdf", "LitFolio User Manual (English)", "LitFolio"),
+            ];
+            for (filename, title, venue) in &manuals {
+                let src = res_dir.join(filename);
+                if src.exists() {
+                    let paper_id = ulid::Ulid::new().to_string();
+                    let _ = ingest::import_pdf_file(&src, &paper_id, &paths);
+                    let _ = paper_repo.update_title_venue(&paper_id, title, Some(venue)).await;
+                    let _ = paper_repo.set_read_status(&paper_id, storage::ReadStatus::Read).await;
+                    if let Ok(Some(p)) = paper_repo.get(&paper_id).await {
+                        let _ = paper_repo.update_bibtex(&p.id, &bibtex::generate_bibtex(&p)).await;
+                    }
+                    tracing::info!(filename, "seeded default manual");
+                }
+            }
+        }
+    }
+    // Backfill BibTeX for papers that predate the bibtex column.
+    let need_bib = paper_repo.list_needing_bibtex().await.unwrap_or_default();
+    if !need_bib.is_empty() {
+        let n = need_bib.len();
+        for p in &need_bib {
+            let bib = bibtex::generate_bibtex(p);
+            let _ = paper_repo.update_bibtex(&p.id, &bib).await;
+        }
+        tracing::info!(count = n, "backfilled BibTeX entries");
     }
     let http = reqwest::Client::builder()
         .user_agent("LitFolio/0.1")
@@ -132,6 +179,7 @@ pub fn run() {
             commands::highlight_create,
             commands::highlight_list,
             commands::highlight_update_note,
+            commands::highlight_update_label,
             commands::highlight_delete,
             commands::reader_terms::paper_terms_list,
             commands::reader_terms::paper_terms_generate,
@@ -157,6 +205,72 @@ pub fn run() {
             commands::feeds::feed_item_set_seen,
             commands::feeds::feed_mark_all_seen,
             commands::feeds::feed_item_link_paper,
+            commands::graph::graph_data,
+            commands::graph::paper_link_create,
+            commands::graph::paper_link_delete,
+            commands::graph::paper_links_for_paper,
+            commands::graph::ai_discover_links,
+            commands::graph::ai_accept_link,
+            commands::graph::ai_reject_link,
+            commands::bibtex_backfill,
+            commands::export_markdown_dir,
+            commands::export_markdown_set_dir,
+            commands::export_markdown_all,
+            commands::export_markdown_paper,
+            commands::search_unified,
+            commands::paper_comparisons_list,
+            commands::paper_comparison_get,
+            commands::paper_comparison_create,
+            commands::paper_comparison_update,
+            commands::paper_comparison_delete,
+            commands::note_sections_get,
+            commands::note_sections_save,
+            commands::note_sections_reorder,
+            commands::note_section_delete,
+            commands::paper_similar,
+            commands::export_citations,
+            commands::paper_citations,
+            commands::queue_list,
+            commands::queue_add,
+            commands::queue_remove,
+            commands::queue_update,
+            commands::queue_reorder,
+            commands::generate_lit_review,
+            commands::smart_collections_list,
+            commands::smart_collection_create,
+            commands::smart_collection_update,
+            commands::smart_collection_delete,
+            commands::smart_collection_query_papers,
+            commands::paper_find_duplicate,
+            commands::paper_scan_duplicates,
+            commands::paper_merge,
+            commands::custom_field_defs_list,
+            commands::custom_field_def_create,
+            commands::custom_field_def_delete,
+            commands::paper_custom_fields_get,
+            commands::paper_custom_field_set,
+            commands::paper_custom_field_delete,
+            commands::import_folder,
+            commands::topic_alerts_list,
+            commands::topic_alert_create,
+            commands::topic_alert_delete,
+            commands::topic_alert_results_list,
+            commands::topic_alert_result_mark_seen,
+            commands::topic_alert_mark_all_seen,
+            commands::topic_alert_unseen_count,
+            commands::topic_alert_run,
+            commands::topic_alert_run_all,
+            commands::concepts_list,
+            commands::concept_create,
+            commands::concept_delete,
+            commands::concept_relations_list,
+            commands::concept_relation_create,
+            commands::concept_relation_delete,
+            commands::concept_link_paper,
+            commands::concept_unlink_paper,
+            commands::concept_for_paper,
+            commands::concept_extract_from_paper,
+            commands::concept_extract_and_store,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

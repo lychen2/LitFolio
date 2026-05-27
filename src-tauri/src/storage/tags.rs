@@ -170,6 +170,8 @@ mod tests {
             abstract_translated: None,
             translate_target_lang: None,
             translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
         }
     }
 

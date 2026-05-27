@@ -1,15 +1,19 @@
-import { memo, useState } from "react";
+import { memo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   LibraryBig, FileText, Sparkles, Loader2, BookOpen, X, Search,
   AlertTriangle, Wrench, Compass, Layers, Tag as TagIcon, Plus, Trash2,
-  Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw,
+  Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw, Clock,
+  PenLine,
 } from "lucide-react";
 import { api, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
 import { FolderPicker } from "./library/FolderPicker";
 import { FolderSidebar } from "./library/FolderSidebar";
 import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
+import { ReadingQueue } from "./library/ReadingQueue";
+import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 
@@ -25,77 +29,118 @@ const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
 export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
+  const [smartCollectionId, setSmartCollectionId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"papers" | "queue">("papers");
   const trimmed = search.trim();
   const { t } = useI18n();
 
   const { data: rawPapers, isLoading } = useQuery({
-    queryKey: ["papers", "list", folderId, trimmed],
+    queryKey: ["papers", "list", folderId, smartCollectionId, trimmed],
     queryFn: () => {
+      if (smartCollectionId != null) return api.smartCollectionQueryPapers(smartCollectionId);
       if (folderId != null) return api.papersInFolder(folderId, 500);
       return trimmed ? api.papersSearch(trimmed, 200) : api.papersRecent(200);
     },
   });
-  const papers = folderId == null || !trimmed
+  const papers = (folderId == null && smartCollectionId == null) || !trimmed
     ? rawPapers
     : rawPapers?.filter((paper) => matchesPaper(paper, trimmed));
 
   const [reading, setReading] = useState<Paper | null>(null);
   const [preview, setPreview] = useState<Paper | null>(null);
+  const [showLitReview, setShowLitReview] = useState(false);
 
   return (
     <section className="h-full flex flex-col">
       <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="font-serif text-2xl tracking-tight">{t("library.title")}</h1>
-          <p className="text-sm text-litera-mute">
-            {trimmed
-              ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
-              : papers
-              ? t("library.recentPapers", { count: String(papers.length) })
-              : t("common.loading")}
-          </p>
-        </div>
-        <div className="relative w-80 max-w-[40vw]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-litera-mute" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("library.searchPlaceholder")}
-            className="litera-input pl-9 pr-8 w-full"
-          />
-          {search && (
+        <div className="min-w-0 flex items-center gap-3">
+          <div>
+            <h1 className="font-serif text-2xl tracking-tight">
+              {viewMode === "queue" ? t("queue.title") : t("library.title")}
+            </h1>
+            <p className="text-sm text-litera-mute">
+              {viewMode === "queue"
+                ? ""
+                : trimmed
+                ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
+                : papers
+                ? t("library.recentPapers", { count: String(papers.length) })
+                : t("common.loading")}
+            </p>
+          </div>
+          <button
+            onClick={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
+            className={`litera-btn text-xs ${viewMode === "queue" ? "bg-litera-accent/15 text-litera-accent border-litera-accent/30" : ""}`}
+            title={t("queue.title")}
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </button>
+          {(folderId != null || smartCollectionId != null) && viewMode === "papers" && papers && papers.length > 0 && (
             <button
-              onClick={() => setSearch("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-litera-mute hover:text-litera-text"
+              onClick={() => setShowLitReview(true)}
+              className="litera-btn text-xs"
+              title={t("litReview.title")}
             >
-              <X className="h-3.5 w-3.5" />
+              <PenLine className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
+        {viewMode === "papers" && (
+          <div className="relative w-80 max-w-[40vw]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-litera-mute" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("library.searchPlaceholder")}
+              className="litera-input pl-9 pr-8 w-full"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-litera-mute hover:text-litera-text"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </header>
+      {viewMode === "queue" ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ReadingQueue />
+        </div>
+      ) : (
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <FolderSidebar selectedId={folderId} onSelect={setFolderId} />
-        <div className="flex-1 overflow-auto">
+        <FolderSidebar
+          selectedId={folderId}
+          onSelect={(id) => { setFolderId(id); setSmartCollectionId(null); }}
+          selectedSmartId={smartCollectionId}
+          onSelectSmart={setSmartCollectionId}
+        />
+        <div className="flex-1 overflow-hidden">
           {isLoading ? (
-            <LibrarySkeleton />
+            <div className="overflow-auto h-full"><LibrarySkeleton /></div>
           ) : !papers || papers.length === 0 ? (
             trimmed ? <NoResults q={trimmed} /> : <Empty />
           ) : (
-            <ul className="divide-y divide-litera-line">
-              {papers.map((p) => (
-                <PaperRow
-                  key={p.id}
-                  p={p}
-                  onInspect={setPreview}
-                  onQuickRead={setReading}
-                />
-              ))}
-            </ul>
+            <VirtualPaperList
+              papers={papers}
+              onInspect={setPreview}
+              onQuickRead={setReading}
+            />
           )}
         </div>
       </div>
+      )}
       {reading && <QuickReadDrawer paper={reading} onClose={() => setReading(null)} />}
       {preview && <PaperDetailDrawer paper={preview} onClose={() => setPreview(null)} />}
+      {showLitReview && papers && (
+        <LitReviewDialog
+          paperIds={papers.map((p) => p.id)}
+          paperCount={papers.length}
+          onClose={() => setShowLitReview(false)}
+        />
+      )}
     </section>
   );
 }
@@ -149,6 +194,51 @@ function NoResults({ q }: { q: string }) {
       <div className="text-center">
         <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
         <p className="text-sm">{t("library.noResults", { query: q })}</p>
+      </div>
+    </div>
+  );
+}
+
+function VirtualPaperList({
+  papers, onInspect, onQuickRead,
+}: {
+  papers: Paper[];
+  onInspect: (p: Paper) => void;
+  onQuickRead: (p: Paper) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: papers.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120,
+    overscan: 5,
+  });
+
+  return (
+    <div ref={parentRef} className="h-full overflow-auto">
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
+      >
+        {virtualizer.getVirtualItems().map((vi) => (
+          <div
+            key={vi.key}
+            data-index={vi.index}
+            ref={virtualizer.measureElement}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${vi.start}px)`,
+            }}
+          >
+            <PaperRow
+              p={papers[vi.index]}
+              onInspect={onInspect}
+              onQuickRead={onQuickRead}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

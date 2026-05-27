@@ -44,11 +44,18 @@ pub struct SaveAskNoteResult {
     pub path: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ConversationMessage {
+    pub role: String,
+    pub content: String,
+}
+
 #[tauri::command]
 pub async fn library_ask(
     state: State<'_, Arc<AppState>>,
     question: String,
     limit: Option<i64>,
+    conversation_history: Option<Vec<ConversationMessage>>,
 ) -> Result<AskLibraryResult, String> {
     let trimmed = question.trim().to_string();
     if trimmed.is_empty() {
@@ -105,6 +112,16 @@ pub async fn library_ask(
         }
     }
 
+    // Convert conversation history to the format expected by the AI module
+    let history = conversation_history.unwrap_or_default();
+    let ai_history: Vec<crate::ai::ChatMessage> = history
+        .iter()
+        .map(|m| crate::ai::ChatMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+        })
+        .collect();
+
     answer_library_question(
         &state.http,
         &profile,
@@ -112,6 +129,7 @@ pub async fn library_ask(
         &papers,
         &highlights,
         &used_terms,
+        &ai_history,
     )
     .await
     .map_err(|e| e.to_string())

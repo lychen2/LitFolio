@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { FileText, Languages, Orbit } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
-import { NotesPane } from "./NotesPane";
+import { NoteSectionsPane } from "./NoteSectionsPane";
 import { SelectionTranslatePane } from "./SelectionTranslatePane";
 import { TermsPane } from "./TermsPane";
 import { cn } from "@/lib/cn";
@@ -54,7 +54,7 @@ export function ReaderWorkspacePane({
       </div>
       <div className="flex-1 min-h-0 relative">
         <div className={cn("h-full", activeTab !== "notes" && "hidden")}>
-          <NotesPane paperId={paperId} />
+          <NoteSectionsPane paperId={paperId} />
         </div>
         <div className={cn("h-full absolute inset-0", activeTab !== "translate" && "hidden")}>
           <SelectionTranslatePane paperId={paperId} selectionText={selectionText} />

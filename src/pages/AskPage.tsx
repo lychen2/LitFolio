@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  BookMarked, Check, FileText, LibraryBig, Loader2, MessagesSquare, Search, Send,
+  BookMarked, FileText, LibraryBig, Loader2, MessagesSquare, Search, Send, User, Bot,
 } from "lucide-react";
 import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
@@ -9,174 +9,205 @@ import { WorkflowCard } from "./ask/WorkflowCard";
 
 const SOURCE_LIMIT = 8;
 
+interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+  result?: AskLibraryResult;
+}
+
 export function AskPage() {
   const t = useT();
   const [question, setQuestion] = useState("");
-  const [askedQuestion, setAskedQuestion] = useState("");
-  const [result, setResult] = useState<AskLibraryResult | null>(null);
+  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when conversation updates
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation]);
 
   const ask = useMutation({
-    mutationFn: (nextQuestion: string) => api.libraryAsk(nextQuestion, SOURCE_LIMIT),
+    mutationFn: (nextQuestion: string) => {
+      // Build conversation history for the API
+      const history = conversation.map((turn) => ({
+        role: turn.role,
+        content: turn.content,
+      }));
+      return api.libraryAsk(nextQuestion, SOURCE_LIMIT, history);
+    },
     onSuccess: (nextResult, nextQuestion) => {
-      setAskedQuestion(nextQuestion);
-      setResult(nextResult);
+      // Add user question and assistant response to conversation
+      setConversation((prev) => [
+        ...prev,
+        { role: "user", content: nextQuestion },
+        { role: "assistant", content: nextResult.answer, result: nextResult },
+      ]);
+      setQuestion("");
     },
   });
 
   const save = useMutation({
-    mutationFn: (nextResult: AskLibraryResult) =>
+    mutationFn: (params: { question: string; result: AskLibraryResult }) =>
       api.askSaveAsNote({
-        question: askedQuestion,
-        answer: nextResult.answer,
-        terms: nextResult.terms,
-        sources: nextResult.sources,
-        model: nextResult.model,
+        question: params.question,
+        answer: params.result.answer,
+        terms: params.result.terms,
+        sources: params.result.sources,
+        model: params.result.model,
       }),
   });
 
   function submit() {
     const nextQuestion = question.trim();
-    if (!nextQuestion) return;
-    save.reset();
+    if (!nextQuestion || ask.isPending) return;
     ask.mutate(nextQuestion);
   }
 
-  function saveNote() {
-    if (!result || !askedQuestion) return;
-    save.mutate(result);
+  function saveNote(turn: ConversationTurn) {
+    if (!turn.result) return;
+    // Find the user question that preceded this response
+    const turnIndex = conversation.indexOf(turn);
+    const userQuestion = turnIndex > 0 ? conversation[turnIndex - 1].content : "";
+    save.mutate({ question: userQuestion, result: turn.result });
   }
+
+  function clearConversation() {
+    setConversation([]);
+    setQuestion("");
+  }
+
+  const hasConversation = conversation.length > 0;
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
       <header className="border-b border-litera-line px-6 py-5">
-        <div className="max-w-6xl">
-          <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-            <MessagesSquare className="h-5 w-5 text-litera-accent" />
-            {t("ask.title")}
-          </h1>
-          <p className="mt-1 text-sm text-litera-mute">{t("ask.subtitle")}</p>
+        <div className="max-w-6xl flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
+              <MessagesSquare className="h-5 w-5 text-litera-accent" />
+              {t("ask.title")}
+            </h1>
+            <p className="mt-1 text-sm text-litera-mute">{t("ask.subtitle")}</p>
+          </div>
+          {hasConversation && (
+            <button
+              onClick={clearConversation}
+              className="text-xs text-litera-mute hover:text-litera-text px-3 py-1.5 rounded-md border border-litera-line hover:bg-litera-panel"
+            >
+              {t("ask.clearConversation")}
+            </button>
+          )}
         </div>
       </header>
 
-      <AskComposer
-        question={question}
-        pending={ask.isPending}
-        error={ask.error as Error | null}
-        onQuestion={setQuestion}
-        onSubmit={submit}
-      />
-
+      {/* Messages area */}
       <div className="flex-1 overflow-auto px-6 py-5">
-        <AskBody
-          askedQuestion={askedQuestion}
-          pending={ask.isPending}
-          result={result}
-          saveError={save.error as Error | null}
-          savePath={save.data?.path ?? null}
-          saving={save.isPending}
-          onSave={saveNote}
-        />
+        {!hasConversation ? (
+          <EmptyState />
+        ) : (
+          <div className="max-w-4xl mx-auto space-y-6">
+            {conversation.map((turn, index) => (
+              <div key={index} className="flex gap-3">
+                <div className="shrink-0 mt-1">
+                  {turn.role === "user" ? (
+                    <div className="h-8 w-8 rounded-full bg-litera-accent/20 flex items-center justify-center">
+                      <User className="h-4 w-4 text-litera-accent" />
+                    </div>
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-emerald-500" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-litera-mute mb-1">
+                    {turn.role === "user" ? t("ask.you") : t("ask.assistant")}
+                  </div>
+                  <div className="litera-panel p-4">
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">
+                      {turn.content}
+                    </div>
+                    {turn.result && (
+                      <div className="mt-4 pt-3 border-t border-litera-line">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-litera-mute">
+                            {turn.result.model || "—"} · {turn.result.prompt_tokens + turn.result.completion_tokens} tk · {t("ask.citationCount", { count: turn.result.sources.length })}
+                          </div>
+                          <button
+                            onClick={() => saveNote(turn)}
+                            disabled={save.isPending}
+                            className="litera-btn text-xs disabled:opacity-60"
+                          >
+                            {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                            {t("ask.save")}
+                          </button>
+                        </div>
+                        {turn.result.sources.length > 0 && (
+                          <div className="mt-3">
+                            <SourcesInline sources={turn.result.sources} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {ask.isPending && (
+              <div className="flex gap-3">
+                <div className="shrink-0 mt-1">
+                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-emerald-500" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-litera-mute mb-1">{t("ask.assistant")}</div>
+                  <div className="litera-panel p-4">
+                    <div className="flex items-center gap-2 text-sm text-litera-mute">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("ask.searching")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Input area */}
+      <div className="border-t border-litera-line px-6 py-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex gap-3">
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+              }}
+              placeholder={hasConversation ? t("ask.followUpPlaceholder") : t("ask.placeholder")}
+              className="flex-1 min-h-[60px] max-h-[120px] resize-none litera-panel p-3 text-sm leading-relaxed text-litera-text outline-none placeholder:text-litera-mute"
+              rows={2}
+            />
+            <button
+              onClick={submit}
+              disabled={ask.isPending || !question.trim()}
+              className="self-end litera-btn-primary px-4 py-3 disabled:opacity-50"
+            >
+              {ask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </button>
+          </div>
+          <div className="mt-2 text-[11px] text-litera-mute">{t("ask.inputHint")}</div>
+          {ask.error && <div className="mt-2 text-sm text-red-400/90 break-all">✕ {(ask.error as Error).message}</div>}
+        </div>
       </div>
     </section>
   );
 }
 
-function AskComposer({
-  question,
-  pending,
-  error,
-  onQuestion,
-  onSubmit,
-}: {
-  question: string;
-  pending: boolean;
-  error: Error | null;
-  onQuestion: (value: string) => void;
-  onSubmit: () => void;
-}) {
+function EmptyState() {
   const t = useT();
-  return (
-    <div className="border-b border-litera-line px-6 py-5">
-      <div className="max-w-6xl">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-          <label className="litera-panel p-3">
-            <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">
-              {t("ask.inputLabel")}
-            </div>
-            <textarea
-              value={question}
-              onChange={(e) => onQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit();
-              }}
-              placeholder={t("ask.placeholder")}
-              className="min-h-28 w-full resize-none bg-transparent text-sm leading-relaxed text-litera-text outline-none placeholder:text-litera-mute"
-            />
-            <div className="mt-2 text-[11px] text-litera-mute">{t("ask.inputHint")}</div>
-          </label>
-          <div className="litera-panel p-3 flex flex-col justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">
-                {t("ask.workflowTitle")}
-              </div>
-              <p className="text-sm text-litera-text/85 leading-relaxed">
-                {t("ask.workflowBody")}
-              </p>
-            </div>
-            <button
-              onClick={onSubmit}
-              disabled={pending || !question.trim()}
-              className="litera-btn-primary justify-center disabled:opacity-50"
-            >
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {t("ask.submit")}
-            </button>
-          </div>
-        </div>
-        {error && <div className="mt-3 text-sm text-red-400/90 break-all">✕ {error.message}</div>}
-      </div>
-    </div>
-  );
-}
-
-function AskBody({
-  askedQuestion,
-  pending,
-  result,
-  saving,
-  saveError,
-  savePath,
-  onSave,
-}: {
-  askedQuestion: string;
-  pending: boolean;
-  result: AskLibraryResult | null;
-  saving: boolean;
-  saveError: Error | null;
-  savePath: string | null;
-  onSave: () => void;
-}) {
-  const t = useT();
-  if (pending) {
-    return (
-      <div className="text-sm text-litera-mute flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("ask.searching")}
-      </div>
-    );
-  }
-  if (result) {
-    return (
-      <AnswerPanel
-        askedQuestion={askedQuestion}
-        result={result}
-        saveError={saveError}
-        savePath={savePath}
-        saving={saving}
-        onSave={onSave}
-      />
-    );
-  }
   return (
     <div className="h-full grid place-items-center">
       <div className="max-w-3xl grid gap-4 lg:grid-cols-2">
@@ -188,110 +219,34 @@ function AskBody({
   );
 }
 
-function AnswerPanel({
-  askedQuestion,
-  result,
-  saving,
-  saveError,
-  savePath,
-  onSave,
-}: {
-  askedQuestion: string;
-  result: AskLibraryResult;
-  saving: boolean;
-  saveError: Error | null;
-  savePath: string | null;
-  onSave: () => void;
-}) {
+function SourcesInline({ sources }: { sources: AskSource[] }) {
   const t = useT();
   return (
-    <div className="max-w-6xl grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <article className="min-w-0 space-y-4">
-        <section className="litera-panel p-4">
-          <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("ask.questionTitle")}</div>
-          <p className="text-sm text-litera-text leading-relaxed">{askedQuestion}</p>
-        </section>
-        <section className="litera-panel p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="text-xs uppercase tracking-wider text-litera-mute">{t("ask.answerTitle")}</div>
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="litera-btn text-xs disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {t("ask.save")}
-            </button>
-          </div>
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">{result.answer}</div>
-          <footer className="mt-4 pt-3 border-t border-litera-line text-xs text-litera-mute">
-            {result.model || "—"} · {result.prompt_tokens + result.completion_tokens} tk · {t("ask.citationCount", { count: result.sources.length })}
-          </footer>
-          {savePath && (
-            <div className="mt-3 text-xs text-emerald-300 flex items-start gap-1.5 break-all">
-              <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              {t("ask.savedTo", { path: savePath })}
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-litera-mute">{t("ask.sources")}</div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sources.slice(0, 4).map((source, index) => (
+          <div key={`${source.paper_id}-${index}`} className="rounded-md bg-litera-panel/60 px-2.5 py-2">
+            <div className="text-xs font-medium text-litera-text truncate">
+              [{index + 1}] {source.title}
             </div>
-          )}
-          {saveError && <div className="mt-3 text-xs text-red-400/90 break-all">✕ {saveError.message}</div>}
-        </section>
-      </article>
-      <aside className="space-y-4">
-        <EvidenceSummary result={result} />
-        <EvidenceList sources={result.sources} />
-      </aside>
+            <div className="mt-0.5 text-[11px] text-litera-mute">
+              {formatSourceMeta(source)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {sources.length > 4 && (
+        <div className="text-[11px] text-litera-mute">
+          +{sources.length - 4} {t("ask.moreSources")}
+        </div>
+      )}
     </div>
   );
 }
 
-function EvidenceSummary({ result }: { result: AskLibraryResult }) {
-  const t = useT();
-  return (
-    <section className="litera-panel p-4">
-      <div className="text-xs uppercase tracking-wider text-litera-mute mb-3">{t("ask.evidenceTitle")}</div>
-      <div className="flex flex-wrap gap-2">
-        {result.terms.map((term) => (
-          <span
-            key={term}
-            className="px-2 py-0.5 rounded-full border border-litera-line bg-litera-line/20 text-xs text-litera-text/80"
-          >
-            {term}
-          </span>
-        ))}
-      </div>
-      <div className="mt-3 text-xs text-litera-mute">
-        {t("ask.retrievedCount", { count: result.retrieved_count })}
-      </div>
-    </section>
-  );
-}
-
-function EvidenceList({ sources }: { sources: AskSource[] }) {
-  const t = useT();
-  return (
-    <section className="litera-panel p-4">
-      <div className="text-xs uppercase tracking-wider text-litera-mute mb-3">{t("ask.sources")}</div>
-      <ol className="space-y-4">
-        {sources.map((source, index) => (
-          <li key={`${source.paper_id}-${index}`} className="text-xs">
-            <div className="font-medium text-litera-text leading-snug">
-              [{index + 1}] {source.title}
-            </div>
-            <div className="mt-1 text-litera-mute leading-relaxed">
-              {formatSourceMeta(source)}
-            </div>
-            <p className="mt-2 whitespace-pre-wrap leading-relaxed text-litera-text/70">
-              {source.snippet}
-            </p>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 function formatSourceMeta(source: AskSource): string {
-  const authors = source.authors.slice(0, 3).join(", ");
-  const authorLabel = source.authors.length > 3 ? `${authors} et al.` : authors;
+  const authors = source.authors.slice(0, 2).join(", ");
+  const authorLabel = source.authors.length > 2 ? `${authors} et al.` : authors;
   return [authorLabel, source.year ?? null].filter(Boolean).join(" · ");
 }

@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, Loader2, Orbit, Trash2 } from "lucide-react";
+import { BookMarked, Loader2, Orbit, Trash2, Link2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
 export function TermsPane({ paperId }: { paperId: string }) {
   const t = useT();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const linkedPapers = useQuery({
+    queryKey: ["paper-links", paperId],
+    queryFn: () => api.paperLinksForPaper(paperId),
+  });
   const list = useQuery({
     queryKey: ["paper-terms", paperId],
     queryFn: () => api.paperTermsList(paperId),
@@ -107,6 +113,49 @@ export function TermsPane({ paperId }: { paperId: string }) {
               )}
             </article>
           ))}
+        </div>
+      )}
+
+      {/* Linked papers via paper_links */}
+      {linkedPapers.data && linkedPapers.data.length > 0 && (
+        <div className="mt-6 border-t border-litera-line pt-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Link2 className="h-3.5 w-3.5 text-litera-accent" />
+            <span className="text-sm font-medium text-litera-text">
+              {t("graph.linkedPapers")} ({linkedPapers.data.length})
+            </span>
+          </div>
+          <div className="space-y-2">
+            {linkedPapers.data.map((link) => {
+              const isSource = link.source_paper_id === paperId;
+              const otherId = isSource ? link.target_paper_id : link.source_paper_id;
+              return (
+                <button
+                  key={link.id}
+                  onClick={() => navigate(`/reader/${otherId}`)}
+                  className="w-full text-left rounded-md border border-litera-line/70 px-3 py-2 hover:bg-litera-panel transition-colors"
+                >
+                  <div className="flex items-center gap-1.5 text-xs text-litera-text">
+                    <BookMarked className="h-3 w-3 text-litera-accent shrink-0" />
+                    <span className="font-medium">{isSource ? "→ " : "← "}{otherId}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-litera-accent/10 text-litera-accent">
+                      {t(`relation.${link.relation}` as any)}
+                    </span>
+                    {link.source_type === "ai" && (
+                      <span className="text-[11px] text-litera-mute">
+                        AI {(link.confidence * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  {link.snippet && (
+                    <p className="mt-1 text-[11px] text-litera-mute line-clamp-2">{link.snippet}</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

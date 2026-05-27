@@ -37,20 +37,22 @@ impl<'a> HighlightRepo<'a> {
         rect: &serde_json::Value,
         text: &str,
         color: Option<&str>,
+        label: Option<&str>,
     ) -> Result<Highlight> {
         let id = Ulid::new().to_string();
         let rect_json = serde_json::to_string(rect)?;
         let color = color.unwrap_or("yellow");
         let created_at = Utc::now().timestamp();
         sqlx::query(
-            "INSERT INTO highlights (id, paper_id, page, rect_json, color, text, note, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7)",
+            "INSERT INTO highlights (id, paper_id, page, rect_json, color, label, text, note, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)",
         )
         .bind(&id)
         .bind(paper_id)
         .bind(page)
         .bind(&rect_json)
         .bind(color)
+        .bind(label)
         .bind(text)
         .bind(created_at)
         .execute(self.pool)
@@ -62,6 +64,7 @@ impl<'a> HighlightRepo<'a> {
             page,
             rect: rect.clone(),
             color: color.into(),
+            label: label.map(|s| s.into()),
             text: text.into(),
             note: None,
             summary_text: None,
@@ -77,7 +80,7 @@ impl<'a> HighlightRepo<'a> {
 
     pub async fn list_by_paper(&self, paper_id: &str) -> Result<Vec<Highlight>> {
         let rows = sqlx::query(
-            "SELECT id, paper_id, page, rect_json, color, text, note,
+            "SELECT id, paper_id, page, rect_json, color, label, text, note,
                     summary_text, summary_model, summarized_at,
                     translation_text, translation_target_lang, translation_model, translated_at,
                     created_at
@@ -92,7 +95,7 @@ impl<'a> HighlightRepo<'a> {
 
     pub async fn get(&self, id: &str) -> Result<Option<Highlight>> {
         let row = sqlx::query(
-            "SELECT id, paper_id, page, rect_json, color, text, note,
+            "SELECT id, paper_id, page, rect_json, color, label, text, note,
                     summary_text, summary_model, summarized_at,
                     translation_text, translation_target_lang, translation_model, translated_at,
                     created_at
@@ -192,15 +195,33 @@ impl<'a> HighlightRepo<'a> {
         }
         Ok(())
     }
+
+    pub async fn update_label(&self, id: &str, label: Option<&str>) -> Result<()> {
+        let res = match label {
+            Some(l) => {
+                sqlx::query("UPDATE highlights SET label = ?1 WHERE id = ?2")
+                    .bind(l)
+                    .bind(id)
+                    .execute(self.pool)
+                    .await
+            }
+            None => {
+                sqlx::query("UPDATE highlights SET label = NULL WHERE id = ?1")
+                    .bind(id)
+                    .execute(self.pool)
+                    .await
+            }
+        };
+        let res = res.context("update highlight label")?;
+        if res.rows_affected() == 0 {
+            return Err(anyhow::anyhow!("highlight {id} not found"));
+        }
+        Ok(())
+    }
 }
 
 fn row_to_highlight(row: sqlx::sqlite::SqliteRow) -> Result<Highlight> {
     let rect_raw: String = row.try_get("rect_json")?;
-    // Use the explicit Option<String> form for nullable columns — `try_get(..).ok()` is
-    // ambiguous: depending on type inference it can read the column as non-null String
-    // and silently swallow real decode errors, OR (worse) read it as Option<String> and
-    // assign Some(None) to fields. Asking for Option<String> directly gives unambiguous
-    // NULL handling.
     let note: Option<String> = row.try_get("note").unwrap_or(None);
     Ok(Highlight {
         id: row.try_get("id")?,
@@ -208,6 +229,7 @@ fn row_to_highlight(row: sqlx::sqlite::SqliteRow) -> Result<Highlight> {
         page: row.try_get("page")?,
         rect: serde_json::from_str(&rect_raw).unwrap_or(serde_json::Value::Null),
         color: row.try_get("color")?,
+        label: row.try_get("label").unwrap_or(None),
         text: row.try_get("text")?,
         note,
         summary_text: row.try_get("summary_text").unwrap_or(None),
@@ -264,6 +286,8 @@ mod tests {
             abstract_translated: None,
             translate_target_lang: None,
             translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
         };
         PaperRepo::new(pool).insert(&p).await.unwrap();
     }
@@ -275,11 +299,11 @@ mod tests {
         let repo = HighlightRepo::new(&pool);
         let rect = serde_json::json!({"x":10,"y":20,"w":100,"h":15});
         let h1 = repo
-            .insert("A", 1, &rect, "hello world", None)
+            .insert("A", 1, &rect, "hello world", None, None)
             .await
             .unwrap();
         let h2 = repo
-            .insert("A", 2, &rect, "second hl", Some("green"))
+            .insert("A", 2, &rect, "second hl", Some("green"), Some("method"))
             .await
             .unwrap();
         let list = repo.list_by_paper("A").await.unwrap();
@@ -368,8 +392,8 @@ mod tests {
         seed_paper(&pool, "P").await;
         let repo = HighlightRepo::new(&pool);
         let rect = serde_json::json!({"x":0,"y":0,"w":1,"h":1});
-        repo.insert("P", 1, &rect, "x", None).await.unwrap();
-        repo.insert("P", 1, &rect, "y", None).await.unwrap();
+        repo.insert("P", 1, &rect, "x", None, None).await.unwrap();
+        repo.insert("P", 1, &rect, "y", None, None).await.unwrap();
         PaperRepo::new(&pool).delete("P").await.unwrap();
         assert!(repo.list_by_paper("P").await.unwrap().is_empty());
         std::fs::remove_dir_all(&dir).ok();
