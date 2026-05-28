@@ -3,6 +3,7 @@
 pub mod ask;
 pub mod feeds;
 pub mod graph;
+pub mod llm;
 pub mod reader_terms;
 pub mod reader_translate;
 pub mod survey;
@@ -15,9 +16,9 @@ use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
 
 use crate::ai::{
-    active_profile, active_profile_for_task, chat_complete, expand_search_query, list_models,
-    load_config, quick_read_paper_text, save_config, summarize_paper_text, ChatMessage,
-    ExpandedQuery, GroupingStrategy, LlmConfig, LlmProfile, LitReviewResult, QuickReadResult,
+    active_profile, active_profile_for_task, expand_search_query,
+    load_config, quick_read_paper_text, save_config, summarize_paper_text,
+    ExpandedQuery, GroupingStrategy, LitReviewResult, QuickReadResult,
     TaskKind, TldrResult,
 };
 use crate::ingest::{
@@ -992,6 +993,13 @@ pub async fn paper_open_pdf(state: State<'_, Arc<AppState>>, id: String) -> Resu
     if !std::path::Path::new(&path).exists() {
         return Err(format!("PDF 文件不存在(已被删除或移动):{path}"));
     }
+    // Reject paths that escape the library root (symlink swap, stale absolute paths
+    // pointing at ~/.ssh/id_rsa, etc.). Without this check a malicious or corrupted
+    // `pdf_path` would hand any host file to the system viewer.
+    let canon = state
+        .paths
+        .ensure_inside_root(std::path::Path::new(&path))
+        .map_err(|e| format!("拒绝打开越界路径: {e}"))?;
     let opener = if cfg!(target_os = "linux") {
         "xdg-open"
     } else if cfg!(target_os = "macos") {
@@ -1002,7 +1010,7 @@ pub async fn paper_open_pdf(state: State<'_, Arc<AppState>>, id: String) -> Resu
         return Err("unsupported OS".into());
     };
     std::process::Command::new(opener)
-        .arg(&path)
+        .arg(&canon)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1029,55 +1037,17 @@ pub async fn paper_read_pdf_bytes(
         .pdf_path
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "这篇文献还没有绑定 PDF".to_string())?;
-    std::fs::read(&path).map_err(|e| format!("read pdf {path}: {e}"))
+    let canon = state
+        .paths
+        .ensure_inside_root(std::path::Path::new(&path))
+        .map_err(|e| format!("拒绝读取越界路径: {e}"))?;
+    std::fs::read(&canon).map_err(|e| format!("read pdf {}: {e}", canon.display()))
 }
 
 // ─── LLM config ──────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub fn llm_get_config(state: State<'_, Arc<AppState>>) -> Result<LlmConfig, String> {
-    load_config(&state.paths).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn llm_save_config(state: State<'_, Arc<AppState>>, config: LlmConfig) -> Result<(), String> {
-    save_config(&state.paths, &config).map_err(|e| e.to_string())
-}
-
-#[derive(serde::Serialize)]
-pub struct LlmTestResult {
-    pub ok: bool,
-    pub model: String,
-    pub reply: String,
-}
-
-#[tauri::command]
-pub async fn llm_test(
-    state: State<'_, Arc<AppState>>,
-    profile: LlmProfile,
-) -> Result<LlmTestResult, String> {
-    let resp = chat_complete(
-        &state.http,
-        &profile,
-        &[
-            ChatMessage {
-                role: "system".into(),
-                content: "Reply with the single word: pong".into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: "ping".into(),
-            },
-        ],
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(LlmTestResult {
-        ok: !resp.content.trim().is_empty(),
-        model: resp.model,
-        reply: resp.content,
-    })
-}
+//
+// Commands moved to `commands::llm`. The `pub use` at the top of this file
+// keeps `commands::llm_get_config` etc. resolving for the invoke_handler list.
 
 // ─── Paper summarization ─────────────────────────────────────────────────
 
@@ -1914,16 +1884,6 @@ pub async fn note_save(
     content: String,
 ) -> Result<(), String> {
     notes::write(&state.paths, &paper_id, &content).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn llm_list_models(
-    state: State<'_, Arc<AppState>>,
-    profile: LlmProfile,
-) -> Result<Vec<String>, String> {
-    list_models(&state.http, &profile)
-        .await
-        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

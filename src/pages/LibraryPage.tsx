@@ -264,12 +264,12 @@ const PaperRow = memo(function PaperRow({
   const rowRef = useRef<HTMLLIElement>(null);
   const tldr = useMutation({
     mutationFn: () => api.paperTldr(p.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
   });
   const translate = useMutation({
     mutationFn: () => api.paperTranslate(p.id, llmLanguageNameFor(lang)),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
       qc.invalidateQueries({ queryKey: ["paper", p.id] });
     },
   });
@@ -281,14 +281,14 @@ const PaperRow = memo(function PaperRow({
     },
     onSuccess: (paper) => {
       if (paper) {
-        qc.invalidateQueries({ queryKey: ["papers"] });
+        qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
         qc.invalidateQueries({ queryKey: ["paper", p.id] });
       }
     },
   });
   const del = useMutation({
     mutationFn: () => api.paperDelete(p.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
   });
   const tagsQ = useQuery({
     queryKey: ["paper-tags", p.id],
@@ -485,7 +485,7 @@ function StatusToggle({ paper }: { paper: Paper }) {
   const { t } = useI18n();
   const m = useMutation({
     mutationFn: (next: ReadStatus) => api.paperSetReadStatus(paper.id, next),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
   });
   const meta = STATUS_META[paper.read_status];
   const Icon = meta.icon;
@@ -593,13 +593,13 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
     mutationFn: () => api.paperQuickRead(paper.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["paper", paper.id] });
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
     },
   });
   const del = useMutation({
     mutationFn: () => api.paperDelete(paper.id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
       onClose();
     },
   });

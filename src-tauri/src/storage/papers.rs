@@ -330,17 +330,17 @@ impl<'a> PaperRepo<'a> {
     }
 }
 
-/// Sanitize raw user input for an FTS5 MATCH query. We split on whitespace,
-/// strip FTS-special characters, and AND the terms together. Empty result
-/// signals "no constraint, fall back to recent list".
+/// Sanitize raw user input for an FTS5 MATCH query. Each whitespace-separated
+/// token is quoted as a phrase + prefix-matched. FTS5 phrase quoting already
+/// neutralizes operator characters inside `"…"`, so we only need to drop the
+/// double-quote itself (which would otherwise terminate the phrase) and skip
+/// purely punctuation tokens. This preserves research-domain tokens like
+/// `BERT-base`, `R3.0`, `IEEE 802.11`, where the previous "strip all special
+/// chars" approach collapsed them into meaningless soup.
 fn escape_fts(input: &str) -> String {
     let pieces: Vec<String> = input
         .split_whitespace()
-        .map(|tok| {
-            tok.chars()
-                .filter(|c| !"\"():.-".contains(*c))
-                .collect::<String>()
-        })
+        .map(sanitize_fts_token)
         .filter(|s| !s.is_empty())
         .map(|s| format!("\"{s}\"*"))
         .collect();
@@ -350,15 +350,23 @@ fn escape_fts(input: &str) -> String {
 fn escape_fts_or(input: &str) -> String {
     let pieces: Vec<String> = input
         .split_whitespace()
-        .map(|tok| {
-            tok.chars()
-                .filter(|c| !"\"():.-".contains(*c))
-                .collect::<String>()
-        })
+        .map(sanitize_fts_token)
         .filter(|s| !s.is_empty())
         .map(|s| format!("\"{s}\"*"))
         .collect();
     pieces.join(" OR ")
+}
+
+fn sanitize_fts_token(token: &str) -> String {
+    // Strip the phrase-terminator and trim leading/trailing punctuation that
+    // FTS5 still treats as a tokenizer boundary even inside quotes. Internal
+    // `-`, `.`, `/` survive — they are valid inside a phrase.
+    token
+        .chars()
+        .filter(|c| *c != '"')
+        .collect::<String>()
+        .trim_matches(|c: char| matches!(c, '(' | ')' | ':' | ',' | ';' | '!' | '?'))
+        .to_string()
 }
 
 pub(super) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
@@ -507,7 +515,15 @@ mod tests {
         assert_eq!(escape_fts(""), "");
         assert_eq!(escape_fts("   "), "");
         assert_eq!(escape_fts("foo bar"), "\"foo\"* AND \"bar\"*");
-        assert_eq!(escape_fts("X(Y).Z"), "\"XYZ\"*");
+        // BERT-base survives — hyphen is now preserved inside the phrase quotes,
+        // so research-domain tokens stop collapsing into meaningless soup.
+        assert_eq!(escape_fts("BERT-base"), "\"BERT-base\"*");
+        assert_eq!(escape_fts("R3.0"), "\"R3.0\"*");
+        // Trailing/leading punctuation still gets trimmed so `foo,` matches `foo`.
+        assert_eq!(escape_fts("(foo)"), "\"foo\"*");
+        // Quotes are the only character we must scrub — they'd terminate the
+        // surrounding phrase.
+        assert_eq!(escape_fts("hi\"there"), "\"hithere\"*");
     }
 
     #[tokio::test]
