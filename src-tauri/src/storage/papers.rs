@@ -129,6 +129,9 @@ impl<'a> PaperRepo<'a> {
     /// Full-text search across title / authors / abstract / tldr via the
     /// `papers_fts` virtual table. `query` is a raw FTS5 MATCH expression;
     /// special characters are escaped to be tolerant of user input.
+    /// Full-text search across title / authors / abstract / tldr via the
+    /// `papers_fts` virtual table. `query` is a raw FTS5 MATCH expression;
+    /// special characters are escaped to be tolerant of user input.
     pub async fn search(&self, query: &str, limit: i64) -> Result<Vec<Paper>> {
         let escaped = escape_fts(query);
         if escaped.is_empty() {
@@ -146,6 +149,29 @@ impl<'a> PaperRepo<'a> {
         .fetch_all(self.pool)
         .await
         .with_context(|| format!("search papers query={escaped}"))?;
+        rows.into_iter().map(row_to_paper).collect()
+    }
+
+    /// Broader OR-based search — each whitespace-separated token is an
+    /// independent prefix query. Used as a fallback when the strict AND
+    /// search returns nothing.
+    pub async fn search_or(&self, query: &str, limit: i64) -> Result<Vec<Paper>> {
+        let escaped = escape_fts_or(query);
+        if escaped.is_empty() {
+            return self.list_recent(limit).await;
+        }
+        let rows = sqlx::query(
+            "SELECT p.* FROM papers p
+             JOIN papers_fts f ON f.rowid = p.rowid
+             WHERE papers_fts MATCH ?1
+             ORDER BY bm25(papers_fts), p.added_at DESC
+             LIMIT ?2",
+        )
+        .bind(&escaped)
+        .bind(limit)
+        .fetch_all(self.pool)
+        .await
+        .with_context(|| format!("search_or papers query={escaped}"))?;
         rows.into_iter().map(row_to_paper).collect()
     }
 
@@ -319,6 +345,20 @@ fn escape_fts(input: &str) -> String {
         .map(|s| format!("\"{s}\"*"))
         .collect();
     pieces.join(" AND ")
+}
+
+fn escape_fts_or(input: &str) -> String {
+    let pieces: Vec<String> = input
+        .split_whitespace()
+        .map(|tok| {
+            tok.chars()
+                .filter(|c| !"\"():.-".contains(*c))
+                .collect::<String>()
+        })
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("\"{s}\"*"))
+        .collect();
+    pieces.join(" OR ")
 }
 
 pub(super) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {

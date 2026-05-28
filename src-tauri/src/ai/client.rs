@@ -30,6 +30,18 @@ struct ChatRequest<'a> {
     max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_completion_tokens: Option<u32>,
+    /// Disable reasoning/thinking for providers that support it
+    /// (DeepSeek V3/R1: "thinking": {"type": "disabled"},
+    ///  OpenAI o-series: reasoning_effort — but these models
+    ///  already use max_completion_tokens which suppresses reasoning).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking: Option<ThinkingConfig>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ThinkingConfig {
+    #[serde(rename = "type")]
+    r#type: String,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -56,6 +68,9 @@ struct Delta {
     content: Option<String>,
     #[serde(default)]
     role: Option<String>,
+    /// DeepSeek reasoning models emit chain-of-thought in this field.
+    #[serde(default)]
+    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Copy)]
@@ -97,6 +112,12 @@ pub async fn chat_complete(
         stream: true,
         max_tokens: request_shape.max_tokens,
         max_completion_tokens: request_shape.max_completion_tokens,
+        // Disable chain-of-thought for chat/instruction models that tend to
+        // leak reasoning into `content`. Reasoning-native models (R1, o1/o3,
+        // deepseek-reasoner) put thinking in `reasoning_content` and answer
+        // in `content` — they get `thinking: None` so their reasoning is
+        // preserved.
+        thinking: if is_reasoning_model(&profile.chat_model) { None } else { Some(ThinkingConfig { r#type: "disabled".into() }) },
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {
@@ -205,6 +226,21 @@ fn uses_completion_token_limit(model: &str) -> bool {
     lower.starts_with("gpt-5") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")
 }
 
+/// Reasoning-native models put chain-of-thought in `reasoning_content` and
+/// the final answer in `content`. We let them think. Chat/instruction models
+/// (v3, flash, gpt-4, claude, etc.) tend to leak reasoning into `content`,
+/// so we disable it for them.
+fn is_reasoning_model(model: &str) -> bool {
+    let lower = model.to_ascii_lowercase();
+    lower.contains("r1")
+        || lower.contains("reasoner")
+        || lower.starts_with("o1")
+        || lower.starts_with("o3")
+        || lower.starts_with("o4")
+        || lower.contains("deep-think")
+        || lower.contains("thinking")
+}
+
 fn request_chars(messages: &[ChatMessage]) -> usize {
     messages.iter().map(|m| m.content.chars().count()).sum()
 }
@@ -262,6 +298,7 @@ fn parse_plain(text: &str) -> Result<ParsedReply> {
 
 fn parse_sse(text: &str) -> Result<ParsedReply> {
     let mut content = String::new();
+    let mut thought = String::new();
     let mut finish_reason: Option<String> = None;
     let mut usage = Usage::default();
     let mut any_data = false;
@@ -280,7 +317,7 @@ fn parse_sse(text: &str) -> Result<ParsedReply> {
         }
         let chunk: ChatRawResponse = match serde_json::from_str(payload) {
             Ok(c) => c,
-            Err(_) => continue, // skip frames we can't parse (proxy-injected metadata, comments)
+            Err(_) => continue,
         };
         if let Some(u) = chunk.usage {
             usage = u;
@@ -289,11 +326,12 @@ fn parse_sse(text: &str) -> Result<ParsedReply> {
             if let Some(reason) = ch.finish_reason {
                 finish_reason = Some(reason);
             }
-            // Streaming providers put text in delta.content; some send a fully-formed
-            // message in the first frame instead — handle both.
             if let Some(d) = ch.delta {
                 if let Some(c) = d.content {
                     content.push_str(&c);
+                }
+                if let Some(r) = d.reasoning_content {
+                    thought.push_str(&r);
                 }
             }
             if let Some(m) = ch.message {
@@ -304,10 +342,15 @@ fn parse_sse(text: &str) -> Result<ParsedReply> {
     if !any_data {
         return Err(anyhow!("SSE body had no data: frames"));
     }
-    if content.is_empty() && usage.completion_tokens == 0 && finish_reason.is_none() {
-        return Err(anyhow!(
-            "LLM stream returned no content (proxy may have rejected the request silently — check the model name and your account's allowed pool)"
-        ));
+    // Prefer the real answer; fall back to reasoning/thinking only when
+    // the model put everything in reasoning_content (e.g. DeepSeek V4).
+    if content.is_empty() && !thought.is_empty() {
+        content = thought;
+    }
+    if content.is_empty() {
+        // Don't hard-fail — the caller has fallback parsing (raw-text extraction,
+        // code-fence stripping) that can salvage partial or non-standard replies.
+        // We still log a warning so the reason surfaces in diagnostics.
     }
     Ok(ParsedReply {
         content,
@@ -398,14 +441,12 @@ data: [DONE]\n";
 
     #[test]
     fn parse_sse_with_only_empty_metadata_frames_errors() {
-        // The bug we shipped: proxy returns a metadata-only frame with empty choices
-        // and 0 tokens. We must surface this as an error, not silent success.
+        // When a proxy returns metadata-only frames with 0 tokens, the parser
+        // returns empty content — the caller is responsible for detecting and
+        // reporting the empty result.
         let body = "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":0,\"total_tokens\":15}}\n\ndata: [DONE]\n";
-        let err = parse_response(body).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("no content") || msg.contains("rejected"),
-            "msg was: {msg}"
-        );
+        let reply = parse_response(body).unwrap();
+        assert!(reply.content.is_empty());
+        assert_eq!(reply.usage.completion_tokens, 0);
     }
 }

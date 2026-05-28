@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { renderMarkdown } from "@/lib/markdown";
 import { WorkflowCard } from "./ask/WorkflowCard";
 
 const SOURCE_LIMIT = 8;
@@ -124,9 +125,16 @@ export function AskPage() {
                     {turn.role === "user" ? t("ask.you") : t("ask.assistant")}
                   </div>
                   <div className="litera-panel p-4">
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">
-                      {turn.content}
-                    </div>
+                    {turn.role === "user" ? (
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">
+                        {turn.content}
+                      </div>
+                    ) : (
+                      <div
+                        className="text-sm leading-relaxed text-litera-text prose-a:text-litera-accent"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.content) }}
+                      />
+                    )}
                     {turn.result && (
                       <div className="mt-4 pt-3 border-t border-litera-line">
                         <div className="flex items-center justify-between gap-3">

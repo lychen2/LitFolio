@@ -85,8 +85,9 @@ fn parse_terms(content: &str) -> Result<Vec<String>> {
     if let Ok(reply) = serde_json::from_str::<LlmReply>(content) {
         return Ok(clean_terms(reply.terms));
     }
-    // Second try: pull the first {...} substring (handles markdown fences + chatty replies)
-    if let (Some(lo), Some(hi)) = (content.find('{'), content.rfind('}')) {
+    // Second try: pull the last {...} substring (reasoning/thinking text before JSON
+    // could contain its own braces; we want the final JSON the model actually produced).
+    if let (Some(lo), Some(hi)) = (content.rfind('{'), content.rfind('}')) {
         if hi > lo {
             let slice = &content[lo..=hi];
             if let Ok(reply) = serde_json::from_str::<LlmReply>(slice) {

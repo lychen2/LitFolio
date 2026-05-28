@@ -203,10 +203,11 @@ pub(crate) fn parse_json_lenient(raw: &str) -> serde_json::Value {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
         return v;
     }
-    // Sometimes the model wraps with leading prose: extract the first {...} block.
-    if let (Some(s), Some(e)) = (body.find('{'), body.rfind('}')) {
-        if s < e {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body[s..=e]) {
+    // Reasoning/thinking content may contain braces that interfere with
+    // extraction. Pick the *last* {…} block, which is the actual response.
+    if let Some(end) = body.rfind('}') {
+        if let Some(start) = body[..end].rfind('{') {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body[start..=end]) {
                 return v;
             }
         }

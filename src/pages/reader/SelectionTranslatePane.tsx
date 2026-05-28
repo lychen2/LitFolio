@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BookMarked, Languages, Loader2, Orbit, Quote } from "lucide-react";
 import { api, type ReaderTranslateResult } from "@/lib/api";
+import { errorMessage } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
 
 export function SelectionTranslatePane({
@@ -46,7 +47,7 @@ export function SelectionTranslatePane({
   if (translate.error) {
     return (
       <div className="p-4 text-sm text-red-400/90">
-        <div className="break-all">✕ {t("reader.translateFailed")}: {(translate.error as Error).message}</div>
+        <div className="break-all">✕ {t("reader.translateFailed")}: {errorMessage(translate.error)}</div>
         <button
           onClick={() => translate.mutate(selectionText)}
           className="litera-btn text-xs px-3 py-1 mt-2"
