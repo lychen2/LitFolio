@@ -30,5 +30,10 @@ src-tauri/gen/
 npm-debug.log*
 pnpm-debug.log*
 
+# latex build artifacts
+docs/manual/*.aux
+docs/manual/*.out
+docs/manual/*.toc
+
 # user library samples
 sample-library/

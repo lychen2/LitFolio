@@ -165,10 +165,10 @@ export const en: Record<TKey, string> = {
   "ask.empty.card2Body": "Answers are generated only from retrieved TL;DRs, abstracts, and highlights, with inline citations preserved.",
   "ask.empty.card3Title": "Turn output into assets",
   "ask.empty.card3Body": "Useful answers can be saved as Markdown knowledge notes with the original question, search terms, and evidence sources.",
-  "ask.emptyHint1": "Your question is first rewritten into 2-4 English search terms.",
-  "ask.emptyHint2": "Multi-path FTS5 retrieval, ranked by term-match count + year.",
+  "ask.emptyHint1": "Your question is rewritten to English search terms, then matched in FTS5 with AND → raw question → OR → fuzzy CJK → fallback to recent papers,",
+  "ask.emptyHint2": "Matched papers are ranked by term hit count + year, top 8 sent to the model,",
   "ask.emptyHint3":
-    "Matched TL;DR / abstract / highlights are handed to the model with [N] citations.",
+    "The model answers from TL;DR / abstract / highlights with inline [N] citations. If no exact match is found, it still attempts an honest answer using available library papers.",
   "ask.terms": "Search terms",
   "ask.sources": "Sources",
   "ask.you": "You",

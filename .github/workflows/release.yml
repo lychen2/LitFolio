@@ -66,7 +66,25 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "LitFolio ${{ github.ref_name }}"
-          releaseBody: "See the attached installers for this release."
+          releaseBody: |
+            ## What's new in ${{ github.ref_name }}
+
+            ### Fixed
+            - DeepSeek V4 / reasoning models: chain-of-thought no longer leaks into translate/summary/ask answers. `thinking:disabled` for chat models, reasoning preserved for R1/o1/o3.
+            - Translation JSON extraction now uses `rfind('{')` — resilient to leading prose or reasoning text with embedded braces.
+            - Empty translation results now return a clear error instead of silent failure.
+            - Library QA degraded search chain (AND → raw question → OR → fuzzy CJK phrase → recent-paper fallback) — no more dead "no papers found" page.
+            - Settings: typing a provider name no longer loses input focus.
+            - Error display: robust `errorMessage()` helper handles Tauri v2's varied error shapes.
+            - Manual: fixed blank first page caused by `titlepage` environment.
+
+            ### Added
+            - Markdown rendering for AI answers (bold, italic, lists, headings, code blocks).
+            - `search_or` method for broader FTS5 recall.
+            - `fuzzy_phrases` for Chinese question tokenization.
+
+            ### Changed
+            - Version bump to 0.3.2.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true
