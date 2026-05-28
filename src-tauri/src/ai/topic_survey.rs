@@ -144,23 +144,15 @@ Use a model with a larger output budget. LLM returned: {}",
 }
 
 /// Tolerant JSON extraction: strips markdown fences first, then falls back to
-/// the first `{…}` substring when the model wraps the JSON in prose.
+/// the first `{…}` substring when the model wraps the JSON in prose. Failure
+/// emits a topic-specific error so the survey screen can show actionable text.
 fn parse_skeleton(raw: &str) -> Result<SurveySkeleton> {
-    let body = strip_code_fence(raw.trim());
-    if let Ok(s) = serde_json::from_str::<SurveySkeleton>(body) {
-        return Ok(sanitize(s));
+    match crate::ai::json_utils::parse_lenient::<SurveySkeleton>(raw) {
+        Ok(s) => Ok(sanitize(s)),
+        Err(_) => Err(anyhow!(
+            "could not parse survey skeleton JSON: expected an object with subareas[] and key_pis[]"
+        )),
     }
-    if let (Some(lo), Some(hi)) = (body.find('{'), body.rfind('}')) {
-        if hi > lo {
-            let slice = &body[lo..=hi];
-            if let Ok(s) = serde_json::from_str::<SurveySkeleton>(slice) {
-                return Ok(sanitize(s));
-            }
-        }
-    }
-    Err(anyhow!(
-        "could not parse survey skeleton JSON: expected an object with subareas[] and key_pis[]"
-    ))
 }
 
 /// Trim whitespace, cap list lengths, drop unusable subareas. A subarea with
@@ -225,18 +217,6 @@ fn json_to_i32(v: &serde_json::Value) -> Option<i32> {
         return Some(n as i32);
     }
     None
-}
-
-fn strip_code_fence(s: &str) -> &str {
-    let s = s.trim();
-    let stripped = s
-        .strip_prefix("```json")
-        .or_else(|| s.strip_prefix("```"))
-        .unwrap_or(s);
-    stripped
-        .trim_start_matches('\n')
-        .trim_end_matches("```")
-        .trim()
 }
 
 fn truncate(s: &str, n: usize) -> String {

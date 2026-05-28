@@ -1256,8 +1256,8 @@ pub struct BatchSummary {
     pub errors: Vec<BatchError>,
 }
 
-fn install_cancel_token(state: &AppState) -> Result<CancellationToken, String> {
-    let mut guard = state.batch_cancel.lock().map_err(|e| e.to_string())?;
+async fn install_cancel_token(state: &AppState) -> Result<CancellationToken, String> {
+    let mut guard = state.batch_cancel.lock().await;
     if let Some(existing) = guard.as_ref() {
         if !existing.is_cancelled() {
             return Err("a batch is already running; cancel it first".into());
@@ -1268,10 +1268,9 @@ fn install_cancel_token(state: &AppState) -> Result<CancellationToken, String> {
     Ok(tok)
 }
 
-fn clear_cancel_token(state: &AppState) {
-    if let Ok(mut g) = state.batch_cancel.lock() {
-        *g = None;
-    }
+async fn clear_cancel_token(state: &AppState) {
+    let mut g = state.batch_cancel.lock().await;
+    *g = None;
 }
 
 // ─── Batch commands (synchronous, no AI) ─────────────────────────────────
@@ -1342,7 +1341,7 @@ where
     F: FnMut(Paper) -> Fut,
     Fut: std::future::Future<Output = anyhow::Result<()>>,
 {
-    let token = install_cancel_token(&state)?;
+    let token = install_cancel_token(&state).await?;
     let total = ids.len();
     let mut ok = 0usize;
     let mut errors = Vec::<BatchError>::new();
@@ -1400,7 +1399,7 @@ where
         }
     }
     let cancelled = token.is_cancelled();
-    clear_cancel_token(&state);
+    clear_cancel_token(&state).await;
     let summary = BatchSummary {
         kind: kind.to_string(),
         total,
@@ -1537,8 +1536,8 @@ pub async fn batch_translate(
 }
 
 #[tauri::command]
-pub fn batch_cancel(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
-    let mut g = state.batch_cancel.lock().map_err(|e| e.to_string())?;
+pub async fn batch_cancel(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
+    let mut g = state.batch_cancel.lock().await;
     if let Some(t) = g.as_ref() {
         t.cancel();
         return Ok(true);

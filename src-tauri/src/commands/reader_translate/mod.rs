@@ -170,17 +170,18 @@ async fn translate_selection(
     target_lang: &str,
 ) -> Result<ReaderTranslateResult> {
     let glossary = format_glossary(terms);
-    let user_content = format!(
-        "Target language: {target_lang}\nPaper title: {}\n\nSelection:\n{}\n\nGlossary:\n{}\n\nOutput exactly this JSON and nothing else:\n{{\"translation\": \"...\"}}\nReplace ... with your translation. No markdown, no explanation.",
-        paper.title, selection, glossary
-    );
+    let user_content = crate::ai::prompts::READER_TRANSLATE_USER
+        .replace("{lang}", target_lang)
+        .replace("{title}", &paper.title)
+        .replace("{selection}", selection)
+        .replace("{glossary}", &glossary);
     let resp = chat_complete(
         client,
         profile,
         &[
             ChatMessage {
                 role: "system".into(),
-                content: "You are a precise scientific translator for in-context reading assistance.".into(),
+                content: crate::ai::prompts::READER_TRANSLATE_SYSTEM.into(),
             },
             ChatMessage {
                 role: "user".into(),
@@ -214,17 +215,16 @@ async fn summarize_highlight(
     paper: &Paper,
     selection: &str,
 ) -> Result<HighlightSummaryResult> {
-    let user_content = format!(
-        "Paper title: {}\n\nHighlighted passage:\n{}\n\nOutput exactly this JSON and nothing else:\n{{\"summary\": \"...\"}}\nReplace ... with one Chinese sentence (≤36 chars), capturing the main claim. No markdown, no explanation.",
-        paper.title, selection
-    );
+    let user_content = crate::ai::prompts::SUMMARIZE_HIGHLIGHT_USER
+        .replace("{title}", &paper.title)
+        .replace("{selection}", selection);
     let resp = chat_complete(
         client,
         profile,
         &[
             ChatMessage {
                 role: "system".into(),
-                content: "You compress technical passages into one precise sentence for a research reader.".into(),
+                content: crate::ai::prompts::SUMMARIZE_HIGHLIGHT_SYSTEM.into(),
             },
             ChatMessage {
                 role: "user".into(),

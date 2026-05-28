@@ -1,57 +1,58 @@
 # LitFolio v0.3.x 代码审查与重构计划
 
-> 2026-05-28 由代码审查 5 专项 agent 并发扫描生成，覆盖前端(78 文件 14.8k LOC) + 后端(72 文件 17.4k LOC)。
+> 2026-05-28 扫描，78 前端 + 72 后端。
 
 ---
 
-## 已完成 (Batch A — 快速胜利包)
+## 已完成
 
-| # | 修复 | 文件 | 严重度 |
-|---|------|------|--------|
-| 1 | PDF 路径 canonicalize 防越界 — `paper_open_pdf` / `paper_read_pdf_bytes` / `paper_save_with_pdf` / `paper_attach_pdf` 均接入 `ensure_inside_root` | `storage/paths.rs` + `commands/mod.rs` | 安全 HIGH |
-| 2 | `escape_fts` 不再删除 `-`/`.`/`:`，BERT-base / R3.0 / IEEE 802.11 保真 | `storage/papers.rs` | 后端 MED |
-| 3 | CommandPalette snippet 高亮改 React 节点渲染，消除 `dangerouslySetInnerHTML` | `components/CommandPalette.tsx` | 前端 MED |
-| 4 | LibraryPage `invalidateQueries` 加 `refetchType: "active"`，翻译 1 篇不再重 fetch 500 条 | `pages/LibraryPage.tsx` | 前端 MED |
-| 5 | CrossRef User-Agent 改为项目地址，不再是 `litfolio@example.com` | `ingest/doi.rs` | 安全 LOW |
+### Batch A — 快速胜利包 (5661bc5)
 
-已验证：TypeScript typecheck pass，cargo check pass，10 个相关单测全绿。
+| # | 修复 | 文件 |
+|---|------|------|
+| 1 | PDF 路径 canonicalize 防越界 | `storage/paths.rs` + `commands/mod.rs` |
+| 2 | `escape_fts` 保真 BERT-base / R3.0 / IEEE 802.11 | `storage/papers.rs` |
+| 3 | CommandPalette snippet 改 React 节点渲染 | `components/CommandPalette.tsx` |
+| 4 | LibraryPage `invalidateQueries` refetchType active | `pages/LibraryPage.tsx` |
+| 5 | CrossRef User-Agent 改项目地址 | `ingest/doi.rs` |
+| + | `commands/llm.rs` 从 mod.rs 抽出（4 命令） | `commands/llm.rs` |
+
+### Batch B1 — 安全加固 (919e782)
+
+| # | 修复 | 新文件 |
+|---|------|--------|
+| S1 | LLM api_key → OS keychain | `secret.rs` + `ai/profile.rs` |
+| S2 | WebDAV password → OS keychain | `secret.rs` + `library_sync/config.rs` |
+| S3 | `download_pdf` 流式 200MB cap + Content-Type + %PDF- magic | `commands/mod.rs` |
+| S4 | 双 client：api (redirect::none) / external (SSRF 防护) | `http.rs` + `lib.rs` |
+| S5 | `validate_external_pdf`：扩展名 + magic byte + canonicalize | `storage/paths.rs` |
+| S6 | 删 `fs:default` + `openPdfInSystem` 死代码 | `capabilities/default.json` + `lib/api.ts` |
+
+### Batch B2 部分 — 后端重构 (本次提交)
+
+| # | 修复 | 文件 |
+|---|------|------|
+| A6 | `batch_cancel` 改 `tokio::sync::Mutex` | `lib.rs` + `commands/mod.rs` |
+| A4 | 抽 `ai/json_utils.rs` — `parse_lenient<T>` + `parse_lenient_value` | `ai/json_utils.rs`, `ai/topic_survey.rs`, `ai/topic_survey_annotate.rs`, `commands/reader_terms.rs` |
+| A5 | prompt 模板外迁 `ai/prompts.rs` 常量 | `ai/prompts.rs`, `commands/reader_terms.rs`, `commands/reader_translate/mod.rs` |
+
+149 测试全绿，cargo check pass。
 
 ---
 
 ## 未完成 — 按优先级排列
 
-### P0 安全加固 (建议 1.5 人日)
-
-| # | 问题 | 文件 | CWE |
-|---|------|------|-----|
-| S1 | **LLM API key 明文 JSON 存储** — `litera.config.json` 可被恶意进程 / WebDAV 同步读取 | `ai/profile.rs:149-156` | CWE-256/312 |
-| S2 | **WebDAV 密码明文 + http:// Basic auth 可嗅探** | `library_sync/webdav.rs:141-146` | CWE-256/319 |
-| S3 | **`download_pdf` 无 response size cap / content-type 校验** — 4 GB 响应 OOM | `commands/mod.rs:845-868` | CWE-400 |
-| S4 | **reqwest Client 无 redirect 策略 / 无 host 白名单** — 可 SSRF 到内网 169.254.169.254 | `lib.rs:88-92` | CWE-918 |
-| S5 | **`import_pdf_files` 不校验 `source_pdf_path` 是否来自合法 dialog** — XSS 可读任意文件 | `commands/mod.rs:412-422` | CWE-22 |
-| S6 | **Tauri capabilities 过宽** — `fs:default` + `shell:allow-open`，XSS 可枚举宿主文件 | `capabilities/default.json` | - |
-
-**修复方案：**
-- S1+S2：引入 `keyring` crate 存入 OS keychain，JSON 只留引用名
-- S3：`resp.bytes()` 改流式 `resp.chunk()` + 200 MB hard cap
-- S4：两个 reqwest Client — arXiv/CrossRef/S2 用固定 allowlist，RSS 用 redirect ≤3 + https-only
-- S5：`paper_save_with_pdf` / `paper_attach_pdf` 加 dialog token TTL 白名单
-- S6：`fs:default` → `fs:allow-read-file` + scope 限 library root，去掉 `shell:allow-open`
-
----
-
-### P1 后端架构重构 (建议 2 人日)
+### P1 后端架构拆分 (剩余)
 
 | # | 问题 | 当前 LOC | 目标 |
 |---|------|---------|------|
-| A1 | **commands/mod.rs god-file** — 126/158 个 `#[tauri::command]` 挤一个文件 | 2492 | 拆为 ~15 文件，每文件 ≤250 |
-| A2 | **commands/reader_terms.rs** — 7 套职责混一起 | 881 | 拆为 `candidates.rs` / `abbrev.rs` / `explain.rs` / `evidence.rs` |
-| A3 | **3 套重复 FTS 检索** — `storage/search.rs` + `ai/library_qa.rs` + `ingest/topic_survey_retrieval.rs` | 各 ~165/~405/~363 | 抽 `shared/retrieval.rs` |
-| A4 | **LLM JSON 容错散落 3+ 处** — `reader_terms.rs` / `topic_survey.rs` / `topic_survey_annotate.rs` | - | 抽 `ai/json_utils.rs` (~50 行) |
-| A5 | **Prompt 模板硬编码在命令层** | `reader_terms.rs:596-599` | 移到 `ai/prompts/*.md` + `include_str!` |
-| A6 | **`batch_cancel` 用 `std::sync::Mutex` 在 async 路径** | `lib.rs:27` | 改 `tokio::sync::Mutex` |
+| A1a | 拆 `papers.rs` / `tags.rs` / `folders.rs` | mod.rs 2452 | 各 ~150 行 |
+| A1b | 拆 `imports.rs` / `pdf.rs` / `batch.rs` | mod.rs | 各 ~120 行 |
+| A1c | 拆 highlights/notes/export/queue/smart_collections/custom_fields/duplicates/topic_alerts/concepts/search/lit_review/comparisons | mod.rs | 各 ≤250 |
+| A2 | `reader_terms.rs` 拆为 4 子模块 | 881 | `candidates.rs` / `abbrev.rs` / `explain.rs` / `evidence.rs` |
+| A3 | 3 套重复 FTS 检索统一 | search 165 / library_qa 405 / topic_survey_retrieval 363 | 抽 `storage/retrieval.rs` |
 
-**拆分模式参考（已建立）：** `commands/llm.rs` 已成功抽出，invoker path 在 lib.rs 用 `commands::llm::llm_*`。
+拆分模式参考：`commands/llm.rs` 已成功抽出，invoker path 在 lib.rs 用 `commands::llm::llm_*`。
 
 ---
 
