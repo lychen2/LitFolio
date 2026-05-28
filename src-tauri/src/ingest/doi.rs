@@ -9,7 +9,11 @@ use serde::Deserialize;
 use super::paper_draft::PaperDraft;
 
 const CROSSREF_BASE: &str = "https://api.crossref.org/works";
-const USER_AGENT: &str = "LitFolio/0.1 (mailto:litfolio@example.com)";
+// CrossRef's polite-pool guideline: include a contact URL so they can throttle
+// per-app rather than per-IP. Pointing at the project repository lets their
+// admins reach us; the previous `litfolio@example.com` placeholder risked
+// landing the user agent on a blacklist.
+const USER_AGENT: &str = "LitFolio/0.3 (+https://github.com/ZonaZcy/litera-desktop)";
 
 #[derive(Debug, Deserialize)]
 struct CrossRefResponse {

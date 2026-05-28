@@ -239,7 +239,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     <div className="min-w-0 flex-1">
                       <span className="truncate block">{item.label}</span>
                       {item.snippet && (
-                        <span className="text-[11px] text-litera-mute truncate block" dangerouslySetInnerHTML={{ __html: item.snippet.replace(/>>>/g, '<mark class="bg-litera-accent/20">').replace(/<<</g, '</mark>') }} />
+                        <span className="text-[11px] text-litera-mute truncate block">
+                          {renderSnippet(item.snippet)}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -267,4 +269,25 @@ function fuzzyMatch(query: string, text: string): boolean {
     if (text[ti] === query[qi]) qi++;
   }
   return qi === query.length;
+}
+
+/**
+ * Backend snippet wraps matched terms with `>>>...<<<`. Split into plain text
+ * and `<mark>` nodes — never feed the snippet through `dangerouslySetInnerHTML`,
+ * because the unmarked spans come straight from paper abstracts / RSS bodies
+ * and can contain raw `<script>`-shaped strings.
+ */
+function renderSnippet(snippet: string): React.ReactNode[] {
+  const parts = snippet.split(/(>>>.*?<<<)/g);
+  return parts.map((part, i) => {
+    const match = part.match(/^>>>(.*?)<<<$/);
+    if (match) {
+      return (
+        <mark key={i} className="bg-litera-accent/20 text-litera-text rounded px-0.5">
+          {match[1]}
+        </mark>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
