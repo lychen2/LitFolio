@@ -3,6 +3,8 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+use crate::secret;
+
 const CONFIG_DIR_NAME: &str = "LitFolio";
 const CONFIG_FILE_NAME: &str = "sync.json";
 
@@ -50,12 +52,52 @@ impl WebDavConfig {
 
 pub fn load_config() -> Result<SyncConfig> {
     let path = config_file()?;
-    load_config_at(&path)
+    let mut cfg = load_config_at(&path)?;
+    if cfg.webdav.password.is_empty() {
+        match secret::get(secret::WEBDAV_ACCOUNT) {
+            Ok(Some(pw)) => cfg.webdav.password = pw,
+            Ok(None) => {}
+            Err(e) => tracing::warn!(
+                error = %e,
+                "keychain read failed; webdav password will be empty until re-entered"
+            ),
+        }
+    } else {
+        // Legacy: password was stored plaintext in JSON. Migrate it to the
+        // keychain, then rewrite the JSON without the secret. On migration
+        // failure we leave the JSON alone so the user keeps working.
+        match secret::put(secret::WEBDAV_ACCOUNT, &cfg.webdav.password) {
+            Ok(()) => {
+                let mut sanitized = cfg.clone();
+                sanitized.webdav.password.clear();
+                if let Err(e) = save_config_at(&path, &sanitized) {
+                    tracing::warn!(error = %e, "rewriting sanitized sync.json failed");
+                } else {
+                    tracing::info!("migrated webdav password from JSON to OS keychain");
+                }
+            }
+            Err(e) => tracing::warn!(
+                error = %e,
+                "keychain migration failed; leaving webdav password in JSON"
+            ),
+        }
+    }
+    Ok(cfg)
 }
 
 pub fn save_config(cfg: &SyncConfig) -> Result<()> {
     let path = config_file()?;
-    save_config_at(&path, cfg)
+    let mut to_persist = cfg.clone();
+    if !to_persist.webdav.password.is_empty() {
+        match secret::put(secret::WEBDAV_ACCOUNT, &to_persist.webdav.password) {
+            Ok(()) => to_persist.webdav.password.clear(),
+            Err(e) => tracing::warn!(
+                error = %e,
+                "keychain put failed; webdav password will be written to JSON as a fallback"
+            ),
+        }
+    }
+    save_config_at(&path, &to_persist)
 }
 
 pub fn configured_webdav(cfg: &SyncConfig) -> Result<WebDavConfig> {

@@ -1,14 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability for the LitFolio main window",
+  "description": "Default capability for the LitFolio main window. fs:default is intentionally absent — every filesystem touch happens through the Rust command layer where we canonicalize against the library root. shell:allow-open is kept (tauri-plugin-shell already restricts open() to http(s) URLs in its bundled scope), used by FeedsPage / ImportPage to launch external links in the system browser.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:event:default",
     "dialog:default",
     "dialog:allow-open",
-    "fs:default",
     "shell:allow-open"
   ]
 }

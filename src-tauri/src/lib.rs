@@ -6,9 +6,11 @@ mod cluster;
 mod discovery;
 mod export;
 mod commands;
+mod http;
 mod index;
 mod ingest;
 mod library_sync;
+mod secret;
 mod storage;
 
 use anyhow::Result;
@@ -24,6 +26,12 @@ pub struct AppState {
     pub pool: Pool,
     pub paths: LibraryPaths,
     pub http: reqwest::Client,
+    /// Hardened client for URLs we got from third-party data (PDF downloads,
+    /// RSS feeds). Redirects are capped at 3 hops, require http(s) scheme, and
+    /// refuse to land on private/loopback/link-local addresses — the SSRF
+    /// defense that stops a malicious server from pivoting us into the local
+    /// network or AWS metadata.
+    pub http_external: reqwest::Client,
     pub batch_cancel: StdMutex<Option<CancellationToken>>,
     pub sync_lock: AsyncMutex<()>,
 }
@@ -85,16 +93,14 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
         }
         tracing::info!(count = n, "backfilled BibTeX entries");
     }
-    let http = reqwest::Client::builder()
-        .user_agent("LitFolio/0.1")
-        .connect_timeout(std::time::Duration::from_secs(15))
-        .timeout(std::time::Duration::from_secs(120))
-        .build()?;
+    let http = http::build_api_client()?;
+    let http_external = http::build_external_client()?;
     tracing::info!(root = %paths.root.display(), "library ready");
     Ok(Arc::new(AppState {
         pool,
         paths,
         http,
+        http_external,
         batch_cancel: StdMutex::new(None),
         sync_lock: AsyncMutex::new(()),
     }))
