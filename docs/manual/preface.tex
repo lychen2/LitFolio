@@ -1,0 +1,71 @@
+% 前言
+\chapter*{前言}
+\addcontentsline{toc}{chapter}{前言}
+\markboth{前言}{前言}
+
+\section*{这本手册是什么}
+
+LitFolio 是一款桌面研究文献工作台。它把
+arXiv 浏览、PDF 阅读、高亮笔记、术语提取、多轮 RAG 对话、知识图谱、
+主题综述生成、文献对比、引用管理、WebDAV 同步全部装进一个 Tauri 应用里，
+所有数据都落在你自己电脑上的 \fpath{\textasciitilde/Litera-Library/} 目录。
+
+这本手册写给两类读者：
+
+\begin{itemize}
+  \item \textbf{新用户}——从未用过 LitFolio，希望在半小时内能把一篇
+    arXiv 论文从导入到深读、翻译、术语网络走通。看第 1 至 4 章即可。
+  \item \textbf{已经在用的研究者}——想吃透「主题综述」、多轮 RAG 对话、
+    知识图谱、WebDAV 同步等进阶功能，并了解数据是怎么落盘的。看 Part II、
+    Part III 与第 12 章。
+  \item \textbf{重度用户}——需要文献对比、综述草稿、BibTeX 管理、智能
+    收藏夹、命令面板等效率工具。重点看 Part III（第 11--17 章）。
+\end{itemize}
+
+\section*{你将学到什么}
+
+\begin{enumerate}
+  \item 三种文献导入方式（arXiv/DOI、PDF 文件、Semantic Scholar 搜索），
+    批量文件夹导入，以及自动去重检测。
+  \item 文献阅读的全流程：列表→速读 TL;DR→深读四段式→翻译→打开 PDF
+    阅读器→高亮（语义标注颜色）→结构化笔记卡片→术语网络。
+  \item BibTeX 自动生成与引用格式化（APA/IEEE/GB/T 7714），批量导出为
+    \cmd{.bib} 或 \cmd{.ris} 文件。
+  \item 把若干篇散乱的论文整合成主题综述，或就 「这些论文里讨论 CPA
+    局限的工作有哪几篇？」这类问题让 LitFolio 直接给出带证据编号的答案。
+    支持多轮追问对话。
+  \item 知识图谱：论文关系网络 + 引用网络 + 概念图谱，AI 自动发现方法
+    演化与跨论文关联。
+  \item 进阶工具：多论文结构化对比、文献综述草稿生成、相似论文推荐、
+    阅读队列、智能收藏夹、自定义元数据字段、Markdown/Obsidian 导出、
+    命令面板（\kbd{Ctrl+K}）。
+  \item 配置 LLM 端点、把不同任务分派给不同模型；通过 WebDAV 把整个库
+    同步到另一台机器。
+  \item 数据落盘的物理结构，便于你做备份、写脚本或排查故障。
+\end{enumerate}
+
+\section*{阅读约定}
+
+\begin{description}
+  \item[\textcolor{violet}{蓝紫色}] 章节标题与强调，对应产品中的主交互
+    色（DESIGN token \cmd{violet}）。
+  \item[\kbd{Ctrl+F}] 快捷键以圆角芯片样式呈现。
+  \item[\fpath{file.tsx}] 文件路径与代码标识符使用等宽字体。
+  \item[\cmd{pnpm tauri dev}] 终端命令同样使用等宽字体。
+\end{description}
+
+下面这两类提示框会在本手册中反复出现：
+
+\begin{tipbox}[提示]
+浅紫色框：补充说明、加速使用的小技巧，可跳过。
+\end{tipbox}
+
+\begin{warnbox}[注意]
+琥珀色框：操作不可逆 / 会覆盖数据 / 需要先理解再执行，请认真读一遍。
+\end{warnbox}
+
+\section*{反馈与协助}
+
+LitFolio 是 GPL-3.0-or-later 开源软件。问题反馈、功能建议、补丁请到项目
+仓库的 issue tracker 提交。本手册随主仓库同源，欢迎一并提 PR 改正错别字
+或补充用例。

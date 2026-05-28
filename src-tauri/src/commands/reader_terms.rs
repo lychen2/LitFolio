@@ -18,6 +18,31 @@ use crate::AppState;
 
 const MAX_TERMS: usize = 12;
 const MAX_EVIDENCE_CHARS: usize = 180;
+const CONTEXT_BEFORE_BYTES: usize = 60;
+const CONTEXT_AFTER_BYTES: usize = 80;
+const PENDING_DEFINITION: &str = "__litera_pending_llm_definition__";
+const NOISE_TERMS: &[&str] = &[
+    "abstract",
+    "acknowledgements",
+    "acknowledgments",
+    "advanced",
+    "article",
+    "copyright",
+    "doi",
+    "figure",
+    "fig",
+    "gmbh",
+    "https",
+    "materials",
+    "references",
+    "research",
+    "supplementary",
+    "supporting",
+    "table",
+    "wiley",
+    "www",
+];
+const NOISE_ACRONYMS: &[&str] = &["PS", "PDF", "HTML", "HTTP", "HTTPS", "WWW", "DOI"];
 /// Minimum quality-weighted score for a candidate to be eligible. Calibrated so
 /// a single appearance of a lowercase bigram (tf=1, idf≈1, bonus=0.7) sits at
 /// ~0.7 and gets dropped, while a Title-Case 3-gram appearing once still passes.
@@ -27,6 +52,7 @@ const MIN_ACCEPT_SCORE: f64 = 0.9;
 pub struct ReaderPaperTerm {
     pub term: PaperTerm,
     pub related: Vec<RelatedPaperTerm>,
+    pub definition_status: String,
 }
 
 #[tauri::command]
@@ -35,12 +61,26 @@ pub async fn paper_terms_list(
     paper_id: String,
 ) -> Result<Vec<ReaderPaperTerm>, String> {
     let repo = PaperTermRepo::new(&state.pool);
-    let terms = repo.list_by_paper(&paper_id).await.map_err(|e| e.to_string())?;
-    enrich_terms(&repo, &paper_id, terms).await.map_err(|e| e.to_string())
+    let terms = repo
+        .list_by_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    enrich_terms(&repo, &paper_id, terms)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn paper_terms_generate(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<ReaderPaperTerm>, String> {
+    paper_terms_generate_candidates(state.clone(), paper_id.clone()).await?;
+    paper_terms_explain(state, paper_id).await
+}
+
+#[tauri::command]
+pub async fn paper_terms_generate_candidates(
     state: State<'_, Arc<AppState>>,
     paper_id: String,
 ) -> Result<Vec<ReaderPaperTerm>, String> {
@@ -51,32 +91,79 @@ pub async fn paper_terms_generate(
         .ok_or_else(|| "paper not found".to_string())?;
     let body = extract_pdf_body(&paper, &state.paths).await;
     let body_str = body.as_deref();
-    let (candidates, abbrev_long) =
-        extract_candidates(&paper, &PaperRepo::new(&state.pool), body_str)
-            .await
-            .map_err(|e| e.to_string())?;
+    let (candidates, _) = extract_candidates(&paper, &PaperRepo::new(&state.pool), body_str)
+        .await
+        .map_err(|e| e.to_string())?;
     if candidates.is_empty() {
         return Ok(Vec::new());
     }
-    let defs = explain_terms(&state, &paper, &candidates, &abbrev_long)
-        .await
-        .map_err(|e| e.to_string())?;
-    let payload = candidates
-        .into_iter()
-        .map(|term| NewPaperTerm {
-            normalized_term: filter_normalize(&term.term),
-            term: term.term.clone(),
-            local_definition: defs.get(&term.term).cloned().unwrap_or_else(|| fallback_definition(&term)),
-            local_evidence: term.local_evidence,
-            score: term.score,
-        })
-        .collect::<Vec<_>>();
+    let payload = pending_payload(candidates);
     let repo = PaperTermRepo::new(&state.pool);
     let stored = repo
         .replace_for_paper(&paper_id, &payload)
         .await
         .map_err(|e| e.to_string())?;
-    enrich_terms(&repo, &paper_id, stored).await.map_err(|e| e.to_string())
+    enrich_terms(&repo, &paper_id, stored)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_terms_explain(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Vec<ReaderPaperTerm>, String> {
+    let repo = PaperTermRepo::new(&state.pool);
+    let existing = repo
+        .list_by_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if existing.is_empty() {
+        return Ok(Vec::new());
+    }
+    let paper = PaperRepo::new(&state.pool)
+        .get(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "paper not found".to_string())?;
+    let body = extract_pdf_body(&paper, &state.paths).await;
+    let mut sections = weighted_metadata_sections(&paper);
+    sections.extend(weighted_body_sections(body.as_deref()));
+    let abbrev_long = extract_abbrev_pairs(&sections).map_err(|e| e.to_string())?;
+    let candidates = existing
+        .iter()
+        .filter(|term| is_explainable_existing_term(term))
+        .map(|term| CandidateTerm {
+            term: term.term.clone(),
+            score: term.score,
+            local_evidence: term.local_evidence.clone(),
+        })
+        .collect::<Vec<_>>();
+    let defs = explain_terms(&state, &paper, &candidates, &abbrev_long)
+        .await
+        .map_err(|e| e.to_string())?;
+    for term in &existing {
+        if !is_explainable_existing_term(term) {
+            repo.delete(&paper_id, term.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            continue;
+        }
+        let definition = defs
+            .get(&term.term)
+            .cloned()
+            .unwrap_or_else(|| fallback_definition_for(&term.term));
+        repo.update_definition(&paper_id, &term.normalized_term, &definition)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let stored = repo
+        .list_by_paper(&paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    enrich_terms(&repo, &paper_id, stored)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Manually add a single term to the paper's library. If `definition` is empty
@@ -110,7 +197,10 @@ pub async fn paper_term_add(
             first_evidence(&paper, body.as_deref(), trimmed)
         }
     };
-    let definition_text = match definition.map(|d| d.trim().to_string()).filter(|s| !s.is_empty()) {
+    let definition_text = match definition
+        .map(|d| d.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
         Some(text) => text,
         None => {
             let candidate = CandidateTerm {
@@ -118,9 +208,14 @@ pub async fn paper_term_add(
                 score: 0.0,
                 local_evidence: evidence_text.clone(),
             };
-            let defs = explain_terms(&state, &paper, std::slice::from_ref(&candidate), &HashMap::new())
-                .await
-                .map_err(|e| e.to_string())?;
+            let defs = explain_terms(
+                &state,
+                &paper,
+                std::slice::from_ref(&candidate),
+                &HashMap::new(),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
             defs.get(trimmed)
                 .cloned()
                 .unwrap_or_else(|| fallback_definition(&candidate))
@@ -147,7 +242,11 @@ pub async fn paper_term_add(
         .related_by_normalized(&row.normalized_term, &paper_id, 3)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(ReaderPaperTerm { term: row, related })
+    Ok(ReaderPaperTerm {
+        term: row,
+        related,
+        definition_status: "ready".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -191,13 +290,27 @@ async fn enrich_terms(
     terms: Vec<PaperTerm>,
 ) -> Result<Vec<ReaderPaperTerm>> {
     let mut out = Vec::with_capacity(terms.len());
-    for term in terms {
+    for mut term in terms {
+        let definition_status = if term.local_definition == PENDING_DEFINITION {
+            term.local_definition.clear();
+            "pending"
+        } else {
+            "ready"
+        };
         let related = repo
             .related_by_normalized(&term.normalized_term, paper_id, 3)
             .await?;
-        out.push(ReaderPaperTerm { term, related });
+        out.push(ReaderPaperTerm {
+            term,
+            related,
+            definition_status: definition_status.to_string(),
+        });
     }
     Ok(out)
+}
+
+fn is_explainable_existing_term(term: &PaperTerm) -> bool {
+    is_term_candidate(&term.term) && !is_noise_term(&term.term)
 }
 
 #[derive(Clone)]
@@ -212,8 +325,10 @@ async fn extract_candidates(
     repo: &PaperRepo<'_>,
     body: Option<&str>,
 ) -> Result<(Vec<CandidateTerm>, HashMap<String, String>)> {
-    let corpus = weighted_sections(paper, body);
+    let metadata = weighted_metadata_sections(paper);
+    let body_sections = weighted_body_sections(body);
     let library = repo.list_recent(500).await.unwrap_or_default();
+    let library_texts = library.iter().map(paper_text).collect::<Vec<_>>();
     // Lowercase set of every word that appears in an author name. Author
     // surnames like "Chen" / "Yang" / "Li" hit the single-token Title-Case
     // path in `is_term_candidate` and would otherwise rank high on
@@ -227,13 +342,11 @@ async fn extract_candidates(
             }
         }
     }
-    // 1-2 word noun-phrase shape: starts with a letter, allows hyphenated tail
-    // words. Default ceiling is 2 words; longer phrases come in via the
-    // abbreviation-pair scan below.
+    // General phrase extraction is intentionally limited to curated metadata.
+    // Full PDF body extraction focuses on abbreviations, which is the fast path
+    // users expect from the reader term table.
     let phrase_re = Regex::new(r"\b[A-Za-z][A-Za-z0-9-]*(?: [A-Za-z0-9-]+)?\b")?;
-    let abbrev_re = Regex::new(
-        r"\b([A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z][A-Za-z0-9-]*){1,4})\s*\(\s*([A-Z][A-Za-z0-9-]{1,8})\s*\)",
-    )?;
+    let abbrev_long = extract_abbrev_pairs(&body_sections)?;
     let mut tf = HashMap::<String, f64>::new();
     let mut surface = HashMap::<String, String>::new();
     let mut section_hits = HashMap::<String, u32>::new();
@@ -241,35 +354,17 @@ async fn extract_candidates(
     // Maps normalized acronym → its trimmed full form, for the LLM explainer.
     // The user wants only the acronym to appear in the list; the long form
     // becomes context for the definition rather than its own term.
-    let mut abbrev_long = HashMap::<String, String>::new();
-
-    for (text, weight) in &corpus {
-        // Abbreviation pairs: only the ACRONYM enters the candidate pool. The
-        // refined full form is stashed for the LLM definition pass so the
-        // explainer can write "SSIM (Structural Similarity Index Measure)
-        // is …" without duplicating the entry.
-        for cap in abbrev_re.captures_iter(text) {
-            let full_raw = cap.get(1).map(|m| m.as_str().trim()).unwrap_or("");
-            let acro_raw = cap.get(2).map(|m| m.as_str().trim()).unwrap_or("");
-            let full_trimmed = refine_full_form(full_raw, acro_raw)
-                .unwrap_or_else(|| full_raw.to_string());
-            if !looks_like_abbrev_pair(&full_trimmed, acro_raw) {
-                continue;
-            }
-            if !is_term_candidate_with(acro_raw, 1) {
-                continue;
-            }
-            let norm = filter_normalize(acro_raw);
-            if author_tokens.contains(&norm) {
-                continue;
-            }
-            *tf.entry(norm.clone()).or_insert(0.0) += *weight * 2.0;
-            surface.entry(norm.clone()).or_insert_with(|| acro_raw.to_string());
-            abbrev_bonus.insert(norm.clone(), 1.8);
-            abbrev_long.entry(norm.clone()).or_insert(full_trimmed);
-            *section_hits.entry(norm).or_insert(0) += 1;
+    for (norm, acro_raw, weight) in abbreviation_candidates(&body_sections, &abbrev_long) {
+        if author_tokens.contains(&norm) || is_noise_term(&acro_raw) {
+            continue;
         }
+        *tf.entry(norm.clone()).or_insert(0.0) += weight;
+        surface.entry(norm.clone()).or_insert(acro_raw);
+        abbrev_bonus.insert(norm.clone(), 2.4);
+        *section_hits.entry(norm).or_insert(0) += 1;
+    }
 
+    for (text, weight) in &metadata {
         let mut seen_in_section = std::collections::HashSet::<String>::new();
         for cap in phrase_re.find_iter(text) {
             let raw = cap.as_str().trim();
@@ -277,23 +372,25 @@ async fn extract_candidates(
                 continue;
             }
             let norm = filter_normalize(raw);
-            if author_tokens.contains(&norm) {
+            if author_tokens.contains(&norm) || is_noise_term(raw) {
                 continue;
             }
             *tf.entry(norm.clone()).or_insert(0.0) += *weight;
-            surface.entry(norm.clone()).or_insert_with(|| raw.to_string());
+            surface
+                .entry(norm.clone())
+                .or_insert_with(|| raw.to_string());
             if seen_in_section.insert(norm.clone()) {
                 *section_hits.entry(norm).or_insert(0) += 1;
             }
         }
     }
-    let total_docs = library.len().max(1) as f64;
+    let total_docs = library_texts.len().max(1) as f64;
     let mut ranked = tf
         .into_iter()
         .map(|(norm, freq)| {
-            let df = library
+            let df = library_texts
                 .iter()
-                .filter(|candidate_paper| paper_text(candidate_paper).contains(&norm))
+                .filter(|text| text.contains(&norm))
                 .count() as f64;
             let idf = ((total_docs + 1.0) / (df + 1.0)).ln() + 1.0;
             let term = surface.get(&norm).cloned().unwrap_or(norm.clone());
@@ -308,45 +405,28 @@ async fn extract_candidates(
                 term,
             }
         })
-        .filter(|candidate| !candidate.local_evidence.is_empty() && candidate.score >= MIN_ACCEPT_SCORE)
+        .filter(|candidate| {
+            !candidate.local_evidence.is_empty() && candidate.score >= MIN_ACCEPT_SCORE
+        })
         .collect::<Vec<_>>();
     ranked.sort_by(|a, b| b.score.total_cmp(&a.score));
     ranked.truncate(MAX_TERMS);
     Ok((ranked, abbrev_long))
 }
 
-/// Extract the PDF body text and cache it next to the original PDF. Subsequent
-/// calls reuse the cached file as long as it's newer than the PDF. Returns
-/// None if no PDF is bound or extraction fails — term generation still works
-/// off the metadata sections in that case.
+/// Read the PDF body text cached by the frontend PDF.js renderer.
+///
+/// This intentionally does not fall back to backend `lopdf` extraction. Term
+/// candidate generation must stay fast and visible; a slow full-PDF backend
+/// parse would make the non-LLM phase look stuck. If the cache is not ready,
+/// term generation still runs on title/abstract/deep-read metadata.
 async fn extract_pdf_body(paper: &Paper, paths: &LibraryPaths) -> Option<String> {
-    let pdf_path = paper.pdf_path.as_deref().filter(|p| !p.is_empty())?;
     let cache_path = paths.paper_dir(&paper.id).join("text.txt");
-    if let (Ok(pdf_meta), Ok(cache_meta)) =
-        (std::fs::metadata(pdf_path), std::fs::metadata(&cache_path))
-    {
-        if let (Ok(pdf_mod), Ok(cache_mod)) = (pdf_meta.modified(), cache_meta.modified()) {
-            if cache_mod >= pdf_mod {
-                if let Ok(cached) = std::fs::read_to_string(&cache_path) {
-                    if !cached.trim().is_empty() {
-                        return Some(cached);
-                    }
-                }
-            }
-        }
+    let cached = std::fs::read_to_string(cache_path).ok()?;
+    if cached.trim().is_empty() {
+        return None;
     }
-    let bytes = std::fs::read(pdf_path).ok()?;
-    let cache_path_owned = cache_path.clone();
-    let extracted = tokio::task::spawn_blocking(move || -> Option<String> {
-        let doc = lopdf::Document::load_mem(&bytes).ok()?;
-        let pages = doc.get_pages();
-        let page_ids: Vec<u32> = pages.values().map(|id| id.0).collect();
-        doc.extract_text(&page_ids).ok()
-    })
-    .await
-    .ok()??;
-    let _ = std::fs::write(&cache_path_owned, &extracted);
-    Some(extracted)
+    Some(cached)
 }
 
 /// Sanity-check a candidate `Full Name (ACRO)` pair. Real abbreviations have
@@ -414,8 +494,7 @@ fn refine_full_form(full: &str, acronym: &str) -> Option<String> {
     let content: Vec<&str> = words
         .iter()
         .filter(|w| {
-            !crate::commands::term_filter::GENERIC_STOPWORDS
-                .contains(&w.to_lowercase().as_str())
+            !crate::commands::term_filter::GENERIC_STOPWORDS.contains(&w.to_lowercase().as_str())
         })
         .copied()
         .collect();
@@ -447,13 +526,19 @@ mod tests {
     #[test]
     fn refines_full_form_drops_leading_extra_word() {
         let refined = refine_full_form("average structural similarity index measure", "SSIM");
-        assert_eq!(refined.as_deref(), Some("structural similarity index measure"));
+        assert_eq!(
+            refined.as_deref(),
+            Some("structural similarity index measure")
+        );
     }
 
     #[test]
     fn refines_full_form_skips_internal_stopwords() {
         let refined = refine_full_form("convolutional and recurrent neural network", "CRNN");
-        assert_eq!(refined.as_deref(), Some("convolutional recurrent neural network"));
+        assert_eq!(
+            refined.as_deref(),
+            Some("convolutional recurrent neural network")
+        );
     }
 
     #[test]
@@ -464,8 +549,14 @@ mod tests {
 
     #[test]
     fn looks_like_pair_accepts_matching_initials() {
-        assert!(looks_like_abbrev_pair("structural similarity index measure", "SSIM"));
-        assert!(looks_like_abbrev_pair("convolutional neural network", "CNN"));
+        assert!(looks_like_abbrev_pair(
+            "structural similarity index measure",
+            "SSIM"
+        ));
+        assert!(looks_like_abbrev_pair(
+            "convolutional neural network",
+            "CNN"
+        ));
     }
 
     #[test]
@@ -473,7 +564,10 @@ mod tests {
         // "Retrieval-Augmented Generation (RAG)" is a real-world abbreviation
         // pair. Splitting on whitespace alone gives 2 tokens and rejects the
         // pair; splitting on hyphen too gives the 3 initials we need.
-        assert!(looks_like_abbrev_pair("Retrieval-Augmented Generation", "RAG"));
+        assert!(looks_like_abbrev_pair(
+            "Retrieval-Augmented Generation",
+            "RAG"
+        ));
     }
 }
 
@@ -484,7 +578,7 @@ async fn explain_terms(
     abbrev_long: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>> {
     let cfg = load_config(&state.paths)?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Tldr)?;
+    let profile = active_profile_for_task(&cfg, TaskKind::Tag)?;
     let items = terms
         .iter()
         .map(|term| {
@@ -519,14 +613,20 @@ async fn explain_terms(
     )
     .await?;
     let value = parse_json_lenient(&resp.content);
-    let defs = value
-        .get("definitions")
-        .and_then(|items| items.as_array())
-        .ok_or_else(|| anyhow!("missing definitions array"))?;
+    let defs = definitions_array(&value)
+        .ok_or_else(|| anyhow!("missing definitions array in LLM response: {}", truncate(&resp.content, 500)))?;
     let mut out = HashMap::new();
     for item in defs {
-        let term = item.get("term").and_then(|value| value.as_str()).unwrap_or("").trim();
-        let definition = item.get("definition").and_then(|value| value.as_str()).unwrap_or("").trim();
+        let term = item
+            .get("term")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
+        let definition = item
+            .get("definition")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
         if !term.is_empty() && !definition.is_empty() {
             out.insert(term.to_string(), definition.to_string());
         }
@@ -534,7 +634,52 @@ async fn explain_terms(
     Ok(out)
 }
 
-fn weighted_sections<'a>(paper: &'a Paper, body: Option<&'a str>) -> Vec<(String, f64)> {
+fn extract_abbrev_pairs(sections: &[(String, f64)]) -> Result<HashMap<String, String>> {
+    let abbrev_re = Regex::new(
+        r"\b([A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z][A-Za-z0-9-]*){1,4})\s*\(\s*([A-Z][A-Za-z0-9-]{1,8})\s*\)",
+    )?;
+    let mut pairs = HashMap::<String, String>::new();
+    for (text, _) in sections {
+        for cap in abbrev_re.captures_iter(text) {
+            let full_raw = cap.get(1).map(|m| m.as_str().trim()).unwrap_or("");
+            let acro_raw = cap.get(2).map(|m| m.as_str().trim()).unwrap_or("");
+            let full_trimmed =
+                refine_full_form(full_raw, acro_raw).unwrap_or_else(|| full_raw.to_string());
+            if looks_like_abbrev_pair(&full_trimmed, acro_raw)
+                && is_term_candidate_with(acro_raw, 1)
+                && !is_noise_term(acro_raw)
+                && !looks_like_layout_full_form(&full_trimmed)
+            {
+                pairs
+                    .entry(filter_normalize(acro_raw))
+                    .or_insert(full_trimmed);
+            }
+        }
+    }
+    Ok(pairs)
+}
+
+fn abbreviation_candidates(
+    sections: &[(String, f64)],
+    abbrev_long: &HashMap<String, String>,
+) -> Vec<(String, String, f64)> {
+    let mut out = Vec::new();
+    for (norm, long) in abbrev_long {
+        let surface = acronym_surface(norm);
+        for (text, weight) in sections {
+            let freq = count_ascii_case_insensitive(text, &surface);
+            if freq > 0 {
+                out.push((norm.clone(), surface.clone(), *weight * 3.0 * freq as f64));
+            }
+            if count_ascii_case_insensitive(text, long) > 0 {
+                out.push((norm.clone(), surface.clone(), *weight));
+            }
+        }
+    }
+    out
+}
+
+fn weighted_metadata_sections(paper: &Paper) -> Vec<(String, f64)> {
     let mut sections = Vec::new();
     push_section(&mut sections, Some(&paper.title), 3.0);
     push_section(&mut sections, paper.abstract_text.as_deref(), 2.0);
@@ -544,10 +689,11 @@ fn weighted_sections<'a>(paper: &'a Paper, body: Option<&'a str>) -> Vec<(String
     push_section(&mut sections, paper.comparison.as_deref(), 1.0);
     push_section(&mut sections, paper.limitations.as_deref(), 1.0);
     push_section(&mut sections, paper.tldr.as_deref(), 1.0);
-    // Full PDF body at lower per-occurrence weight than the curated summary
-    // sections: it's where acronyms like "LSF", "RAG", "CST" actually live,
-    // but it also contains a lot of citation text that we don't want to
-    // overpower the title/abstract signal.
+    sections
+}
+
+fn weighted_body_sections(body: Option<&str>) -> Vec<(String, f64)> {
+    let mut sections = Vec::new();
     push_section(&mut sections, body, 0.4);
     sections
 }
@@ -559,7 +705,7 @@ fn push_section(out: &mut Vec<(String, f64)>, text: Option<&str>, weight: f64) {
 }
 
 fn first_evidence(paper: &Paper, body: Option<&str>, term: &str) -> String {
-    let needle = term.to_lowercase();
+    let needle = term.to_ascii_lowercase();
     // Order: title → abstract → research question → method → comparison →
     // limitations → body. We prefer the curated summary sections because
     // their context lines are tighter, but fall back to the PDF body so
@@ -575,18 +721,107 @@ fn first_evidence(paper: &Paper, body: Option<&str>, term: &str) -> String {
         body,
     ];
     for text in sources.into_iter().flatten() {
-        let lower = text.to_lowercase();
-        if let Some(index) = lower.find(&needle) {
-            let start = index.saturating_sub(60);
-            let end = (index + term.len() + 80).min(text.len());
-            return truncate(text[start..end].trim(), MAX_EVIDENCE_CHARS);
+        let lower = text.to_ascii_lowercase();
+        if let Some(index) = find_ascii_word(&lower, &needle) {
+            return evidence_window(text, index, needle.len());
         }
     }
     String::new()
 }
 
+fn evidence_window(text: &str, start: usize, len: usize) -> String {
+    let from = previous_char_boundary(text, start.saturating_sub(CONTEXT_BEFORE_BYTES));
+    let to = next_char_boundary(
+        text,
+        (start + len + CONTEXT_AFTER_BYTES).min(text.len()),
+    );
+    truncate(text[from..to].trim(), MAX_EVIDENCE_CHARS)
+}
+
+fn previous_char_boundary(text: &str, mut index: usize) -> usize {
+    while index > 0 && !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn next_char_boundary(text: &str, mut index: usize) -> usize {
+    while index < text.len() && !text.is_char_boundary(index) {
+        index += 1;
+    }
+    index
+}
+
+fn acronym_surface(norm: &str) -> String {
+    norm.to_ascii_uppercase()
+}
+
+fn count_ascii_case_insensitive(text: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    let lower = text.to_ascii_lowercase();
+    let lower_needle = needle.to_ascii_lowercase();
+    ascii_word_matches(&lower, &lower_needle).count()
+}
+
+fn find_ascii_word(text: &str, needle: &str) -> Option<usize> {
+    ascii_word_matches(text, needle).next()
+}
+
+fn ascii_word_matches<'a>(text: &'a str, needle: &'a str) -> impl Iterator<Item = usize> + 'a {
+    text.match_indices(needle)
+        .filter(move |(index, _)| is_ascii_word_hit(text, *index, needle.len()))
+        .map(|(index, _)| index)
+}
+
+fn is_ascii_word_hit(text: &str, start: usize, len: usize) -> bool {
+    let before = text[..start].chars().next_back();
+    let after = text[start + len..].chars().next();
+    !before.map_or(false, is_ascii_word_char) && !after.map_or(false, is_ascii_word_char)
+}
+
+fn is_ascii_word_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
+}
+
+fn is_noise_term(raw: &str) -> bool {
+    let trimmed = raw.trim_matches(|ch: char| !ch.is_ascii_alphanumeric());
+    if trimmed.is_empty() {
+        return true;
+    }
+    if NOISE_ACRONYMS.contains(&trimmed) {
+        return true;
+    }
+    NOISE_TERMS.contains(&trimmed.to_ascii_lowercase().as_str())
+}
+
+fn looks_like_layout_full_form(full: &str) -> bool {
+    let normalized = full.to_ascii_lowercase();
+    NOISE_TERMS
+        .iter()
+        .any(|term| ascii_word_matches(&normalized, term).next().is_some())
+}
+
+fn pending_payload(candidates: Vec<CandidateTerm>) -> Vec<NewPaperTerm> {
+    candidates
+        .into_iter()
+        .map(|term| NewPaperTerm {
+            normalized_term: filter_normalize(&term.term),
+            term: term.term,
+            local_definition: PENDING_DEFINITION.to_string(),
+            local_evidence: term.local_evidence,
+            score: term.score,
+        })
+        .collect()
+}
+
 fn fallback_definition(term: &CandidateTerm) -> String {
-    format!("本文将 {} 放在当前论证或方法上下文中使用。", term.term)
+    fallback_definition_for(&term.term)
+}
+
+fn fallback_definition_for(term: &str) -> String {
+    format!("本文将 {term} 放在当前论证或方法上下文中使用。")
 }
 
 fn paper_text(paper: &Paper) -> String {
@@ -636,4 +871,11 @@ fn parse_json_lenient(raw: &str) -> serde_json::Value {
         }
     }
     serde_json::json!({})
+}
+
+fn definitions_array(value: &serde_json::Value) -> Option<&Vec<serde_json::Value>> {
+    if let Some(items) = value.get("definitions").and_then(|items| items.as_array()) {
+        return Some(items);
+    }
+    value.as_array()
 }

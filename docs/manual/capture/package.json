@@ -1,0 +1,15 @@
+{
+  "name": "litfolio-manual-capture",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Screenshot harness for the LitFolio user manual: vite + mocked Tauri IPC + Playwright",
+  "scripts": {
+    "vite": "../../../node_modules/.bin/vite --config vite.screenshot.config.ts",
+    "capture": "node capture.mjs",
+    "capture:keep": "KEEP_VITE=1 node capture.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

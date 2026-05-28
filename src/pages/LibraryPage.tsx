@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from "react";
+import { memo, useCallback, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -16,6 +16,7 @@ import { ReadingQueue } from "./library/ReadingQueue";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 
 const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { labelKey: "common.unread",  icon: Circle,      tone: "text-litera-mute" },
@@ -260,6 +261,7 @@ const PaperRow = memo(function PaperRow({
 }) {
   const qc = useQueryClient();
   const { t, lang } = useI18n();
+  const rowRef = useRef<HTMLLIElement>(null);
   const tldr = useMutation({
     mutationFn: () => api.paperTldr(p.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"] }),
@@ -272,8 +274,8 @@ const PaperRow = memo(function PaperRow({
     },
   });
   const attachPdf = useMutation({
-    mutationFn: async () => {
-      const src = await pickSinglePdf();
+    mutationFn: async (sourcePath?: string) => {
+      const src = sourcePath ?? await pickSinglePdf();
       if (!src) return null;
       return api.paperAttachPdf(p.id, src);
     },
@@ -296,13 +298,21 @@ const PaperRow = memo(function PaperRow({
   const canOpenPdf = !!p.pdf_path;
   const openMut = useMutation({ mutationFn: () => api.paperOpenPdf(p.id) });
   const [confirming, setConfirming] = useState(false);
+  const handlePdfDrop = useCallback((paths: string[]) => {
+    const sourcePath = paths[0];
+    if (!sourcePath) return Promise.resolve();
+    return attachPdf.mutateAsync(sourcePath).then(() => undefined);
+  }, [attachPdf]);
+
+  usePdfDropTarget(rowRef, handlePdfDrop, !attachPdf.isPending);
+
   function openPdf() {
     if (!p.pdf_path) return;
     openMut.mutate();
   }
 
   return (
-    <li className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
+    <li ref={rowRef} className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
       <div className="flex items-start gap-3">
         <StatusToggle paper={p} />
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
@@ -365,7 +375,7 @@ const PaperRow = memo(function PaperRow({
               </button>
             ) : (
               <button
-                onClick={() => attachPdf.mutate()}
+                onClick={() => attachPdf.mutate(undefined)}
                 disabled={attachPdf.isPending}
                 className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
                 title={t("library.attachPdfTitle")}
@@ -412,7 +422,7 @@ const PaperRow = memo(function PaperRow({
             {/* Hover-only actions */}
             {canOpenPdf && (
               <button
-                onClick={() => attachPdf.mutate()}
+                onClick={() => attachPdf.mutate(undefined)}
                 disabled={attachPdf.isPending}
                 className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
                 title={t("library.attachPdfTitle")}
@@ -689,13 +699,19 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
           {result && <ResultBody r={result} />}
           {m.error && (
             <div className="text-sm text-red-400/90 border border-red-400/30 rounded p-3">
-              ✕ {(m.error as Error).message}
+              ✕ {errorMessage(m.error, t("reader.unknownError"))}
             </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  const message = String(error ?? "").trim();
+  return message || fallback;
 }
 
 function ResultBody({ r }: { r: QuickReadResult }) {

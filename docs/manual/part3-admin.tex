@@ -1,0 +1,887 @@
+\part{高级工具与运维}
+
+% =====================================================================
+\chapter{多论文对比}
+\label{ch:compare}
+
+选中 3--5 篇同主题的论文后，AI 可以生成一份结构化对比矩阵，帮你快速梳理它们的
+方法、数据集、指标和结论差异。
+
+\section{使用方式}
+
+在文献库中勾选论文（至少 2 篇），工具栏点「对比」。LitFolio 会调用 LLM
+对每篇论文的 TL;DR + 深读内容进行结构化分析。
+
+\litfigure{30-compare.png}{多论文对比页。表格按 Problem / Method / Dataset / Key Metric / Limitation /
+Conclusion 六列组织，单元格可直接编辑。}
+
+\subsection{对比生成流程}
+
+\begin{enumerate}
+  \item \textbf{材料收集}——对每篇选中论文，查询其 TL;DR、关键发现、深读
+    四段（Problem / Method / Comparison / Limitations）、摘要。
+    如果某篇论文没有深读结果，只用 TL;DR + 摘要。
+  \item \textbf{Prompt 构建}——将所有论文的材料按固定格式拼接，每篇用
+    \cmd{=== PAPER: <title> ===} 分隔。System prompt 要求 LLM 返回
+    JSON 数组，每个元素对应一篇论文，包含六列内容。
+  \item \textbf{JSON 解析}——三级容错解析（与 TL;DR 一致）。如果解析失败，
+    将 LLM 的原始文本按表格格式尝试提取。
+  \item \textbf{存储}——结果写入 \cmd{paper\_comparisons} 表，
+    \cmd{paper\_ids} 字段存储为 JSON 数组，\cmd{content} 字段存储为
+    Markdown 表格文本。
+\end{enumerate}
+
+\subsection{对比表格结构}
+
+对比结果以表格呈现，列包括：
+
+\begin{longtable}{p{3cm} p{9.5cm}}
+\toprule
+\textbf{列名} & \textbf{内容} \\
+\midrule
+\endhead
+Paper & 论文标题 \\
+Problem & 解决的问题（2--3 句） \\
+Method & 核心方法（重点描述创新点） \\
+Dataset & 使用的数据集和规模 \\
+Key Metric & 主要指标名称和数值（如 \cmd{BLEU 41.2}、\cmd{F1 0.89}） \\
+Limitation & 局限性（1--2 句） \\
+Conclusion & 结论（1 句） \\
+\bottomrule
+\end{longtable}
+
+\subsection{编辑与保存}
+
+\begin{itemize}
+  \item 表格支持\textbf{直接编辑}——点击单元格即可修改 AI 的输出。
+    编辑后的内容自动保存到数据库。
+  \item 对比结果跨会话持久化——下次打开无需重新生成。
+  \item 「重新生成」按钮用最新的论文内容重跑 AI（覆盖已有结果）。
+  \item 5 篇论文的对比通常在 30 秒内完成。
+\end{itemize}
+
+\begin{tipbox}
+对比质量取决于论文的深读质量。如果某篇论文还没有运行过深读，对比时只会用到
+TL;DR 和摘要，信息量会少一些。建议先对所有待对比论文运行深读。
+\end{tipbox}
+
+% =====================================================================
+\chapter{Markdown 导出}
+\label{ch:markdown-export}
+
+LitFolio 的笔记和高亮可以导出为结构化 Markdown 文件，兼容 Obsidian、Logseq
+和通用 Markdown 工作流。
+
+\section{导出内容}
+
+每篇论文生成一个 \cmd{.md} 文件，文件名格式：
+\cmd{<第一作者>\_<年份>\_<标题首词>.md}。文件名中的特殊字符被替换为下划线。
+
+\subsection{文件结构}
+
+\begin{verbatim}
+---
+title: "Attention Is All You Need"
+authors: ["Vaswani, Ashish", "Shazeer, Noam"]
+year: 2017
+venue: "NeurIPS"
+doi: "10.48550/arXiv.1706.03762"
+arxiv_id: "1706.03762"
+tags: ["transformer", "attention"]
+folders: ["ML/Transformer"]
+read_status: "read"
+bibtex: "@inproceedings{vaswani2017attention, ...}"
+custom_project: "thesis-ch3"
+custom_priority: "high"
+---
+
+## Notes
+
+自由文本笔记内容（来自 note.md）。
+
+## Structured Notes
+
+### Problem
+解决什么问题...
+
+### Method
+提出了什么方法...
+
+### Key Numbers
+关键实验数据...
+
+### Limitations
+局限与未解决的问题...
+
+### Thoughts
+你自己的想法...
+
+## Highlights
+
+### Key Finding
+- **[p.3]** The self-attention mechanism connects all
+  positions with a constant number of operations.
+  > 用户评论（如有）
+
+### Method
+- **[p.5]** Multi-head attention allows the model to
+  attend to information from different representation
+  subspaces at different positions.
+
+## Terms
+
+- **Transformer**: 基于自注意力机制的序列到序列
+  模型，摒弃了循环和卷积结构。
+  - 证据: "We propose a new simple network
+    architecture, the Transformer."
+  - 跨论文复用: 3
+\end{verbatim}
+
+\subsection{Frontmatter 字段}
+
+YAML frontmatter 包含论文的所有元数据字段。自定义元数据字段以
+\cmd{custom\_<字段名>} 的格式写入。标签和文件夹以数组形式输出，方便
+Obsidian 的 Dataview 插件查询。
+
+\subsection{高亮按标签分组}
+
+高亮输出时按标注颜色标签分组（参见 4.6 节）。每个标签作为三级标题，
+其下的高亮按页码排序。每条高亮包含：
+
+\begin{itemize}
+  \item 页码和颜色标签。
+  \item 高亮文本（加粗）。
+  \item 用户评论（如有的话，以引用块形式呈现）。
+\end{itemize}
+
+\subsection{术语与双向链接}
+
+术语输出时，每个术语名称用 \cmd{[[术语名]]} 双方括号包裹，利用 Obsidian 的
+wikilink 语法实现图谱集成。如果同一篇论文的笔记中引用了某个术语，
+Obsidian 会自动建立双向链接。
+
+\section{增量导出算法}
+
+增量导出通过 \cmd{papers.last\_exported\_at} 字段追踪：
+
+\begin{enumerate}
+  \item 查询 \cmd{SELECT id FROM papers WHERE last\_exported\_at IS NULL
+    OR updated\_at > last\_exported\_at}。
+  \item 对每篇论文，比较 \cmd{updated\_at}（最后元数据/笔记/高亮变更时间）
+    和 \cmd{last\_exported\_at}（最后导出时间）。
+  \item 只导出 \cmd{updated\_at > last\_exported\_at} 的论文。
+  \item 导出成功后更新 \cmd{last\_exported\_at = 当前时间戳}。
+\end{enumerate}
+
+这保证了批量导出时不会重复写入未变更的文件。
+
+\section{配置与触发}
+
+在「设置 → 导出」中配置：
+
+\begin{itemize}
+  \item \textbf{导出目录}——如 \cmd{\textasciitilde/ObsidianVault/LitFolio/}。
+  \item \textbf{增量导出}——默认开启。关闭后每次导出全部论文。
+  \item \textbf{自动导出}——开启后，笔记或高亮保存时自动触发导出（防抖 5 秒，
+    避免频繁写入）。
+\end{itemize}
+
+也可以手动点「立即导出」批量导出全部论文。500 篇论文的完整导出通常在 10 秒内
+完成。
+
+\begin{tipbox}
+Obsidian 会自动解析 YAML frontmatter，你可以在 Obsidian 的属性视图中按
+\cmd{year}、\cmd{read\_status}、\cmd{tags} 等字段筛选和排序论文。
+配合 Dataview 插件可以创建动态查询视图，如「所有 2024 年以后的未读论文」。
+\end{tipbox}
+
+% =====================================================================
+\chapter{命令面板}
+\label{ch:palette}
+
+命令面板是 LitFolio 的键盘驱动快捷操作中心。按 \kbd{Ctrl+K}
+（macOS：\kbd{Cmd+K}）在任意页面打开。
+
+\litfigure{31-command-palette.png}{命令面板。顶部输入框支持模糊搜索，结果按导航/论文/操作三类分组。}
+
+\section{三种模式}
+
+命令面板同时索引三类数据源，输入时实时过滤：
+
+\begin{description}
+  \item[导航] 页面路由名称（\cmd{library}、\cmd{reader}、\cmd{graph}、
+    \cmd{settings}、\cmd{browse}、\cmd{feeds}、\cmd{topic}、\cmd{ask}、
+    \cmd{import}、\cmd{compare}）。输入后跳转到对应页面。
+  \item[搜索] 论文标题和作者名。从数据库查询最近 20 篇论文的标题，
+    与用户输入做模糊匹配。选中后在阅读器中打开。
+  \item[命令] 可执行动作，如 \cmd{export bibtex}、\cmd{generate terms}、
+    \cmd{ai discover}、\cmd{extract concepts}、\cmd{find duplicates}。
+    选中后直接执行对应操作。
+\end{description}
+
+\subsection{模糊匹配算法}
+
+命令面板使用基于子序列的模糊匹配算法（subsequence matching），而非简单的
+子串匹配。算法流程：
+
+\begin{enumerate}
+  \item \textbf{输入规范化}——将用户输入和所有候选项都转小写，去除非字母
+    数字字符。
+  \item \textbf{子序列匹配}——检查用户输入的每个字符是否按顺序出现在候选项中。
+    例如 \cmd{grpah} 对 \cmd{graph}：g→g✓, r→r✓, p→a✗, 跳过 a, p→p✓,
+    a→a✓, h→h✓ → 匹配成功。
+  \item \textbf{评分}——匹配成功后计算相关度分数：
+    \begin{itemize}
+      \item 连续匹配字符加分（\cmd{graph} 匹配 \cmd{graph} 比匹配
+        \cmd{generate paragraph} 分高）。
+      \item 匹配位置越靠前加分越多。
+      \item 完全匹配额外加分。
+    \end{itemize}
+  \item \textbf{排序}——按分数降序排列，取前 10 条结果。
+\end{enumerate}
+
+这种算法的好处是容错性强——即使用户打错字（\cmd{librray} → \cmd{library}），
+只要字符按顺序出现就能匹配。
+
+\subsection{结果分组与展示}
+
+结果按类别分组展示：
+
+\begin{itemize}
+  \item \textbf{Recent}——最近使用的 5 个命令和最近打开的 3 篇论文，
+    固定显示在顶部（无需输入）。
+  \item \textbf{Navigation}——匹配到的页面路由。
+  \item \textbf{Papers}——匹配到的论文。
+  \item \textbf{Actions}——匹配到的命令。
+\end{itemize}
+
+上下箭头移动选中项，\kbd{Enter} 执行，\kbd{Esc} 关闭。
+
+\begin{tipbox}
+命令面板的设计目标是让所有功能都可以通过键盘到达。如果你不确定某个功能在哪里，
+在命令面板里搜一下通常比翻菜单更快。它也适合作为快速论文跳转工具——输入标题
+中的几个关键词就能找到目标论文。
+\end{tipbox}
+
+% =====================================================================
+\chapter{自定义元数据字段}
+\label{ch:custom-fields}
+
+不同研究者有不同的组织方式。自定义元数据字段让你为论文添加任意键值对。
+
+\section{字段管理}
+
+在「设置 → 自定义字段」中定义字段。字段定义存储在 \cmd{custom\_field\_defs}
+表中，字段值存储在 \cmd{paper\_custom\_fields} 表中。
+
+\subsection{字段类型}
+
+\begin{longtable}{p{2.5cm} p{4cm} p{6cm}}
+\toprule
+\textbf{类型} & \textbf{存储格式} & \textbf{前端控件} \\
+\midrule
+\endhead
+\cmd{text} & 任意字符串 & 文本输入框 \\
+\cmd{number} & 数字字符串 & 数字输入框，支持排序比较 \\
+\cmd{date} & Unix 时间戳 & 日期选择器 \\
+\cmd{select} & 选项值字符串 & 下拉选择框，选项在 \cmd{options}
+  字段中以 JSON 数组定义 \\
+\bottomrule
+\end{longtable}
+
+\subsection{数据模型}
+
+\begin{itemize}
+  \item \cmd{custom\_field\_defs}——字段定义表。每行一个字段：
+    \cmd{name}（唯一）、\cmd{field\_type}、\cmd{options}（select 类型的
+    可选值 JSON 数组）、\cmd{created\_at}。
+  \item \cmd{paper\_custom\_fields}——字段值表。复合主键
+    \cmd{(paper\_id, field\_id)}，每行存储一个论文的一个字段值。
+\end{itemize}
+
+\section{使用}
+
+字段定义后，会在所有论文的抽屉中出现一个「自定义字段」区域。你可以直接编辑
+每个论文的字段值。自定义字段支持：
+
+\begin{itemize}
+  \item \textbf{筛选}——在主列表的筛选栏中，可以按自定义字段的值过滤论文。
+    例如筛选 \cmd{project = thesis-ch3} 的所有论文。
+  \item \textbf{排序}——number 和 date 类型的字段支持升序/降序排序。
+  \item \textbf{导出}——在 Markdown 导出的 YAML frontmatter 中，
+    自定义字段以 \cmd{custom\_<字段名>} 的格式写入。
+  \item \textbf{全局定义}——创建一次，所有论文共享相同的字段定义。
+    删除字段定义会级联删除所有论文的该字段值。
+\end{itemize}
+
+\begin{tipbox}
+自定义字段与标签的区别：标签是扁平的、无类型的关键词；自定义字段是有类型的
+结构化数据（如日期、数字、枚举）。如果你需要按「截止日期」排序或按「优先级」
+筛选，用自定义字段比标签更合适。
+\end{tipbox}
+
+% =====================================================================
+\chapter{设置}
+\label{ch:settings}
+
+\cmd{/settings} 路由是 LitFolio 的「管脚」。主要板块：\textbf{LLM 配置}、
+\textbf{任务分配}、\textbf{WebDAV 同步}、\textbf{导出}、\textbf{自定义字段}、
+\textbf{标注颜色}、\textbf{主题提醒}。
+
+\section{LLM 配置}
+
+LitFolio 不绑死任何一家 LLM 服务。它的设计是「OpenAI 兼容协议」：你可以加任意多
+个端点配置（profile），其中一个标记为「当前」。每个 profile 包含 API 地址、密钥、
+对话模型、向量模型（可选）、采样温度。
+
+\litfigure{17-settings-profiles.png}{LLM 配置。两个 profile：DeepSeek 与本地 Ollama；当前激活的是 DeepSeek。
+每个 profile 都能「📥 拉取」远端可用模型列表填进 chatModel 字段。}
+
+\subsection{拉取可用模型}
+
+填好 API 地址与密钥后点 \cmd{📥 拉取}，LitFolio 会调远端 \cmd{GET /v1/models}
+拿可用模型列表。这一步可避免你手敲错 model name。返回的模型会填入下拉框。
+
+\subsection{测试连接}
+
+「测试连接」会发起一次小规模 chat（提示「你好」），用真实模型回复来验证整条链路。
+失败原因（鉴权、网络、模型不存在）会原样显示。
+
+\subsection{推理模型兼容}
+
+LitFolio 自动适配 OpenAI 推理系列模型（GPT-5、o1、o3、o4 等）：
+这些模型使用 \cmd{max\_completion\_tokens} 替代 \cmd{max\_tokens}，且不支持
+\cmd{temperature} 参数。LitFolio 会根据模型名称自动切换请求格式，
+无需手动配置。如果你使用的是这些模型，在 profile 中正常填写模型名称即可。
+
+\section{任务分配}
+
+LitFolio 把所有 LLM 调用归到 \textbf{6 个任务（task）}：
+
+\begin{itemize}
+  \item \textbf{速读 TL;DR}——一句话摘要 + 关键发现
+  \item \textbf{深读 quickRead}——4 段式深度阅读
+  \item \textbf{翻译 translate}——标题/摘要/选段翻译
+  \item \textbf{搜索扩写 search}——主题搜索的查询扩写
+  \item \textbf{综述 survey}——主题综述生成
+  \item \textbf{术语 term}——术语表抽取
+  \item \textbf{提问 ask}——库内 RAG 回答
+\end{itemize}
+
+每个任务可独立绑到任一 profile 与任一具体 model。所以你可以把：
+\begin{description}
+  \item[贵但聪明] 深读、综述、提问 \ensuremath{\rightarrow} 选\textbf{当代顶级闭源对话模型}（如 OpenAI、Anthropic、Google 各家
+    最新的旗舰），事关回答质量，但单次 token 量并不大。
+  \item[便宜大碗] 翻译、术语 \ensuremath{\rightarrow} 选\textbf{国内主流 API 服务的低价档}（DeepSeek、Doubao、
+    智谱、月之暗面等都有性价比极高的对话型号），翻译/术语调用量大，每百万 token 一两块以内就够用。
+  \item[本地白嫖] TL;DR、搜索扩写 \ensuremath{\rightarrow} \textbf{本地 Ollama 上的开源对话模型}（Qwen、Llama、
+    DeepSeek 蒸馏版等 7B\textasciitilde32B 任一），无成本、隐私好，速度看你显卡。
+\end{description}
+
+\subsection{各任务的 LLM 调用细节}
+
+了解每个任务具体怎么调 LLM，有助于你判断该给它绑什么档次的模型。
+
+\subsubsection{速读 TL;DR}
+
+输入：标题 + 作者（前 6 位）+ 摘要。prompt 要求返回 JSON：\cmd{\detokenize{{"tldr": "一句话，
+不超过 40 词", "key_findings": ["3–5 条，每条不超过 20 词"]}}}。输出语言跟随用户
+设置。JSON 解析有三级容错（直接解析 → 提取 \cmd{\{...\}} 子串 → 空对象兜底）。
+结果写入 \cmd{papers} 表缓存，再次点击不会重调 LLM。
+
+\subsubsection{深读 Quick Read}
+
+输入与 TL;DR 相同（标题 + 作者 + 摘要），但 prompt 更细致：要求返回四段结构化 JSON
+（problem / method / comparison / limitations），每段 2–4 句散文体，不能用 bullet。
+system prompt 以「资深审稿人替同事判断该不该细读」的角色定位，引导 LLM 给出有判断力
+的评价，而非泛泛概括。
+
+\subsubsection{翻译}
+
+输入：标题 + 摘要。prompt 要求保留技术术语原文（模型名、算法名、数学符号、单位、
+数据集名）不翻译，不意译不概括，返回 JSON \cmd{\detokenize{{"title": "...", "abstract": "..."}}}。
+
+\section{WebDAV 同步}
+
+\litfigure{18-settings-sync.png}{WebDAV 同步面板。配好 URL 与凭据后可\textbf{推送}（本地→远端）或\textbf{拉取并替换本地}
+（远端→本地，会先备份本地到 \fpath{backups/sync/}）。}
+
+LitFolio 的同步是「整库快照」语义，不是细粒度增量。具体来说：
+
+\begin{enumerate}
+  \item \textbf{推送}——把整个 \fpath{\textasciitilde/Litera-Library/} 打包推到 WebDAV，
+    远端会有完整副本。
+  \item \textbf{拉取并替换本地}——从远端拉一个完整副本，覆盖本地。
+\end{enumerate}
+
+\begin{warnbox}
+「拉取并替换本地」会\textbf{覆盖}本地数据库与所有 \fpath{papers/}。LitFolio 在执行
+前会自动把当前本地状态保存到 \fpath{backups/sync/<timestamp>/}，所以即使你拉错
+方向也能回滚——但请认真对待这个操作，特别是当两台机器都有未推送变更时。
+\end{warnbox}
+
+「整库覆盖」而不是增量合并的设计选择，是因为论文库的修改大多是 PDF 与笔记，
+冲突时哪一边胜出的语义对用户难以解释；只暴露「整体推/整体拉」与「自动备份」
+反而更可预测。
+
+\section{导出设置}
+
+「设置 → 导出」面板控制 Markdown 导出行为（详见第 14 章）：
+
+\begin{itemize}
+  \item \textbf{导出目录}——选择 \cmd{.md} 文件的输出位置。
+  \item \textbf{增量导出}——默认开启。关闭后每次导出全部论文。
+  \item \textbf{自动导出}——开启后，笔记或高亮保存时自动触发导出（防抖 5 秒）。
+  \item \textbf{立即导出}——手动触发一次完整或增量导出。
+\end{itemize}
+
+\section{标注颜色设置}
+
+「设置 → 标注颜色」面板管理高亮颜色与语义标签的映射（详见 4.6 节）：
+
+\begin{itemize}
+  \item 查看当前所有颜色-标签映射。
+  \item 编辑标签名称。
+  \item 添加新的颜色-标签映射。
+  \item 删除不使用的映射。
+\end{itemize}
+
+\section{自定义字段设置}
+
+「设置 → 自定义字段」面板管理论文的自定义元数据字段定义（详见第 16 章）：
+
+\begin{itemize}
+  \item 创建新字段（名称 + 类型 + 可选的 select 选项）。
+  \item 编辑已有字段。
+  \item 删除字段（会级联删除所有论文的该字段值）。
+\end{itemize}
+
+\section{主题提醒设置}
+
+「设置 → 主题提醒」面板管理自动化论文监控（详见 7.4 节）：
+
+\begin{itemize}
+  \item 查看所有提醒及其上次运行时间。
+  \item 查看每个提醒的历史结果列表。
+  \item 编辑提醒的查询、频率、目标文件夹。
+  \item 暂停或删除提醒。
+  \item 标记结果为已读。
+\end{itemize}
+
+% =====================================================================
+\chapter{数据与文件布局}
+\label{ch:data}
+
+LitFolio 信奉「数据是用户的」。所有信息以可读格式落在 \fpath{\textasciitilde/Litera-Library/}，
+你不依赖 LitFolio 一样能用脚本访问。
+
+\section{顶层结构}
+
+\begin{quote}\small\ttfamily
+\textasciitilde/Litera-Library/\\
+\ \ library.db\hfill\textnormal{\small SQLite 主库}\\
+\ \ library.db-wal\hfill\textnormal{\small WAL 日志（运行时）}\\
+\ \ library.db-shm\hfill\textnormal{\small 共享内存（运行时）}\\
+\ \ papers/\\
+\ \ \ \ \textless paperId\textgreater /\\
+\ \ \ \ \ \ paper.pdf\\
+\ \ \ \ \ \ meta.json\\
+\ \ \ \ \ \ note.md\\
+\ \ \ \ \ \ pdf-text.txt\\
+\ \ notes/\\
+\ \ \ \ ask/\hfill\textnormal{\small 「保存为笔记」的 Ask 结果}\\
+\ \ backups/\\
+\ \ \ \ deleted/\hfill\textnormal{\small 删除前的 papers 副本}\\
+\ \ \ \ sync/\hfill\textnormal{\small 拉取前的本地快照}\\
+\ \ sync/\hfill\textnormal{\small WebDAV 推送时使用的临时区}
+\end{quote}
+
+\section{library.db 表概览}
+
+主要表（详细 schema 见仓库 \fpath{src-tauri/migrations/}，共 24 个迁移文件）：
+
+\subsection{核心}
+
+\begin{itemize}
+  \item \cmd{papers}——核心元数据，每篇一行（id、title、authors、abstract、status、
+    tldr、quick\_read\_json、translated\_title、translated\_abstract、bibtex、
+    last\_exported\_at...）
+  \item \cmd{highlights}——选区高亮与区域高亮（paper\_id、page、boundingRect、
+    text、comment、color、label）
+  \item \cmd{terms}——术语表（paper\_id、term、definition、evidence、cross\_refs）
+  \item \cmd{tags} / \cmd{paper\_tags}——标签与归属
+  \item \cmd{folders} / \cmd{paper\_folders}——文件夹与归属（支持嵌套与多归属）
+\end{itemize}
+
+\subsection{发现与阅读}
+
+\begin{itemize}
+  \item \cmd{feeds} / \cmd{feed\_items}——RSS 源与条目
+  \item \cmd{topic\_surveys}——已保存的主题综述
+  \item \cmd{topic\_alerts} / \cmd{topic\_alert\_results}——主题提醒配置与结果
+  \item \cmd{reading\_queue}——阅读队列（paper\_id、priority、target\_date、note）
+  \item \cmd{paper\_comparisons}——多论文对比结果
+  \item \cmd{recommendation\_cache}——相似论文推荐缓存
+  \item \cmd{paper\_citations}——引用网络缓存
+\end{itemize}
+
+\subsection{笔记与知识}
+
+\begin{itemize}
+  \item \cmd{paper\_note\_sections}——结构化笔记卡片（paper\_id、section\_key、
+    content、source、sort\_order）
+  \item \cmd{paper\_links}——论文间手动/AI 关系
+  \item \cmd{paper\_terms}——论文与术语的关联（含跨论文复用）
+  \item \cmd{concepts}——概念节点（name、description、source）
+  \item \cmd{concept\_relations}——概念间关系（replaces/extends/requires/enables/competes\_with）
+  \item \cmd{paper\_concepts}——论文与概念的关联
+\end{itemize}
+
+\subsection{配置与索引}
+
+\begin{itemize}
+  \item \cmd{llm\_profiles} / \cmd{task\_assignments}——端点与任务绑定
+  \item \cmd{papers\_fts} / \cmd{highlights\_fts} / \cmd{terms\_fts}——FTS5 全文索引
+  \item \cmd{paper\_embeddings}——向量嵌入缓存
+  \item \cmd{custom\_field\_defs} / \cmd{paper\_custom\_fields}——自定义元数据
+  \item \cmd{smart\_collections}——智能收藏夹规则
+\end{itemize}
+
+\section{papers/$<$id$>$/ 单篇布局}
+
+每篇论文一个目录，目录名是 ULID（\cmd{01KSCN65XF4B2PZ83D27ET55PX} 这种 26 字符）：
+
+\begin{description}
+  \item[paper.pdf] 原文 PDF。删除该文件 LitFolio 会显示「PDF 未绑定」，但元数据与笔记
+    仍然在；用文献库抽屉里的「重新绑定 PDF」可挂回去。
+  \item[meta.json] 元数据快照（标题、作者、年份、DOI/arXiv ID、来源等）。SQLite 是
+    主存储，meta.json 是供脚本读取的镜像。
+  \item[note.md] 这篇的笔记。完全由你写，LitFolio 不会改动除你在阅读器写入之外的内容。
+  \item[pdf-text.txt] PDF 全文提取（用 pdf-extract 离线生成），用于 FTS5 索引与
+    RAG 召回。
+\end{description}
+
+\section{性能优化}
+
+LitFolio 针对大规模文献库（1000+ 篇论文）做了两项关键优化。
+
+\subsection{虚拟滚动}
+
+文献库主列表使用虚拟滚动（virtual scrolling）技术，基于
+\cmd{@tanstack/react-virtual} 实现。核心原理：
+
+\begin{enumerate}
+  \item \textbf{容器测量}——列表容器挂载时测量可视区域高度（如 800px）。
+  \item \textbf{行高估算}——每行论文卡片的估算高度（如 72px）。
+  \item \textbf{可视窗口计算}——根据滚动偏移量和容器高度，计算当前需要渲染的
+    行索引范围。例如滚动到 500px 时，渲染第 7--18 行（加上上下各 3 行的
+    overscan 缓冲）。
+  \item \textbf{DOM 节点池}——只创建可视范围内的 DOM 节点。滚动时，离开
+    可视区域的节点被回收，新进入的节点被创建。
+  \item \textbf{占位填充}——列表总高度通过 \cmd{totalSize * rowHeight}
+    计算，用上下 padding 元素撑开滚动条，保证滚动行为与完整列表一致。
+\end{enumerate}
+
+效果：
+
+\begin{itemize}
+  \item 初始渲染时间 $< 100$ms（2000 篇论文）。
+  \item 滚动保持 60fps——因为每次只操作 20--30 个 DOM 节点。
+  \item 内存占用与可视区域大小成正比，而非与论文总数成正比。
+\end{itemize}
+
+\subsection{嵌入缓存}
+
+RAG 查询（库内提问）需要对论文文本做向量嵌入。LitFolio 使用
+\cmd{paper\_embeddings} 表缓存已生成的嵌入向量：
+
+\begin{enumerate}
+  \item 查询前，检查 \cmd{paper\_embeddings} 表中是否有该论文的缓存记录，
+    且 \cmd{content\_hash} 与当前文本哈希一致。
+  \item 命中缓存 → 直接使用缓存的嵌入向量，跳过 API 调用。
+  \item 未命中 → 调用嵌入 API 生成向量，写入缓存表。
+  \item 论文内容变更（笔记编辑、高亮增删）→ \cmd{content\_hash} 变化 →
+    下次查询时自动重新生成嵌入。
+\end{enumerate}
+
+嵌入缓存对用户完全透明——不需要任何手动操作。日志中可以看到
+\cmd{"embedding cache hit"} 或 \cmd{"embedding cache miss"} 来确认缓存是否
+生效。
+
+\section{备份}
+
+LitFolio 有两类自动备份：
+
+\begin{enumerate}
+  \item \textbf{删除回收站}（\fpath{backups/deleted/}）——\textbf{第 2 章}讲过，删除论文
+    会先移到这里。30 天后自动清理。
+  \item \textbf{同步快照}（\fpath{backups/sync/}）——「拉取并替换」前的本地完整快照。
+    保留最近 5 次。
+\end{enumerate}
+
+如果你需要自己加日定时备份，最简单的办法是把整个 \fpath{\textasciitilde/Litera-Library/}
+作为 borg/restic 仓库源——SQLite WAL 文件也包括在内，可保证一致性。
+
+% =====================================================================
+\chapter{快捷键速查}
+\label{ch:shortcuts}
+
+\section{阅读器（\cmd{/reader}）}
+
+\begin{longtable}{p{5.5cm} p{8cm}}
+\toprule
+\textbf{快捷键} & \textbf{动作} \\
+\midrule
+\endhead
+\kbd{Ctrl+F} / \kbd{Cmd+F} & 打开 PDF 搜索框 \\
+\kbd{Enter} & 跳到下一个匹配 \\
+\kbd{Shift+Enter} & 跳到上一个匹配 \\
+\kbd{Esc} & 关闭搜索框 \\
+\kbd{Alt+拖拽} & 区域高亮（矩形截图） \\
+\kbd{鼠标选择} & 文本高亮（弹气泡） \\
+\kbd{j} / \kbd{k} & 下一页 / 上一页 \\
+\kbd{1} / \kbd{2} / \kbd{3} & 切换右栏 笔记 / 选段翻译 / 术语 \\
+\kbd{[} / \kbd{]} & 左/右栏宽度 5\% 步进 \\
+\bottomrule
+\end{longtable}
+
+\section{全局}
+
+\begin{longtable}{p{5.5cm} p{8cm}}
+\toprule
+\textbf{动作} & \textbf{效果} \\
+\midrule
+\endhead
+\kbd{Ctrl+K} / \kbd{Cmd+K} & 打开命令面板 \\
+拖拽 PDF 到任意页面 & 跳到「导入 → PDF 文件」并预填该文件 \\
+\kbd{Ctrl+Enter} / \kbd{Cmd+Enter} & 在 Ask 页发送消息 \\
+\kbd{Esc} & 关闭命令面板 / 弹窗 / 搜索框 \\
+\bottomrule
+\end{longtable}
+
+% =====================================================================
+\chapter{故障排查}
+\label{ch:troubleshoot}
+
+下面把最常遇到的几类问题按「现象 → 原因 → 修复」整理。
+
+\section{LLM 调用失败}
+
+\textbf{现象}：TL;DR / 深读 / 翻译按钮转圈后弹「请求失败」。
+
+\textbf{常见原因与修复}：
+
+\begin{enumerate}
+  \item 当前 profile 没填或 model name 拼错——到「设置 → LLM 配置」点「测试连接」。
+  \item API key 余额耗尽 / 鉴权过期——错误详情会原样展示，参考服务商提示。
+  \item 网络不可达（特别是国内访问 OpenAI 直连）——换走兼容端点（Azure / 国内中转）。
+  \item 本地 Ollama 没起——\cmd{ollama serve} 拉起服务，再到设置点测试。
+\end{enumerate}
+
+\section{PDF 加载失败}
+
+\textbf{现象}：阅读器中间一直转圈或显示「加载 PDF 失败」。
+
+\textbf{修复}：
+
+\begin{itemize}
+  \item 检查 \fpath{papers/<id>/paper.pdf} 文件是否存在；不在则到文献库抽屉点「重新绑定 PDF」。
+  \item 某些扫描版 PDF 用了非标准编码，PDF.js 渲染失败——可尝试用 \cmd{ocrmypdf} 或
+    \cmd{qpdf --linearize} 处理后重新绑定。
+\end{itemize}
+
+\section{RSS 抓不到 / 一直「已是最新」}
+
+\textbf{现象}：明明远端有新内容，点「刷新」却显示「已是最新」。
+
+\textbf{原因}：LitFolio 用条件 GET（\cmd{If-Modified-Since} / \cmd{ETag}），远端
+说没变就不再拉。如果你怀疑远端在撒谎，可以从「订阅源管理」删除该源再重加。
+
+\textbf{User-Agent 被屏蔽}：少数期刊网站会屏蔽默认 UA。在订阅时填入自定义
+\cmd{User-Agent} 头即可。
+
+\section{WebDAV 同步失败}
+
+常见三种：
+
+\begin{itemize}
+  \item \textbf{401 Unauthorized}——账号密码错；如用「Nextcloud」请用 \textbf{应用密码}
+    而非账户密码。
+  \item \textbf{404 / 405}——WebDAV URL 路径不对。Nextcloud 是 \cmd{/remote.php/dav/files/<user>/}，
+    坚果云是 \cmd{https://dav.jianguoyun.com/dav/}。
+  \item \textbf{冲突 / 中途失败}——拉取前的本地快照在 \fpath{backups/sync/}，可手动恢复。
+\end{itemize}
+
+\section{数据库锁住}
+
+\textbf{现象}：启动时弹「database is locked」。
+
+\textbf{原因}：意外 kill 后 WAL 文件残留，多数情况 SQLite 会自动 checkpoint 恢复。
+如果 LitFolio 一直起不来，关闭所有 LitFolio 进程后删 \fpath{library.db-wal} 与
+\fpath{library.db-shm}（数据本身在 \fpath{library.db}，删 WAL 只丢未持久化的最近
+几秒变更）。
+
+\section{批量导入部分失败}
+
+\textbf{现象}：导入文件夹时，部分 PDF 显示「失败」。
+
+\textbf{常见原因}：
+
+\begin{enumerate}
+  \item \textbf{PDF 损坏}——文件不完整或被截断。用 \cmd{qpdf --check} 验证。
+  \item \textbf{无文本层}——扫描版 PDF 没有 OCR 文本层。LitFolio 仍然会入库
+    （用文件名作为标题），但全文搜索无法覆盖内容。用 \cmd{ocrmypdf} 处理后
+    重新绑定 PDF。
+  \item \textbf{权限问题}——PDF 文件被其他程序锁定或没有读权限。
+\end{enumerate}
+
+\section{概念提取结果为空}
+
+\textbf{现象}：点击「提取概念」后，知识图谱中没有出现概念节点。
+
+\textbf{常见原因}：
+
+\begin{enumerate}
+  \item 论文没有 TL;DR 或深读结果——LLM 缺乏足够上下文来识别概念。
+    先对论文运行速读或深读。
+  \item LLM 返回了无法解析的 JSON——检查 LLM 配置的模型是否支持 JSON
+    输出格式。
+  \item 论文内容太短或不是学术论文——概念提取对学术论文的效果最好。
+\end{enumerate}
+
+\section{引用网络/相似论文为空}
+
+\textbf{现象}：点击「引用」或「相似论文」后显示「暂无数据」。
+
+\textbf{原因}：
+
+\begin{itemize}
+  \item 论文没有 DOI 且标题匹配不到 Semantic Scholar 中的记录。
+  \item 论文非常新（发表不到 1 周），S2 尚未收录。
+  \item 小众领域或非英文论文，S2 覆盖率有限。
+  \item 网络问题——检查是否能访问 \cmd{api.semanticscholar.org}。
+\end{itemize}
+
+\section{智能收藏夹不更新}
+
+\textbf{现象}：修改了论文的标签或状态，但智能收藏夹的论文列表没有变化。
+
+\textbf{原因}：智能收藏夹是实时查询的——你需要重新选中该收藏夹才能看到更新。
+这不是 bug，而是设计选择：避免每次论文变更都触发规则查询影响性能。
+
+\section{Linux AppImage 无法启动}
+
+\textbf{现象}：双击 \fpath{.AppImage} 文件没有反应，或命令行运行报错。
+
+\textbf{常见原因与修复}：
+
+\begin{enumerate}
+  \item \textbf{缺少执行权限}——运行 \cmd{chmod +x LitFolio\_x.y.z\_amd64.AppImage}。
+  \item \textbf{FUSE 未安装}——错误提示含 ``fuse'' 或 ``libfuse''。Ubuntu/Debian：
+    \cmd{sudo apt install libfuse2}；Fedora：\cmd{sudo dnf install fuse-libs}。
+  \item \textbf{沙箱冲突}——部分桌面环境（如某些 Wayland compositor）下 Chromium
+    沙箱可能失败。尝试命令行加 \cmd{-{}-no-sandbox} 参数启动。
+  \item \textbf{磁盘空间不足}——AppImage 运行时需临时解压到 \fpath{/tmp}，确保
+    有至少 500 MB 可用空间。
+\end{enumerate}
+
+% =====================================================================
+\appendix
+
+% ---------------------------------------------------------------------
+\chapter{LLM 端点兼容清单}
+\label{appx:llm}
+
+LitFolio 遵循「OpenAI Chat Completions 协议」，下面这些端点都验证过可直接接入：
+
+\begin{longtable}{p{4cm} p{5.5cm} p{4.5cm}}
+\toprule
+\textbf{服务} & \textbf{API 地址} & \textbf{备注} \\
+\midrule
+\endhead
+OpenAI 官方 & \cmd{https://api.openai.com/v1} & 直连可能受限 \\
+DeepSeek & \cmd{https://api.deepseek.com/v1} & 推荐：性价比高 \\
+Azure OpenAI & \cmd{<resource>.openai.azure.com/} \mbox{}\cmd{openai/deployments/<dep>/v1} & 需要 API 版本头 \\
+Ollama（本地） & \cmd{http://localhost:11434/v1} & 完全离线 \\
+LM Studio（本地） & \cmd{http://localhost:1234/v1} & 桌面 GUI 加载 GGUF \\
+OpenRouter & \cmd{https://openrouter.ai/api/v1} & 一个 key 多模型 \\
+Together.ai & \cmd{https://api.together.xyz/v1} & 开源模型托管 \\
+\bottomrule
+\end{longtable}
+
+\textbf{任务分配推荐思路}（具体型号迭代很快，按思路选当下的就行）：
+
+\begin{itemize}
+  \item \textbf{学生 / 全免费}——能本地的全本地（本地 Ollama 跑 7\textasciitilde14B
+    开源模型已够用于 TL;DR / 翻译 / 搜索扩写）；非要联网的留给「深读」「综述」「提问」，
+    挑国内厂商的免费层即可。
+  \item \textbf{研究者 / 性价比}——所有任务统一指向\textbf{国内主流 API 的低价档}
+    （DeepSeek、Doubao、智谱、月之暗面等任选一家），单价低、上下文窗口大，绝大多数
+    研究场景已经够用。
+  \item \textbf{硬核 / 不计成本}——TL;DR / 翻译 / 术语丢国内便宜档；
+    深读 / 综述 / 提问交给\textbf{当时最强的旗舰对话模型}（OpenAI、Anthropic、
+    Google 各家轮流领先，按发布时间挑一个即可），保证回答上限。
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\chapter{arXiv 主流分类速查}
+\label{appx:arxiv}
+
+\begin{description}
+  \item[cs.AI / cs.LG / cs.CL] 人工智能 / 机器学习 / 自然语言处理
+  \item[cs.CV] 计算机视觉
+  \item[cs.CR / cs.DC] 密码与安全 / 分布式系统
+  \item[stat.ML] 统计机器学习
+  \item[physics.optics] 光学与光子学
+  \item[physics.atom-ph] 原子物理
+  \item[cond-mat.mes-hall] 凝聚态-介观与纳米
+  \item[quant-ph] 量子物理
+  \item[math.OC] 优化与控制
+  \item[math.AP] 偏微分方程
+  \item[q-bio.NC] 神经科学
+\end{description}
+
+完整列表见 \cmd{https://arxiv.org/category\_taxonomy}。
+
+% ---------------------------------------------------------------------
+\chapter{推荐 RSS 源}
+\label{appx:rss}
+
+\textbf{arXiv 子分类}（替换 \cmd{CAT} 为如 \cmd{cs.LG}）：
+
+\begin{itemize}
+  \item \cmd{http://export.arxiv.org/rss/CAT}——官方 RSS，每日刷新
+  \item \cmd{http://export.arxiv.org/rss/CAT.recent}——只看最新
+\end{itemize}
+
+\textbf{期刊}：
+
+\begin{itemize}
+  \item Nature：\cmd{https://www.nature.com/nature.rss}
+  \item Science：\cmd{https://www.science.org/rss/news\_current.xml}
+  \item Nature Photonics：\cmd{https://www.nature.com/nphoton.rss}
+  \item Optica（OSA）：\cmd{https://www.optica-opn.org/rss/news.xml}
+  \item PRL：\cmd{http://feeds.aps.org/rss/recent/prl.xml}
+\end{itemize}
+
+\textbf{研究博客 / 综述}：
+
+\begin{itemize}
+  \item Distill: \cmd{https://distill.pub/rss.xml}（已停更，但旧文价值高）
+  \item Lil'Log: \cmd{https://lilianweng.github.io/index.xml}
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\chapter{许可证}
+\label{appx:license}
+
+LitFolio 使用 \textbf{GPL-3.0-or-later} 许可证发布。这意味着：
+
+\begin{itemize}
+  \item 你可以自由使用、修改、再分发。
+  \item 如果你基于 LitFolio 做了衍生作品并对外分发，衍生作品也必须以同样许可证（或更宽
+    松的兼容许可证）发布，并提供源码。
+  \item 不提供任何形式的明示或暗示担保。
+\end{itemize}
+
+完整许可证文本见仓库根目录 \fpath{LICENSE} 文件。

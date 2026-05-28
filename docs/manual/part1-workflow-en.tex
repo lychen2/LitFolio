@@ -1,0 +1,1177 @@
+\part{Daily Workflow}
+
+% =====================================================================
+\chapter{Getting Started}
+\label{ch:start}
+
+\section{What Is LitFolio}
+
+LitFolio is a desktop research paper workbench:
+all data---metadata, PDFs, notes, highlights, terms, surveys---lives directly under
+\fpath{\textasciitilde/Litera-Library/} on your own machine. Network access is only
+needed to fetch arXiv metadata, parse RSS feeds, and call LLMs. In other words, you
+can read, write, and search even when offline; moving to another computer is as simple
+as syncing that directory.
+
+LitFolio is composed of eight major feature areas:
+
+\begin{enumerate}
+  \item \textbf{Library}---local paper list, reading-state machine, TL;DR, deep read,
+    translation, folders, tags, automatic BibTeX generation, citation formatting,
+    batch export.
+  \item \textbf{Reader}---three-pane PDF view with a highlight list on the left and
+    notes / selection translation / terms tabs on the right; structured note cards
+    and semantic annotation colors.
+  \item \textbf{Import}---three entry points: arXiv/DOI metadata, local PDF files,
+    and Semantic Scholar search; batch folder import with deduplication.
+  \item \textbf{Discovery}---arXiv category browsing, RSS subscriptions, topic survey
+    generation, and topic alerts.
+  \item \textbf{Ask}---multi-turn RAG conversation over your read papers: query
+    rewriting, multi-path FTS5 retrieval, answers with citation numbers, and
+    context-aware follow-ups.
+  \item \textbf{Knowledge Graph}---paper-relationship network, citation network,
+    and concept map, with AI-powered discovery of connections and method evolution.
+  \item \textbf{Advanced Tools}---multi-paper comparison, literature review draft,
+    similar-paper recommendations, reading queue, smart collections, custom metadata
+    fields, Markdown export, command palette.
+  \item \textbf{Settings}---multiple LLM endpoint configurations, per-task model
+    assignment, whole-library WebDAV sync.
+\end{enumerate}
+
+\section{Installation and First Launch}
+
+LitFolio is built with Tauri 2 + React 18 and is available through two channels:
+
+\subsection{Download from Releases (Recommended)}
+
+Go to the project repository's Releases page and download the installer for your platform:
+
+\begin{itemize}
+  \item Linux: \fpath{LitFolio\_x.y.z\_amd64.AppImage} or \fpath{.deb}
+  \item macOS: \fpath{LitFolio\_x.y.z\_universal.dmg}
+  \item Windows: \fpath{LitFolio\_x.y.z\_x64-setup.exe}
+\end{itemize}
+
+\begin{tipbox}[Linux AppImage Usage]
+After downloading the \fpath{.AppImage} file, make it executable:
+\cmd{chmod +x LitFolio\_x.y.z\_amd64.AppImage}, then double-click or run from
+the terminal. AppImage requires FUSE (\cmd{libfuse2}); most distributions ship it
+by default. If prompted, install it with \cmd{sudo apt install libfuse2}
+(Ubuntu/Debian) or \cmd{sudo dnf install fuse-libs} (Fedora).
+AppImage is a portable format---no installation needed; simply delete the file to
+remove it.
+\end{tipbox}
+
+\subsection{Run from Source (Developers)}
+
+\begin{enumerate}
+  \item Install \cmd{pnpm}, \cmd{rustup} (with the stable toolchain), and the
+    platform-specific Tauri system dependencies
+    (on Linux typically \cmd{webkit2gtk-4.1}, \cmd{librsvg}, \cmd{libsoup-3.0}).
+  \item Run \cmd{pnpm install} to install frontend dependencies.
+  \item Run \cmd{pnpm tauri dev} to start development mode; the first launch will
+    compile Rust crates and may take a few minutes.
+\end{enumerate}
+
+\begin{tipbox}
+In development mode the window title includes a ``[dev]'' badge. The database is
+the same as the production build (both live under \fpath{\textasciitilde/Litera-Library/}),
+so papers you import, deep-read, or annotate in dev mode will also appear in the
+packaged build.
+\end{tipbox}
+
+\section{The Library Directory at a Glance}
+
+On first launch, LitFolio automatically creates \fpath{\textasciitilde/Litera-Library/}
+and initializes an empty database. You will immediately see the left navigation bar
+(\textbf{Library / Import / Browse / Feeds / Topics / Ask / Settings}) and an empty
+main list.
+
+\litfigure{01-shell-library-en.png}{LitFolio main interface. Left: navigation bar; center: folder sidebar;
+right: paper list with search box. Deep violet (\cmd{violet}) is the primary interactive
+color, used for buttons, links, and emphasis.}
+
+The physical layout of the library directory (detailed in Chapter 12) is roughly:
+
+\begin{quote}\small\ttfamily
+\textasciitilde/Litera-Library/\\
+\ \ library.db\hfill\textnormal{\small // SQLite main database}\\
+\ \ papers/<paperId>/\hfill\textnormal{\small // one directory per paper}\\
+\ \ \ \ paper.pdf\\
+\ \ \ \ meta.json\\
+\ \ \ \ note.md\\
+\ \ \ \ pdf-text.txt\\
+\ \ backups/\hfill\textnormal{\small // automatic backups}\\
+\ \ sync/\hfill\textnormal{\small // sync snapshots}
+\end{quote}
+
+\section{Next Step: Configure Your First LLM Endpoint}
+
+LitFolio does not ship with any built-in LLM. To use TL;DR, deep reading, translation,
+term extraction, topic surveys, and library Q\&A, you must first add at least one
+endpoint under \emph{Settings $\to$ LLM Configuration} (any OpenAI-compatible API
+or a local Ollama instance will work). See \textbf{Chapter 15} for full details;
+you can jump there now and come back, or proceed to Chapter 2 to explore the
+features that do not require an LLM.
+
+% =====================================================================
+\chapter{The Library}
+\label{ch:library}
+
+The library page (\cmd{/library} route) is the screen you will spend the most time on.
+Its design goal is simple: one glance at the list should tell you what these papers are
+about, which ones deserve a deep read, and which are just RSS items you have not
+touched yet.
+
+\section{Main List and Search}
+
+Each row in the main list displays: title, authors, year/journal, reading-status badge,
+TL;DR summary (if generated), key-finding chips, and tag chips. Clicking anywhere on
+a row opens the detail drawer on the right (see Section 2.4).
+
+\subsection{Search Box}
+
+The search box at the top uses SQLite FTS5: titles, abstracts, TL;DRs, notes, and
+highlights are all indexed in a unified full-text index. Keywords are space-delimited
+with AND semantics. To search for an exact phrase, wrap it in double quotes.
+
+\subsection{FTS5 Full-Text Search Mechanics}
+
+LitFolio's full-text index is based on the SQLite FTS5 virtual table \cmd{papers\_fts},
+using the \cmd{unicode61} tokenizer. The table indexes five fields: title, authors,
+abstract, TL;DR, and notes. INSERT / UPDATE / DELETE triggers keep it in sync with
+the \cmd{papers} main table---papers are automatically re-indexed on import or update.
+
+The search pipeline:
+
+\begin{enumerate}
+  \item \textbf{Input sanitization}---the \cmd{escape\_fts} function splits user input
+    on spaces, strips FTS5 special characters (\cmd{"():.-}), wraps each token as
+    \cmd{"token"*} (prefix matching), and joins them with AND. For example,
+    \cmd{retrieval augmented} becomes \cmd{"retrieval"* AND "augmented"*}.
+  \item \textbf{BM25 ranking}---FTS5's built-in BM25 algorithm computes a relevance
+    score automatically. Results are sorted by ascending BM25 (lower is more relevant),
+    with ties broken by descending import time.
+  \item \textbf{Empty-query fallback}---if sanitization produces an empty query (e.g.,
+    the user typed only special characters), the system falls back to \cmd{list\_recent},
+    returning papers in reverse chronological order.
+\end{enumerate}
+
+\begin{tipbox}
+The FTS5 \cmd{unicode61} tokenizer splits CJK text character by character, so searching
+for a Chinese phrase like ``neural network'' is equivalent to searching for each character
+individually with AND---short characters may bring in noise. For precise CJK searching,
+consider using English keywords or the English names of technical terms.
+\end{tipbox}
+
+\subsection{Sorting and Filtering}
+
+The sidebar's Must-read / Reading / Read / Unread filters correspond to the
+\cmd{must}/\cmd{reading}/\cmd{read}/\cmd{unread} status values. Clicking a folder
+(see 2.6) or a tag chip applies the corresponding filter.
+
+\section{Reading States: unread → reading → read → must}
+
+Each paper has a \textbf{reading state}, initially \cmd{unread}:
+
+\begin{description}
+  \item[unread] Not yet touched. Papers imported via RSS or arXiv default to this state.
+  \item[reading] Currently being read. Signals that you want this paper to appear
+    near the top of the list.
+  \item[read] Finished; the paper can fade into the background.
+  \item[must] ``Must read''---a higher-priority marker than \cmd{read}, also given
+    priority when generating topic surveys.
+\end{description}
+
+Clicking the status badge cycles through the states in order. This four-state mechanism
+is a deliberate design choice: LitFolio does not assume that reading a paper once means
+you are done with it---it preserves the semantics of ``important papers deserve to be
+revisited.''
+
+\section{Quick Read (TL;DR)}
+
+The main list has a ``Quick Read'' button on the right. Clicking it invokes the
+``TL;DR generation'' task (bound by default to your configured \cmd{tldr} model).
+The returned paragraph is saved directly to the database as a compact summary and
+appears instantly the next time you open the paper.
+
+\begin{tipbox}
+Once generated, the TL;DR is cached in SQLite. Clicking the same paper again will not
+re-invoke the LLM. To force regeneration, click ``Regenerate'' in the drawer.
+\end{tipbox}
+
+\section{Deep Read: Four-Section Drawer}
+
+``Deep Read'' is one of the core interactions that sets LitFolio apart from other
+reader tools. Click the ``Deep Read'' button on a paper row and the right drawer
+presents content in four structured sections:
+
+\litfigure{02-library-drawer-en.png}{Deep-read drawer. Top to bottom: \textbf{What problem
+does it solve}, \textbf{What method is proposed}, \textbf{How does it differ from
+others}, \textbf{Limitations and open issues}---each section is extracted from the
+full text and has a \cmd{Regenerate} button beside it.}
+
+The four-section design lets you judge whether a paper deserves a detailed read
+without going through the entire text. The \textbf{Differences} and \textbf{Limitations}
+sections alone are usually enough to decide whether to open the PDF. The full result
+is likewise cached.
+
+\section{Title/Abstract Translation}
+
+The drawer includes a ``Translate'' button that calls the ``translation'' task (bound
+to your \cmd{translate} model). The result is presented as a bilingual side-by-side
+view, and the translated title and abstract are saved in the metadata for quick
+scanning.
+
+\begin{tipbox}
+Different tasks can be bound to different models---for instance, you can assign TL;DR
+to DeepSeek and translation to a local Ollama instance. See \textbf{Chapter 15}.
+\end{tipbox}
+
+\section{Folders}
+
+Folders are hierarchical (unlike tags) and support multiple membership---a single paper
+can reside in both ``ML/Transformer'' and ``Applications/NLP'' simultaneously.
+
+\litfigure{03-library-folder-en.png}{Sidebar folders. Selecting a folder filters the main
+list to its contents; combined with the search box, this gives you ``full-text search
+within a folder.''}
+
+To create a folder: right-click an empty area in the sidebar $\to$ \cmd{New}. To manage
+membership: drag and drop, or click ``Move to\ldots'' in the drawer.
+
+\section{Tags}
+
+Tags are flat, string-based labels created through the input box in the drawer. A paper
+can have any number of tags. The distinction from folders:
+
+\begin{itemize}
+  \item Folders = \textbf{research domain taxonomy}, relatively stable, 2--3 levels deep.
+  \item Tags = \textbf{ad-hoc topic/project markers}, ephemeral and flat.
+\end{itemize}
+
+\section{Deleting a Paper}
+
+The drawer has a ``Delete'' button at the bottom. Deleting removes: the entire
+\fpath{papers/<id>/} directory, the SQLite row, and all associated highlights,
+notes, and terms.
+
+\begin{warnbox}
+Deletion is irreversible in the database, but LitFolio moves \fpath{papers/<id>/} to
+\fpath{backups/deleted/<timestamp>/} instead of running \cmd{rm -rf}. If you
+accidentally delete something, you can recover it from \fpath{backups/deleted/}.
+\end{warnbox}
+
+\section{Automatic BibTeX Generation}
+
+When a paper is imported, LitFolio automatically generates a BibTeX entry from its
+metadata and stores it in the \cmd{bibtex} database field. Both the drawer and the
+reader header have a ``Copy BibTeX'' button that copies the entry to the system
+clipboard.
+
+\litfigure{21-library-bibtex-en.png}{BibTeX section in the paper drawer. One click copies the
+entry to the clipboard, ready to paste into a LaTeX document.}
+
+\subsection{BibTeX Key Generation Algorithm}
+
+The BibTeX key is a paper's unique citation identifier, formatted as
+\cmd{<first-author-surname-lowercase><year><first-significant-title-word-lowercase>},
+e.g.\ \cmd{vaswani2017attention}. The generation pipeline:
+
+\begin{enumerate}
+  \item \textbf{Extract first author's surname}---take the first element of the
+    \cmd{authors} array, split on space or comma, take the last token (to handle both
+    \cmd{Firstname Lastname} and \cmd{Lastname, Firstname} formats), lowercase it,
+    and strip non-ASCII characters (keeping only \cmd{a-z} and hyphens). If the
+    author list is empty, use \cmd{unknown}.
+  \item \textbf{Extract first significant title word}---split the title on spaces,
+    skip stop words (\cmd{a/an/the/on/in/of/for/and/or/to/with/from/by/at}),
+    take the first non-stop word, lowercase it, and keep only \cmd{a-z0-9}. If the
+    title consists entirely of stop words (extremely rare), take the first word.
+  \item \textbf{Concatenate}---\cmd{<surname><year><first-word>}. If the year is
+    missing, use \cmd{0000}.
+  \item \textbf{Deduplicate}---after generation, check whether the key already exists
+    in the library. If so, append \cmd{a}, \cmd{b}\ldots until the key is unique.
+    This ensures that importing the same paper from different sources will never
+    produce a BibTeX key collision.
+\end{enumerate}
+
+\subsection{Field Mapping}
+
+\begin{longtable}{p{3.5cm} p{3cm} p{6cm}}
+\toprule
+\textbf{BibTeX Field} & \textbf{Source} & \textbf{Processing Rule} \\
+\midrule
+\endhead
+\cmd{title} & \cmd{papers.title} & Used directly \\
+\cmd{author} & \cmd{papers.authors} & JSON array joined with \cmd{ and } \\
+\cmd{year} & \cmd{papers.year} & Used directly; omitted if missing \\
+\cmd{journal}/\cmd{booktitle} & \cmd{papers.venue} & Written if venue exists; omitted otherwise \\
+\cmd{doi} & \cmd{papers.doi} & Written if DOI exists; omitted otherwise \\
+\cmd{eprint} & \cmd{papers.arxiv\_id} & Written if arXiv ID exists \\
+\cmd{archivePrefix} & Hardcoded & Fixed to \cmd{arXiv} when arXiv ID exists \\
+\cmd{primaryClass} & arXiv ID parsing & Inferred from the arXiv ID prefix (e.g.\
+  \cmd{cs} $\to$ \cmd{cs.AI}); omitted if uninferrable \\
+\cmd{url} & Composed & If DOI exists $\to$ \cmd{https://doi.org/<doi>}; if arXiv ID
+  exists $\to$ \cmd{https://arxiv.org/abs/<id>}; otherwise omitted \\
+\bottomrule
+\end{longtable}
+
+\subsection{Generation on Import}
+
+BibTeX generation is the final step of every import path: arXiv ID import, DOI import,
+PDF file import, and Semantic Scholar search import. It is a pure in-memory string
+concatenation---no LLM calls, no network access, no external service dependency;
+the time cost is negligible. Legacy papers with a NULL BibTeX field can be backfilled
+in bulk via the ``Backfill BibTeX'' button on the Settings page.
+
+\begin{tipbox}
+BibTeX key uniqueness is enforced by the database. If you use Zotero or another tool
+that generates keys in a different format, LitFolio's keys will not collide---because
+LitFolio keys always start with a lowercase surname and never contain underscores.
+Generation is pure in-memory string concatenation with negligible overhead.
+\end{tipbox}
+
+\section{Citation Formatting}
+
+In addition to BibTeX, LitFolio can produce formatted citations in standard academic
+styles. In the paper drawer, click ``Copy Citation'' and choose from four styles.
+Formatting is pure template rendering---metadata fields are substituted into predefined
+string templates; no LLM is involved.
+
+\subsection{Four Style Templates}
+
+\subsubsection{APA 7th}
+
+Template:
+\cmd{<Surname>, <First Initial>. (<Year>). <Title>. <Journal>.}
+
+Example output:\\
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N.,
+Kaiser, L., \& Polosukhin, I. (2017). Attention is all you need. \textit{NeurIPS}.
+
+Rules: for more than 20 authors, list the first 19 followed by \cmd{...} and the last;
+title in sentence case; journal name in italics.
+
+\subsubsection{IEEE}
+
+Template:
+\cmd{[N] <First Initial>. <Surname> et al., ``<Title>,'' <Journal>, <Year>.}
+
+Example output:\\
+{[}1{]} A. Vaswani et al., ``Attention is all you need,'' \textit{NeurIPS}, 2017.
+
+Rules: IEEE uses bracketed numbering; 3+ authors use \cmd{et al.}; title in Title Case;
+journal in italics.
+
+\subsubsection{GB/T 7714-2015}
+
+Template:
+\cmd{[N] <SURNAME> <First Initial>, <SURNAME> <First Initial>, ... <Title>[J]. <Journal>, <Year>.}
+
+Example output:\\
+{[}1{]} VASWANI A, SHAZEER N, PARMAR N, et al. Attention is all you need[J].
+NeurIPS, 2017.
+
+Rules: Chinese national standard---surname in uppercase before initials; 3+ authors
+use \cmd{et al.}; document type identifier \cmd{[J]} for journals, \cmd{[C]} for
+conferences, \cmd{[D]} for dissertations. LitFolio selects \cmd{[J]} or \cmd{[C]}
+automatically based on whether the venue string contains
+\cmd{Conference/Proceedings/Workshop}.
+
+\subsubsection{Chicago 17th}
+
+Template:
+\cmd{<Surname>, <First>. <Year>. ``<Title>.'' <Journal>.}
+
+Example output:\\
+Vaswani, Ashish, Noam Shazeer, Niki Parmar, et al. 2017.
+``Attention Is All You Need.'' \textit{NeurIPS}.
+
+Rules: authors use full names (not abbreviations); 7+ authors list the first 7
+followed by \cmd{et al.}
+
+\subsection{Batch Citation Formatting}
+
+Select multiple papers and click ``Export Citations $\to$ Formatted Text''. LitFolio
+generates a numbered reference list in the chosen style. Numbers are assigned in the
+order papers appear in the list (IEEE and GB/T 7714 require numbering; APA and Chicago
+sort by author-year).
+
+\section{Batch Citation Export}
+
+In the library, select papers in checkbox mode; a toolbar ``Export Citations'' button
+appears. Three formats are supported:
+
+\subsection{BibTeX (.bib)}
+
+Merges the BibTeX entries of all selected papers into a single \cmd{.bib} file. Each
+record is taken directly from \cmd{papers.bibtex} (generated by the algorithm in
+Section 2.9) and separated by blank lines. If a paper's BibTeX field is NULL (very
+old data), the entry is skipped and listed in the export report. The output file can
+be used directly with \cmd{bibtex} / \cmd{biber} / \cmd{biblatex}.
+
+\subsection{RIS (.ris)}
+
+RIS (Research Information Systems) is a universal reference exchange format. Each
+record consists of tagged lines:
+
+\begin{verbatim}
+TY  - JOUR
+TI  - Attention Is All You Need
+AU  - Vaswani, Ashish
+AU  - Shazeer, Noam
+PY  - 2017
+JO  - NeurIPS
+DO  - 10.48550/arXiv.1706.03762
+ER  -
+\end{verbatim}
+
+Tag mapping rules: \cmd{TY} is determined by venue (journal $\to$ \cmd{JOUR},
+conference $\to$ \cmd{CONF}, preprint $\to$ \cmd{UNPB}); \cmd{AU} one author per
+line in \cmd{Lastname, Firstname} format; \cmd{DO} from DOI; \cmd{UR} from URL.
+RIS files can be imported directly into Zotero, Mendeley, or EndNote.
+
+\subsection{Formatted Text}
+
+Generates a numbered citation list in one of the four styles (APA/IEEE/GB/T 7714/Chicago)
+as described in Section 2.10. Each paper occupies one or more lines (depending on
+style requirements); numbers are assigned in list-appearance order.
+
+\subsection{File Naming and Trigger}
+
+Export files are named \cmd{litera-export-<YYYY-MM-DD>.<ext>} and saved via a browser
+download dialog to a location of your choice. You can also choose ``Copy to Clipboard''
+to paste directly into an editor.
+
+\section{Smart Collections}
+
+Smart collections are rule-based virtual folders---papers are automatically included
+based on rules, without manual drag-and-drop. The sidebar's ``Smart Collections''
+area lets you create and manage them.
+
+\litfigure{22-smart-collections-en.png}{Smart collection creation dialog. Papers are filtered
+by combining conditions; results update in real time.}
+
+\subsection{Rule Structure}
+
+Each smart collection stores its rules as a JSON tree supporting nested AND/OR logic:
+
+\begin{verbatim}
+{
+  "op": "and",
+  "conditions": [
+    { "field": "read_status", "op": "eq", "value": "unread" },
+    { "field": "year", "op": "gte", "value": 2024 },
+    { "field": "tags", "op": "includes", "value": "transformer" },
+    { "op": "or", "conditions": [
+      { "field": "folder", "op": "in", "value": "ML" },
+      { "field": "title", "op": "contains", "value": "attention" }
+    ]}
+  ]
+}
+\end{verbatim}
+
+\subsection{SQL Translation Engine}
+
+At query time, the rule tree is recursively translated into a SQL WHERE clause:
+
+\begin{enumerate}
+  \item \textbf{Leaf nodes}---each condition becomes a SQL fragment:
+    \begin{itemize}
+      \item \cmd{read\_status} $\to$ \cmd{p.read\_status = '<value>'}
+      \item \cmd{year} + \cmd{gte/lte} $\to$ \cmd{p.year >= <value>} or
+        \cmd{p.year <= <value>}
+      \item \cmd{tags} + \cmd{includes} $\to$ \cmd{EXISTS (SELECT 1 FROM paper\_tags pt
+        JOIN tags t ON pt.tag\_id = t.id WHERE pt.paper\_id = p.id AND t.name = '<value>')}
+      \item \cmd{folder} + \cmd{in} $\to$ \cmd{EXISTS (SELECT 1 FROM paper\_folders pf
+        JOIN folders f ON pf.folder\_id = f.id WHERE pf.paper\_id = p.id
+        AND f.name LIKE '<value>\%')} (prefix matching to include subfolders)
+      \item \cmd{title} + \cmd{contains} $\to$ \cmd{p.title LIKE '\%<value>\%'}
+      \item \cmd{authors} + \cmd{contains} $\to$ \cmd{p.authors LIKE '\%<value>\%'}
+    \end{itemize}
+  \item \textbf{Branch nodes}---\cmd{op: "and"} becomes \cmd{(cond1 AND cond2 AND \ldots)},
+    \cmd{op: "or"} becomes \cmd{(cond1 OR cond2 OR \ldots)}. Nesting depth is unlimited.
+  \item \textbf{Final query}---assembled as \cmd{SELECT p.* FROM papers p WHERE <rules>
+    ORDER BY p.added\_at DESC}.
+\end{enumerate}
+
+\subsection{Real-Time Updates}
+
+Smart collections are not snapshots---they query live every time you select them. So
+when a paper's tags or status change, the next time you click the collection the results
+immediately reflect the update. This is fundamentally different from ordinary folders:
+folders require manual drag-in/drag-out; smart collections only care whether the rules
+match.
+
+\subsection{Performance}
+
+The translated SQL leverages SQLite indexes. For tag and folder conditions, the
+\cmd{paper\_tags} and \cmd{paper\_folders} tables have \cmd{paper\_id} indexes, so
+EXISTS subqueries are fast. Ten smart collections add no perceptible delay to sidebar
+loading---only the currently selected one executes its query; the rest display only
+their name and rule description.
+
+\begin{tipbox}
+Smart collections are ideal for long-lived perspectives such as ``unread ML papers
+from the last two years'' or ``all must-read papers.'' For ad-hoc filtering, the search
+box is more convenient. Rules can be edited at any time; matching results update
+immediately after modification.
+\end{tipbox}
+
+\section{Reading Queue}
+
+The reading queue is a prioritization tool independent of folders and tags, solving
+the problem of ``I have 20 papers I want to read and need to order them.'' Access it
+from the library sidebar under ``Reading Queue.''
+
+\litfigure{23-reading-queue-en.png}{Reading queue. Drag to reorder, set target dates,
+overdue papers are highlighted.}
+
+\subsection{Queue Data Model}
+
+The queue is stored in the \cmd{reading\_queue} table. Each row contains:
+
+\begin{itemize}
+  \item \cmd{paper\_id}---the associated paper (primary key; a paper can appear in the
+    queue only once).
+  \item \cmd{priority}---integer priority determined by drag-sort position (starting
+    at 0, incrementing).
+  \item \cmd{target\_date}---optional Unix timestamp representing the planned reading
+    date.
+  \item \cmd{note}---optional note text.
+  \item \cmd{added\_at}---timestamp when the paper was enqueued.
+\end{itemize}
+
+\subsection{Drag-and-Drop Sorting}
+
+The frontend uses the HTML5 Drag and Drop API for sorting. When a drag completes:
+
+\begin{enumerate}
+  \item The new position index of the dragged item is computed.
+  \item All queue items have their \cmd{priority} values reassigned (starting at 0,
+    incrementing by 1).
+  \item The \cmd{queue\_reorder} command batch-updates the database.
+\end{enumerate}
+
+Sort order persists across sessions---close the app and reopen it, and the order is
+unchanged.
+
+\subsection{Target Dates and Overdue Alerts}
+
+Target dates are optional. If the current date exceeds a paper's target date, that row
+is highlighted in amber (the same color used by \cmd{warnbox}). Overdue status is a
+visual cue only; it does not change any paper state automatically.
+
+\subsection{Automatic Status Update}
+
+When you open a queued paper in the reader, the system automatically transitions that
+paper's \cmd{read\_status} from \cmd{unread} to \cmd{reading}. This transition is
+idempotent---if the paper is already \cmd{reading} or higher, nothing happens.
+
+\subsection{Queue vs.\ Folders/Tags}
+
+The queue is a completely independent dimension:
+
+\begin{itemize}
+  \item A paper can be in any folder, carry any tag, and be in any reading state while
+    also being in the queue.
+  \item Removing a paper from the queue does not delete the paper itself or change its
+    folders, tags, or status.
+  \item If a queued paper is deleted, its queue entry is cascade-deleted.
+\end{itemize}
+
+\section{Paper Deduplication}
+
+LitFolio automatically detects duplicate papers at import time, preventing the same
+paper from appearing multiple times due to different import sources (arXiv ID / DOI /
+PDF file).
+
+\subsection{Three-Level Matching Strategy}
+
+Detection runs in priority order and stops on first match:
+
+\begin{enumerate}
+  \item \textbf{DOI exact match}---query \cmd{SELECT id FROM papers WHERE doi = ?}.
+    DOIs are globally unique identifiers with a 100\% match rate.
+  \item \textbf{arXiv ID exact match}---query \cmd{SELECT id FROM papers WHERE
+    arxiv\_id = ?}. Different versions of the same paper (\cmd{v1}/\cmd{v2}) have
+    their version suffix stripped before comparison.
+  \item \textbf{Title similarity match}---uses normalized Levenshtein edit distance.
+    Given two titles $s_1, s_2$, the edit distance $d(s_1, s_2)$ (each insertion,
+    deletion, or substitution costs 1) is normalized as:
+    \[
+      D(s_1, s_2) = \frac{d(s_1, s_2)}{\max(|s_1|, |s_2|)}
+    \]
+    When $D < 0.15$, the papers are considered duplicates. This means two titles can
+    differ by up to 15\% of their characters---enough to tolerate case differences
+    (\cmd{Attention Is All You Need} vs.\ \cmd{attention is all you need}),
+    punctuation differences (hyphens vs.\ spaces), and minor OCR errors.
+\end{enumerate}
+
+\subsection{Title Preprocessing}
+
+Before computing edit distance, both titles undergo preprocessing:
+
+\begin{enumerate}
+  \item Convert to lowercase.
+  \item Remove all non-alphanumeric characters (keeping spaces).
+  \item Collapse consecutive spaces into a single space.
+  \item Trim leading and trailing whitespace.
+\end{enumerate}
+
+This ensures that \cmd{"Attention-Is-All-You-Need"} and
+\cmd{"attention is all you need"} have a distance of 0 (exact match).
+
+\subsection{Full-Library Scan}
+
+The ``Find Duplicates'' button on the Settings page performs a full-library scan.
+The algorithm is $O(n^2)$ title comparisons (where $n$ is the number of papers),
+with two optimizations:
+
+\begin{itemize}
+  \item \textbf{DOI/arXiv ID pre-filter}---papers with DOIs are bucketed by DOI first;
+    title comparison only happens within the same bucket. The same applies to arXiv
+    IDs. This dramatically reduces the number of pairs needing string comparison.
+  \item \textbf{Length pre-filter}---if the length difference between two titles exceeds
+    15\%, the edit-distance computation is skipped entirely. This is a conservative
+    pruning: when $|s_1| - |s_2| > 0.15 \times \max(|s_1|, |s_2|)$, $D$ is
+    necessarily $> 0.15$.
+\end{itemize}
+
+A full scan of 1,000 papers takes about 2--3 seconds on typical hardware.
+
+\subsection{Merge Workflow}
+
+When duplicates are found, a merge dialog appears. You choose which record to keep
+(usually the one with more complete metadata), and the system performs:
+
+\begin{enumerate}
+  \item Transfer all highlights, notes, terms, tags, and folder memberships from the
+    merged paper to the retained paper.
+  \item Set the retained paper's reading state to the higher of the two
+    (\cmd{must} > \cmd{read} > \cmd{reading} > \cmd{unread}).
+  \item Fill empty TL;DR, deep-read, and translation fields on the retained paper
+    with values from the merged paper (existing values are not overwritten).
+  \item Delete the merged paper's database row and \fpath{papers/<id>/} directory.
+\end{enumerate}
+
+\begin{warnbox}
+Merge operations cannot be undone. The merged paper's PDF file is moved to
+\fpath{backups/deleted/}, but metadata is deleted directly. If you are unsure which
+record to keep, cancel the merge, manually inspect both records, and try again.
+\end{warnbox}
+
+% =====================================================================
+\chapter{Importing Papers}
+\label{ch:import}
+
+The Import page (\cmd{/import}) consolidates three entry points: arXiv/DOI metadata,
+local PDFs, and Semantic Scholar search. All three ultimately write to a
+\fpath{papers/<id>/} directory and a SQLite row.
+
+\section{arXiv ID / DOI}
+
+The most common import path. It is a \textbf{two-step} process:
+
+\litfigure{04-import-arxiv-en.png}{arXiv/DOI tab. Paste an ID or DOI, click ``Query Metadata''
+to retrieve title/authors/abstract, then click ``Import'' to persist.}
+
+\begin{enumerate}
+  \item \textbf{Query metadata}---paste an arXiv ID like \cmd{1706.03762} or a DOI like
+    \cmd{10.1038/s41586-024-...} and click Query. LitFolio fetches metadata from the
+    arXiv API or Crossref and immediately displays the title, authors, and abstract.
+  \item \textbf{Import}---confirm the metadata and click ``Import.'' LitFolio will
+    simultaneously attempt to download the PDF (directly from arXiv for arXiv IDs;
+    via Unpaywall's open-access pathway for DOIs---a download failure does not block
+    import).
+\end{enumerate}
+
+\begin{tipbox}
+arXiv IDs support both the new format (\cmd{2402.12345}) and the old format
+(\cmd{cs/0501001}). Versioned IDs like \cmd{2402.12345v2} are also parsed correctly.
+\end{tipbox}
+
+\section{Local PDF Files}
+
+\litfigure{05-import-pdf-en.png}{PDF file tab. Select a single PDF or an entire directory;
+edit the guessed title/author before importing.}
+
+\begin{itemize}
+  \item \textbf{Single PDF}---after selecting a file, LitFolio runs lightweight metadata
+    extraction (first page of the PDF + DOI regex) to guess title and authors; you can
+    edit them in the form.
+  \item \textbf{Drag and drop}---drag a PDF onto the LitFolio window with
+    \textbf{targeted drop zones}: dropping onto a paper row in the library list
+    directly binds the PDF (replacing manual file selection); dropping onto the
+    PDF area on the import page fills the selected file; dropping onto the DOI
+    citation import dialog fills the PDF. If no specific target is hit, the
+    default batch import flow is used.
+\end{itemize}
+
+\subsection{PDF Metadata Extraction Strategy}
+
+When importing a local PDF, LitFolio tries the following extraction steps in order:
+
+\begin{enumerate}
+  \item \textbf{PDF Info Dictionary}---use \cmd{lopdf} to read the \cmd{/Title},
+    \cmd{/Author}, and \cmd{/Subject} fields. Text decoding attempts both UTF-8 and
+    UTF-16 BE (with BOM), since academic PDFs commonly use either encoding.
+  \item \textbf{First-page DOI regex}---if the Info Dictionary contains no DOI, scan
+    the first-page text with the regex \cmd{10.\textbackslash d\{4,9\}/\textbackslash S+},
+    stripping trailing punctuation (.,);] etc.) from matches.
+  \item \textbf{Title guess}---if still no title, take the first line on page 1 that
+    is $\geq 12$ characters long and contains letters.
+  \item \textbf{Filename fallback}---if everything else fails, use the PDF filename
+    (without extension) as the title.
+\end{enumerate}
+
+The author field is split on commas, semicolons, and ``and'' (accommodating both
+BibTeX and natural-language formats). A SHA-256 hash of the file is also computed
+at import time for deduplication.
+
+\section{Semantic Scholar Search}
+
+If you only remember a fragment of the title, a keyword, or want to find all papers
+by a specific author:
+
+\litfigure{06-import-search-en.png}{Search tab. Results are sorted by citation count;
+each can be directly ``Imported'' (fetches metadata + attempts PDF download).}
+
+LitFolio calls the Semantic Scholar Graph API, returning 25 results per page. After
+selecting a result and clicking ``Import,'' the full metadata is fetched and the PDF
+download is attempted.
+
+\begin{warnbox}
+The Semantic Scholar public API has QPS limits; frequent searching may trigger 429
+responses. If your research direction requires heavy retrieval, consider applying for
+a free API key on their website and entering it under ``Settings $\to$ API Keys.''
+\end{warnbox}
+
+\section{Batch Folder Import}
+
+Beyond single-PDF import, LitFolio supports importing all PDFs in a directory. On the
+Import page, click the ``Import Folder'' button and select a directory.
+
+\subsection{Recursive Scanning}
+
+After selecting a folder, LitFolio recursively scans all subdirectories for \cmd{.pdf}
+files. The scan results are displayed as a list, each entry showing:
+
+\begin{itemize}
+  \item Filename (used as a fallback source for title guessing).
+  \item File size.
+  \item Extraction status (Pending / Processing / Success / Failed).
+\end{itemize}
+
+\subsection{Filename Heuristic Parsing}
+
+For batch-imported PDFs, LitFolio attempts to extract metadata from the filename.
+Common naming patterns:
+
+\begin{description}
+  \item[\cmd{Author\_Year\_Title.pdf}] Split on underscores: first segment is the
+    author, second is the year (4 digits), the rest is the title.
+  \item[\cmd{Author - Title (Year).pdf}] Split on \cmd{ - } to separate author and
+    title; extract the year from parentheses.
+  \item[\cmd{2024 - Author - Title.pdf}] Year-first variant.
+\end{description}
+
+Heuristic parsing achieves roughly 70\% accuracy. For files that cannot be parsed,
+the filename (minus extension) is used as the title, and the author and year are left
+blank for manual completion after import.
+
+\subsection{Concurrent Processing and Progress Tracking}
+
+Batch import uses 4-way concurrent processing (configurable). Progress is pushed to
+the frontend in real time via event streams:
+
+\begin{itemize}
+  \item A progress bar shows ``Processing 23/150\ldots\ (3 failed).''
+  \item Failed files are listed separately with failure reasons (corrupted PDF, no text
+    layer, metadata extraction failure, etc.).
+  \item On completion, a summary is displayed: N succeeded, N failed, N skipped
+    (duplicate papers already in the library).
+\end{itemize}
+
+\begin{tipbox}
+Batch-importing 100 PDFs typically completes within 5 minutes. If some PDFs are
+scanned images (no text layer), LitFolio will still import them (using the filename
+as the title), but full-text search and RAG retrieval will not cover their content.
+You can preprocess scanned PDFs with \cmd{ocrmypdf} and then re-bind them.
+\end{tipbox}
+
+\section{Redirect from RSS / arXiv Browse}
+
+The arXiv browse and RSS feed features described in Chapters 5 and 6 each include an
+``Import'' button in their detail drawers, which is equivalent to pasting the arXiv ID
+on the Import page. In other words: you do not need to visit the Import page
+separately---when browsing RSS, just import directly from what catches your eye.
+
+% =====================================================================
+\chapter{The Reader}
+\label{ch:reader}
+
+The reader is LitFolio's second most-used page. Access it from the main list by
+clicking the \kbd{clip} icon or ``Open in Reader.''
+
+\section{Three-Pane Layout}
+\subsection{PDF Text Extraction and Caching}
+
+When the reader loads a PDF, PDF.js performs full-text extraction on the frontend
+(it handles CMap encoding, embedded font subsets, and ToUnicode tables in modern
+academic PDFs more reliably than the backend \cmd{lopdf}). The extracted text is
+sent to the backend via IPC and cached in \fpath{papers/<id>/text.txt}. Subsequent
+term extraction and FTS5 indexing read from this cache file directly---as long as
+\fpath{text.txt}'s modification time is newer than \fpath{paper.pdf}'s, the cache
+is reused; otherwise \cmd{lopdf} re-extracts. This means term generation never
+needs to re-parse the PDF and is available instantly.
+
+\litfigure{14-reader-en.png}{Reader three-pane layout. Left: highlight list; center:
+PDF.js-rendered document; right: notes / selection translation / terms tab switcher.
+Pane widths are adjustable by dragging; state is automatically persisted.}
+
+\begin{itemize}
+  \item \textbf{Left pane}---all highlights for the current paper (sorted by page);
+    click any highlight to jump to its location.
+  \item \textbf{Center pane}---the PDF body. Based on PDF.js + react-pdf-highlighter;
+    inherits system dark mode and inverts colors during rendering. A zoom toolbar in
+    the top-left corner supports the following operations:
+    \begin{itemize}
+      \item \kbd{Ctrl++} / \kbd{Ctrl+-}: zoom in / out in 15\% increments.
+      \item \kbd{Ctrl+0}: reset to 100\%.
+      \item \kbd{Ctrl+scroll wheel}: smooth zoom.
+      \item The ``Fit'' button (\cmd{RotateCcw} icon) restores page-width auto-fit.
+    \end{itemize}
+    Zoom range is 60\%--240\%, defaulting to ``page-width'' fit mode.
+  \item \textbf{Right pane}---three online tool tabs: \textbf{Notes} (Markdown),
+    \textbf{Selection Translation}, and \textbf{Terms}.
+\end{itemize}
+
+\section{Highlights: Text Selection + Region}
+
+Two highlight methods:
+
+\begin{description}
+  \item[Text selection highlight] Select text in the PDF as you normally would;
+    releasing the mouse shows a small popup---click ``Highlight.'' The selected text
+    is cleaned of ligatures and line breaks and written to the highlights table.
+  \item[Region highlight (\kbd{Alt+drag})] Hold Alt and drag a rectangle over the PDF
+    to capture a screenshot as a highlight---useful for formulas, charts, and diagrams.
+\end{description}
+
+Each highlight in the left pane supports comments (click the pencil icon); comments
+are written in Markdown.
+
+\section{DOI Citation Import}
+
+When reading a PDF, if the text contains clickable DOI links (e.g.,
+\cmd{https://doi.org/10.xxxx/xxxx}), LitFolio intercepts the click and opens a
+\textbf{citation import dialog} instead of navigating to an external browser.
+The dialog automatically checks whether the DOI already exists in the library:
+
+\begin{itemize}
+  \item \textbf{Already exists}---shows the paper's title, authors, and year. Click
+    ``Create link'' to establish a \cmd{builds_on} citation relationship between the
+    current paper and the target (automatically deduplicated).
+  \item \textbf{Not found}---shows metadata preview parsed from the DOI. You need to
+    select or drop the corresponding PDF file, then click ``Import and link'' to
+    simultaneously import the paper and create the citation link.
+  \item \textbf{Points to current paper}---shows a notice and disables the action button.
+\end{itemize}
+
+\begin{tipbox}
+Citation relationships are visualizable in the knowledge graph. You can also drag and
+drop a PDF onto a paper row in the library list to quickly bind a PDF file.
+\end{tipbox}
+
+\section{Selection Translation}
+
+Select text in the PDF, switch to the ``Selection Translation'' tab in the right pane,
+and click ``Translate Selection'':
+
+\litfigure{15-reader-translate-en.png}{Selection translation. In addition to the bilingual
+side-by-side view, domain terms from the passage are listed as purple chips---click
+any chip to jump to the ``Terms'' tab for the full definition.}
+
+The output is structured as three parts: bilingual text, term extraction, and
+cross-paper references.
+
+\subsubsection{Internal Pipeline}
+
+Selection translation is not a single API call but a three-step process:
+
+\begin{enumerate}
+  \item \textbf{Term matching}---the selected text is checked against the current
+    paper's existing terms (case-insensitive substring matching on normalized forms).
+    Matches reuse existing definitions and evidence snippets; misses trigger real-time
+    extraction: three regex patterns capture all-uppercase abbreviations (e.g.\ SSIM),
+    Title Case proper nouns (e.g.\ MetaDesigner), and 1--3 word noun phrases, filtered
+    through \cmd{is\_term\_candidate}.
+  \item \textbf{Cross-paper association}---for each term, an FTS5 search across the
+    entire library (max 12 results) is performed. After excluding the current paper,
+    up to 3 related papers are retained. Association type is determined by which section
+    of the target paper the term appears in: method section $\to$ ``Method
+    Implementation,'' comparison section $\to$ ``Comparative Discussion,'' other
+    $\to$ ``Related Mention.''
+  \item \textbf{LLM translation}---the selected text (truncated to 2000 characters) is
+    sent to the translation model. The prompt injects a term glossary (matched terms
+    with their local definitions) and instructs the LLM to keep English terms verbatim,
+    annotating them on first appearance as \cmd{Term[Chinese gloss]}. This keeps the
+    translation fluent while preserving term anchors.
+\end{enumerate}
+
+The frontend composites the three results: bilingual text + purple term-chip list +
+cross-paper links.
+\begin{itemize}
+  \item \textbf{Bilingual text}---original and translated paragraphs rendered
+    side-by-side.
+  \item \textbf{Terms}---domain terms extracted from the passage, each with a one-line
+    in-context definition; if other papers also use the same term, a ``cross-paper
+    reuse \cmd{N}'' badge is shown.
+  \item \textbf{Cross-paper references}---locations in the current paper where the same
+    concept was previously discussed (page + line); useful for the ``Have I seen this
+    before?'' scenario in long papers.
+\end{itemize}
+
+\section{Term Table and Term Network}
+
+\litfigure{16-reader-terms-en.png}{Terms tab. After generating the paper's term table, each
+term shows ``In-paper evidence / Cross-paper reuse'' sections, facilitating cross-paper
+consistency checks.}
+
+``Generate Terms'' executes in \textbf{two phases}:
+
+\begin{enumerate}
+  \item \textbf{Candidate extraction}---local TF-IDF statistical filtering with no LLM
+    calls, completing instantly. The candidate term list appears immediately, with each
+    term's definition area showing ``Waiting for model explanation'' and a spinner icon.
+  \item \textbf{Definition generation}---candidates are sent to the LLM for one-line
+    definitions. A progress indicator at the top displays ``Candidate terms are ready.
+    Generating explanations\ldots''
+\end{enumerate}
+
+This approach lets you review and edit the candidate list (removing unwanted terms)
+without waiting for the LLM to finish. Generated terms are cached in the
+\fpath{papers/<id>/} directory and the SQLite \cmd{terms} table for reuse during
+selection translation.
+
+\subsection{Term Extraction Algorithm}
+
+Term generation does not simply dump the full text into an LLM and ask it to list
+terms. LitFolio uses a \textbf{local statistical filtering + LLM definition} two-stage
+architecture: first, an offline TF-IDF statistical method extracts candidate terms
+from the full text; then the LLM writes a one-line definition for each candidate.
+The advantages: it saves tokens (no need for the LLM to scan the full text) and the
+candidate list is reusable for term matching during selection translation.
+
+\subsubsection{Candidate Extraction: Weighted TF x IDF x Multi-Factor Scoring}
+
+The candidate pipeline has four steps:
+
+\begin{enumerate}
+  \item \textbf{Weighted segmentation}---different sections of the paper are assigned
+    different weights (title 3.0, abstract 2.0, methods 2.0, research questions 1.5,
+    datasets 1.5, comparison 1.0, limitations 1.0, TL;DR 1.0, full PDF text 0.4).
+    Terms appearing in the title or abstract carry higher weight; those in the body
+    carry lower weight.
+  \item \textbf{Regex extraction + filtering}---regex matching is applied to each
+    segment: by default only single tokens are captured (proper nouns, all-uppercase
+    abbreviations, hyphenated compounds); for ``Full Name (ACRO)'' abbreviation pairs,
+    a dedicated recognition path allows the full name up to 5 words. Each candidate
+    must pass \cmd{is\_term\_candidate}: the first and last words cannot be function
+    words (with/from/of\ldots), 3+ word phrases cannot have conjunctions/prepositions
+    in the middle (and/or/with\ldots), and all-lowercase single words must be at least
+    4 characters and contain an uppercase letter or hyphen.
+  \item \textbf{TF-IDF calculation}---term frequency is the sum of candidate
+    occurrences in each weighted segment multiplied by the segment weight; document
+    frequency is the number of papers among the library's most recent 500 that contain
+    the candidate. The IDF formula is $\ln\!\bigl((N+1)/(df+1)\bigr) + 1$. Three
+    correction factors are applied:
+    \begin{itemize}
+      \item \textbf{section\_hits} ($\sqrt{\min(3, \text{number of sections appeared in})}$)
+        ---appearing in more distinct sections increases credibility.
+      \item \textbf{surface\_quality}---all-uppercase abbreviations $\times 2.0$,
+        Title Case multi-word $\times 1.6$, hyphenated $\times 1.3$,
+        all-lowercase multi-word $\times 0.7$. Surface forms that look more like
+        technical terms score higher.
+      \item \textbf{abbrev\_bonus} ($\times 1.8$)---candidates from the abbreviation-pair
+        path receive extra weighting.
+    \end{itemize}
+  \item \textbf{Sort and truncate}---candidates with a total score $\geq 0.9$ are sorted
+    in descending order and the top 12 are kept. Scores below the threshold are discarded
+    (for example, a single-occurrence all-lowercase bigram scores about 0.7, just below
+    the cutoff).
+\end{enumerate}
+
+\subsubsection{Abbreviation Pair Recognition}
+
+For text like ``Structural Similarity Index Measure (SSIM),'' LitFolio uses a dedicated
+regex to capture the full name and abbreviation, then performs two checks:
+
+\begin{itemize}
+  \item \textbf{Initial matching}---take the first letter of each word in the full name
+    and greedily match against the abbreviation character by character; at least half
+    must match. Hyphens are treated as word boundaries (``Retrieval-Augmented
+    Generation'' $\to$ RAG matches).
+  \item \textbf{Full-name refinement}---if the regex-captured full name is longer than
+    the abbreviation, a word sequence from the tail equal to the abbreviation length
+    is extracted for exact initial matching; if that misses, stop words (and/the/of)
+    are removed and the process retries. For example, ``average structural similarity
+    index measure (SSIM)'' is refined to ``structural similarity index measure.''
+\end{itemize}
+
+Only the abbreviation enters the final term list (the full name does not appear
+independently), but the full name is saved as context for the LLM definition.
+
+\subsubsection{Author Name Filtering}
+
+A frequently overlooked noise source is author surnames---common surnames like ``Chen,''
+``Yang,'' and ``Li'' appear at high frequency in paper author lists, satisfy Title Case
+proper-noun criteria, and can rank highly among term candidates. Before extraction,
+LitFolio collects all author surnames of the current paper into a HashSet (splitting
+on spaces, hyphens, and periods, then lowercasing). Candidates that match after
+normalization are skipped. This is especially important for Chinese authors' pinyin
+surnames---``Chen'' and ``Wang'' appear at extremely high frequency in author lists
+and would dominate the term rankings without filtering.
+
+\subsubsection{LLM Definition Generation}
+
+Once candidates are finalized, each term's ``surface form + full name (if any) +
+evidence snippet'' is assembled into a prompt for the LLM, which returns a JSON-formatted
+one-line Chinese definition. If the LLM call fails or returns empty, a fallback is used:
+\cmd{This paper uses <term> in the context of the current argument or method.}
+
+\begin{tipbox}
+Term generation consumes significantly more tokens than TL;DR (it must scan the full
+text). Consider binding it to a cost-effective domestic low-tier conversational model,
+or running a local 7B+ open-source model.
+\end{tipbox}
+
+\section{Structured Note Cards}
+
+The ``Notes'' tab has been upgraded from a single text box to a \textbf{structured card
+system}. Each paper has five independently editable note sections by default, stored in
+the \cmd{paper\_note\_sections} table.
+
+\subsection{Default Sections}
+
+\begin{description}
+  \item[Problem] What problem the paper addresses.
+  \item[Method] What method is proposed.
+  \item[Key Numbers] Key experimental data or metrics.
+  \item[Limitations] Limitations and open issues.
+  \item[Thoughts] Your own ideas and comments.
+\end{description}
+
+Each section is independently editable, collapsible, and reorderable by drag-and-drop.
+Sort order is persisted through the \cmd{sort\_order} field. You can add custom sections
+(e.g., ``Experiment Ideas,'' ``Related Work''); custom sections have the same editing
+and sorting capabilities as the defaults.
+
+\subsection{AI Auto-Fill Mechanism}
+
+Each section has a \cmd{source} field indicating the content origin:
+
+\begin{description}
+  \item[user] Content you wrote manually.
+  \item[ai:tldr] Auto-filled by TL;DR (Quick Read).
+  \item[ai:quick\_read] Auto-filled by Deep Read.
+\end{description}
+
+The fill rule is \textbf{fill only empty, never overwrite}:
+
+\begin{enumerate}
+  \item When TL;DR runs, the \cmd{key\_findings} array returned by the LLM is written
+    to the ``Key Numbers'' section---but only if that section's \cmd{content} is empty
+    and its \cmd{source} is not \cmd{user}.
+  \item When Deep Read runs, the four-section JSON is mapped to the corresponding
+    sections: \cmd{problem} $\to$ Problem, \cmd{method} $\to$ Method,
+    \cmd{limitations} $\to$ Limitations. Only empty sections are filled.
+  \item If you have manually edited a section (\cmd{source = user}), AI will never
+    overwrite it, even if you re-run TL;DR or Deep Read.
+  \item AI-filled content is prefixed with a timestamp: \cmd{[2025-05-27 AI:TLDR]
+    <content>}.
+\end{enumerate}
+
+\subsection{Sections and Full-Text Search}
+
+All sections' \cmd{content} fields are included in the \cmd{papers\_fts} FTS5 index.
+This means you can search for a keyword you wrote in a section and find the
+corresponding paper---even if the word never appears in the title or abstract.
+
+\begin{tipbox}
+Section drag-and-drop sorting uses HTML5 Drag and Drop; sort order is written to
+the \cmd{sort\_order} field. The default order is Problem $\to$ Method $\to$ Key Numbers
+$\to$ Limitations $\to$ Thoughts.
+\end{tipbox}
+
+\section{Annotation Color Semantics}
+
+Highlight colors can carry semantic meaning, stored in the \cmd{highlights.label} field.
+Configure color-to-label mappings under ``Settings $\to$ Annotation Colors.'' Default
+mapping:
+
+\begin{longtable}{p{2cm} p{3.5cm} p{7cm}}
+\toprule
+\textbf{Color} & \textbf{Label} & \textbf{Semantics} \\
+\midrule
+\endhead
+Yellow & Key Finding & Key findings, important conclusions \\
+Purple & Method & Methodological points, algorithmic details \\
+Blue & To Verify & Claims that need verification, questionable data \\
+Red & Disagree & Points of disagreement, controversial assumptions \\
+Green & Citable & Excellent formulations worth quoting directly \\
+\bottomrule
+\end{longtable}
+
+\subsection{Workflow}
+
+\begin{enumerate}
+  \item \textbf{Create highlights}---after selecting text, the popup menu shows each
+    color with its label name (e.g., ``Yellow $\cdot$ Key Finding''). Choosing a color
+    simultaneously sets the label.
+  \item \textbf{Filter highlights}---the top of the reader's left pane now has a row
+    of label filter chips. Clicking a chip shows only highlights with that label;
+    click again to remove the filter. Multiple chips can be active (OR semantics).
+  \item \textbf{AI integration}---the highlight summary feature (invoke LLM on selected
+    highlights) supports label-based filtering. For example, summarize only ``Key
+    Finding'' highlights, ignoring ``To Verify'' noise.
+  \item \textbf{Export integration}---during Markdown export, highlights are grouped
+    by label, with each label as a third-level heading.
+\end{enumerate}
+
+\subsection{Custom Labels}
+
+You can modify the color-to-label mapping in Settings: rename labels, add new colors,
+or delete unused mappings. Existing highlights are unaffected---the label name is stored
+in each highlight record, not referenced from the global configuration.
+
+\section{Markdown Notes}
+
+The bottom of the ``Notes'' tab still has a free-text Markdown editing area, auto-saved
+to \fpath{papers/<id>/note.md}. LitFolio does not enforce any template---you can use
+any Markdown syntax and embed arbitrary image links; the file is synced along with
+the PDF via WebDAV.
+
+\section{PDF Search}
+
+\kbd{Ctrl+F} (macOS: \kbd{Cmd+F}) opens the search box:
+
+\begin{itemize}
+  \item \kbd{Enter} jumps to the next match; \kbd{Shift+Enter} jumps to the previous.
+  \item Match count is displayed to the right of the search box.
+  \item \kbd{Esc} closes the search box.
+\end{itemize}
+
+\section{Page Shortcuts}
+
+Other commonly used keys in the reader:
+
+\begin{itemize}
+  \item \kbd{j} / \kbd{k}---next page / previous page.
+  \item \kbd{1} / \kbd{2} / \kbd{3}---switch the right-pane tab.
+  \item \kbd{[} / \kbd{]}---adjust left/right pane width (5\% step).
+\end{itemize}
+
+The full shortcut table is in \textbf{Chapter 17}.

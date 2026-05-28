@@ -1,0 +1,982 @@
+\part{Advanced Tools and Administration}
+
+% =====================================================================
+\chapter{Multi-paper Comparison}
+\label{ch:compare}
+
+After selecting 3--5 papers on the same topic, AI can generate a structured comparison
+matrix to help you quickly sort out differences in methods, datasets, metrics, and conclusions.
+
+\section{How to Use}
+
+Select papers in the library (at least 2), then click ``Compare'' in the toolbar. LitFolio
+will call the LLM to perform a structured analysis of each paper's TL;DR and deep-read content.
+
+\litfigure{30-compare-en.png}{Multi-paper comparison page. The table is organized into six columns: Problem / Method / Dataset / Key Metric / Limitation /
+Conclusion. Cells are directly editable.}
+
+\subsection{Comparison Generation Pipeline}
+
+\begin{enumerate}
+  \item \textbf{Material Collection}---for each selected paper, query its TL;DR, key findings,
+    deep-read four-section content (Problem / Method / Comparison / Limitations), and abstract.
+    If a paper has no deep-read results, only TL;DR + abstract are used.
+  \item \textbf{Prompt Construction}---concatenate all paper materials in a fixed format,
+    separated by \cmd{=== PAPER: <title> ===} for each paper. The system prompt instructs
+    the LLM to return a JSON array, where each element corresponds to one paper and contains
+    six columns of content.
+  \item \textbf{JSON Parsing}---three-level fault-tolerant parsing (consistent with TL;DR).
+    If parsing fails, an attempt is made to extract data from the LLM's raw text in table format.
+  \item \textbf{Storage}---results are written to the \cmd{paper\_comparisons} table.
+    The \cmd{paper\_ids} field is stored as a JSON array, and the \cmd{content} field stores
+    the Markdown table text.
+\end{enumerate}
+
+\subsection{Comparison Table Structure}
+
+The comparison results are presented in a table with the following columns:
+
+\begin{longtable}{p{3cm} p{9.5cm}}
+\toprule
+\textbf{Column} & \textbf{Content} \\
+\midrule
+\endhead
+Paper & Paper title \\
+Problem & The problem addressed (2--3 sentences) \\
+Method & Core method (focus on innovations) \\
+Dataset & Datasets used and their scale \\
+Key Metric & Primary metric name and value (e.g., \cmd{BLEU 41.2}, \cmd{F1 0.89}) \\
+Limitation & Limitations (1--2 sentences) \\
+Conclusion & Conclusion (1 sentence) \\
+\bottomrule
+\end{longtable}
+
+\subsection{Editing and Saving}
+
+\begin{itemize}
+  \item The table supports \textbf{inline editing}---click any cell to modify the AI output.
+    Edited content is automatically saved to the database.
+  \item Comparison results persist across sessions---no need to regenerate on next open.
+  \item The ``Regenerate'' button reruns the AI with the latest paper content (overwriting
+    existing results).
+  \item Comparing 5 papers typically completes within 30 seconds.
+\end{itemize}
+
+\begin{tipbox}
+Comparison quality depends on the deep-read quality of each paper. If a paper has not been
+deep-read, only the TL;DR and abstract will be used, resulting in less information. It is
+recommended to run a deep read on all papers before comparing.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Markdown Export}
+\label{ch:markdown-export}
+
+LitFolio's notes and highlights can be exported as structured Markdown files, compatible
+with Obsidian, Logseq, and general Markdown workflows.
+
+\section{Export Content}
+
+Each paper generates a single \cmd{.md} file with the filename format:
+\cmd{<first\_author>\_<year>\_<first\_word\_of\_title>.md}. Special characters in
+filenames are replaced with underscores.
+
+\subsection{File Structure}
+
+\begin{verbatim}
+---
+title: "Attention Is All You Need"
+authors: ["Vaswani, Ashish", "Shazeer, Noam"]
+year: 2017
+venue: "NeurIPS"
+doi: "10.48550/arXiv.1706.03762"
+arxiv_id: "1706.03762"
+tags: ["transformer", "attention"]
+folders: ["ML/Transformer"]
+read_status: "read"
+bibtex: "@inproceedings{vaswani2017attention, ...}"
+custom_project: "thesis-ch3"
+custom_priority: "high"
+---
+
+## Notes
+
+Free-text note content (from note.md).
+
+## Structured Notes
+
+### Problem
+What problem is being solved...
+
+### Method
+What method is proposed...
+
+### Key Numbers
+Key experimental data...
+
+### Limitations
+Limitations and open problems...
+
+### Thoughts
+Your own reflections...
+
+## Highlights
+
+### Key Finding
+- **[p.3]** The self-attention mechanism connects all
+  positions with a constant number of operations.
+  > User comment (if any)
+
+### Method
+- **[p.5]** Multi-head attention allows the model to
+  attend to information from different representation
+  subspaces at different positions.
+
+## Terms
+
+- **Transformer**: A sequence-to-sequence model based
+  on the self-attention mechanism, abandoning recurrent
+  and convolutional structures.
+  - Evidence: "We propose a new simple network
+    architecture, the Transformer."
+  - Cross-paper reuse: 3
+\end{verbatim}
+
+\subsection{Frontmatter Fields}
+
+The YAML frontmatter contains all metadata fields for the paper. Custom metadata fields
+are written in the format \cmd{custom\_<field\_name>}. Tags and folders are output as
+arrays, making it easy to query with Obsidian's Dataview plugin.
+
+\subsection{Highlights Grouped by Label}
+
+Highlights are grouped by annotation color label (see Section 4.6). Each label serves as
+a third-level heading, with its highlights sorted by page number. Each highlight includes:
+
+\begin{itemize}
+  \item Page number and color label.
+  \item Highlight text (bold).
+  \item User comment (if any, displayed as a block quote).
+\end{itemize}
+
+\subsection{Terms and Bidirectional Links}
+
+Terms are output with each term name wrapped in \cmd{[[term name]]} double brackets,
+leveraging Obsidian's wikilink syntax for graph integration. If a note in the same paper
+references a term, Obsidian will automatically establish a bidirectional link.
+
+\section{Incremental Export Algorithm}
+
+Incremental export is tracked via the \cmd{papers.last\_exported\_at} field:
+
+\begin{enumerate}
+  \item Query \cmd{SELECT id FROM papers WHERE last\_exported\_at IS NULL
+    OR updated\_at > last\_exported\_at}.
+  \item For each paper, compare \cmd{updated\_at} (last metadata/note/highlight change time)
+    with \cmd{last\_exported\_at} (last export time).
+  \item Only export papers where \cmd{updated\_at > last\_exported\_at}.
+  \item After successful export, update \cmd{last\_exported\_at = current timestamp}.
+\end{enumerate}
+
+This ensures that batch exports do not redundantly write unchanged files.
+
+\section{Configuration and Triggers}
+
+Configure in ``Settings $\rightarrow$ Export'':
+
+\begin{itemize}
+  \item \textbf{Export Directory}---e.g., \cmd{\textasciitilde/ObsidianVault/LitFolio/}.
+  \item \textbf{Incremental Export}---enabled by default. When disabled, all papers are
+    exported each time.
+  \item \textbf{Auto Export}---when enabled, saving notes or highlights automatically
+    triggers an export (5-second debounce to avoid frequent writes).
+\end{itemize}
+
+You can also manually click ``Export Now'' to batch-export all papers. A full export of
+500 papers typically completes within 10 seconds.
+
+\begin{tipbox}
+Obsidian automatically parses YAML frontmatter. You can filter and sort papers in
+Obsidian's property view by fields such as \cmd{year}, \cmd{read\_status}, and \cmd{tags}.
+Combined with the Dataview plugin, you can create dynamic query views such as
+``all unread papers published after 2024.''
+\end{tipbox}
+
+% =====================================================================
+\chapter{Command Palette}
+\label{ch:palette}
+
+The command palette is LitFolio's keyboard-driven quick-action hub. Press \kbd{Ctrl+K}
+(macOS: \kbd{Cmd+K}) on any page to open it.
+
+\litfigure{31-command-palette-en.png}{Command palette. The top input field supports fuzzy search, with results grouped into Navigation / Papers / Actions.}
+
+\section{Three Modes}
+
+The command palette indexes three data sources simultaneously, filtering in real time
+as you type:
+
+\begin{description}
+  \item[Navigation] Page route names (\cmd{library}, \cmd{reader}, \cmd{graph},
+    \cmd{settings}, \cmd{browse}, \cmd{feeds}, \cmd{topic}, \cmd{ask},
+    \cmd{import}, \cmd{compare}). Selecting one navigates to that page.
+  \item[Search] Paper titles and author names. Queries the database for the 20 most
+    recent paper titles and performs fuzzy matching against user input. Selecting one
+    opens it in the reader.
+  \item[Actions] Executable commands such as \cmd{export bibtex}, \cmd{generate terms},
+    \cmd{ai discover}, \cmd{extract concepts}, \cmd{find duplicates}.
+    Selecting one directly executes the corresponding action.
+\end{description}
+
+\subsection{Fuzzy Matching Algorithm}
+
+The command palette uses a subsequence-based fuzzy matching algorithm rather than simple
+substring matching. The algorithm flow:
+
+\begin{enumerate}
+  \item \textbf{Input Normalization}---convert both user input and all candidates to
+    lowercase and strip non-alphanumeric characters.
+  \item \textbf{Subsequence Matching}---check whether each character of the user input
+    appears in the candidate in order. For example, \cmd{grpah} against \cmd{graph}:
+    g->g checkmark, r->r checkmark, p->a cross, skip a, p->p checkmark,
+    a->a checkmark, h->h checkmark $\rightarrow$ match successful.
+  \item \textbf{Scoring}---after a successful match, calculate a relevance score:
+    \begin{itemize}
+      \item Consecutive matching characters earn bonus points (\cmd{graph} matching
+        \cmd{graph} scores higher than matching \cmd{generate paragraph}).
+      \item Earlier match positions earn more bonus points.
+      \item An exact match earns additional bonus points.
+    \end{itemize}
+  \item \textbf{Sorting}---sort by score in descending order and return the top 10 results.
+\end{enumerate}
+
+The advantage of this algorithm is its strong fault tolerance---even if the user makes
+a typo (\cmd{librray} $\rightarrow$ \cmd{library}), as long as the characters appear
+in order, the match succeeds.
+
+\subsection{Result Grouping and Display}
+
+Results are displayed grouped by category:
+
+\begin{itemize}
+  \item \textbf{Recent}---the 5 most recently used commands and 3 most recently opened
+    papers, displayed at the top by default (no input required).
+  \item \textbf{Navigation}---matched page routes.
+  \item \textbf{Papers}---matched papers.
+  \item \textbf{Actions}---matched commands.
+\end{itemize}
+
+Use the up and down arrow keys to move the selection, \kbd{Enter} to execute, and
+\kbd{Esc} to close.
+
+\begin{tipbox}
+The command palette is designed so that all features are reachable via keyboard. If you
+are unsure where a feature is, searching in the command palette is usually faster than
+browsing menus. It also works well as a quick paper-jumping tool---enter a few keywords
+from the title to find the target paper.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Custom Metadata Fields}
+\label{ch:custom-fields}
+
+Different researchers have different organizational needs. Custom metadata fields let
+you add arbitrary key-value pairs to papers.
+
+\section{Field Management}
+
+Define fields in ``Settings $\rightarrow$ Custom Fields.'' Field definitions are stored
+in the \cmd{custom\_field\_defs} table, and field values are stored in the
+\cmd{paper\_custom\_fields} table.
+
+\subsection{Field Types}
+
+\begin{longtable}{p{2.5cm} p{4cm} p{6cm}}
+\toprule
+\textbf{Type} & \textbf{Storage Format} & \textbf{UI Control} \\
+\midrule
+\endhead
+\cmd{text} & Arbitrary string & Text input field \\
+\cmd{number} & Numeric string & Number input field, supports sorting comparisons \\
+\cmd{date} & Unix timestamp & Date picker \\
+\cmd{select} & Option value string & Dropdown select; options defined as a JSON array
+  in the \cmd{options} field \\
+\bottomrule
+\end{longtable}
+
+\subsection{Data Model}
+
+\begin{itemize}
+  \item \cmd{custom\_field\_defs}---field definition table. One row per field:
+    \cmd{name} (unique), \cmd{field\_type}, \cmd{options} (JSON array of selectable values
+    for select type), \cmd{created\_at}.
+  \item \cmd{paper\_custom\_fields}---field value table. Composite primary key
+    \cmd{(paper\_id, field\_id)}; each row stores one field value for one paper.
+\end{itemize}
+
+\section{Usage}
+
+Once fields are defined, a ``Custom Fields'' section appears in every paper's detail
+drawer. You can directly edit each paper's field values. Custom fields support:
+
+\begin{itemize}
+  \item \textbf{Filtering}---in the main list's filter bar, you can filter papers by
+    custom field values. For example, filter all papers where
+    \cmd{project = thesis-ch3}.
+  \item \textbf{Sorting}---number and date type fields support ascending/descending sort.
+  \item \textbf{Export}---in Markdown export's YAML frontmatter, custom fields are
+    written in the format \cmd{custom\_<field\_name>}.
+  \item \textbf{Global Definitions}---define once, and all papers share the same field
+    definitions. Deleting a field definition cascades to delete that field's values
+    across all papers.
+\end{itemize}
+
+\begin{tipbox}
+The difference between custom fields and tags: tags are flat, untyped keywords; custom
+fields are typed, structured data (such as dates, numbers, enums). If you need to sort
+by ``deadline'' or filter by ``priority,'' custom fields are more appropriate than tags.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Settings}
+\label{ch:settings}
+
+The \cmd{/settings} route is LitFolio's ``control panel.'' The main sections are:
+\textbf{LLM Configuration}, \textbf{Task Assignment}, \textbf{WebDAV Sync},
+\textbf{Export}, \textbf{Custom Fields}, \textbf{Annotation Colors}, and
+\textbf{Topic Alerts}.
+
+\section{LLM Configuration}
+
+LitFolio is not locked to any single LLM provider. Its design follows the ``OpenAI-compatible
+protocol'': you can add any number of endpoint configurations (profiles), with one marked
+as ``active.'' Each profile contains an API URL, API key, chat model, embedding model
+(optional), and sampling temperature.
+
+\litfigure{17-settings-profiles-en.png}{LLM Configuration. Two profiles: DeepSeek and local Ollama; the currently active profile is DeepSeek.
+Each profile can ``Pull'' the remote available model list to populate the chatModel field.}
+
+\subsection{Pulling Available Models}
+
+After filling in the API URL and key, click \cmd{Pull}. LitFolio will call the remote
+\cmd{GET /v1/models} endpoint to fetch the available model list. This step prevents
+manual typos in model names. The returned models populate the dropdown.
+
+\subsection{Testing the Connection}
+
+``Test Connection'' initiates a small chat request (prompt: ``Hello'') and verifies the
+entire pipeline using a real model response. Failure reasons (authentication, network,
+model not found) are displayed as-is.
+
+\subsection{Reasoning Model Compatibility}
+
+LitFolio automatically adapts to OpenAI reasoning-series models (GPT-5, o1, o3, o4, etc.):
+these models use \cmd{max\_completion\_tokens} instead of \cmd{max\_tokens} and do not
+support the \cmd{temperature} parameter. LitFolio switches the request format automatically
+based on the model name---no manual configuration needed. If you use one of these models,
+simply enter the model name in the profile as usual.
+
+\section{Task Assignment}
+
+LitFolio groups all LLM calls into \textbf{6 tasks}:
+
+\begin{itemize}
+  \item \textbf{Quick Read TL;DR}---one-sentence summary + key findings
+  \item \textbf{Deep Read quickRead}---four-section deep reading
+  \item \textbf{Translation translate}---title/abstract/selection translation
+  \item \textbf{Search Expansion search}---query expansion for topic search
+  \item \textbf{Survey survey}---topic survey generation
+  \item \textbf{Terms term}---glossary extraction
+  \item \textbf{Ask ask}---in-library RAG answer
+\end{itemize}
+
+Each task can be independently bound to any profile and any specific model. This lets
+you configure:
+\begin{description}
+  \item[Expensive but Smart] Deep read, survey, ask \ensuremath{\rightarrow} choose
+    \textbf{top-tier proprietary chat models} (such as the latest flagships from OpenAI,
+    Anthropic, Google). These affect answer quality, but per-call token usage is modest.
+  \item[cheap and Capable] Translation, terms \ensuremath{\rightarrow} choose
+    \textbf{budget tiers from major domestic API providers} (DeepSeek, Doubao, Zhipu,
+    Moonshot, etc., all offer excellent value). Translation/terms have high call volume,
+    but at a few yuan per million tokens, costs stay minimal.
+  \item[Local and Free] TL;DR, search expansion \ensuremath{\rightarrow} \textbf{open-source
+    chat models on local Ollama} (Qwen, Llama, DeepSeek distilled versions, 7B--32B
+    all work). Zero cost, good privacy, speed depends on your GPU.
+\end{description}
+
+\subsection{LLM Call Details per Task}
+
+Understanding how each task calls the LLM helps you decide what tier of model to assign.
+
+\subsubsection{Quick Read TL;DR}
+
+Input: title + authors (first 6) + abstract. The prompt requests JSON: \cmd{\detokenize{{"tldr": "one
+sentence, no more than 40 words", "key\_findings": ["3--5 items, each no more than 20
+words"]}}}. Output language follows user settings. JSON parsing has three-level fault
+tolerance (direct parse $\rightarrow$ extract \cmd{\{...\}} substring $\rightarrow$ empty
+object fallback). Results are written to the \cmd{papers} table cache; clicking again
+will not re-invoke the LLM.
+
+\subsubsection{Deep Read Quick Read}
+
+Input is the same as TL;DR (title + authors + abstract), but the prompt is more detailed:
+it requests four-section structured JSON (problem / method / comparison / limitations),
+each section 2--4 sentences in prose style, no bullet points allowed. The system prompt
+positions the LLM as ``a senior reviewer helping a colleague decide whether to read the
+full paper,'' guiding it to provide judgmental assessments rather than generic summaries.
+
+\subsubsection{Translation}
+
+Input: title + abstract. The prompt instructs the LLM to preserve technical terms in
+their original language (model names, algorithm names, mathematical symbols, units,
+dataset names), not to paraphrase or summarize, and return JSON
+\cmd{\detokenize{{"title": "...", "abstract": "..."}}}.
+
+\section{WebDAV Sync}
+
+\litfigure{18-settings-sync-en.png}{WebDAV Sync panel. After configuring the URL and credentials, you can \textbf{Push} (local$\rightarrow$remote) or \textbf{Pull and Replace Local}
+(remote$\rightarrow$local, which first backs up the local state to \fpath{backups/sync/}).}
+
+LitFolio's sync uses ``full library snapshot'' semantics, not fine-grained incremental
+sync. Specifically:
+
+\begin{enumerate}
+  \item \textbf{Push}---packages the entire \fpath{\textasciitilde/Litera-Library/} and
+    pushes it to WebDAV, creating a complete copy on the remote.
+  \item \textbf{Pull and Replace Local}---pulls a complete copy from the remote and
+    overwrites the local state.
+\end{enumerate}
+
+\begin{warnbox}
+``Pull and Replace Local'' will \textbf{overwrite} the local database and all
+\fpath{papers/}. LitFolio automatically saves the current local state to
+\fpath{backups/sync/<timestamp>/} before executing, so you can roll back even if you
+pull in the wrong direction---but please take this operation seriously, especially when
+both machines have unpushed changes.
+\end{warnbox}
+
+The design choice of ``full library overwrite'' rather than incremental merging is because
+most modifications to a paper library involve PDFs and notes, and the semantics of which
+side wins during a conflict are difficult to explain to users; exposing only ``push all /
+pull all'' with ``automatic backup'' is more predictable.
+
+\section{Export Settings}
+
+The ``Settings $\rightarrow$ Export'' panel controls Markdown export behavior (see
+Chapter 14 for details):
+
+\begin{itemize}
+  \item \textbf{Export Directory}---choose the output location for \cmd{.md} files.
+  \item \textbf{Incremental Export}---enabled by default. When disabled, all papers are
+    exported each time.
+  \item \textbf{Auto Export}---when enabled, saving notes or highlights automatically
+    triggers an export (5-second debounce).
+  \item \textbf{Export Now}---manually trigger a full or incremental export.
+\end{itemize}
+
+\section{Annotation Color Settings}
+
+The ``Settings $\rightarrow$ Annotation Colors'' panel manages the mapping between
+highlight colors and semantic labels (see Section 4.6 for details):
+
+\begin{itemize}
+  \item View all current color-label mappings.
+  \item Edit label names.
+  \item Add new color-label mappings.
+  \item Delete unused mappings.
+\end{itemize}
+
+\section{Custom Field Settings}
+
+The ``Settings $\rightarrow$ Custom Fields'' panel manages custom metadata field
+definitions for papers (see Chapter 16 for details):
+
+\begin{itemize}
+  \item Create new fields (name + type + optional select options).
+  \item Edit existing fields.
+  \item Delete fields (cascading deletion of that field's values across all papers).
+\end{itemize}
+
+\section{Topic Alert Settings}
+
+The ``Settings $\rightarrow$ Topic Alerts'' panel manages automated paper monitoring
+(see Section 7.4 for details):
+
+\begin{itemize}
+  \item View all alerts and their last run times.
+  \item View the history of results for each alert.
+  \item Edit an alert's query, frequency, and target folder.
+  \item Pause or delete alerts.
+  \item Mark results as read.
+\end{itemize}
+
+% =====================================================================
+\chapter{Data and File Layout}
+\label{ch:data}
+
+LitFolio believes ``your data belongs to you.'' All information is stored in readable
+formats under \fpath{\textasciitilde/Litera-Library/}, so you can access it with scripts
+even without LitFolio.
+
+\section{Top-Level Structure}
+
+\begin{quote}\small\ttfamily
+\textasciitilde/Litera-Library/\\
+\ \ library.db\hfill\textnormal{\small Main SQLite database}\\
+\ \ library.db-wal\hfill\textnormal{\small WAL log (runtime)}\\
+\ \ library.db-shm\hfill\textnormal{\small Shared memory (runtime)}\\
+\ \ papers/\\
+\ \ \ \ \textless paperId\textgreater /\\
+\ \ \ \ \ \ paper.pdf\\
+\ \ \ \ \ \ meta.json\\
+\ \ \ \ \ \ note.md\\
+\ \ \ \ \ \ pdf-text.txt\\
+\ \ notes/\\
+\ \ \ \ ask/\hfill\textnormal{\small Ask results saved as notes}\\
+\ \ backups/\\
+\ \ \ \ deleted/\hfill\textnormal{\small Paper copies before deletion}\\
+\ \ \ \ sync/\hfill\textnormal{\small Local snapshots before pull}\\
+\ \ sync/\hfill\textnormal{\small Temporary area for WebDAV push}
+\end{quote}
+
+\section{library.db Table Overview}
+
+Main tables (detailed schema in the repository at \fpath{src-tauri/migrations/}, totaling
+24 migration files):
+
+\subsection{Core}
+
+\begin{itemize}
+  \item \cmd{papers}---core metadata, one row per paper (id, title, authors, abstract, status,
+    tldr, quick\_read\_json, translated\_title, translated\_abstract, bibtex,
+    last\_exported\_at, ...)
+  \item \cmd{highlights}---selection highlights and area highlights (paper\_id, page,
+    boundingRect, text, comment, color, label)
+  \item \cmd{terms}---glossary (paper\_id, term, definition, evidence, cross\_refs)
+  \item \cmd{tags} / \cmd{paper\_tags}---tags and associations
+  \item \cmd{folders} / \cmd{paper\_folders}---folders and associations (supports nesting
+    and multiple membership)
+\end{itemize}
+
+\subsection{Discovery and Reading}
+
+\begin{itemize}
+  \item \cmd{feeds} / \cmd{feed\_items}---RSS feeds and entries
+  \item \cmd{topic\_surveys}---saved topic surveys
+  \item \cmd{topic\_alerts} / \cmd{topic\_alert\_results}---topic alert configurations
+    and results
+  \item \cmd{reading\_queue}---reading queue (paper\_id, priority, target\_date, note)
+  \item \cmd{paper\_comparisons}---multi-paper comparison results
+  \item \cmd{recommendation\_cache}---similar paper recommendation cache
+  \item \cmd{paper\_citations}---citation network cache
+\end{itemize}
+
+\subsection{Notes and Knowledge}
+
+\begin{itemize}
+  \item \cmd{paper\_note\_sections}---structured note cards (paper\_id, section\_key,
+    content, source, sort\_order)
+  \item \cmd{paper\_links}---manual/AI relationships between papers
+  \item \cmd{paper\_terms}---paper-term associations (including cross-paper reuse)
+  \item \cmd{concepts}---concept nodes (name, description, source)
+  \item \cmd{concept\_relations}---relationships between concepts
+    (replaces/extends/requires/enables/competes\_with)
+  \item \cmd{paper\_concepts}---paper-concept associations
+\end{itemize}
+
+\subsection{Configuration and Indexing}
+
+\begin{itemize}
+  \item \cmd{llm\_profiles} / \cmd{task\_assignments}---endpoints and task bindings
+  \item \cmd{papers\_fts} / \cmd{highlights\_fts} / \cmd{terms\_fts}---FTS5 full-text indexes
+  \item \cmd{paper\_embeddings}---vector embedding cache
+  \item \cmd{custom\_field\_defs} / \cmd{paper\_custom\_fields}---custom metadata
+  \item \cmd{smart\_collections}---smart collection rules
+\end{itemize}
+
+\section{papers/<id>/ Per-Paper Layout}
+
+Each paper has its own directory, named with a ULID (a 26-character string like
+\cmd{01KSCN65XF4B2PZ83D27ET55PX}):
+
+\begin{description}
+  \item[paper.pdf] The original PDF. If this file is deleted, LitFolio will display
+    ``PDF unbound,'' but metadata and notes remain intact; use ``Rebind PDF'' in the
+    library drawer to reattach it.
+  \item[meta.json] Metadata snapshot (title, authors, year, DOI/arXiv ID, source, etc.).
+    SQLite is the primary storage; meta.json is a mirror for script access.
+  \item[note.md] Notes for this paper. Entirely user-written; LitFolio does not modify
+    content beyond what you write in the reader.
+  \item[pdf-text.txt] Full-text extraction from the PDF (generated offline with
+    pdf-extract), used for FTS5 indexing and RAG retrieval.
+\end{description}
+
+\section{Performance Optimization}
+
+LitFolio includes two key optimizations for large-scale libraries (1000+ papers).
+
+\subsection{Virtual Scrolling}
+
+The library main list uses virtual scrolling, implemented with
+\cmd{@tanstack/react-virtual}. Core principles:
+
+\begin{enumerate}
+  \item \textbf{Container Measurement}---when the list container mounts, measure the
+    visible area height (e.g., 800px).
+  \item \textbf{Row Height Estimation}---estimate the height of each paper card row
+    (e.g., 72px).
+  \item \textbf{Viewport Calculation}---based on scroll offset and container height,
+    calculate the range of row indices that need to be rendered. For example, when
+    scrolled to 500px, render rows 7--18 (plus an overscan buffer of 3 rows above
+    and below).
+  \item \textbf{DOM Node Pool}---only create DOM nodes within the visible range. As the
+    user scrolls, nodes leaving the viewport are recycled and new nodes entering the
+    viewport are created.
+  \item \textbf{Placeholder Padding}---the total list height is calculated as
+    \cmd{totalSize $\times$ rowHeight}, using top and bottom padding elements to
+    maintain the scrollbar, ensuring scroll behavior is consistent with a full list.
+\end{enumerate}
+
+Results:
+
+\begin{itemize}
+  \item Initial render time $< 100$ms (2000 papers).
+  \item Scrolling maintains 60fps---because only 20--30 DOM nodes are manipulated at
+    a time.
+  \item Memory usage is proportional to the visible area size, not to the total number
+    of papers.
+\end{itemize}
+
+\subsection{Embedding Cache}
+
+RAG queries (in-library asking) require vector embeddings of paper text. LitFolio uses
+the \cmd{paper\_embeddings} table to cache generated embedding vectors:
+
+\begin{enumerate}
+  \item Before a query, check whether the \cmd{paper\_embeddings} table has a cached
+    record for the paper and whether the \cmd{content\_hash} matches the current text hash.
+  \item Cache hit $\rightarrow$ use the cached embedding vector directly, skipping the
+    API call.
+  \item Cache miss $\rightarrow$ call the embedding API to generate the vector and write
+    it to the cache table.
+  \item Paper content changes (note edits, highlight additions/deletions) $\rightarrow$
+    \cmd{content\_hash} changes $\rightarrow$ embedding is automatically regenerated
+    on the next query.
+\end{enumerate}
+
+The embedding cache is fully transparent to users---no manual operation is required.
+Logs will show \cmd{"embedding cache hit"} or \cmd{"embedding cache miss"} to confirm
+whether the cache is working.
+
+\section{Backups}
+
+LitFolio has two types of automatic backups:
+
+\begin{enumerate}
+  \item \textbf{Deletion Recycle Bin} (\fpath{backups/deleted/})---as described in
+    \textbf{Chapter 2}, deleted papers are moved here first. Automatically cleaned
+    after 30 days.
+  \item \textbf{Sync Snapshots} (\fpath{backups/sync/})---a complete local snapshot
+    taken before ``Pull and Replace.'' Retains the most recent 5 snapshots.
+\end{enumerate}
+
+If you need to add your own daily scheduled backups, the simplest approach is to use
+the entire \fpath{\textasciitilde/Litera-Library/} as a borg/restic repository
+source---the SQLite WAL files are included, ensuring consistency.
+
+% =====================================================================
+\chapter{Keyboard Shortcuts Quick Reference}
+\label{ch:shortcuts}
+
+\section{Reader (\cmd{/reader})}
+
+\begin{longtable}{p{5.5cm} p{8cm}}
+\toprule
+\textbf{Shortcut} & \textbf{Action} \\
+\midrule
+\endhead
+\kbd{Ctrl+F} / \kbd{Cmd+F} & Open PDF search box \\
+\kbd{Enter} & Jump to next match \\
+\kbd{Shift+Enter} & Jump to previous match \\
+\kbd{Esc} & Close search box \\
+\kbd{Alt+Drag} & Area highlight (rectangular screenshot) \\
+\kbd{Mouse Selection} & Text highlight (bubble appears) \\
+\kbd{j} / \kbd{k} & Next page / Previous page \\
+\kbd{1} / \kbd{2} / \kbd{3} & Switch right panel: Notes / Selection Translation / Terms \\
+\kbd{[} / \kbd{]} & Left/Right panel width 5\% step \\
+\bottomrule
+\end{longtable}
+
+\section{Global}
+
+\begin{longtable}{p{5.5cm} p{8cm}}
+\toprule
+\textbf{Action} & \textbf{Effect} \\
+\midrule
+\endhead
+\kbd{Ctrl+K} / \kbd{Cmd+K} & Open command palette \\
+Drag PDF to any page & Navigate to ``Import $\rightarrow$ PDF File'' with the file prefilled \\
+\kbd{Ctrl+Enter} / \kbd{Cmd+Enter} & Send message on Ask page \\
+\kbd{Esc} & Close command palette / dialog / search box \\
+\bottomrule
+\end{longtable}
+
+% =====================================================================
+\chapter{Troubleshooting}
+\label{ch:troubleshoot}
+
+Below are the most commonly encountered issues, organized by ``Symptom $\rightarrow$
+Cause $\rightarrow$ Fix.''
+
+\section{LLM Call Failure}
+
+\textbf{Symptom}: TL;DR / Deep Read / Translation buttons spin and then show
+``Request failed.''
+
+\textbf{Common Causes and Fixes}:
+
+\begin{enumerate}
+  \item The current profile is not configured or the model name is misspelled---go to
+    ``Settings $\rightarrow$ LLM Configuration'' and click ``Test Connection.''
+  \item API key balance exhausted / authentication expired---error details are displayed
+    as-is; refer to your provider's instructions.
+  \item Network unreachable (especially direct access to OpenAI from certain regions)---switch
+    to a compatible endpoint (Azure / regional proxy).
+  \item Local Ollama is not running---start with \cmd{ollama serve}, then go to settings
+    and test.
+\end{enumerate}
+
+\section{PDF Load Failure}
+
+\textbf{Symptom}: The reader shows a perpetual spinner or displays ``Failed to load PDF.''
+
+\textbf{Fix}:
+
+\begin{itemize}
+  \item Check whether \fpath{papers/<id>/paper.pdf} exists; if not, click ``Rebind PDF''
+    in the library drawer.
+  \item Some scanned PDFs use non-standard encodings that cause PDF.js rendering to
+    fail---try processing with \cmd{ocrmypdf} or \cmd{qpdf --linearize} and then rebind.
+\end{itemize}
+
+\section{RSS Not Fetching / Always ``Already Up to Date''}
+
+\textbf{Symptom}: The remote clearly has new content, but clicking ``Refresh'' shows
+``Already up to date.''
+
+\textbf{Cause}: LitFolio uses conditional GET (\cmd{If-Modified-Since} / \cmd{ETag});
+if the remote says nothing has changed, it will not re-fetch. If you suspect the remote
+is reporting incorrectly, delete the feed from ``Feed Management'' and re-add it.
+
+\textbf{User-Agent Blocked}: A small number of journal websites block the default UA.
+Enter a custom \cmd{User-Agent} header when subscribing.
+
+\section{WebDAV Sync Failure}
+
+Three common scenarios:
+
+\begin{itemize}
+  \item \textbf{401 Unauthorized}---incorrect username or password. For Nextcloud, use
+    an \textbf{app password} rather than your account password.
+  \item \textbf{404 / 405}---incorrect WebDAV URL path. Nextcloud uses
+    \cmd{/remote.php/dav/files/<user>/}, and Jianguo Cloud uses
+    \cmd{https://dav.jianguoyun.com/dav/}.
+  \item \textbf{Conflict / Midway Failure}---the local snapshot taken before the pull
+    is in \fpath{backups/sync/} and can be manually restored.
+\end{itemize}
+
+\section{Database Locked}
+
+\textbf{Symptom}: On startup, a ``database is locked'' error appears.
+
+\textbf{Cause}: After an unexpected kill, WAL files remain. In most cases, SQLite will
+automatically checkpoint and recover. If LitFolio fails to start repeatedly, close all
+LitFolio processes and delete \fpath{library.db-wal} and \fpath{library.db-shm} (the
+data itself is in \fpath{library.db}; deleting the WAL only loses the most recent few
+seconds of unpersisted changes).
+
+\section{Partial Batch Import Failure}
+
+\textbf{Symptom}: When importing a folder, some PDFs show ``Failed.''
+
+\textbf{Common Causes}:
+
+\begin{enumerate}
+  \item \textbf{Corrupt PDF}---the file is incomplete or truncated. Verify with
+    \cmd{qpdf --check}.
+  \item \textbf{No Text Layer}---scanned PDF without an OCR text layer. LitFolio will
+    still import it (using the filename as the title), but full-text search will not
+    cover its content. Process with \cmd{ocrmypdf} and then rebind the PDF.
+  \item \textbf{Permission Issues}---the PDF file is locked by another program or
+    lacks read permissions.
+\end{enumerate}
+
+\section{Linux AppImage Won't Launch}
+
+\textbf{Symptom}: Double-clicking the \fpath{.AppImage} file does nothing, or running
+from the terminal produces an error.
+
+\textbf{Common Causes and Fixes}:
+
+\begin{enumerate}
+  \item \textbf{Missing execute permission}---run
+    \cmd{chmod +x LitFolio\_x.y.z\_amd64.AppImage}.
+  \item \textbf{FUSE not installed}---error message contains ``fuse'' or ``libfuse''.
+    Ubuntu/Debian: \cmd{sudo apt install libfuse2};
+    Fedora: \cmd{sudo dnf install fuse-libs}.
+  \item \textbf{Sandbox conflict}---on some desktop environments (certain Wayland
+    compositors), the Chromium sandbox may fail. Try launching with the
+    \cmd{-{}-no-sandbox} flag from the terminal.
+  \item \textbf{Insufficient disk space}---AppImage extracts to \fpath{/tmp} at
+    runtime; ensure at least 500\,MB of free space.
+\end{enumerate}
+
+\section{Concept Extraction Returns Empty}
+
+\textbf{Symptom}: After clicking ``Extract Concepts,'' no concept nodes appear in the
+knowledge graph.
+
+\textbf{Common Causes}:
+
+\begin{enumerate}
+  \item The paper has no TL;DR or deep-read results---the LLM lacks sufficient context
+    to identify concepts. Run a quick read or deep read on the paper first.
+  \item The LLM returned unparseable JSON---check whether the model configured in your
+    LLM settings supports JSON output format.
+  \item The paper content is too short or is not an academic paper---concept extraction
+    works best on academic papers.
+\end{enumerate}
+
+\section{Citation Network / Similar Papers Empty}
+
+\textbf{Symptom}: After clicking ``Citations'' or ``Similar Papers,'' it shows ``No
+data available.''
+
+\textbf{Cause}:
+
+\begin{itemize}
+  \item The paper has no DOI and its title cannot be matched to a record in Semantic
+    Scholar.
+  \item The paper is very new (published less than 1 week ago) and has not yet been
+    indexed by S2.
+  \item Niche field or non-English paper---S2 coverage is limited in some areas.
+  \item Network issues---check whether \cmd{api.semanticscholar.org} is accessible.
+\end{itemize}
+
+\section{Smart Collection Not Updating}
+
+\textbf{Symptom}: After changing a paper's tags or status, the smart collection's
+paper list does not change.
+
+\textbf{Cause}: Smart collections are queried in real time---you need to re-select the
+collection to see the update. This is not a bug but a design choice: avoiding rule
+queries triggered by every paper change to prevent performance impacts.
+
+% =====================================================================
+\appendix
+
+% ---------------------------------------------------------------------
+\chapter{LLM Endpoint Compatibility List}
+\label{appx:llm}
+
+LitFolio follows the ``OpenAI Chat Completions protocol.'' The following endpoints have
+been verified to work directly:
+
+\begin{longtable}{p{4cm} p{5.5cm} p{4.5cm}}
+\toprule
+\textbf{Service} & \textbf{API URL} & \textbf{Notes} \\
+\midrule
+\endhead
+OpenAI Official & \cmd{https://api.openai.com/v1} & Direct access may be restricted \\
+DeepSeek & \cmd{https://api.deepseek.com/v1} & Recommended: great value \\
+Azure OpenAI & \cmd{<resource>.openai.azure.com/} \mbox{}\cmd{openai/deployments/<dep>/v1} & Requires API version header \\
+Ollama (local) & \cmd{http://localhost:11434/v1} & Fully offline \\
+LM Studio (local) & \cmd{http://localhost:1234/v1} & Desktop GUI loads GGUF \\
+OpenRouter & \cmd{https://openrouter.ai/api/v1} & One key, multiple models \\
+Together.ai & \cmd{https://api.together.xyz/v1} & Open-source model hosting \\
+\bottomrule
+\end{longtable}
+
+\textbf{Task Assignment Recommendations} (specific models change rapidly; follow the
+approach and pick what is currently best):
+
+\begin{itemize}
+  \item \textbf{Student / Fully Free}---run everything possible locally (local Ollama
+    with 7B--14B open-source models is sufficient for TL;DR / translation / search
+    expansion). Reserve online calls for ``deep read,'' ``survey,'' and ``ask,''
+    using free tiers from domestic providers.
+  \item \textbf{Researcher / Best Value}---point all tasks to the \textbf{budget tier
+    of a major domestic API} (DeepSeek, Doubao, Zhipu, Moonshot---pick one). Low unit
+    price, large context window, sufficient for the vast majority of research scenarios.
+  \item \textbf{Power User / No Compromise}---assign TL;DR / translation / terms to
+    a domestic budget tier; assign deep read / survey / ask to the \textbf{strongest
+    flagship chat model available at the time} (OpenAI, Anthropic, Google take turns
+    leading---pick one based on release date) to guarantee the highest quality answers.
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\chapter{arXiv Main Category Quick Reference}
+\label{appx:arxiv}
+
+\begin{description}
+  \item[cs.AI / cs.LG / cs.CL] Artificial Intelligence / Machine Learning / Natural
+    Language Processing
+  \item[cs.CV] Computer Vision
+  \item[cs.CR / cs.DC] Cryptography and Security / Distributed Systems
+  \item[stat.ML] Statistical Machine Learning
+  \item[physics.optics] Optics and Photonics
+  \item[physics.atom-ph] Atomic Physics
+  \item[cond-mat.mes-hall] Condensed Matter -- Mesoscopic and Nanoscale
+  \item[quant-ph] Quantum Physics
+  \item[math.OC] Optimization and Control
+  \item[math.AP] Partial Differential Equations
+  \item[q-bio.NC] Neuroscience
+\end{description}
+
+For the complete list, see \cmd{https://arxiv.org/category\_taxonomy}.
+
+% ---------------------------------------------------------------------
+\chapter{Recommended RSS Feeds}
+\label{appx:rss}
+
+\textbf{arXiv Subcategories} (replace \cmd{CAT} with e.g. \cmd{cs.LG}):
+
+\begin{itemize}
+  \item \cmd{http://export.arxiv.org/rss/CAT}---official RSS, refreshed daily
+  \item \cmd{http://export.arxiv.org/rss/CAT.recent}---latest only
+\end{itemize}
+
+\textbf{Journals}:
+
+\begin{itemize}
+  \item Nature: \cmd{https://www.nature.com/nature.rss}
+  \item Science: \cmd{https://www.science.org/rss/news\_current.xml}
+  \item Nature Photonics: \cmd{https://www.nature.com/nphoton.rss}
+  \item Optica (OSA): \cmd{https://www.optica-opn.org/rss/news.xml}
+  \item PRL: \cmd{http://feeds.aps.org/rss/recent/prl.xml}
+\end{itemize}
+
+\textbf{Research Blogs / Surveys}:
+
+\begin{itemize}
+  \item Distill: \cmd{https://distill.pub/rss.xml} (no longer updated, but archived
+    articles remain valuable)
+  \item Lil'Log: \cmd{https://lilianweng.github.io/index.xml}
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\chapter{License}
+\label{appx:license}
+
+LitFolio is released under the \textbf{GPL-3.0-or-later} license. This means:
+
+\begin{itemize}
+  \item You are free to use, modify, and redistribute.
+  \item If you create and distribute a derivative work based on LitFolio, the derivative
+    must also be released under the same license (or a compatible more permissive license)
+    and include source code.
+  \item No warranty of any kind, express or implied, is provided.
+\end{itemize}
+
+The full license text is in the \fpath{LICENSE} file in the repository root directory.

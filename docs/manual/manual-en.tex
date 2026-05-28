@@ -1,0 +1,173 @@
+% LitFolio User Manual — English Edition
+% Compile: xelatex manual-en.tex && xelatex manual-en.tex
+\documentclass[11pt,a4paper,oneside]{book}
+
+% ========== Fonts (with fallback chain) ==========
+\usepackage{fontspec}
+\IfFontExistsTF{Lora}{%
+  \setmainfont{Lora}%
+}{%
+  \IfFontExistsTF{Noto Serif}{\setmainfont{Noto Serif}}{}%
+}
+\IfFontExistsTF{Source Sans 3}{%
+  \setsansfont{Source Sans 3}%
+}{%
+  \IfFontExistsTF{Noto Sans}{\setsansfont{Noto Sans}}{}%
+}
+\IfFontExistsTF{JetBrainsMono Nerd Font Mono}{%
+  \setmonofont{JetBrainsMono Nerd Font Mono}[Scale=0.92]%
+}{%
+  \IfFontExistsTF{JetBrains Maple Mono}{\setmonofont{JetBrains Maple Mono}[Scale=0.92]}{}%
+}
+
+% ========== Colors & Layout ==========
+\usepackage{xcolor}
+\definecolor{violet}{HTML}{8b6df0}
+\definecolor{arctic}{HTML}{4ba3d0}
+\definecolor{amber}{HTML}{e08e3a}
+\definecolor{ink}{HTML}{1a1f2c}
+\definecolor{paper}{HTML}{f8f9fb}
+\definecolor{panel}{HTML}{eef0f5}
+\definecolor{line}{HTML}{d8dde6}
+\definecolor{muted}{HTML}{6b7280}
+
+\usepackage{geometry}
+\geometry{a4paper, top=2.6cm, bottom=2.8cm, inner=2.5cm, outer=2.5cm, headheight=24pt}
+
+\usepackage{graphicx}
+\usepackage{caption}
+\captionsetup{font=small, labelfont={bf,color=violet}, labelsep=quad}
+
+\usepackage[most,breakable]{tcolorbox}
+\tcbuselibrary{skins}
+
+\usepackage{titlesec}
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=*, itemsep=2pt, topsep=2pt}
+\setlist[enumerate]{leftmargin=*, itemsep=2pt, topsep=2pt}
+\setlist[description]{leftmargin=1.2em, itemsep=2pt, topsep=2pt}
+
+\usepackage{array}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\renewcommand{\arraystretch}{1.25}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{muted}\nouppercase{\leftmark}}
+\fancyhead[R]{\small\color{muted}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{line}\leaders\hrule height \headrulewidth\hfill}}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=violet,
+  urlcolor=arctic,
+  citecolor=violet,
+  pdftitle={LitFolio User Manual},
+  pdfauthor={LitFolio Project},
+}
+
+% Route Unicode characters missing in the main font to suitable substitutes
+\usepackage{newunicodechar}
+\newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{←}{\ensuremath{\leftarrow}}
+\newunicodechar{✓}{\ensuremath{\checkmark}}
+\newunicodechar{✗}{\ensuremath{\times}}
+
+% ========== Chapter styling ==========
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries}
+  {\filleft{\color{violet}\fontsize{14}{16}\selectfont Chapter\,\thechapter}}
+  {0.5ex}
+  {\filleft\fontsize{28}{32}\selectfont\color{ink}}
+  [\vspace{0.3ex}{\color{violet}\rule{\linewidth}{0.6pt}}]
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{violet!85!black}}
+  {\thesection}{0.8em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{ink}}
+  {\thesubsection}{0.8em}{}
+
+% ========== Custom macros ==========
+% \litfigure{filename}{caption}
+\newcommand{\litfigure}[2]{%
+  \begin{figure}[ht]
+    \centering
+    \fbox{\includegraphics[width=0.97\linewidth]{figures/#1}}%
+    \caption{#2}
+    \label{fig:#1}
+  \end{figure}%
+}
+
+\newtcolorbox{tipbox}[1][Tip]{%
+  enhanced, breakable,
+  colback=violet!6, colframe=violet,
+  boxrule=0pt, leftrule=2pt, arc=2pt,
+  left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fontupper=\small,
+  title=\textcolor{violet}{\textbf{#1}}, coltitle=violet,
+  attach title to upper, after title={\quad},
+  parbox=false,
+}
+\newtcolorbox{warnbox}[1][Warning]{%
+  enhanced, breakable,
+  colback=amber!8, colframe=amber,
+  boxrule=0pt, leftrule=2pt, arc=2pt,
+  left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fontupper=\small,
+  title=\textcolor{amber!70!black}{\textbf{#1}}, coltitle=amber!70!black,
+  attach title to upper, after title={\quad},
+  parbox=false,
+}
+
+% Inline keyboard shortcut chip
+\newcommand{\kbd}[1]{%
+  \tcbox[on line, colback=violet!10, colframe=violet!60,
+         boxrule=0.4pt, arc=2pt, left=2pt, right=2pt, top=0pt, bottom=0pt]{\small\ttfamily #1}%
+}
+
+% Inline file path / command
+\newcommand{\fpath}[1]{{\small\ttfamily\color{arctic!75!black}#1}}
+\newcommand{\cmd}[1]{{\small\ttfamily #1}}
+
+% ========== Document info ==========
+\title{%
+  {\fontsize{32}{38}\selectfont\bfseries\color{ink} LitFolio User Manual}\\[1.2em]
+  {\Large\color{violet} A Local-First Research Paper Workbench}\\[0.6em]
+  {\large\color{muted} v0.3.1 \(\cdot\) May 2026}%
+}
+\author{LitFolio Project}
+\date{}
+
+\begin{document}
+
+\frontmatter
+\begin{titlepage}
+  \vspace*{4cm}
+  \begin{center}
+    \maketitle
+  \end{center}
+  \vfill
+  \begin{center}\small\color{muted}
+    Typeset with \LaTeX{}.
+  \end{center}
+\end{titlepage}
+
+\tableofcontents
+
+\include{preface-en}
+
+\mainmatter
+\include{part1-workflow-en}
+\include{part2-discovery-en}
+\include{part3-admin-en}
+
+\backmatter
+\end{document}

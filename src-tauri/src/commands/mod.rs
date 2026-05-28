@@ -9,7 +9,7 @@ pub mod survey;
 pub mod sync;
 pub mod term_filter;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use ulid::Ulid;
@@ -353,6 +353,17 @@ pub async fn import_doi(state: State<'_, Arc<AppState>>, doi: String) -> Result<
 }
 
 #[tauri::command]
+pub async fn paper_find_by_doi(
+    state: State<'_, Arc<AppState>>,
+    doi: String,
+) -> Result<Option<Paper>, String> {
+    PaperRepo::new(&state.pool)
+        .find_by_doi(&doi)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_arxiv(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
@@ -443,15 +454,27 @@ pub async fn import_pdf_files(
                         }
                     }
                 }
+                let existing = match existing_paper_for_draft(&repo, &draft).await {
+                    Ok(existing) => existing,
+                    Err(e) => {
+                        failed.push(PdfFailure {
+                            path: p,
+                            error: e.to_string(),
+                        });
+                        continue;
+                    }
+                };
                 let mut paper = draft.into_paper();
                 paper.id = paper_id;
                 paper.pdf_path = Some(r.stored_path.display().to_string());
                 paper.bibtex = Some(generate_bibtex(&paper));
-                if let Err(e) = repo.insert(&paper).await {
-                    failed.push(PdfFailure {
-                        path: p,
-                        error: e.to_string(),
-                    });
+                if let Some(existing) = existing {
+                    match attach_imported_pdf_to_existing(&repo, &library, &existing, &r.stored_path).await {
+                        Ok(updated) => imported.push(updated),
+                        Err(e) => failed.push(PdfFailure { path: p, error: e.to_string() }),
+                    }
+                } else if let Err(e) = repo.insert(&paper).await {
+                    failed.push(PdfFailure { path: p, error: e.to_string() });
                 } else {
                     imported.push(paper);
                 }
@@ -463,6 +486,41 @@ pub async fn import_pdf_files(
         }
     }
     Ok(PdfImportSummary { imported, failed })
+}
+
+async fn attach_imported_pdf_to_existing(
+    repo: &PaperRepo<'_>,
+    paths: &crate::storage::LibraryPaths,
+    existing: &Paper,
+    imported_path: &Path,
+) -> anyhow::Result<Paper> {
+    let dest = paths.paper_dir(&existing.id).join("original.pdf");
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::copy(imported_path, &dest)?;
+    let dest_str = dest.display().to_string();
+    repo.update_pdf_path(&existing.id, &dest_str).await?;
+    repo.get(&existing.id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("paper vanished after pdf update"))
+}
+
+async fn existing_paper_for_draft(
+    repo: &PaperRepo<'_>,
+    draft: &PaperDraft,
+) -> anyhow::Result<Option<Paper>> {
+    if let Some(doi) = draft.doi.as_deref() {
+        if let Some(existing) = repo.find_by_doi(doi).await? {
+            return Ok(Some(existing));
+        }
+    }
+    if let Some(arxiv_id) = draft.arxiv_id.as_deref() {
+        if let Some(existing) = repo.find_by_arxiv_id(arxiv_id).await? {
+            return Ok(Some(existing));
+        }
+    }
+    Ok(None)
 }
 
 // ─── Folder import (recursive, with progress) ─────────────────────────
@@ -567,11 +625,29 @@ pub async fn import_folder(
                         }
                     }
                 }
+                let existing = match existing_paper_for_draft(&repo, &draft).await {
+                    Ok(existing) => existing,
+                    Err(e) => {
+                        failed.push(PdfFailure {
+                            path: path.display().to_string(),
+                            error: e.to_string(),
+                        });
+                        continue;
+                    }
+                };
                 let mut paper = draft.into_paper();
                 paper.id = paper_id;
                 paper.pdf_path = Some(r.stored_path.display().to_string());
                 paper.bibtex = Some(generate_bibtex(&paper));
-                if let Err(e) = repo.insert(&paper).await {
+                if let Some(existing) = existing {
+                    match attach_imported_pdf_to_existing(&repo, &library, &existing, &r.stored_path).await {
+                        Ok(updated) => imported.push(updated),
+                        Err(e) => failed.push(PdfFailure {
+                            path: path.display().to_string(),
+                            error: e.to_string(),
+                        }),
+                    }
+                } else if let Err(e) = repo.insert(&paper).await {
                     failed.push(PdfFailure {
                         path: path.display().to_string(),
                         error: e.to_string(),

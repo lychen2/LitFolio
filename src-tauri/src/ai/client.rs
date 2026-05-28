@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use super::profile::LlmProfile;
 
+const LLM_REQUEST_TIMEOUT_SECS: u64 = 120;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String, // "system" | "user" | "assistant"
@@ -21,10 +23,13 @@ pub struct ChatMessage {
 struct ChatRequest<'a> {
     model: &'a str,
     messages: &'a [ChatMessage],
-    temperature: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_completion_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -78,10 +83,11 @@ pub async fn chat_complete(
     messages: &[ChatMessage],
 ) -> Result<ChatResponse> {
     let url = endpoint(&profile.base_url, "/chat/completions");
+    let request_shape = request_shape(&profile.chat_model, profile.max_tokens, profile.temperature);
     let body = ChatRequest {
         model: &profile.chat_model,
         messages,
-        temperature: profile.temperature,
+        temperature: request_shape.temperature,
         // Always stream. Standard providers (OpenAI / DeepSeek / Moonshot / SiliconFlow / Ollama)
         // all support stream:true and return SSE we know how to parse. Several Chinese gateway
         // proxies (new-api/one-api) silently return an empty metadata-only frame when stream:false
@@ -89,30 +95,47 @@ pub async fn chat_complete(
         // in practice. The parser handles a single-JSON response too if a provider ignores the flag
         // and replies non-streaming anyway.
         stream: true,
-        max_tokens: Some(profile.max_tokens),
+        max_tokens: request_shape.max_tokens,
+        max_completion_tokens: request_shape.max_completion_tokens,
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {
         req = req.bearer_auth(&profile.api_key);
     }
-    let resp = tokio::time::timeout(
-        std::time::Duration::from_secs(120),
-        req.send(),
-    )
-    .await
-    .map_err(|_| anyhow!("LLM request timed out after 120s (model `{}`, url={url})", profile.chat_model))?
-    .with_context(|| format!("POST {url}"))?;
+    let resp = tokio::time::timeout(llm_request_timeout(), req.send())
+        .await
+        .map_err(|_| {
+            anyhow!(
+                "LLM request timed out after {}s (model `{}`, url={url})",
+                LLM_REQUEST_TIMEOUT_SECS,
+                profile.chat_model
+            )
+        })?
+        .with_context(|| format!("POST {url}"))?;
     let status = resp.status();
     let headers = resp.headers().clone();
-    let text = resp.text().await.with_context(|| {
-        format!(
-            "read LLM response body for model `{}` from {url}",
-            profile.chat_model
-        )
-    })?;
+    let text = tokio::time::timeout(llm_request_timeout(), resp.text())
+        .await
+        .map_err(|_| {
+            anyhow!(
+                "LLM response body timed out after {}s (model `{}`, url={url})",
+                LLM_REQUEST_TIMEOUT_SECS,
+                profile.chat_model
+            )
+        })?
+        .with_context(|| {
+            format!(
+                "read LLM response body for model `{}` from {url}",
+                profile.chat_model
+            )
+        })?;
     if !status.is_success() {
         return Err(anyhow!(
-            "LLM endpoint returned {status}: {}",
+            "LLM endpoint returned {status} (model `{}`, url={url}, stream=true, request_chars={}, token_param={}, temperature={}): {}",
+            profile.chat_model,
+            request_chars(messages),
+            request_shape.token_param_name(),
+            request_shape.temperature_label(),
             truncate(&text, 800)
         ));
     }
@@ -137,8 +160,57 @@ pub async fn chat_complete(
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RequestShape {
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
+    max_completion_tokens: Option<u32>,
+}
+
+impl RequestShape {
+    fn token_param_name(self) -> &'static str {
+        if self.max_completion_tokens.is_some() {
+            "max_completion_tokens"
+        } else {
+            "max_tokens"
+        }
+    }
+
+    fn temperature_label(self) -> &'static str {
+        if self.temperature.is_some() {
+            "sent"
+        } else {
+            "omitted"
+        }
+    }
+}
+
+fn request_shape(model: &str, max_tokens: u32, temperature: f32) -> RequestShape {
+    if uses_completion_token_limit(model) {
+        return RequestShape {
+            temperature: None,
+            max_tokens: None,
+            max_completion_tokens: Some(max_tokens),
+        };
+    }
+    RequestShape {
+        temperature: Some(temperature),
+        max_tokens: Some(max_tokens),
+        max_completion_tokens: None,
+    }
+}
+
+fn uses_completion_token_limit(model: &str) -> bool {
+    let lower = model.to_ascii_lowercase();
+    lower.starts_with("gpt-5") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")
+}
+
 fn request_chars(messages: &[ChatMessage]) -> usize {
     messages.iter().map(|m| m.content.chars().count()).sum()
+}
+
+fn llm_request_timeout() -> std::time::Duration {
+    std::time::Duration::from_secs(LLM_REQUEST_TIMEOUT_SECS)
 }
 
 fn header_value(headers: &reqwest::header::HeaderMap, name: &str) -> String {

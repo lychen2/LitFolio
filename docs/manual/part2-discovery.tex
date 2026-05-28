@@ -1,0 +1,772 @@
+\part{发现与综合}
+
+% =====================================================================
+\chapter{arXiv 浏览}
+\label{ch:browse}
+
+\cmd{/browse} 路由是一个为研究者「逛 arXiv」而设计的页面。它按 arXiv 官方分类树
+组织，让你在不预先有关键词的情况下浏览某领域的最新论文。
+
+\section{分类树}
+
+\litfigure{07-browse.png}{arXiv 浏览。左侧分类树（按 cs / math / physics 等顶层归类），主区按选中分类
+显示最新论文，支持往前翻页和入库。}
+
+LitFolio 内置了 arXiv 全部 150+ 分类的中英文映射；点任一叶子节点（如 \cmd{cs.LG}
+机器学习、\cmd{physics.optics} 光学）会发起一次 arXiv API 请求拉取最新 50 条。
+
+\section{翻页与「已穷尽」}
+
+往下滚到底点「加载更多」会继续抓更多页（每页 50 条）。当某分类发布量较小、连续两次
+返回都没有新条目时，LitFolio 会显示「已穷尽」并停止请求——这是为避免无意义的 API
+调用，不是 bug。
+
+\section{入库}
+
+点任一论文打开详情抽屉，可看到完整摘要、作者、提交日期、原始 arXiv 链接。抽屉右下
+角的「入库」按钮等同于第 3 章里 arXiv ID 入库流程，区别只是这里 ID 已经填好了。
+
+\begin{tipbox}
+arXiv 浏览页本身\textbf{不会}把列表保存到本地数据库——它每次都是实时 API。如果你
+想长期跟某分类的新论文，建议改用 RSS 订阅（见下章），可离线、可翻译、可标记已读。
+\end{tipbox}
+
+% =====================================================================
+\chapter{RSS 订阅}
+\label{ch:feeds}
+
+\cmd{/feeds} 路由让你以 RSS 方式跟踪 arXiv 子分类、期刊新文章、研究组主页。所有
+拉到的条目会落 SQLite，未读计数与已读状态都本地保存。
+
+\section{订阅源管理}
+
+\litfigure{08-feeds.png}{订阅源列表。左：源（arXiv cs.LG / Nature Photonics / Optica 等）；右：选中源的最新条目，
+带未读徽章、翻译按钮、入库按钮。}
+
+新增订阅源：点「+」按钮，填 RSS URL 与显示名即可。LitFolio 不限定 feed 来源，
+只要是合法 RSS/Atom 都行。常用源参见附录 C。
+
+\section{条件 GET 刷新}
+
+LitFolio 用条件 GET（\cmd{If-Modified-Since} / \cmd{ETag}）拉 feed，远端没更新
+时会返回 304 Not Modified——这是为什么有时点「刷新」秒回「已是最新」。这一行为
+对你来说意味着：
+
+\begin{itemize}
+  \item 频繁点刷新是\textbf{廉价的}，不会触发对方限流。
+  \item 真正的「没新东西」与「网络/对端故障」都会显示同一文案，需要看错误徽章区分。
+\end{itemize}
+
+\section{条目详情与翻译}
+
+\litfigure{09-feeds-detail.png}{选中某条 feed item 后右侧抽屉显示完整摘要；可一键翻译，可标记已读，
+可直接入库（等同于到「导入」页粘 arXiv ID）。}
+
+「翻译」按钮和文献库一致：调 \cmd{translate} 任务（绑你设置的翻译模型）。结果同样
+缓存到 SQLite \cmd{feed\_items} 表，下次打开秒显示。
+
+\begin{warnbox}
+RSS 翻译每个条目都会消耗 token；如果你订阅的源更新很快（如多个 arXiv 分类），
+建议把翻译任务绑给\textbf{本地 Ollama 上的开源对话模型}或者\textbf{国内低价 API}，
+避免开销失控。
+\end{warnbox}
+
+\section{从 feed item 直接入库}
+
+详情抽屉的「入库」按钮和第 3 章 arXiv ID 入库流程完全一致——拉完整元数据 + 尝试
+下载 PDF。入库后该条目仍留在 feed 列表里，只是会显示「已入库」标记。
+
+% =====================================================================
+\chapter{主题发现}
+\label{ch:topic}
+
+\cmd{/topic} 路由是 LitFolio 的进阶能力之一，分两个 tab：\textbf{搜索召回}与
+\textbf{综述生成}。两者解决的问题不同。
+
+\section{两 tab 心智模型}
+
+\begin{description}
+  \item[搜索召回] 你已经有大致研究方向，想从已经入库的论文里把相关的全捞出来。
+    流程：扩写查询 → 多路 FTS5 命中 → 按引用排序。完全离线、不调外网。
+  \item[综述生成] 你想看某个新方向的「鸟瞰图」，但你的库里可能根本就没有这方向
+    的论文。流程：LLM 拆分子主题 → Semantic Scholar 拉真实文献 → LLM 标注必读。
+\end{description}
+
+\section{搜索召回}
+
+\litfigure{10-topic-search.png}{搜索召回 tab。输入查询后，LitFolio 会先扩写出若干相关短语，再在本地
+FTS5 索引上多路召回，最后按引用数排序展示。结果可点入抽屉查看 TL;DR。}
+
+\subsection{扩写查询}
+
+输入「retrieval augmented generation」会被扩写为「RAG / 检索增强 / 向量检索 /
+chunk + retrieval / Lewis 2020...」等十几条相关查询。这一步使用 \cmd{search}
+任务的 LLM，目的是召回那些用了不同表述但讲同一件事的论文。
+
+\subsection{扩写算法细节}
+
+扩写由 \cmd{query\_expand} 模块负责。它不会把用户原话直接扔给 S2，而是先让 LLM 把
+（可能是中文的）宽泛话题翻译为 2–4 个精确的英文搜索词。核心约束写在 system prompt 里：
+
+\begin{itemize}
+  \item 只输出 2--4 个搜索词，宁少勿多——多词 OR 只会膨胀噪声。
+  \item 选领域专家实际会输入的术语，不堆砌相邻子领域的关键词。
+  \item 如果两个候选词会召回同一批论文（如「attosecond pulses」和「attosecond laser」），
+    只保留更规范的那个。
+  \item 中文输入先翻译为英文再检索。
+  \item 去掉空泛修饰词（research / study / novel / recent 等）。
+\end{itemize}
+
+LLM 返回 JSON：\cmd{\{"terms": [...]\}}。解析器有三级容错：先尝试直接 JSON 解析，
+失败则提取第一个 \cmd{\{...\}} 子串（应对 markdown fence 和闲聊包裹），
+最后按逗号或换行分词兜底。最多取 4 个词。
+
+\subsection{时间窗与排序}
+
+默认按引用数排序；右上角下拉框可改为「最新」「相关度」「必读优先」。时间窗（近 1/3/5 年）
+用来过滤旧论文。
+
+\section{综述生成}
+
+\litfigure{11-topic-survey.png}{综述生成 tab。输入一个开放话题，LitFolio 会调用 LLM 把它拆成 3 个子领域，
+然后到 Semantic Scholar 取每个子领域 4 篇代表论文，最后 LLM 标注「必读」并给出一句话理由。}
+
+\subsection{流水线}
+
+综述生成是一条四步流水线，每步进度通过 IPC 事件实时推送到前端。
+
+\subsubsection{为什么不直接让 LLM 列论文}
+
+如果让 LLM 直接输出论文列表，它会编造 DOI、作者、年份——幻觉率极高。LitFolio
+的做法是把「规划」和「检索」严格分开：LLM 只负责规划（拆子领域 + 给搜索词），
+真正去 Semantic Scholar 拉论文的是程序代码，最后再让 LLM 对真实论文做注释。
+
+\begin{enumerate}
+  \item \textbf{planning}——把开放话题拆成 3 个子领域（如「极端超短脉冲激光」可能拆为
+    啁啾脉冲放大 / 谐波生成 / 光学参量过程）。
+  \item \textbf{grounding}——对每个子领域调 Semantic Scholar Graph API 拉 4 篇
+    高引用论文。这里是真实文献，不是 LLM 编的。
+  \item \textbf{annotating}——LLM 给每篇论文打「必读」标记 + 一句话理由（解释为什么
+    该方向看这篇）。
+  \item \textbf{done}——把整份综述保存到 SQLite \cmd{topic\_surveys} 表，可下次直接打开。
+\end{enumerate}
+
+\subsubsection{Phase 1：LLM 规划}
+
+LLM 收到一个（可能是中文的）研究话题，输出 JSON 结构：4--7 个子领域，每个含名称、
+活跃年份范围、一段中文叙述、2--4 个英文 S2 搜索词、可选的 PI 人名提示。还有 5--10
+个跨子领域的 key\_PI（重要研究者）。中文输入会在 prompt 里被要求翻译为英文搜索词。
+
+\subsubsection{Phase 2：Semantic Scholar 接地}
+
+对每个子领域，程序依次执行：
+
+\begin{enumerate}
+  \item \textbf{按词检索}——每个 search\_term 调一次 S2 \cmd{bulk\_by\_citations}
+    API，拉回按引用数排序的论文，带年份过滤。每个词拉 \cmd{topk $\times$ 3}（至少 15）
+    条结果，保证去重后还有足够的候选。
+  \item \textbf{PI 补充检索}——把 PI 人名和 search\_term 拼起来搜 S2，每个 PI
+    最多和 2 个搜索词组合。
+  \item \textbf{去重}——同一子领域内按 paperId 去重（优先 paperId，无 paperId 用 DOI），
+    重复的保留引用数更高的版本。
+  \item \textbf{相关度过滤}——论文标题和摘要中必须包含至少 2 个去停用词后的搜索词 token，
+    或者直接包含某个搜索词完整短语。S2 偶尔会召回不相关的论文，这一层过滤专门拦截它们。
+  \item \textbf{DOI 过滤 + 排序}——没有 DOI 的论文被丢弃（保证可追溯），剩下的按
+    引用数降序取 top-K。
+\end{enumerate}
+
+跨子领域去重采用「先到先得」策略：一篇论文如果在多个子领域都命中，只保留在先处理的
+那个子领域里。
+
+\subsubsection{S2 API 速率控制}
+
+LitFolio 内置了令牌桶限流：每 300 秒窗口最多 80 次请求（S2 未认证限制是 100 次/5 分钟，
+留 20\% 余量）。用全局原子计数器实现，窗口过期自动重置。超出时返回明确错误提示
+「try again later」而非静默失败。综述生成时每个子领域的多个 search\_term 串行调用，
+如果子领域多、搜索词多，可能会触发限流——这就是为什么综述生成有时需要等 30--60 秒。
+
+\subsubsection{Phase 3：LLM 注释（可选）}
+
+把所有子领域的真实论文列表（id + 标题 + 年份 + 摘要）交给 LLM，要求：
+
+\begin{itemize}
+  \item 每篇写 1--2 句中文「为什么重要」。
+  \item 在全部论文中标记 8--12 篇为「必读」，要求覆盖不同子领域（不要堆在同一个里）。
+\end{itemize}
+
+Phase 3 是可选的——如果这一步 LLM 调用失败，综述仍然可用，只是缺少注释和必读标记。
+
+\subsection{保存与恢复}
+
+每次生成会自动保存。「历史综述」按钮可回到旧的综述继续看（无需重新调 LLM 与 API）。
+
+\begin{tipbox}
+中文输入完全 OK。LitFolio 会在 planning 步先把中文话题翻译成英文检索词再调 S2，
+所以「极端超短脉冲激光」会变成「ultrashort intense laser pulses」之类去拉文献。
+整个流程通常 30-60 秒。
+\end{tipbox}
+
+\section{主题提醒}
+
+主题提醒是「主题发现」的自动化延伸——设定一个研究方向后，LitFolio 会定期监控
+新出现的相关论文。与 RSS 订阅的区别：RSS 跟踪的是\textbf{来源}（某个 arXiv
+分类或期刊），主题提醒跟踪的是\textbf{话题}（跨来源的研究方向）。
+
+\litfigure{27-topic-alerts.png}{主题提醒管理界面。设定查询、频率和目标文件夹，系统自动运行并报告新发现的论文。}
+
+\subsection{创建提醒}
+
+创建提醒时需要设置：
+
+\begin{description}
+  \item[查询] 研究主题的自然语言描述（与主题发现的输入方式相同），
+    如「极端超短脉冲激光的啁啾脉冲放大技术」。
+  \item[频率] 每日 / 每周 / 每次启动时。
+  \item[目标文件夹] 可选——自动入库的论文会被放入指定文件夹。
+  \item[自动入库] 开启后，新发现的论文自动导入到库中。
+\end{description}
+
+\subsection{提醒执行流程}
+
+提醒触发时，LitFolio 执行以下流程：
+
+\begin{enumerate}
+  \item \textbf{LLM 规划}——将查询翻译为 2--4 个英文搜索词（与主题发现的
+    \cmd{query\_expand} 使用相同的逻辑）。
+  \item \textbf{Semantic Scholar 检索}——每个搜索词调用 S2 API，
+    按引用数排序拉取最新论文。
+  \item \textbf{去重过滤}——将检索结果与两个列表比较：
+    \begin{itemize}
+      \item 已入库论文（DOI / arXiv ID 匹配）→ 排除。
+      \item 上次提醒已展示的论文（\cmd{topic\_alert\_results} 表）→ 排除。
+    \end{itemize}
+    只保留\textbf{既未入库也未展示过}的新论文。
+  \item \textbf{存储结果}——新论文写入 \cmd{topic\_alert\_results} 表，
+    标记 \cmd{seen = 0}。
+  \item \textbf{通知}——导航栏的主题入口显示未读数量徽章。
+\end{enumerate}
+
+\subsection{自动入库}
+
+如果开启了「自动入库」，第 4 步之后会额外执行：
+
+\begin{enumerate}
+  \setcounter{enumi}{4}
+  \item \textbf{批量入库}——对每篇新论文，调用 arXiv/DOI 入库流程拉取
+    元数据和 PDF。
+  \item \textbf{放入目标文件夹}——如果指定了目标文件夹，入库的论文自动
+    归入该文件夹。
+\end{enumerate}
+
+\subsection{管理与查看}
+
+在「设置 → 主题提醒」中管理所有提醒：
+
+\begin{itemize}
+  \item 查看每个提醒的历史结果列表。
+  \item 标记结果为已读（\cmd{seen = 1}）。
+  \item 编辑提醒的查询、频率、目标文件夹。
+  \item 暂停或删除提醒。
+\end{itemize}
+
+\begin{warnbox}
+自动入库会消耗 LLM token（元数据翻译等）。如果你设置了多个高频提醒且开启了
+自动入库，建议将相关任务绑给低成本模型。
+\end{warnbox}
+
+% =====================================================================
+\chapter{库内提问（RAG）}
+\label{ch:ask}
+
+\cmd{/ask} 是把 LitFolio 当作\textbf{你自己的知识库}来问问题。和通用 ChatGPT
+的区别：回答只基于你已经入库的论文，并且每一句结论旁边都标 \cmd{[N]} 引用编号。
+
+\section{工作机制}
+
+\litfigure{12-ask-empty.png}{Ask 页初始状态。三张卡片解释工作流：1）问题改写；2）多路 FTS5 召回；3）LLM 回答带引用。}
+
+整个流程分四步：
+
+\begin{enumerate}
+  \item \textbf{LLM 问题改写}——这一步是整个 RAG 流水线的关键。直接把中文问题扔进
+    FTS5 的 AND-of-tokens 路径基本是零召回（FTS5 \cmd{unicode61} 对中文按字切分，
+    「神经网络」会变成「神 AND 经 AND 网 AND 络」）。因此 \cmd{query\_expand} 模块
+    先将自然语言问题改写为 2--4 个英文搜索词。改写失败时（离线、key 无效、模型未配置）
+    不阻塞流程，降级为用原始问题直接搜索。
+  \item \textbf{多路 FTS5 召回 + 合并评分}——每个搜索词独立跑一次 FTS5 BM25 搜索
+    （每词超取 \cmd{limit $\times$ 3}，至少 8 条），然后按 paper\_id 合并。合并时的
+    排序规则：\textbf{命中词数}（被越多搜索词命中的论文越靠前）> 年份降序 > 入库时间
+    降序。这样，「跨多个语义角度都相关」的论文会优先于「只在一个词上高分」的论文。
+    如果扩写全部返回空，则用原始问题做一次 FTS5 搜索作为兜底。
+  \item \textbf{证据拼装}——每篇召回论文被压缩为一段不超过 1800 字符的 snippet，按
+    优先级拼接：TL;DR → Abstract → Problem → Method → Comparison → Limitations →
+    Key Findings → 用户高亮（最多 3 条，每条 240 字符）。所有 snippet 拼在一起不超过
+    14000 字符，超出则截断。
+  \item \textbf{LLM 回答}——system prompt 强制要求：只基于提供的证据回答，每个事实
+    标注 \cmd{[N]} 引用编号，证据不足时明说「找不到相关文献」而不是猜测，用中文回复。
+    如果检索结果为空，直接返回固定提示文案而不调 LLM。
+\end{enumerate}
+
+\section{多轮对话界面}
+
+Ask 页已升级为\textbf{聊天式对话界面}，支持连续追问。每轮对话显示用户问题和
+AI 回答，带有独立的头像标识（用户蓝色、AI 绿色）。
+
+\litfigure{24-ask-multiturn.png}{Ask 多轮对话。用户和 AI 交替显示消息气泡，每条回答附带来源引用和保存按钮。}
+
+\subsection{对话状态模型}
+
+前端维护一个 \cmd{ConversationTurn[]} 数组，每个元素包含：
+
+\begin{itemize}
+  \item \cmd{role}——\cmd{"user"} 或 \cmd{"assistant"}。
+  \item \cmd{content}——消息文本。
+  \item \cmd{result}——仅 assistant 角色有，包含完整的 \cmd{AskLibraryResult}
+    （answer、sources、model、prompt\_tokens、completion\_tokens、terms）。
+\end{itemize}
+
+对话历史\textbf{仅在当前会话中保持}——关闭页面或切换路由后清空。这与
+单轮模式的行为一致（之前的单轮结果也不跨会话持久化）。
+
+\subsection{多轮 RAG 流程}
+
+每轮追问的处理流程与单轮完全相同（问题改写→FTS5 召回→证据拼装→LLM 回答），
+区别在于 LLM 的消息数组构建方式：
+
+\begin{enumerate}
+  \item \textbf{System prompt}——与单轮相同的引用严格系统提示。
+  \item \textbf{历史消息}——将之前的对话历史（所有 user/assistant 消息对）
+    作为 \cmd{ChatMessage} 数组插入到 system 和当前问题之间。
+  \item \textbf{当前问题+证据}——当前追问的文本加上本轮新检索到的 Sources 块。
+\end{enumerate}
+
+这意味着：
+
+\begin{itemize}
+  \item \textbf{上下文传递}——LLM 能看到之前的问答，因此代词和指代可以被
+    正确解析。例如「它用了什么方法？」中的「它」可以指向上一轮讨论的论文。
+  \item \textbf{每轮独立检索}——每轮追问都会重新做问题改写和 FTS5 召回，
+    而不是只用第一轮的证据。这保证了追问可以覆盖新的语义角度。
+  \item \textbf{引用独立}——每条回答的 \cmd{[N]} 编号只对应本轮的 Sources，
+    不会与前几轮的编号混淆。每条回答下方独立展示来源卡片。
+\end{itemize}
+
+\subsection{对话历史传递的细节}
+
+发给后端的 \cmd{conversation\_history} 是一个 \cmd{Vec<ConversationMessage>}，
+每个元素有 \cmd{role} 和 \cmd{content}。后端将其转换为 \cmd{ChatMessage} 数组
+传给 LLM。注意：历史消息中\textbf{不包含} Sources 块——Sources 只附加在当前
+追问的 user 消息中。这样做的原因是：
+
+\begin{itemize}
+  \item 避免 token 爆炸——如果每轮都保留完整的 Sources 块，5 轮对话后
+    context 可能超过模型窗口。
+  \item LLM 只需要当前轮的证据来回答当前问题——之前的证据已经体现在
+    之前的 assistant 回答中。
+\end{itemize}
+
+\subsection{UI 交互}
+
+\begin{itemize}
+  \item 输入框在页面底部，\kbd{Ctrl+Enter} / \kbd{Cmd+Enter} 发送。
+  \item 占位文字在有对话历史时变为「继续追问…」。
+  \item 新消息发送后自动滚动到底部（\cmd{scrollIntoView} + smooth behavior）。
+  \item 顶部「清除对话」按钮重置整个对话历史和输入框。
+  \item 加载中显示 AI 头像 + 旋转图标 + 「正在检索…」文字。
+  \item 错误信息以红色文字显示在输入框下方。
+\end{itemize}
+
+\begin{tipbox}
+多轮对话的质量取决于上下文窗口大小。如果你的 LLM 配置的 context window 较小
+（如 4K tokens），5 轮以上的对话可能会截断历史。建议使用 8K+ 窗口的模型。
+\end{tipbox}
+
+\section{保存为知识笔记}
+
+每条回答下方有「保存为笔记」。点击会生成一份独立的 Markdown 文档（位于
+\fpath{notes/ask/<timestamp>.md}），完整保留\textbf{问题、检索词、答案、证据来源}。
+WebDAV 同步时这份笔记会一起被推送。
+
+\begin{tipbox}
+RAG 的回答质量直接取决于你库的覆盖度——库里没有相关论文，回答会诚实地说「找不到
+明显相关的文献」。这是\textbf{特性}：不会编造没读过的文献。多轮对话时，如果第一轮
+找不到文献，后续追问也不会凭空编造。
+\end{tipbox}
+
+% =====================================================================
+\chapter{知识图谱}
+\label{ch:graph}
+
+\cmd{/graph} 路由是 LitFolio 的文献关系可视化中心。它把论文之间的引用、方法继承、
+对比等关系，以及论文与概念术语之间的关联，汇聚为一张可交互的知识图谱。
+
+\section{网络图}
+
+\litfigure{19-graph-network.png}{知识图谱——网络视图。蓝色节点为论文，绿色节点为概念；连线颜色表示关系类型，
+虚线为 AI 发现的潜在关联。}
+
+网络图是默认视图，使用力导向布局自动排布节点：
+
+\begin{itemize}
+  \item \textbf{论文节点}（蓝色）——大小固定，悬停显示标题与年份。
+  \item \textbf{概念节点}（绿色）——来自术语表中被两篇以上论文共享的
+    \cmd{normalized\_term}，节点旁标注关联论文数。
+  \item \textbf{连线}——颜色按关系类型区分（见图例），实线为用户手动创建，
+    虚线为 AI 发现。
+\end{itemize}
+
+点击任意节点，右侧边栏会展示该节点的详细信息和所有关联节点列表。
+
+\section{思维导图}
+
+\litfigure{20-graph-mindmap.png}{知识图谱——思维导图视图。以概念为中心向外辐射，
+第一环为关联论文，第二环为这些论文的链接论文。}
+
+思维导图以某个概念术语为根节点，按环形向外辐射：
+
+\begin{itemize}
+  \item \textbf{第一环}——通过术语表直接关联到该概念的论文。
+  \item \textbf{第二环}——与第一环论文存在 \cmd{paper\_links} 关系的其他论文。
+  \item 点击概念节点上的「定位」按钮可切换到以该概念为中心的思维导图。
+\end{itemize}
+
+\section{手动创建关系}
+
+工具栏上的「添加链接」按钮打开创建对话框。你需要选择：
+
+\begin{enumerate}
+  \item \textbf{来源论文}——默认为当前选中的论文节点。
+  \item \textbf{目标论文}——从下拉列表中选择。
+  \item \textbf{关系类型}——六种预定义类型：\cmd{extends}（扩展）、
+    \cmd{contradicts}（矛盾）、\cmd{compares}（对比）、\cmd{builds\_on}（基于）、
+    \cmd{uses\_method}（使用方法）、\cmd{related}（相关）。
+  \item \textbf{说明}（可选）——一段简短的文字描述两篇论文的具体关联。
+\end{enumerate}
+
+用户创建的关系置信度固定为 1.0，以实线显示。
+
+\section{引用网络}
+
+除了用户手动创建和 AI 发现的关系，LitFolio 还能从 Semantic Scholar 拉取论文的
+学术引用关系——展示「学术界认为这篇论文与谁相关」。在论文抽屉或知识图谱页面
+点「引用」按钮。
+
+\litfigure{25-citations-network.png}{引用网络视图。中心论文左侧为它引用的论文，右侧为引用它的论文，
+已入库论文以绿色边框标识。}
+
+\subsection{数据获取流程}
+
+引用数据通过 Semantic Scholar Graph API 获取：
+
+\begin{enumerate}
+  \item \textbf{论文匹配}——用论文的 DOI 或标题向 S2 发起匹配请求。
+    优先使用 DOI（精确匹配）；无 DOI 时用标题模糊匹配，S2 返回最相关的
+    paperId。
+  \item \textbf{拉取引用关系}——调用 \cmd{GET /paper/\{id\}?fields=references,citations}，
+    返回两个数组：\cmd{references}（该论文引用了谁）和 \cmd{citations}（谁引用了
+    该论文）。每个元素包含 title、authors、year、venue、externalIds。
+  \item \textbf{缓存}——结果写入 \cmd{paper\_citations} 表，每条记录包含
+    方向（\cmd{references} / \cmd{citations}）和 \cmd{fetched\_at} 时间戳。
+    再次查看时直接读缓存，不重复调 API。
+\end{enumerate}
+
+\subsection{树形展示}
+
+引用网络以树形布局展示：
+
+\begin{itemize}
+  \item \textbf{中心节点}——当前论文。
+  \item \textbf{左向分支}——References（该论文引用了哪些论文），最多 2 层
+    深度（第一层是直接引用，第二层是这些引用论文各自的引用）。
+  \item \textbf{右向分支}——Citations（哪些论文引用了该论文），同样最多 2 层。
+  \item \textbf{入库标识}——已在你库中的论文以绿色边框高亮，悬停显示
+    TL;DR（如有）。
+  \item \textbf{未入库论文}——显示标题、作者、年份；点击可查看摘要详情，
+    并有「入库」按钮。
+\end{itemize}
+
+\subsection{与知识图谱的关系}
+
+引用网络和知识图谱是互补的两个维度：
+
+\begin{description}
+  \item[引用网络] 来自学术社区的客观数据——谁引用了谁，不依赖你的判断。
+  \item[知识图谱] 来自你的主观判断和 AI 推断——论文之间的方法继承、
+    矛盾、对比等关系。
+\end{description}
+
+两者可以交叉验证：如果知识图谱中 A 延展了 B，而引用网络中 A 确实引用了 B，
+这条关系的可信度就更高。
+
+\begin{warnbox}
+Semantic Scholar 的引用数据覆盖率并非 100\%——非常新的论文（发表不到 1 周）
+或小众期刊的论文可能没有引用数据。此时 API 返回空数组，界面会显示
+「暂无引用数据」。
+\end{warnbox}
+
+\section{概念图谱}
+
+概念图谱是知识图谱的进阶维度——它展示的不是论文之间的关系，而是\textbf{方法论
+概念之间的演化关系}。点击工具栏上的「提取概念」按钮启动。
+
+\litfigure{26-concept-graph.png}{概念图谱。概念节点（绿色）之间用不同颜色的连线表示关系类型：
+替代（粉色）、扩展（紫色）、需要（橙色）、赋能（绿色）、竞争（红色）。}
+
+\subsection{概念提取流水线}
+
+点击「提取概念」后，LitFolio 逐篇论文执行以下流程：
+
+\begin{enumerate}
+  \item \textbf{文本准备}——取论文的 TL;DR + 摘要 + 深读四段（如有），
+    拼接为不超过 3000 字符的输入文本。
+  \item \textbf{LLM 提取}——将文本交给 LLM，system prompt 要求返回 JSON
+    数组，每个元素包含：
+    \begin{itemize}
+      \item \cmd{name}——方法论概念名称（如 \cmd{Transformer}、\cmd{LoRA}、
+        \cmd{Self-Attention}），要求规范化命名（首字母大写、不用缩写除非
+        缩写更通用）。
+      \item \cmd{description}——一句话中文描述该概念。
+      \item \cmd{relations}——与其他概念的关系列表，每条含 \cmd{target}
+        （目标概念名）、\cmd{relation}（关系类型）、\cmd{snippet}（原文证据
+        片段）。
+    \end{itemize}
+  \item \textbf{JSON 解析}——三级容错（直接解析→提取 \cmd{[...]} 子串→空数组
+    兜底），与 TL;DR 的解析策略一致。
+  \item \textbf{去重与规范化}——将提取到的概念名转小写做去重比较。如果库中
+    已有同名概念（忽略大小写），复用已有概念的 ID；否则创建新概念。
+  \item \textbf{关系创建}——对每条关系，查找目标概念（同名匹配），如果目标
+    概念不存在则先创建。然后在 \cmd{concept\_relations} 表中创建边，
+    记录 \cmd{evidence\_paper\_id} 和 \cmd{snippet}。
+  \item \textbf{论文-概念关联}——在 \cmd{paper\_concepts} 表中创建
+    \cmd{discusses} 边，默认 relevance = 1.0。
+\end{enumerate}
+
+\subsection{概念关系类型}
+
+五种预定义关系类型，每种对应不同的学术语义：
+
+\begin{longtable}{p{3cm} p{4cm} p{5.5cm}}
+\toprule
+\textbf{类型} & \textbf{含义} & \textbf{典型示例} \\
+\midrule
+\endhead
+\cmd{replaces} & 新方法取代旧方法 & Transformer replaces RNN \\
+\cmd{extends} & 在已有方法上改进 & LoRA extends Fine-tuning \\
+\cmd{requires} & 依赖另一方法 & Attention requires Embedding \\
+\cmd{enables} & 使另一方法成为可能 & GPU enables Deep Learning \\
+\cmd{competes\_with} & 同时期替代方案 & BERT competes\_with GPT \\
+\bottomrule
+\end{longtable}
+
+\subsection{图谱可视化集成}
+
+提取完成后，概念节点自动出现在知识图谱中：
+
+\begin{itemize}
+  \item \textbf{网络图}——概念节点为绿色，大小固定。概念间的关系用不同颜色
+    连线：replaces 粉色、extends 紫色、requires 橙色、enables 绿色、
+    competes\_with 红色。论文与概念之间用 \cmd{discusses} 边（浅绿色）连接。
+  \item \textbf{思维导图}——以概念为根节点向外辐射。第一环为与该概念直接
+    关联的论文（通过 \cmd{paper\_concepts}），第二环为这些论文的链接论文
+    （通过 \cmd{paper\_links}）。
+  \item \textbf{图例}——左下角图例面板标注了所有关系类型的连线颜色和样式。
+\end{itemize}
+
+\subsection{手动管理}
+
+你可以对 AI 提取的结果进行手动修正：
+
+\begin{itemize}
+  \item \textbf{创建概念}——手动添加 AI 遗漏的概念。
+  \item \textbf{编辑概念}——修改名称或描述。
+  \item \textbf{删除概念}——删除后，关联的 \cmd{paper\_concepts} 和
+    \cmd{concept\_relations} 记录会被级联删除。
+  \item \textbf{创建/删除关系}——手动添加或移除概念间的关系。
+  \item \textbf{关联/取消关联论文}——管理概念与论文之间的 \cmd{discusses} 边。
+\end{itemize}
+
+\begin{tipbox}
+概念提取的质量取决于论文的深读质量。如果论文只有 TL;DR 而没有深读四段，
+LLM 能获取的上下文较少，提取的概念可能不够精确。建议先对论文运行深读，
+再做概念提取。
+\end{tipbox}
+
+\section{AI 发现关系}
+
+点击工具栏上的「AI 发现」按钮，LitFolio 会：
+
+\begin{enumerate}
+  \item 收集库内所有论文的元数据（标题、年份、TL;DR、方法、关键发现）。
+  \item 按共享术语分批（每批最多 12 篇），交给 LLM 分析潜在关联。
+  \item 解析 LLM 返回的 JSON，为每对论文生成带置信度和说明的关系建议。
+\end{enumerate}
+
+AI 发现的关系以虚线显示，置信度低于 1.0。在阅读器的术语面板中，AI 关系旁会标注
+置信百分比。你可以：
+
+\begin{itemize}
+  \item \textbf{接受}——将 AI 关系提升为用户关系（置信度变为 1.0）。
+  \item \textbf{拒绝}——删除该关系建议。
+\end{itemize}
+
+\section{筛选与图例}
+
+工具栏提供两组筛选：
+
+\begin{itemize}
+  \item \textbf{关系类型}——按类型标签过滤显示哪些连线。
+  \item \textbf{包含概念}——开关概念节点的显示。关闭后只显示论文间的直接关系。
+\end{itemize}
+
+左下角的图例面板标注了节点颜色和每种关系类型对应的连线样式。
+
+\section{阅读器集成}
+
+在阅读器的术语面板（第~\ref{ch:reader}~章）底部，会显示当前论文的所有关联文献。
+每条关联标注了关系类型和来源（用户/AI），点击即可跳转到对应论文的阅读器视图。
+
+\begin{tipbox}
+知识图谱的数据完全来自本地 SQLite 数据库（\cmd{paper\_links} 表和
+\cmd{paper\_terms} 表的交集）。WebDAV 同步时关系数据会随库一起推送。
+\end{tipbox}
+
+% =====================================================================
+\chapter{相似论文推荐}
+\label{ch:similar}
+
+读完一篇论文后的自然问题是「还有什么值得读？」。相似论文推荐用 Semantic Scholar
+的推荐 API 自动找到相关文献。
+
+\section{使用方式}
+
+在论文抽屉或阅读器顶部点「相似论文」按钮。LitFolio 会用论文的 DOI 或标题
+向 Semantic Scholar 发起推荐请求。
+
+\litfigure{28-similar-papers.png}{相似论文推荐面板。结果卡片展示标题、作者、年份、摘要片段和相关度评分。}
+
+\subsection{推荐获取流程}
+
+\begin{enumerate}
+  \item \textbf{论文匹配}——用 DOI（优先）或标题向 Semantic Scholar 匹配
+    paperId。与引用网络使用相同的匹配逻辑。
+  \item \textbf{调用推荐 API}——请求
+    \cmd{GET /paper/\{id\}/recommendations}，
+    返回按相关度排序的论文列表。每条包含 title、authors、year、abstract、
+    citationCount。
+  \item \textbf{库内过滤}——遍历推荐结果，用 DOI 和 arXiv ID 检查是否已在
+    库中。已入库的论文从结果中移除。
+  \item \textbf{缓存}——过滤后的结果写入 \cmd{recommendation\_cache} 表，
+    附带 \cmd{fetched\_at} 时间戳。7 天内再次查看直接读缓存。
+\end{enumerate}
+
+\subsection{结果展示}
+
+每张结果卡片包含：
+
+\begin{itemize}
+  \item 标题、作者（前 3 位 + \cmd{et al.}）、年份。
+  \item 摘要片段（截取前 200 字符）。
+  \item 引用数（如 S2 返回了该字段）。
+  \item 「入库」按钮——点击后拉取完整元数据并尝试下载 PDF。
+\end{itemize}
+
+\subsection{边界情况}
+
+\begin{itemize}
+  \item \textbf{无 DOI 的论文}——标题模糊匹配可能返回错误的 paperId，
+    导致推荐结果不相关。此时界面会显示「匹配精度较低，结果仅供参考」。
+  \item \textbf{非常新的论文}——S2 的推荐模型需要论文有一定引用积累才
+    能生成推荐。发表不到 1 个月的论文通常没有推荐结果。
+  \item \textbf{小众领域}——S2 数据覆盖率并非 100\%，某些非英文或
+    非主流会议的论文可能匹配不到。
+\end{itemize}
+
+\begin{tipbox}
+如果推荐结果为空，可以尝试用「主题发现」（第 7 章）的手动搜索功能，
+或在知识图谱中查看 AI 发现的关联论文。
+\end{tipbox}
+
+% =====================================================================
+\chapter{文献综述草稿生成}
+\label{ch:litreview}
+
+当你为某个研究方向收集了 20--50 篇论文后，第一稿文献综述是最难写的。
+LitFolio 的 AI 综述生成能帮你搭好骨架。
+
+\section{使用方式}
+
+在文献库中多选论文（勾选模式），工具栏点「生成综述」。也可以在文件夹右键菜单中
+选择「生成综述」。
+
+\litfigure{29-lit-review.png}{生成的文献综述草稿。按主题分节，每节引用相关论文，末尾列出研究空白。}
+
+\subsection{生成流水线}
+
+综述生成是一条两步流水线：
+
+\subsubsection{Step 1：分组}
+
+将选中的论文交给 LLM，要求按主题/方法/应用领域分组。LLM 返回 JSON：
+
+\begin{verbatim}
+{
+  "groups": [
+    {
+      "name": "注意力机制变体",
+      "paper_ids": ["p1", "p3", "p7"],
+      "rationale": "这些论文都在改进注意力计算效率"
+    },
+    {
+      "name": "位置编码方法",
+      "paper_ids": ["p2", "p5"],
+      "rationale": "解决 Transformer 的位置感知问题"
+    }
+  ]
+}
+\end{verbatim}
+
+分组策略可选：\cmd{method}（按方法，默认）、\cmd{year}（按年代）、
+\cmd{application}（按应用领域）。不同策略会产生不同的分组结果。
+
+\subsubsection{Step 2：撰写}
+
+将分组结果和每篇论文的 TL;DR + 深读四段 + 摘要拼接为 prompt，要求 LLM
+撰写综述。System prompt 约束：
+
+\begin{itemize}
+  \item 每个分组对应一个二级章节。
+  \item 每篇论文在正文中至少被引用一次，引用格式为 \cmd{[Author, Year]}。
+  \item 引言概述研究方向的背景和综述范围。
+  \item 末尾有一个「研究空白」章节，指出当前文献中尚未解决的问题。
+  \item 结论总结主要发现和未来方向。
+  \item 语言为学术中文，风格与正式综述论文一致。
+  \item 不编造未提供的论文或数据。
+\end{itemize}
+
+\subsection{输入材料}
+
+每篇论文提供给 LLM 的材料包括（按优先级，总 token 不超过窗口限制）：
+
+\begin{enumerate}
+  \item TL;DR + 关键发现（约 100 tokens/篇）
+  \item 深读四段：Problem / Method / Comparison / Limitations（约 400 tokens/篇）
+  \item 摘要（约 200 tokens/篇）
+\end{enumerate}
+
+20 篇论文的输入约 14000 tokens，加上 system prompt 和输出空间，需要至少
+16K context window 的模型。
+
+\section{输出与编辑}
+
+\begin{itemize}
+  \item 输出为 Markdown 格式，2000--5000 词（20 篇论文时）。
+  \item 可在界面上直接编辑，纠正 AI 的概括或补充你的观点。
+  \item 可保存为笔记文件（\fpath{notes/review/<timestamp>.md}）。
+  \item 可重新生成——选择不同的分组策略（按方法 / 按年份 / 按应用领域）。
+\end{itemize}
+
+\begin{warnbox}
+综述草稿是起点，不是成品。AI 可能遗漏论文间的细微差异或过度概括。请务必
+人工审读并补充你自己的分析。尤其注意：AI 可能会过度强调某几篇论文而忽略
+其他——检查「研究空白」章节是否覆盖了你认为重要的方向。
+\end{warnbox}

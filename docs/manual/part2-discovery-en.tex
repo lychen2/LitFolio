@@ -1,0 +1,871 @@
+\part{Discovery and Synthesis}
+
+% =====================================================================
+\chapter{arXiv Browse}
+\label{ch:browse}
+
+The \cmd{/browse} route is a page designed for researchers who like to "browse arXiv." It organizes
+papers by the official arXiv category tree, letting you explore the latest papers in a field without
+having specific keywords in mind.
+
+\section{Category Tree}
+
+\litfigure{07-browse-en.png}{arXiv Browse. The left sidebar shows the category tree (top-level groups such as cs / math / physics);
+the main area displays the latest papers in the selected category, with pagination and import support.}
+
+LitFolio includes a built-in Chinese--English mapping for all 150+ arXiv categories. Clicking any
+leaf node (e.g.\ \cmd{cs.LG} for Machine Learning, \cmd{physics.optics} for Optics) triggers an
+arXiv API request to fetch the 50 most recent papers.
+
+\section{Pagination and "Exhausted"}
+
+Scrolling to the bottom and clicking "Load More" fetches the next page (50 items per page). When a
+category has low publication volume and two consecutive requests return no new entries, LitFolio
+displays "Exhausted" and stops requesting---this is intentional behavior to avoid unnecessary API
+calls, not a bug.
+
+\section{Importing}
+
+Clicking any paper opens a detail drawer showing the full abstract, authors, submission date, and
+original arXiv link. The "Import" button in the bottom-right corner of the drawer follows the same
+arXiv ID import workflow described in Chapter 3---the only difference is that the ID is already
+filled in.
+
+\begin{tipbox}
+The arXiv Browse page itself does \textbf{not} save the list to the local database---it queries
+the live API every time. If you want to follow a category's new papers long-term, consider using
+RSS subscriptions (see the next chapter), which work offline, support translation, and track read
+status.
+\end{tipbox}
+
+% =====================================================================
+\chapter{RSS Feeds}
+\label{ch:feeds}
+
+The \cmd{/feeds} route lets you track arXiv sub-categories, journal articles, and research group
+homepages via RSS. All fetched entries are stored in SQLite, with unread counts and read status
+saved locally.
+
+\section{Feed Management}
+
+\litfigure{08-feeds-en.png}{Feed list. Left: sources (arXiv cs.LG / Nature Photonics / Optica, etc.); Right: latest entries
+for the selected source, with unread badges, translation buttons, and import buttons.}
+
+To add a new feed source, click the "+" button and enter the RSS URL and a display name. LitFolio
+imposes no restrictions on feed sources---any valid RSS/Atom feed works. See Appendix C for
+commonly used sources.
+
+\section{Conditional GET Refresh}
+
+LitFolio uses conditional GET (\cmd{If-Modified-Sometimes} / \cmd{ETag}) to fetch feeds. When the
+remote has not been updated, the server returns 304 Not Modified---this is why clicking "Refresh"
+sometimes instantly responds with "Already up to date." The practical implications are:
+
+\begin{itemize}
+  \item Refreshing frequently is \textbf{cheap}---it will not trigger rate limiting on the server.
+  \item Genuine "nothing new" and "network/server error" states display the same message; you need
+    to check the error badge to tell them apart.
+\end{itemize}
+
+\section{Entry Details and Translation}
+
+\litfigure{09-feeds-detail-en.png}{After selecting a feed item, the right drawer shows the full abstract; you can translate
+with one click, mark as read, or import directly (equivalent to pasting an arXiv ID on the Import page).}
+
+The "Translate" button works the same way as in the library: it invokes the \cmd{translate} task
+(bound to the translation model you configured). Results are cached in the SQLite \cmd{feed\_items}
+table and load instantly on subsequent views.
+
+\begin{warnbox}
+RSS translation consumes tokens for every entry. If your subscribed sources update frequently
+(e.g., multiple arXiv categories), consider binding the translation task to a \textbf{local Ollama
+open-source chat model} or a \textbf{low-cost domestic API} to avoid runaway costs.
+\end{warnbox}
+
+\section{Direct Import from Feed Items}
+
+The "Import" button in the detail drawer follows the exact same workflow as the arXiv ID import
+process in Chapter 3---fetching full metadata and attempting to download the PDF. After import, the
+entry remains in the feed list but is marked as "Imported."
+
+% =====================================================================
+\chapter{Topic Discovery}
+\label{ch:topic}
+
+The \cmd{/topic} route is one of LitFolio's advanced capabilities, split into two tabs:
+\textbf{Search Recall} and \textbf{Survey Generation}. They solve different problems.
+
+\section{Two-Tab Mental Model}
+
+\begin{description}
+  \item[Search Recall] You already have a rough research direction and want to find all relevant
+    papers from your existing library. Workflow: query expansion $\to$ multi-path FTS5 retrieval
+    $\to$ rank by citation count. Fully offline, no external network calls.
+  \item[Survey Generation] You want a "bird's-eye view" of a new direction, but your library may
+    not contain any papers on that topic. Workflow: LLM decomposes into sub-topics $\to$ Semantic
+    Scholar fetches real papers $\to$ LLM annotates must-reads.
+\end{description}
+
+\section{Search Recall}
+
+\litfigure{10-topic-search-en.png}{Search Recall tab. After entering a query, LitFolio expands it into several related phrases,
+retrieves them via multi-path FTS5, and ranks results by citation count. Clicking a result opens a drawer with the TL;DR.}
+
+\subsection{Query Expansion}
+
+Entering "retrieval augmented generation" gets expanded to queries like "RAG / retrieval-augmented
+/ vector retrieval / chunk + retrieval / Lewis 2020..." and so on---a dozen or so related queries.
+This step uses the LLM configured for the \cmd{search} task, with the goal of recalling papers that
+use different phrasing to describe the same concept.
+
+\subsection{Query Expansion Algorithm Details}
+
+Expansion is handled by the \cmd{query\_expand} module. It does not pass the user's raw input
+directly to S2; instead, it first asks the LLM to translate the (possibly Chinese) broad topic
+into 2--4 precise English search terms. The core constraints are written in the system prompt:
+
+\begin{itemize}
+  \item Output only 2--4 search terms---fewer is better than more, as multi-term OR queries only
+    inflate noise.
+  \item Choose terms that domain experts would actually type, rather than piling on keywords from
+    adjacent sub-fields.
+  \item If two candidate terms would recall the same set of papers (e.g., "attosecond pulses" and
+    "attosecond laser"), keep only the more standard one.
+  \item Chinese input is translated to English before searching.
+  \item Remove vague modifiers (research / study / novel / recent, etc.).
+\end{itemize}
+
+The LLM returns JSON: \cmd{\{"terms": [...]\}}. The parser has three-level fault tolerance: it
+first attempts direct JSON parsing; on failure, it extracts the first \cmd{\{...\}} substring
+(handling markdown fences and conversational wrappers); as a last resort, it splits by comma or
+newline. At most 4 terms are used.
+
+\subsection{Time Window and Sorting}
+
+Results are sorted by citation count by default; the dropdown in the top-right corner allows
+switching to "Newest," "Relevance," or "Must-Read First." The time window (last 1/3/5 years)
+filters out older papers.
+
+\section{Survey Generation}
+
+\litfigure{11-topic-survey-en.png}{Survey Generation tab. Enter an open topic, and LitFolio uses an LLM to decompose it into
+3 sub-fields, fetches 4 representative papers per sub-field from Semantic Scholar, then has the LLM mark "Must-Read" with a one-line justification.}
+
+\subsection{Pipeline}
+
+Survey generation is a four-step pipeline, with each step's progress pushed to the frontend in
+real time via IPC events.
+
+\subsubsection{Why Not Let the LLM List Papers Directly}
+
+If you ask an LLM to output a paper list directly, it will fabricate DOIs, authors, and
+years---hallucination rates are extremely high. LitFolio's approach strictly separates "planning"
+from "retrieval": the LLM is only responsible for planning (decomposing sub-fields + providing
+search terms). The actual paper retrieval from Semantic Scholar is done by program code, and the
+LLM then annotates the real papers.
+
+\begin{enumerate}
+  \item \textbf{Planning}---Decompose the open topic into 3 sub-fields (e.g., "extreme ultrashort
+    pulse laser" might decompose into chirped pulse amplification / harmonic generation / optical
+    parametric processes).
+  \item \textbf{Grounding}---For each sub-field, call the Semantic Scholar Graph API to fetch 4
+    highly cited papers. These are real references, not LLM fabrications.
+  \item \textbf{Annotating}---The LLM marks each paper as "Must-Read" with a one-line
+    justification (explaining why this paper is important for the sub-field).
+  \item \textbf{Done}---Save the complete survey to the SQLite \cmd{topic\_surveys} table for
+    later retrieval.
+\end{enumerate}
+
+\subsubsection{Phase 1: LLM Planning}
+
+The LLM receives a (possibly Chinese) research topic and outputs a JSON structure: 4--7 sub-fields,
+each containing a name, active year range, a Chinese narrative, 2--4 English S2 search terms, and
+an optional PI name hint. Additionally, 5--10 cross-sub-field key\_PIs (important researchers) are
+included. Chinese input is translated into English search terms within the prompt.
+
+\subsubsection{Phase 2: Semantic Scholar Grounding}
+
+For each sub-field, the program executes the following steps:
+
+\begin{enumerate}
+  \item \textbf{Term-based retrieval}---Each search\_term triggers one call to the S2
+    \cmd{bulk\_by\_citations} API, returning papers sorted by citation count with year filtering.
+    Each term fetches \cmd{topk $\times$ 3} (at least 15) results to ensure sufficient candidates
+    after deduplication.
+  \item \textbf{PI supplementary retrieval}---Combine PI names with search\_terms to query S2;
+    each PI is combined with at most 2 search terms.
+  \item \textbf{Deduplication}---Within each sub-field, deduplicate by paperId (prefer paperId;
+    use DOI if paperId is unavailable). When duplicates exist, keep the version with higher citation
+    count.
+  \item \textbf{Relevance filtering}---The paper title and abstract must contain at least 2
+    stop-word-removed search term tokens, or directly contain a complete search phrase. S2
+    occasionally returns irrelevant papers; this filtering layer specifically catches them.
+  \item \textbf{DOI filtering + sorting}---Papers without a DOI are discarded (to ensure
+    traceability). The remaining papers are sorted by citation count in descending order and the
+    top-K are selected.
+\end{enumerate}
+
+Cross-sub-field deduplication uses a "first come, first served" strategy: if a paper matches in
+multiple sub-fields, it is kept only in the sub-field processed first.
+
+\subsubsection{S2 API Rate Control}
+
+LitFolio has a built-in token bucket rate limiter: at most 80 requests per 300-second window (S2's
+unauthenticated limit is 100 requests per 5 minutes; LitFolio leaves a 20\% margin). It is
+implemented with a global atomic counter that resets automatically when the window expires. When the
+limit is exceeded, a clear error message "try again later" is returned instead of silent failure.
+During survey generation, multiple search\_terms within a sub-field are called serially. If there
+are many sub-fields and search terms, rate limiting may be triggered---this is why survey generation
+sometimes takes 30--60 seconds.
+
+\subsubsection{Phase 3: LLM Annotation (Optional)}
+
+The real paper list from all sub-fields (id + title + year + abstract) is sent to the LLM with the
+following requirements:
+
+\begin{itemize}
+  \item Write 1--2 sentences in Chinese explaining "why this matters" for each paper.
+  \item Mark 8--12 papers across all sub-fields as "Must-Read," ensuring coverage across different
+    sub-fields (do not cluster them in a single sub-field).
+\end{itemize}
+
+Phase 3 is optional---if this LLM call fails, the survey is still usable; it simply lacks
+annotations and must-read markers.
+
+\subsection{Saving and Restoring}
+
+Each generation is automatically saved. The "History" button lets you return to a previous survey
+without re-calling the LLM or APIs.
+
+\begin{tipbox}
+Chinese input is fully supported. LitFolio translates the Chinese topic into English search terms
+during the planning step before querying S2, so "extreme ultrashort pulse laser" becomes something
+like "ultrashort intense laser pulses" for literature retrieval. The entire process typically takes
+30--60 seconds.
+\end{tipbox}
+
+\section{Topic Alerts}
+
+Topic Alerts are an automated extension of Topic Discovery---once you set a research direction,
+LitFolio periodically monitors for newly published relevant papers. Unlike RSS subscriptions, which
+track \textbf{sources} (an arXiv category or journal), Topic Alerts track \textbf{topics}
+(cross-source research directions).
+
+\litfigure{27-topic-alerts-en.png}{Topic Alert management interface. Set the query, frequency, and target folder;
+the system runs automatically and reports newly discovered papers.}
+
+\subsection{Creating an Alert}
+
+Creating an alert requires the following settings:
+
+\begin{description}
+  \item[Query] A natural language description of the research topic (same input format as Topic
+    Discovery), e.g., "chirped pulse amplification for extreme ultrashort pulse lasers."
+  \item[Frequency] Daily / Weekly / On startup.
+  \item[Target Folder] Optional---papers imported automatically will be placed in the specified
+    folder.
+  \item[Auto Import] When enabled, newly discovered papers are automatically imported into the
+    library.
+\end{description}
+
+\subsection{Alert Execution Flow}
+
+When an alert triggers, LitFolio executes the following flow:
+
+\begin{enumerate}
+  \item \textbf{LLM Planning}---Translate the query into 2--4 English search terms (using the same
+    logic as Topic Discovery's \cmd{query\_expand}).
+  \item \textbf{Semantic Scholar Retrieval}---Call the S2 API for each search term, fetching the
+    latest papers sorted by citation count.
+  \item \textbf{Deduplication Filtering}---Compare the retrieval results against two lists:
+    \begin{itemize}
+      \item Already-imported papers (DOI / arXiv ID match) $\to$ excluded.
+      \item Papers shown in previous alerts (\cmd{topic\_alert\_results} table) $\to$ excluded.
+    \end{itemize}
+    Only papers that are \textbf{neither imported nor previously shown} are kept.
+  \item \textbf{Store Results}---New papers are written to the \cmd{topic\_alert\_results} table
+    with \cmd{seen = 0}.
+  \item \textbf{Notification}---The topic entry in the navigation bar displays an unread count
+    badge.
+\end{enumerate}
+
+\subsection{Auto Import}
+
+If "Auto Import" is enabled, the following additional steps execute after step 4:
+
+\begin{enumerate}
+  \setcounter{enumi}{4}
+  \item \textbf{Batch Import}---For each new paper, invoke the arXiv/DOI import workflow to fetch
+    metadata and PDF.
+  \item \textbf{Place in Target Folder}---If a target folder is specified, imported papers are
+    automatically placed into that folder.
+\end{enumerate}
+
+\subsection{Management and Viewing}
+
+Manage all alerts in Settings $\to$ Topic Alerts:
+
+\begin{itemize}
+  \item View the history of results for each alert.
+  \item Mark results as read (\cmd{seen = 1}).
+  \item Edit an alert's query, frequency, or target folder.
+  \item Pause or delete an alert.
+\end{itemize}
+
+\begin{warnbox}
+Auto Import consumes LLM tokens (for metadata translation, etc.). If you have multiple
+high-frequency alerts with Auto Import enabled, consider binding the related tasks to a low-cost
+model.
+\end{warnbox}
+
+% =====================================================================
+\chapter{Library Q\&A (RAG)}
+\label{ch:ask}
+
+The \cmd{/ask} route turns LitFolio into \textbf{your personal knowledge base} for asking
+questions. Unlike generic ChatGPT, answers are based solely on papers you have already imported,
+and every factual claim is accompanied by a \cmd{[N]} citation reference.
+
+\section{How It Works}
+
+\litfigure{12-ask-empty-en.png}{Ask page initial state. Three cards explain the workflow: 1) question rewriting;
+2) multi-path FTS5 retrieval; 3) LLM answer with citations.}
+
+The entire process has four steps:
+
+\begin{enumerate}
+  \item \textbf{LLM Question Rewriting}---This step is the key to the entire RAG pipeline. Throwing
+    a Chinese question directly into FTS5's AND-of-tokens path yields essentially zero recall
+    (FTS5 \cmd{unicode61} tokenizes Chinese character by character, so "neural network" becomes
+    "neural AND network" in individual characters). Therefore, the \cmd{query\_expand} module first
+    rewrites the natural language question into 2--4 English search terms. If rewriting fails
+    (offline, invalid key, model not configured), it does not block the flow---it degrades to
+    searching with the original question directly.
+  \item \textbf{Multi-Path FTS5 Retrieval + Merged Scoring}---Each search term runs an independent
+    FTS5 BM25 search (each term over-fetches \cmd{limit $\times$ 3}, at least 8 results), then
+    results are merged by paper\_id. The sorting rule during merging is: \textbf{number of matched
+    terms} (papers matched by more search terms rank higher) $>$ descending year $>$ descending
+    import time. This way, papers that are "relevant from multiple semantic angles" take priority
+    over papers that score high on only one term. If all expanded queries return empty, a fallback
+    FTS5 search using the original question is performed.
+  \item \textbf{Evidence Assembly}---Each recalled paper is compressed into a snippet of no more
+    than 1800 characters, assembled by priority: TL;DR $\to$ Abstract $\to$ Problem $\to$ Method
+    $\to$ Comparison $\to$ Limitations $\to$ Key Findings $\to$ User highlights (up to 3, each 240
+    characters). All snippets combined do not exceed 14,000 characters; excess is truncated.
+  \item \textbf{LLM Answer}---The system prompt enforces: answer only based on the provided
+    evidence, annotate each fact with a \cmd{[N]} citation reference, explicitly state "no relevant
+    literature found" when evidence is insufficient rather than guessing, and reply in Chinese. If
+    the retrieval results are empty, a fixed prompt message is returned without calling the LLM.
+\end{enumerate}
+
+\section{Multi-Turn Chat Interface}
+
+The Ask page has been upgraded to a \textbf{chat-style conversational interface} that supports
+follow-up questions. Each turn displays the user's question and the AI's answer, with distinct
+avatar indicators (blue for user, green for AI).
+
+\litfigure{24-ask-multiturn-en.png}{Ask multi-turn conversation. User and AI messages alternate in bubbles,
+each answer accompanied by source citations and a save button.}
+
+\subsection{Conversation State Model}
+
+The frontend maintains a \cmd{ConversationTurn[]} array, where each element contains:
+
+\begin{itemize}
+  \item \cmd{role}---\cmd{"user"} or \cmd{"assistant"}.
+  \item \cmd{content}---The message text.
+  \item \cmd{result}---Only present for the assistant role, containing the complete
+    \cmd{AskLibraryResult} (answer, sources, model, prompt\_tokens, completion\_tokens, terms).
+\end{itemize}
+
+Conversation history is \textbf{maintained only within the current session}---it is cleared when
+the page is closed or the route is changed. This is consistent with the single-turn behavior
+(previous single-turn results were also not persisted across sessions).
+
+\subsection{Multi-Turn RAG Flow}
+
+Each follow-up question is processed using the exact same pipeline as a single turn (question
+rewriting $\to$ FTS5 retrieval $\to$ evidence assembly $\to$ LLM answer). The difference lies in
+how the LLM message array is constructed:
+
+\begin{enumerate}
+  \item \cmd{System prompt}---The same citation-strict system prompt as single-turn.
+  \item \cmd{History messages}---Previous conversation history (all user/assistant message pairs)
+    is inserted as a \cmd{ChatMessage} array between the system prompt and the current question.
+  \item \cmd{Current question + evidence}---The current follow-up text plus the newly retrieved
+    Sources block for this turn.
+\end{enumerate}
+
+This means:
+
+\begin{itemize}
+  \item \textbf{Context carry-over}---The LLM can see previous Q\&A, so pronouns and references
+    are correctly resolved. For example, "what method did it use?"---the "it" can refer to the
+    paper discussed in the previous turn.
+  \item \textbf{Independent retrieval per turn}---Each follow-up re-runs question rewriting and
+    FTS5 retrieval rather than reusing evidence from the first turn. This ensures that follow-ups
+    can cover new semantic angles.
+  \item \textbf{Independent citations}---The \cmd{[N]} numbering in each answer corresponds only
+    to that turn's Sources and does not conflict with numbering from previous turns. Source cards
+    are displayed independently below each answer.
+\end{itemize}
+
+\subsection{Conversation History Passing Details}
+
+The \cmd{conversation\_history} sent to the backend is a \cmd{Vec<ConversationMessage>}, where
+each element has \cmd{role} and \cmd{content}. The backend converts it into a \cmd{ChatMessage}
+array and passes it to the LLM. Note: the history messages \textbf{do not contain} Sources
+blocks---Sources are only attached to the current follow-up's user message. The reasons are:
+
+\begin{itemize}
+  \item Avoid token explosion---if each turn retained full Sources blocks, the context could exceed
+    the model window after 5 turns.
+  \item The LLM only needs the current turn's evidence to answer the current question---previous
+    evidence is already reflected in previous assistant answers.
+\end{itemize}
+
+\subsection{UI Interaction}
+
+\begin{itemize}
+  \item The input box is at the bottom of the page; \kbd{Ctrl+Enter} / \kbd{Cmd+Enter} sends the
+    message.
+  \item The placeholder text changes to "Continue the conversation..." when conversation history
+    exists.
+  \item After sending a new message, the view automatically scrolls to the bottom
+    (\cmd{scrollIntoView} + smooth behavior).
+  \item The "Clear Conversation" button at the top resets the entire conversation history and input
+    box.
+  \item During loading, the AI avatar + spinning icon + "Searching..." text are displayed.
+  \item Error messages appear as red text below the input box.
+\end{itemize}
+
+\begin{tipbox}
+Multi-turn conversation quality depends on the context window size. If your LLM is configured with
+a small context window (e.g., 4K tokens), conversations beyond 5 turns may truncate history. A
+model with 8K+ window is recommended.
+\end{tipbox}
+
+\section{Save as Knowledge Note}
+
+Each answer has a "Save as Note" button below it. Clicking generates an independent Markdown
+document (at \fpath{notes/ask/<timestamp>.md}), fully preserving the \textbf{question, search
+terms, answer, and evidence sources}. This note is synced along with the library during WebDAV
+sync.
+
+\begin{tipbox}
+RAG answer quality depends directly on your library's coverage---if there are no relevant papers
+in your library, the answer will honestly state "no obviously relevant literature found." This is
+a \textbf{feature}: it will not fabricate references to papers you have not read. In multi-turn
+conversations, if the first turn finds no literature, subsequent follow-ups will not fabricate
+references either.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Knowledge Graph}
+\label{ch:graph}
+
+The \cmd{/graph} route is LitFolio's literature relationship visualization hub. It aggregates
+citation relationships, methodological inheritance, comparisons, and other connections between
+papers---as well as associations between papers and conceptual terms---into an interactive knowledge
+graph.
+
+\section{Network Graph}
+
+\litfigure{19-graph-network-en.png}{Knowledge Graph---network view. Blue nodes are papers, green nodes are concepts;
+line colors indicate relationship types; dashed lines represent AI-discovered potential associations.}
+
+The network graph is the default view, using force-directed layout to automatically arrange nodes:
+
+\begin{itemize}
+  \item \textbf{Paper nodes} (blue)---Fixed size; hover to display title and year.
+  \item \textbf{Concept nodes} (green)---Derived from \cmd{normalized\_term} entries in the term
+    table shared by two or more papers; the node label shows the number of associated papers.
+  \item \textbf{Lines}---Color-coded by relationship type (see legend); solid lines are
+    user-created, dashed lines are AI-discovered.
+\end{itemize}
+
+Clicking any node displays its detailed information and a list of all associated nodes in the right
+sidebar.
+
+\section{Mind Map}
+
+\litfigure{20-graph-mindmap-en.png}{Knowledge Graph---mind map view. A concept is at the center, radiating outward;
+the first ring contains associated papers; the second ring contains papers linked to those papers.}
+
+The mind map takes a conceptual term as its root node and radiates outward in concentric rings:
+
+\begin{itemize}
+  \item \textbf{First ring}---Papers directly associated with the concept through the term table.
+  \item \textbf{Second ring}---Other papers that have \cmd{paper\_links} relationships with the
+    first-ring papers.
+  \item Clicking the "Locate" button on a concept node switches to a mind map centered on that
+    concept.
+\end{itemize}
+
+\section{Manual Relationship Creation}
+
+The "Add Link" button on the toolbar opens a creation dialog. You need to select:
+
+\begin{enumerate}
+  \item \textbf{Source paper}---Defaults to the currently selected paper node.
+  \item \textbf{Target paper}---Selected from a dropdown list.
+  \item \textbf{Relationship type}---Six predefined types: \cmd{extends},
+    \cmd{contradicts}, \cmd{compares}, \cmd{builds\_on}, \cmd{uses\_method}, \cmd{related}.
+  \item \textbf{Description} (optional)---A brief text describing the specific connection between
+    the two papers.
+\end{enumerate}
+
+User-created relationships have a fixed confidence of 1.0 and are displayed with solid lines.
+
+\section{Citation Network}
+
+Beyond user-created and AI-discovered relationships, LitFolio can also fetch academic citation
+relationships from Semantic Scholar---showing "who the academic community considers related to this
+paper." Click the "Citations" button in the paper drawer or on the Knowledge Graph page.
+
+\litfigure{25-citations-network-en.png}{Citation network view. Papers cited by the central paper appear on the left;
+papers citing it appear on the right. Papers already in the library are highlighted with a green border.}
+
+\subsection{Data Fetching Flow}
+
+Citation data is obtained through the Semantic Scholar Graph API:
+
+\begin{enumerate}
+  \item \textbf{Paper matching}---Send a matching request to S2 using the paper's DOI or title.
+    DOI is preferred (exact match); when no DOI is available, title fuzzy matching is used, and S2
+    returns the most relevant paperId.
+  \item \textbf{Fetch citation relationships}---Call \cmd{GET /paper/\{id\}?fields=references,citations},
+    which returns two arrays: \cmd{references} (papers this paper cites) and \cmd{citations}
+    (papers that cite this paper). Each element contains title, authors, year, venue, and
+    externalIds.
+  \item \textbf{Caching}---Results are written to the \cmd{paper\_citations} table, with each
+    record containing the direction (\cmd{references} / \cmd{citations}) and a \cmd{fetched\_at}
+    timestamp. Subsequent views read directly from cache without re-calling the API.
+\end{enumerate}
+
+\subsection{Tree Display}
+
+The citation network is displayed in a tree layout:
+
+\begin{itemize}
+  \item \textbf{Center node}---The current paper.
+  \item \textbf{Left branches}---References (papers cited by this paper), up to 2 levels deep
+    (the first level is direct citations; the second level is citations of those cited papers).
+  \item \textbf{Right branches}---Citations (papers that cite this paper), also up to 2 levels.
+  \item \textbf{Library indicator}---Papers already in your library are highlighted with a green
+    border; hovering shows the TL;DR (if available).
+  \item \textbf{Non-library papers}---Title, authors, and year are displayed; clicking shows
+    abstract details with an "Import" button.
+\end{itemize}
+
+\subsection{Relationship with the Knowledge Graph}
+
+The citation network and the knowledge graph are complementary dimensions:
+
+\begin{description}
+  \item[Citation Network] Objective data from the academic community---who cites whom,
+    independent of your judgment.
+  \item[Knowledge Graph] Derived from your subjective judgment and AI inference---methodological
+    inheritance, contradictions, comparisons, and other relationships between papers.
+\end{description}
+
+The two can be cross-validated: if the knowledge graph shows that A extends B, and the citation
+network confirms that A indeed cites B, the relationship's credibility is higher.
+
+\begin{warnbox}
+Semantic Scholar's citation data coverage is not 100\%---very recent papers (published less than a
+week ago) or papers from niche journals may have no citation data. In such cases, the API returns
+empty arrays, and the interface displays "No citation data available."
+\end{warnbox}
+
+\section{Concept Graph}
+
+The concept graph is an advanced dimension of the knowledge graph---it visualizes not relationships
+between papers, but \textbf{evolutionary relationships between methodological concepts}. Click the
+"Extract Concepts" button on the toolbar to start.
+
+\litfigure{26-concept-graph-en.png}{Concept graph. Concept nodes (green) are connected by different colored lines
+indicating relationship types: replaces (pink), extends (purple), requires (orange), enables (green), competes\_with (red).}
+
+\subsection{Concept Extraction Pipeline}
+
+After clicking "Extract Concepts," LitFolio executes the following pipeline for each paper:
+
+\begin{enumerate}
+  \item \textbf{Text preparation}---Take the paper's TL;DR + abstract + deep-read sections (if
+    available), concatenated into input text of no more than 3000 characters.
+  \item \textbf{LLM extraction}---Pass the text to the LLM; the system prompt requires returning
+    a JSON array where each element contains:
+    \begin{itemize}
+      \item \cmd{name}---Methodological concept name (e.g., \cmd{Transformer}, \cmd{LoRA},
+        \cmd{Self-Attention}), with normalized naming (capitalize first letters, avoid
+        abbreviations unless the abbreviation is more commonly used).
+      \item \cmd{description}---A one-sentence Chinese description of the concept.
+      \item \cmd{relations}---A list of relationships with other concepts, each containing
+        \cmd{target} (target concept name), \cmd{relation} (relationship type), and
+        \cmd{snippet} (evidence text from the original paper).
+    \end{itemize}
+  \item \textbf{JSON parsing}---Three-level fault tolerance (direct parsing $\to$ extract
+    \cmd{[...]} substring $\to$ empty array fallback), consistent with the TL;DR parsing strategy.
+  \item \textbf{Deduplication and normalization}---Convert extracted concept names to lowercase for
+    deduplication comparison. If a concept with the same name already exists in the library
+    (case-insensitive), reuse its existing ID; otherwise, create a new concept.
+  \item \textbf{Relationship creation}---For each relationship, look up the target concept
+    (name-based matching); if the target concept does not exist, create it first. Then create an
+    edge in the \cmd{concept\_relations} table, recording the \cmd{evidence\_paper\_id} and
+    \cmd{snippet}.
+  \item \textbf{Paper-concept association}---Create a \cmd{discusses} edge in the
+    \cmd{paper\_concepts} table with default relevance = 1.0.
+\end{enumerate}
+
+\subsection{Concept Relationship Types}
+
+Five predefined relationship types, each corresponding to a different academic semantic:
+
+\begin{longtable}{p{3cm} p{4cm} p{5.5cm}}
+\toprule
+\textbf{Type} & \textbf{Meaning} & \textbf{Typical Example} \\
+\midrule
+\endhead
+\cmd{replaces} & New method replaces old method & Transformer replaces RNN \\
+\cmd{extends} & Improvement on existing method & LoRA extends Fine-tuning \\
+\cmd{requires} & Depends on another method & Attention requires Embedding \\
+\cmd{enables} & Makes another method possible & GPU enables Deep Learning \\
+\cmd{competes\_with} & Contemporary alternative & BERT competes\_with GPT \\
+\bottomrule
+\end{longtable}
+
+\subsection{Graph Visualization Integration}
+
+After extraction completes, concept nodes automatically appear in the knowledge graph:
+
+\begin{itemize}
+  \item \textbf{Network graph}---Concept nodes are green with fixed size. Relationships between
+    concepts use different colored lines: replaces (pink), extends (purple), requires (orange),
+    enables (green), competes\_with (red). Papers and concepts are connected by \cmd{discusses}
+    edges (light green).
+  \item \textbf{Mind map}---Concepts serve as root nodes radiating outward. The first ring
+    contains papers directly associated with the concept (via \cmd{paper\_concepts}); the second
+    ring contains papers linked to those papers (via \cmd{paper\_links}).
+  \item \textbf{Legend}---The legend panel in the bottom-left corner annotates all relationship
+    types with their line colors and styles.
+\end{itemize}
+
+\subsection{Manual Management}
+
+You can manually correct AI extraction results:
+
+\begin{itemize}
+  \item \textbf{Create concept}---Manually add concepts the AI missed.
+  \item \textbf{Edit concept}---Modify the name or description.
+  \item \textbf{Delete concept}---Upon deletion, associated \cmd{paper\_concepts} and
+    \cmd{concept\_relations} records are cascade-deleted.
+  \item \textbf{Create/delete relationship}---Manually add or remove relationships between
+    concepts.
+  \item \textbf{Associate/disassociate papers}---Manage \cmd{discusses} edges between concepts
+    and papers.
+\end{itemize}
+
+\begin{tipbox}
+Concept extraction quality depends on the quality of the paper's deep-read. If a paper only has a
+TL;DR without deep-read sections, the LLM has less context to work with, and the extracted concepts
+may be less precise. It is recommended to run deep-read on papers before performing concept
+extraction.
+\end{tipbox}
+
+\section{AI-Discovered Relationships}
+
+Click the "AI Discover" button on the toolbar, and LitFolio will:
+
+\begin{enumerate}
+  \item Collect metadata from all papers in the library (title, year, TL;DR, methods, key findings).
+  \item Group them by shared terms (up to 12 papers per batch) and send to the LLM to analyze
+    potential associations.
+  \item Parse the LLM's JSON output and generate relationship suggestions with confidence scores
+    and descriptions for each pair of papers.
+\end{enumerate}
+
+AI-discovered relationships are displayed with dashed lines and have confidence scores below 1.0.
+In the reader's term panel, AI relationships show a confidence percentage. You can:
+
+\begin{itemize}
+  \item \textbf{Accept}---Promote the AI relationship to a user relationship (confidence becomes
+    1.0).
+  \item \textbf{Reject}---Delete the relationship suggestion.
+\end{itemize}
+
+\section{Filtering and Legend}
+
+The toolbar provides two filter groups:
+
+\begin{itemize}
+  \item \textbf{Relationship type}---Filter which lines are displayed by type label.
+  \item \textbf{Include concepts}---Toggle concept node visibility. When disabled, only direct
+    paper-to-paper relationships are shown.
+\end{itemize}
+
+The legend panel in the bottom-left corner annotates node colors and the line style for each
+relationship type.
+
+\section{Reader Integration}
+
+At the bottom of the reader's term panel (Chapter~\ref{ch:reader}), all associated papers for the
+current paper are displayed. Each association shows the relationship type and source (user/AI);
+clicking navigates to the corresponding paper's reader view.
+
+\begin{tipbox}
+The knowledge graph data comes entirely from the local SQLite database (intersection of the
+\cmd{paper\_links} table and the \cmd{paper\_terms} table). Relationship data is synced along
+with the library during WebDAV sync.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Similar Paper Recommendations}
+\label{ch:similar}
+
+After reading a paper, the natural question is "what else is worth reading?" Similar Paper
+Recommendations use Semantic Scholar's recommendation API to automatically find related literature.
+
+\section{Usage}
+
+Click the "Similar Papers" button in the paper drawer or at the top of the reader. LitFolio uses
+the paper's DOI or title to send a recommendation request to Semantic Scholar.
+
+\litfigure{28-similar-papers-en.png}{Similar Paper Recommendations panel. Result cards display title, authors, year,
+abstract snippet, and relevance score.}
+
+\subsection{Recommendation Fetching Flow}
+
+\begin{enumerate}
+  \item \textbf{Paper matching}---Use DOI (preferred) or title to match a paperId with Semantic
+    Scholar. The same matching logic as the citation network is used.
+  \item \textbf{Call recommendation API}---Request
+    \cmd{GET /paper/\{id\}/recommendations}, which returns a list of papers sorted by relevance.
+    Each entry contains title, authors, year, abstract, and citationCount.
+  \item \textbf{Library filtering}---Iterate through the recommendation results and check each
+    against the library using DOI and arXiv ID. Papers already in the library are removed from the
+    results.
+  \item \textbf{Caching}---Filtered results are written to the \cmd{recommendation\_cache} table
+    with a \cmd{fetched\_at} timestamp. Results are read directly from cache for 7 days.
+\end{enumerate}
+
+\subsection{Result Display}
+
+Each result card contains:
+
+\begin{itemize}
+  \item Title, authors (first 3 + \cmd{et al.}), year.
+  \item Abstract snippet (first 200 characters).
+  \item Citation count (if S2 returned this field).
+  \item "Import" button---clicking fetches full metadata and attempts to download the PDF.
+\end{itemize}
+
+\subsection{Edge Cases}
+
+\begin{itemize}
+  \item \textbf{Papers without DOI}---Title fuzzy matching may return an incorrect paperId,
+    leading to irrelevant recommendation results. In this case, the interface displays "Match
+    accuracy is low; results are for reference only."
+  \item \textbf{Very recent papers}---S2's recommendation model requires papers to have some
+    citation accumulation before generating recommendations. Papers published less than a month ago
+    typically have no recommendation results.
+  \item \textbf{Niche fields}---S2's data coverage is not 100\%; some non-English or
+    non-mainstream conference papers may not match.
+\end{itemize}
+
+\begin{tipbox}
+If recommendation results are empty, try using the manual search in "Topic Discovery" (Chapter 7),
+or check AI-discovered associations in the Knowledge Graph.
+\end{tipbox}
+
+% =====================================================================
+\chapter{Literature Review Draft Generation}
+\label{ch:litreview}
+
+After collecting 20--50 papers on a research direction, the first draft of a literature review is
+the hardest to write. LitFolio's AI review generation helps you build the skeleton.
+
+\section{Usage}
+
+Select multiple papers in the library (using checkbox mode) and click "Generate Review" on the
+toolbar. You can also select "Generate Review" from a folder's right-click context menu.
+
+\litfigure{29-lit-review-en.png}{Generated literature review draft. Organized by theme sections, each citing relevant
+papers, with a research gaps section at the end.}
+
+\subsection{Generation Pipeline}
+
+Review generation is a two-step pipeline:
+
+\subsubsection{Step 1: Grouping}
+
+Send the selected papers to the LLM and ask it to group them by theme/method/application area.
+The LLM returns JSON:
+
+\begin{verbatim}
+{
+  "groups": [
+    {
+      "name": "Attention Mechanism Variants",
+      "paper_ids": ["p1", "p3", "p7"],
+      "rationale": "These papers all improve attention computation efficiency"
+    },
+    {
+      "name": "Positional Encoding Methods",
+      "paper_ids": ["p2", "p5"],
+      "rationale": "Addressing Transformer position awareness"
+    }
+  ]
+}
+\end{verbatim}
+
+Grouping strategy options: \cmd{method} (by method, default), \cmd{year} (by era),
+\cmd{application} (by application area). Different strategies produce different groupings.
+
+\subsubsection{Step 2: Writing}
+
+Concatenate the grouping results with each paper's TL;DR + deep-read sections + abstract into a
+prompt, and ask the LLM to write the review. System prompt constraints:
+
+\begin{itemize}
+  \item Each group corresponds to a second-level section.
+  \item Every paper is cited at least once in the text, using the format \cmd{[Author, Year]}.
+  \item The introduction outlines the research background and the review's scope.
+  \item A "Research Gaps" section at the end identifies unresolved problems in the current
+    literature.
+  \item The conclusion summarizes main findings and future directions.
+  \item Language is academic Chinese, consistent with the style of formal review papers.
+  \item Do not fabricate papers or data not provided.
+\end{itemize}
+
+\subsection{Input Materials}
+
+Materials provided to the LLM for each paper (by priority, total tokens not exceeding the window
+limit):
+
+\begin{enumerate}
+  \item TL;DR + key findings (approx.\ 100 tokens/paper)
+  \item Deep-read sections: Problem / Method / Comparison / Limitations (approx.\ 400 tokens/paper)
+  \item Abstract (approx.\ 200 tokens/paper)
+\end{enumerate}
+
+Input for 20 papers is approximately 14,000 tokens; including the system prompt and output space,
+a model with at least a 16K context window is required.
+
+\section{Output and Editing}
+
+\begin{itemize}
+  \item Output is in Markdown format, 2000--5000 words (for 20 papers).
+  \item Can be edited directly in the interface to correct AI summaries or supplement your own
+    observations.
+  \item Can be saved as a note file (\fpath{notes/review/<timestamp>.md}).
+  \item Can be regenerated---choose a different grouping strategy (by method / by year / by
+    application area).
+\end{itemize}
+
+\begin{warnbox}
+The review draft is a starting point, not a finished product. The AI may overlook subtle
+differences between papers or overgeneralize. Be sure to manually review and supplement with your
+own analysis. Pay particular attention to whether the "Research Gaps" section covers the directions
+you consider important---the AI may over-emphasize certain papers while neglecting others.
+\end{warnbox}

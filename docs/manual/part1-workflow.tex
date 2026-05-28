@@ -1,0 +1,1008 @@
+\part{日常工作流}
+
+% =====================================================================
+\chapter{起步}
+\label{ch:start}
+
+\section{什么是 LitFolio}
+
+LitFolio 是一款桌面端的研究文献工作台：
+所有数据——元数据、PDF、笔记、高亮、术语、综述——都直接落在你机器的
+\fpath{\textasciitilde/Litera-Library/} 下；联网只用来抓 arXiv 元数据、解析 RSS、
+请求 LLM。换言之，断网你照样能读、能写、能搜索；换台机器只需要把这个目录同步过去。
+
+LitFolio 的产品形态由八大功能板块拼起来：
+
+\begin{enumerate}
+  \item \textbf{文献库}——本地论文的列表、状态机、TL;DR、深读、翻译、文件夹、标签、BibTeX 自动生成、引用格式化、批量导出。
+  \item \textbf{阅读器}——三栏 PDF 视图，左侧高亮列表、右侧笔记/选段翻译/术语三 tab；结构化笔记卡片、语义标注颜色。
+  \item \textbf{导入}——arXiv/DOI 元数据、本地 PDF 文件、Semantic Scholar 搜索三种入口；批量文件夹导入与去重检测。
+  \item \textbf{发现}——arXiv 分类浏览 + RSS 订阅 + 主题综述生成 + 主题提醒监控。
+  \item \textbf{提问}——基于已读论文的多轮 RAG 对话：问题改写、多路 FTS5 召回、带引用编号的回答、上下文追问。
+  \item \textbf{知识图谱}——论文关系网络 + 引用网络 + 概念图谱，AI 自动发现关联与方法演化。
+  \item \textbf{高级工具}——多论文对比、文献综述草稿、相似论文推荐、阅读队列、智能收藏夹、自定义元数据字段、Markdown 导出、命令面板。
+  \item \textbf{设置}——多个 LLM 端点配置、把不同任务分派给不同模型、WebDAV 整库同步。
+\end{enumerate}
+
+\section{安装与首次启动}
+
+LitFolio 用 Tauri 2 + React 18 构建，提供两种获取方式：
+
+\subsection{从发布版下载（推荐）}
+
+到项目仓库的 Releases 页面下载对应平台的安装包：
+
+\begin{itemize}
+  \item Linux：\fpath{LitFolio\_x.y.z\_amd64.AppImage} 或 \fpath{.deb}
+  \item macOS：\fpath{LitFolio\_x.y.z\_universal.dmg}
+  \item Windows：\fpath{LitFolio\_x.y.z\_x64-setup.exe}
+\end{itemize}
+
+\begin{tipbox}[Linux AppImage 使用提示]
+下载 \fpath{.AppImage} 文件后，需要先赋予执行权限：
+\cmd{chmod +x LitFolio\_x.y.z\_amd64.AppImage}，然后双击或命令行运行即可。
+AppImage 依赖 FUSE（\cmd{libfuse2}），大多数发行版已预装；若提示缺少，
+Ubuntu/Debian 执行 \cmd{sudo apt install libfuse2}，
+Fedora 执行 \cmd{sudo dnf install fuse-libs}。
+AppImage 是便携格式，无需安装，移除时直接删除文件即可。
+\end{tipbox}
+
+\subsection{从源码运行（开发者）}
+
+\begin{enumerate}
+  \item 装好 \cmd{pnpm}、\cmd{rustup}（含 stable toolchain）以及对应平台的 Tauri 系统依赖
+    （Linux 上一般是 \cmd{webkit2gtk-4.1}、\cmd{librsvg}、\cmd{libsoup-3.0}）。
+  \item \cmd{pnpm install} 安装前端依赖。
+  \item \cmd{pnpm tauri dev} 启动开发模式；首次启动会调好 Rust crate，稍等几分钟。
+\end{enumerate}
+
+\begin{tipbox}
+开发模式下窗口标题会带上「[dev]」字样；与生产版数据库相同（都落在
+\fpath{\textasciitilde/Litera-Library/}），所以在 dev 里做的导入、深读、笔记，
+切到打包版同样能看见。
+\end{tipbox}
+
+\section{库目录第一眼}
+
+第一次启动后，LitFolio 会自动创建 \fpath{\textasciitilde/Litera-Library/} 并初始化空数据库。
+你可以立刻看到左侧导航栏（\textbf{文献库 / 导入 / 浏览 / 订阅 / 主题 / 提问 / 设置}）
+和空空如也的主列表。
+
+\litfigure{01-shell-library.png}{LitFolio 主界面。左：导航栏；中：文件夹侧栏；右：论文列表与搜索框。深紫色 \cmd{violet} 是主交互色，用于按钮、链接和强调。}
+
+库目录的物理结构（详见第 10 章）大致是：
+
+\begin{quote}\small\ttfamily
+\textasciitilde/Litera-Library/\\
+\ \ library.db\hfill\textnormal{\small // SQLite 主库}\\
+\ \ papers/<paperId>/\hfill\textnormal{\small // 每篇一目录}\\
+\ \ \ \ paper.pdf\\
+\ \ \ \ meta.json\\
+\ \ \ \ note.md\\
+\ \ \ \ pdf-text.txt\\
+\ \ backups/\hfill\textnormal{\small // 自动备份}\\
+\ \ sync/\hfill\textnormal{\small // 同步快照}
+\end{quote}
+
+\section{下一步：配第一个 LLM 端点}
+
+LitFolio 自身不内置任何 LLM。要使用 TL;DR、深读、翻译、术语提取、主题综述、库内提问
+这些 AI 能力，你需要先在「设置 → LLM 配置」里添加至少一个端点（OpenAI 兼容 API
+或本地 Ollama 都行）。详细配置见 \textbf{第 9 章}；你可以现在跳过去配好，再回到这里
+继续；也可以先用第 2 章里不依赖 LLM 的功能熟悉界面。
+
+% =====================================================================
+\chapter{文献库}
+\label{ch:library}
+
+文献库（\cmd{/library} 路由）是 LitFolio 最常驻的页面。它的设计目标是：让你扫一眼
+列表就知道这堆论文都在讲什么、哪些值得深读，哪些只是 RSS 推过来还没碰过。
+
+\section{主列表与搜索}
+
+主列表每一行展示：标题、作者、年份/期刊、状态徽章、TL;DR 摘要（如已生成）、
+关键发现 chip、标签 chip。点行任意位置打开右侧抽屉（详见 2.4）。
+
+\subsection{搜索框}
+
+顶部搜索框走的是 SQLite FTS5：标题、摘要、TL;DR、笔记、高亮全文统一索引。
+关键词支持空格分词（AND 语义）。如果你想搜「正好这几个字」请用英文引号包起来。
+
+\subsection{FTS5 全文检索机制}
+
+LitFolio 的全文索引基于 SQLite FTS5 虚拟表 \cmd{papers\_fts}，使用 \cmd{unicode61}
+分词器。该表索引论文的五个字段：标题、作者、摘要、TL;DR、笔记。通过 INSERT / UPDATE /
+DELETE 触发器与 \cmd{papers} 主表保持同步——论文入库或更新时自动重索引。
+
+搜索流程：
+
+\begin{enumerate}
+  \item \textbf{输入清洗}——\cmd{escape\_fts} 函数把用户输入按空格拆词，去掉 FTS5 特殊字符
+    （\cmd{"():.-}），然后把每个词包装成 \cmd{"词"*}（前缀匹配）并用 AND 连接。例如
+    输入 \cmd{retrieval augmented} 变成 \cmd{"retrieval"* AND "augmented"*}。
+  \item \textbf{BM25 排序}——FTS5 内置的 BM25 算法自动计算相关度得分，结果按 BM25 升序
+    （越小越相关）排列，同分再按入库时间倒序。
+  \item \textbf{空查询回退}——如果清洗后为空（比如用户只输入了特殊字符），回退到
+    \cmd{list\_recent} 按时间倒序列出。
+\end{enumerate}
+
+\begin{tipbox}
+FTS5 的 \cmd{unicode61} 分词器对中文按字切分，所以搜「神经网络」等于搜「神 AND 经 AND
+网 AND 络」——短词可能召回噪声。如果需要精准中文搜索，建议用英文关键词或术语的英文名。
+\end{tipbox}
+
+\subsection{排序与筛选}
+
+侧栏的「必读/在读/已读/未读」分别对应 \cmd{must}/\cmd{reading}/\cmd{read}/\cmd{unread}
+四个状态。点击文件夹（见 2.6）或标签 chip 都会做相应筛选。
+
+\section{阅读状态：unread → reading → read → must}
+
+每篇论文有一个 \textbf{阅读状态}，初始 \cmd{unread}：
+
+\begin{description}
+  \item[unread] 还没碰过。RSS / arXiv 入库的论文默认是这个状态。
+  \item[reading] 在读。表示你正在跟，希望它在列表里靠前。
+  \item[read] 读完了，可以从主列表淡出。
+  \item[must] 「必读」——明显比 read 更高优先级的标记，主题综述生成时也会优先纳入。
+\end{description}
+
+点状态徽章会按顺序循环切换。这套四态机制是 LitFolio 的一个判断：它不假设你看完
+一篇文献就万事大吉，而是希望保留「重要的还要常翻」这个语义。
+
+\section{速读 TL;DR}
+
+主列表右侧有「速读」按钮。点一下会调用「TL;DR 生成」任务（默认绑你设置的 \cmd{tldr}
+模型）；返回的一段话作为论文摘要的缩写直接写入数据库，下次打开瞬间就有。
+
+\begin{tipbox}
+速读结果一旦生成会缓存到 SQLite，再次点击同一论文不会重新调 LLM；要强制重生成
+请在抽屉里点「重新生成」。
+\end{tipbox}
+
+\section{深读：4 段式抽屉}
+
+「深读」是 LitFolio 区别于其它 reader 工具的核心交互之一。点论文行的「深读」按钮，
+右侧抽屉会以四段结构给出可裁的内容：
+
+\litfigure{02-library-drawer.png}{深读抽屉。从上到下：\textbf{解决什么问题}、\textbf{提出了什么方法}、
+\textbf{和别人有什么不同}、\textbf{局限与未解决的问题}——每一段都从全文中抽取，旁边有 \cmd{重新生成} 按钮。}
+
+四段式的设计意图是让你不必读全文也能判断「这篇是否值得读细节」：
+看 \textbf{差异} 与 \textbf{局限} 两段足以决定要不要打开 PDF。整段结果同样会缓存。
+
+\section{标题/摘要翻译}
+
+抽屉里有「翻译」按钮，调用「翻译」任务（绑 \cmd{translate} 模型）。结果以双语对照
+呈现，元数据中保存翻译后的标题和摘要，方便你扫中文标题。
+
+\begin{tipbox}
+不同任务可以绑不同模型——比如把 TL;DR 绑给 DeepSeek、把翻译绑给本地 Ollama。详
+\textbf{第 9 章}。
+\end{tipbox}
+
+\section{文件夹}
+
+文件夹是嵌套的（不像标签），并支持多归属——一篇论文可以同时在「机器学习/Transformer」
+和「应用/NLP」两个文件夹里。
+
+\litfigure{03-library-folder.png}{侧栏文件夹。选中某个文件夹后，主列表会筛出该文件夹下的论文；
+配合搜索框可做「文件夹内全文搜索」。}
+
+新建文件夹：右键侧栏空白处 → \cmd{新建}。论文归属管理：拖拽，或在抽屉里点
+「移动到…」。
+
+\section{标签}
+
+标签是扁平的、字符串型的，靠抽屉里的输入框创建。同样支持多挂——一篇文献可有任意
+多个标签。与文件夹的区别：
+
+\begin{itemize}
+  \item 文件夹 = \textbf{研究领域分类}，相对稳定，嵌套深 2-3 层。
+  \item 标签 = \textbf{临时主题/项目标记}，朝生暮死，扁平。
+\end{itemize}
+
+\section{删除论文}
+
+抽屉底部有「删除」按钮。会同时删除：\fpath{papers/<id>/} 整目录、SQLite 行、所有
+关联的高亮/笔记/术语。
+
+\begin{warnbox}
+删除是不可逆的，但 LitFolio 在执行前会把 \fpath{papers/<id>/} 移动到
+\fpath{backups/deleted/<timestamp>/} 而不是直接 \cmd{rm -rf}。所以误删了可以从
+\fpath{backups/deleted/} 里捞回。
+\end{warnbox}
+
+\section{BibTeX 自动生成}
+
+每篇论文入库时，LitFolio 会自动根据元数据生成 BibTeX 条目，存入数据库
+\cmd{bibtex} 字段。抽屉和阅读器顶部都有「复制 BibTeX」按钮，点击即复制到
+系统剪贴板。
+
+\litfigure{21-library-bibtex.png}{论文抽屉中的 BibTeX 区域。一键复制到剪贴板，可直接粘贴到 LaTeX 文档。}
+
+\subsection{BibTeX Key 生成算法}
+
+BibTeX key 是论文的唯一引用标识符，格式为
+\cmd{<第一作者姓氏小写><年份><标题首实义词小写>}，例如
+\cmd{vaswani2017attention}。生成流程：
+
+\begin{enumerate}
+  \item \textbf{提取第一作者姓氏}——从 \cmd{authors} 数组取第一个元素，
+    按空格/逗号拆分取最后一个 token（适配 \cmd{Firstname Lastname} 和
+    \cmd{Lastname, Firstname} 两种写法），转小写，去除非 ASCII 字符
+    （保留 \cmd{a-z} 和连字符）。如果作者列表为空，使用 \cmd{unknown}。
+  \item \textbf{提取标题首实义词}——将标题按空格拆分，跳过停用词
+    （\cmd{a/an/the/on/in/of/for/and/or/to/with/from/by/at}），
+    取第一个非停用词，转小写，只保留 \cmd{a-z0-9}。如果标题全由停用词组成
+    （极罕见），取第一个词。
+  \item \textbf{拼接}——\cmd{<姓氏><年份><首词>}。如果年份缺失，用 \cmd{0000}。
+  \item \textbf{去重}——生成后检查库中是否已有相同 key。如果有，在末尾追加
+    \cmd{a}、\cmd{b}\ldots 直到唯一。这一步保证你从不同来源导入同一篇论文时
+    BibTeX key 不会冲突。
+\end{enumerate}
+
+\subsection{条目字段映射}
+
+\begin{longtable}{p{3.5cm} p{3cm} p{6cm}}
+\toprule
+\textbf{BibTeX 字段} & \textbf{来源} & \textbf{处理规则} \\
+\midrule
+\endhead
+\cmd{title} & \cmd{papers.title} & 直接使用 \\
+\cmd{author} & \cmd{papers.authors} & JSON 数组用 \cmd{ and } 连接 \\
+\cmd{year} & \cmd{papers.year} & 直接使用；缺失则省略 \\
+\cmd{journal}/\cmd{booktitle} & \cmd{papers.venue} & 有 venue 时写入；缺失则省略 \\
+\cmd{doi} & \cmd{papers.doi} & 有 DOI 时写入；缺失则省略 \\
+\cmd{eprint} & \cmd{papers.arxiv\_id} & 有 arXiv ID 时写入 \\
+\cmd{archivePrefix} & 硬编码 & arXiv ID 存在时固定为 \cmd{arXiv} \\
+\cmd{primaryClass} & arXiv ID 解析 & 从 arXiv ID 前缀推断（如 \cmd{cs} →
+  \cmd{cs.AI}）；无法推断则省略 \\
+\cmd{url} & 组合 & 有 DOI → \cmd{https://doi.org/<doi>}；有 arXiv ID →
+  \cmd{https://arxiv.org/abs/<id>}；否则省略 \\
+\bottomrule
+\end{longtable}
+
+\subsection{入库时自动生成}
+
+BibTeX 生成发生在以下入库路径的最后一步：arXiv ID 入库、DOI 入库、PDF 文件
+入库、Semantic Scholar 搜索入库。生成是纯内存字符串拼接——不调 LLM、不联网、
+不依赖外部服务，耗时可忽略。旧论文（BibTeX 字段为 NULL）可通过设置页的
+「回填 BibTeX」按钮一次性补全。
+
+\begin{tipbox}
+BibTeX key 的唯一性由数据库保证。如果你用 Zotero 或其他工具生成了不同格式的
+key，LitFolio 的 key 不会与之冲突——因为 LitFolio 的 key 总是以小写姓氏开头
+且不含下划线。生成是纯内存字符串拼接，耗时可忽略。
+\end{tipbox}
+
+\section{引用格式化}
+
+除了 BibTeX，LitFolio 还支持按标准学术格式生成格式化引用。在论文抽屉中点
+「复制引用」，可选以下四种样式。格式化是纯模板渲染——将元数据字段代入预定义
+的字符串模板，不调 LLM。
+
+\subsection{四种样式模板}
+
+\subsubsection{APA 7th}
+
+模板：
+\cmd{<姓>, <名首字母>. (<年>). <标题>. <期刊>.}
+
+渲染结果示例：\\
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N.,
+Kaiser, L., \& Polosukhin, I. (2017). Attention is all you need. \textit{NeurIPS}.
+
+规则：作者超过 20 人时列前 19 人 + \cmd{...} + 最后一人；标题仅首词首字母大写
+（sentence case）；斜体期刊名。
+
+\subsubsection{IEEE}
+
+模板：
+\cmd{[N] <名首字母>. <姓> et al., ``<标题>,'' <期刊>, <年>.}
+
+渲染结果示例：\\
+{[}1{]} A. Vaswani et al., ``Attention is all you need,'' \textit{NeurIPS}, 2017.
+
+规则：IEEE 用方括号编号；3 人以上用 \cmd{et al.}；标题用 Title Case；
+期刊斜体。
+
+\subsubsection{GB/T 7714-2015}
+
+模板：
+\cmd{[N] <姓大写> <名首字母大写>, <姓大写> <名首字母大写>, ... <标题>[J]. <期刊>, <年>.}
+
+渲染结果示例：\\
+{[}1{]} VASWANI A, SHAZEER N, PARMAR N, et al. Attention is all you need[J].
+NeurIPS, 2017.
+
+规则：中国国标格式——作者姓全大写在前、名缩写在后；超过 3 人用 \cmd{et al.}；
+文献类型标识 \cmd{[J]} 表示期刊、\cmd{[C]} 表示会议、\cmd{[D]} 表示学位论文。
+LitFolio 根据 \cmd{venue} 是否包含 \cmd{Conference/Proceedings/Workshop}
+自动选择 \cmd{[J]} 或 \cmd{[C]}。
+
+\subsubsection{Chicago 17th}
+
+模板：
+\cmd{<姓>, <名>. <年>. ``<标题>.'' <期刊>.}
+
+渲染结果示例：\\
+Vaswani, Ashish, Noam Shazeer, Niki Parmar, et al. 2017.
+``Attention Is All You Need.'' \textit{NeurIPS}.
+
+规则：作者用全名（非缩写）；7 人以上列前 7 人 + \cmd{et al.}。
+
+\subsection{批量格式化引用}
+
+多选论文后点「导出引用 → 格式化文本」，LitFolio 按选定样式生成带编号的
+参考文献列表。编号按在列表中的出现顺序自动分配（IEEE 和 GB/T 7714 需要编号，
+APA 和 Chicago 按作者-年份排序）。
+
+\section{批量引用导出}
+
+在文献库中多选论文（勾选模式），工具栏会出现「导出引用」按钮。支持三种格式：
+
+\subsection{BibTeX (.bib)}
+
+将所有选中论文的 BibTeX 条目合并为一个 \cmd{.bib} 文件。每条记录直接取
+\cmd{papers.bibtex} 字段（由 2.9 节的算法自动生成），用空行分隔。如果某篇
+论文的 BibTeX 字段为 NULL（极老的数据），跳过该条并在导出报告中列出。
+输出文件可直接用于 \cmd{bibtex} / \cmd{biber} / \cmd{biblatex} 编译。
+
+\subsection{RIS (.ris)}
+
+RIS（Research Information Systems）是通用文献交换格式。每条记录由标签行组成：
+
+\begin{verbatim}
+TY  - JOUR
+TI  - Attention Is All You Need
+AU  - Vaswani, Ashish
+AU  - Shazeer, Noam
+PY  - 2017
+JO  - NeurIPS
+DO  - 10.48550/arXiv.1706.03762
+ER  -
+\end{verbatim}
+
+标签映射规则：\cmd{TY} 根据 venue 判断（期刊 → \cmd{JOUR}，会议 →
+\cmd{CONF}，预印本 → \cmd{UNPB}）；\cmd{AU} 每个作者一行，格式为
+\cmd{Lastname, Firstname}；\cmd{DO} 取 DOI；\cmd{UR} 取 URL。
+RIS 文件可直接导入 Zotero、Mendeley、EndNote。
+
+\subsection{格式化文本}
+
+按 2.10 节的四种样式（APA/IEEE/GB/T 7714/Chicago）生成编号引用列表。
+每篇论文一行或多行（取决于样式要求），编号按在列表中的出现顺序自动分配。
+
+\subsection{文件命名与触发}
+
+导出文件命名为 \cmd{litera-export-<YYYY-MM-DD>.<ext>}，通过浏览器下载
+对话框保存到你选择的位置。也可以选择「复制到剪贴板」直接粘贴到编辑器中。
+
+\section{智能收藏夹}
+
+智能收藏夹是基于规则的虚拟文件夹——论文按规则自动归入，无需手动拖拽。
+侧栏的「智能收藏夹」区域可以创建和管理。
+
+\litfigure{22-smart-collections.png}{智能收藏夹创建对话框。通过组合条件筛选论文，结果实时更新。}
+
+\subsection{规则结构}
+
+每条智能收藏夹的规则以 JSON 树存储，支持嵌套的 AND/OR 逻辑。规则树的结构：
+
+\begin{verbatim}
+{
+  "op": "and",
+  "conditions": [
+    { "field": "read_status", "op": "eq", "value": "unread" },
+    { "field": "year", "op": "gte", "value": 2024 },
+    { "field": "tags", "op": "includes", "value": "transformer" },
+    { "op": "or", "conditions": [
+      { "field": "folder", "op": "in", "value": "ML" },
+      { "field": "title", "op": "contains", "value": "attention" }
+    ]}
+  ]
+}
+\end{verbatim}
+
+\subsection{SQL 翻译引擎}
+
+查询时，规则树被递归翻译为 SQL WHERE 子句：
+
+\begin{enumerate}
+  \item \textbf{叶节点}——每个条件翻译为一个 SQL 片段：
+    \begin{itemize}
+      \item \cmd{read\_status} → \cmd{p.read\_status = '<value>'}
+      \item \cmd{year} + \cmd{gte/lte} → \cmd{p.year >= <value>} 或 \cmd{p.year <= <value>}
+      \item \cmd{tags} + \cmd{includes} → \cmd{EXISTS (SELECT 1 FROM paper\_tags pt
+        JOIN tags t ON pt.tag\_id = t.id WHERE pt.paper\_id = p.id AND t.name = '<value>')}
+      \item \cmd{folder} + \cmd{in} → \cmd{EXISTS (SELECT 1 FROM paper\_folders pf
+        JOIN folders f ON pf.folder\_id = f.id WHERE pf.paper\_id = p.id
+        AND f.name LIKE '<value>\%')}（支持前缀匹配以包含子文件夹）
+      \item \cmd{title} + \cmd{contains} → \cmd{p.title LIKE '\%<value>\%'}
+      \item \cmd{authors} + \cmd{contains} → \cmd{p.authors LIKE '\%<value>\%'}
+    \end{itemize}
+  \item \textbf{组合节点}——\cmd{op: "and"} 翻译为 \cmd{(cond1 AND cond2 AND ...)}，
+    \cmd{op: "or"} 翻译为 \cmd{(cond1 OR cond2 OR ...)}。嵌套深度不限。
+  \item \textbf{最终查询}——拼接为 \cmd{SELECT p.* FROM papers p WHERE <规则>
+    ORDER BY p.added\_at DESC}。
+\end{enumerate}
+
+\subsection{实时更新}
+
+智能收藏夹不是快照——它是每次选中时实时查询的。所以当一篇论文的标签或状态
+变更后，下次点击该收藏夹会立即反映变化。这与普通文件夹的语义完全不同：
+普通文件夹需要你手动拖入/拖出，智能收藏夹只关心规则是否匹配。
+
+\subsection{性能}
+
+规则翻译后的 SQL 走 SQLite 索引。对于标签和文件夹条件，\cmd{paper\_tags} 和
+\cmd{paper\_folders} 表有 \cmd{paper\_id} 索引，EXISTS 子查询很快。
+10 个智能收藏夹不会对侧栏加载造成可感知的延迟——因为只有被选中的那个才会
+执行查询，其他的只显示名称和规则描述。
+
+\begin{tipbox}
+智能收藏夹适合长期维护的视角，比如「近两年未读的机器学习论文」或「所有必读
+论文」。临时筛选用搜索框更方便。规则一旦创建可以随时编辑——修改规则后
+匹配结果立即更新。
+\end{tipbox}
+
+\section{阅读队列}
+
+阅读队列是一个独立于文件夹/标签的优先级排序工具，解决「有 20 篇想读但需要
+排个先后」的问题。在文献库侧栏点击「阅读队列」进入。
+
+\litfigure{23-reading-queue.png}{阅读队列。拖拽排序，设置目标日期，超期论文高亮提示。}
+
+\subsection{队列数据模型}
+
+队列存储在 \cmd{reading\_queue} 表中，每行包含：
+
+\begin{itemize}
+  \item \cmd{paper\_id}——关联论文（主键，一篇论文只能在队列中出现一次）。
+  \item \cmd{priority}——整数优先级，由拖拽排序位置决定（从 0 开始递增）。
+  \item \cmd{target\_date}——可选的 Unix 时间戳，表示计划阅读日期。
+  \item \cmd{note}——可选的备注文本。
+  \item \cmd{added\_at}——入队时间。
+\end{itemize}
+
+\subsection{拖拽排序机制}
+
+前端使用 HTML5 Drag and Drop API 实现拖拽排序。拖拽完成时：
+
+\begin{enumerate}
+  \item 计算拖拽目标的新位置索引。
+  \item 重新分配所有队列项的 \cmd{priority} 值（从 0 开始递增，步长 1）。
+  \item 调用 \cmd{queue\_reorder} 命令批量更新数据库。
+\end{enumerate}
+
+排序结果跨会话持久化——关闭应用再打开，顺序不变。
+
+\subsection{目标日期与超期提醒}
+
+目标日期是可选的。设置了目标日期的论文，如果当前日期超过目标日期，该行会以
+琥珀色高亮显示（与 \cmd{warnbox} 使用相同的 amber 色值）。超期只是视觉提示，
+不会自动改变论文的任何状态。
+
+\subsection{自动状态更新}
+
+当你在阅读器中打开一篇队列中的论文时，系统会自动将该论文的 \cmd{read\_status}
+从 \cmd{unread} 切换为 \cmd{reading}。这个转换是幂等的——如果已经是
+\cmd{reading} 或更高状态，不做任何操作。
+
+\subsection{队列与文件夹/标签的关系}
+
+队列是完全独立的维度：
+
+\begin{itemize}
+  \item 一篇论文可以同时在任何文件夹、挂任何标签、处于任何阅读状态，仍然可以
+    加入队列。
+  \item 从队列中移除论文不会删除论文本身，也不会改变其文件夹/标签/状态。
+  \item 队列中引用的论文如果被删除，队列条目会被级联删除。
+\end{itemize}
+
+\section{论文去重}
+
+LitFolio 在导入时自动检测重复论文，避免同一论文因不同来源（arXiv ID / DOI / PDF
+文件导入）而出现多份副本。
+
+\subsection{三级匹配策略}
+
+检测按优先级依次执行，命中即停：
+
+\begin{enumerate}
+  \item \textbf{DOI 精确匹配}——查询 \cmd{SELECT id FROM papers WHERE doi = ?}。
+    DOI 是全球唯一的数字对象标识符，匹配率 100\%。
+  \item \textbf{arXiv ID 精确匹配}——查询 \cmd{SELECT id FROM papers WHERE arxiv\_id = ?}。
+    同一论文不同版本（\cmd{v1}/\cmd{v2}）在去比较时去掉版本后缀再匹配。
+  \item \textbf{标题相似度匹配}——使用归一化 Levenshtein 编辑距离。设两标题为
+    $s_1, s_2$，编辑距离为 $d(s_1, s_2)$（插入/删除/替换一个字符各计 1），
+    归一化公式为：
+    \[
+      D(s_1, s_2) = \frac{d(s_1, s_2)}{\max(|s_1|, |s_2|)}
+    \]
+    当 $D < 0.15$ 时判定为重复。这意味着两标题最多差 15\% 的字符——足以
+    容忍大小写差异（\cmd{Attention Is All You Need} vs
+    \cmd{attention is all you need}）、标点差异（连字符 vs 空格）、以及
+    少量 OCR 错误。
+\end{enumerate}
+
+\subsection{标题预处理}
+
+在计算编辑距离之前，两个标题都经过预处理：
+
+\begin{enumerate}
+  \item 转小写。
+  \item 移除所有非字母数字字符（保留空格）。
+  \item 将连续空格合并为单个空格。
+  \item 去除首尾空格。
+\end{enumerate}
+
+这保证了 \cmd{"Attention-Is-All-You-Need"} 和
+\cmd{"attention is all you need"} 的距离为 0（完全匹配）。
+
+\subsection{全库扫描}
+
+设置页的「查找重复」按钮执行一次全库扫描。算法为 $O(n^2)$ 标题比较（$n$ 为
+论文数），但有两个优化：
+
+\begin{itemize}
+  \item \textbf{DOI/arXiv ID 先筛}——有 DOI 的论文先按 DOI 分桶，同桶内才做
+    标题比较；有 arXiv ID 的同理。这大幅减少需要做字符串比较的论文对数量。
+  \item \textbf{长度预筛}——如果两标题长度差超过 15\%，直接跳过编辑距离计算。
+    这是一个保守的剪枝：$|s_1| - |s_2| > 0.15 \times \max(|s_1|, |s_2|)$
+    时 $D$ 必然 $> 0.15$。
+\end{itemize}
+
+1000 篇论文的全库扫描在普通硬件上约需 2--3 秒。
+
+\subsection{合并流程}
+
+检测到重复时弹出合并对话框。你选择保留哪条记录（通常选元数据更完整的那条），
+系统执行以下合并：
+
+\begin{enumerate}
+  \item 将被合并论文的高亮、笔记、术语、标签、文件夹归属全部转移到保留论文。
+  \item 将被合并论文的阅读状态取两者中更高的（\cmd{must} > \cmd{read} >
+    \cmd{reading} > \cmd{unread}）。
+  \item 将被合并论文的 TL;DR、深读、翻译字段填入保留论文的空缺处（不覆盖
+    已有值）。
+  \item 删除被合并论文的数据库行和 \fpath{papers/<id>/} 目录。
+\end{enumerate}
+
+\begin{warnbox}
+合并操作不可撤销。被合并论文的 PDF 文件会被移到 \fpath{backups/deleted/}，
+但元数据直接删除。如果你不确定应该保留哪条，可以先取消合并，手动检查两条
+记录的完整性后再操作。
+\end{warnbox}
+
+% =====================================================================
+\chapter{导入文献}
+\label{ch:import}
+
+「导入」页（\cmd{/import}）汇集了三种入口：arXiv/DOI 元数据、本地 PDF、Semantic
+Scholar 搜索。三者最终都落到 \fpath{papers/<id>/} 目录与 SQLite 行。
+
+\section{arXiv ID / DOI}
+
+最常见的入库路径。流程是\textbf{两步}：
+
+\litfigure{04-import-arxiv.png}{arXiv/DOI tab。粘贴 ID 或 DOI 后点「查询元数据」拿到标题/作者/摘要，
+再点「入库」落盘。}
+
+\begin{enumerate}
+  \item \textbf{查询元数据}——粘贴形如 \cmd{1706.03762} 的 arXiv ID 或
+    \cmd{10.1038/s41586-024-...} 的 DOI，点查询。LitFolio 会去 arXiv API
+    或 Crossref 抓元数据，立刻展示标题、作者、摘要。
+  \item \textbf{入库}——确认无误后点「入库」。LitFolio 会同时尝试下载 PDF
+    （arXiv 直接拿，DOI 走开放访问的 unpaywall 链路；失败也不阻塞入库）。
+\end{enumerate}
+
+\begin{tipbox}
+arXiv ID 既支持新格式（\cmd{2402.12345}）也支持老格式（\cmd{cs/0501001}）。带版本
+号的 \cmd{2402.12345v2} 也会被正确解析。
+\end{tipbox}
+
+\section{本地 PDF 文件}
+
+\litfigure{05-import-pdf.png}{PDF 文件 tab。可以挑单个 PDF，也可以批量选目录；选好后能编辑标题/作者再入库。}
+
+\begin{itemize}
+  \item \textbf{单个 PDF}——选文件后 LitFolio 会跑一遍轻量元数据抽取（PDF 第一页 +
+    DOI 正则），猜出标题/作者；你可以在表单里手改。
+  \item \textbf{拖拽}——把 PDF 拖到 LitFolio 窗口，支持\textbf{精确投放}：
+    拖到文献库列表中的某篇论文行上会直接绑定 PDF（替代手动选文件）；
+    拖到导入页的 PDF 区域会填充选中文件；
+    拖到 DOI 引用导入对话框会填充 PDF。如果没有命中特定目标区域，
+    则走默认的批量导入流程。
+\end{itemize}
+
+\subsection{PDF 元数据提取策略}
+
+本地 PDF 入库时，LitFolio 按以下顺序尝试提取元数据：
+
+\begin{enumerate}
+  \item \textbf{PDF Info Dictionary}——用 \cmd{lopdf} 读取 \cmd{/Title}、\cmd{/Author}、
+    \cmd{/Subject} 字段。文本解码同时尝试 UTF-8 和 UTF-16 BE（带 BOM），因为学术 PDF
+    两种编码都常见。
+  \item \textbf{第一页 DOI 正则}——如果 Info Dictionary 里没有 DOI，用正则
+    \cmd{10.\textbackslash d\{4,9\}/\textbackslash S+} 扫描第一页文本，匹配后去掉末尾
+    的标点（.,);] 等）。
+  \item \textbf{标题猜测}——如果仍然没有标题，取第一页第一行长度 $\geq 12$ 且含字母的行
+    作为标题。
+  \item \textbf{文件名兜底}——以上全失败时，用 PDF 文件名（去掉扩展名）作为标题。
+\end{enumerate}
+
+作者字段按逗号、分号和「and」三种分隔符拆分（适配 BibTeX 和自然语言两种写法）。
+入库时还会计算文件 SHA-256 哈希用于去重。
+
+\section{Semantic Scholar 搜索}
+
+如果你只记得标题片段、关键词、或想搜某作者的全部论文：
+
+\litfigure{06-import-search.png}{搜索 tab。结果按引用数排序，每条都能直接「入库」（拉元数据 + 尝试下载 PDF）。}
+
+LitFolio 调 Semantic Scholar Graph API，每页返回 25 条；命中后点「入库」会立刻拉
+该条目的完整元数据并尝试下载 PDF。
+
+\begin{warnbox}
+Semantic Scholar 公共 API 有 QPS 限制，频繁搜索可能 429。如果你的研究方向需要大量
+检索，建议在它们网站申请一个免费的 API key，填到「设置 → API Keys」里。
+\end{warnbox}
+
+\section{批量文件夹导入}
+
+除了单个 PDF 导入，LitFolio 支持导入整个文件夹中的 PDF 文件。在「导入」页
+点击「导入文件夹」按钮，选择一个目录。
+
+\subsection{递归扫描}
+
+选中文件夹后，LitFolio 递归扫描所有子目录中的 \cmd{.pdf} 文件。扫描结果
+以列表形式展示，每个文件显示：
+
+\begin{itemize}
+  \item 文件名（作为标题猜测的兜底来源）。
+  \item 文件大小。
+  \item 提取状态（等待中 / 处理中 / 成功 / 失败）。
+\end{itemize}
+
+\subsection{文件名启发式解析}
+
+对于批量导入的 PDF，LitFolio 会尝试从文件名中提取元数据。常见命名模式：
+
+\begin{description}
+  \item[\cmd{Author\_Year\_Title.pdf}] 按下划线拆分：第一段为作者，第二段为年份
+    （4 位数字），其余为标题。
+  \item[\cmd{Author - Title (Year).pdf}] 按 \cmd{ - } 拆分作者和标题，
+    从括号中提取年份。
+  \item[\cmd{2024 - Author - Title.pdf}] 年份在前的变体。
+\end{description}
+
+启发式解析的准确率约 70\%——对于无法解析的文件，标题使用文件名（去掉扩展名），
+作者和年份留空，你可以在入库后手动补充。
+
+\subsection{并发处理与进度追踪}
+
+批量导入使用 4 路并发处理（可配置）。进度通过事件流实时推送到前端：
+
+\begin{itemize}
+  \item 进度条显示「处理中 23/150…（3 失败）」。
+  \item 失败文件单独列出，附带失败原因（PDF 损坏、无文本层、元数据提取失败等）。
+  \item 处理完成后显示汇总：成功 N 篇、失败 N 篇、跳过 N 篇（已存在的重复论文）。
+\end{itemize}
+
+\begin{tipbox}
+批量导入 100 篇 PDF 通常在 5 分钟内完成。如果某些 PDF 是扫描版（无文本层），
+LitFolio 仍然会入库（用文件名作为标题），但全文搜索和 RAG 召回将无法覆盖
+这些论文的内容。可以用 \cmd{ocrmypdf} 预处理扫描版 PDF 后重新绑定。
+\end{tipbox}
+
+\section{从 RSS / arXiv 浏览跳转}
+
+第 5、6 章里讲的 arXiv 浏览和 RSS 订阅，详情抽屉里都有「入库」按钮，效果等同于
+在「导入」页粘贴 arXiv ID 后入库。也就是说：你不必专门去「导入」页，刷 RSS 时
+看到喜欢的直接入。
+
+% =====================================================================
+\chapter{阅读器}
+\label{ch:reader}
+
+阅读器是 LitFolio 第二常驻的页面。从主列表点 \kbd{📎} 或「在阅读器中打开」即可进入。
+
+\section{三栏布局}
+\subsection{PDF 全文提取与缓存}
+
+阅读器加载 PDF 时，PDF.js 会在前端完成全文文本提取（它比后端 \cmd{lopdf} 对现代学术
+PDF 的 CMap 编码、嵌入字体子集、ToUnicode 表处理更可靠）。提取出的文本通过 IPC 发送给
+后端，缓存到 \fpath{papers/<id>/text.txt}。后续的术语提取和 FTS5 索引都直接读这个
+缓存文件——只要 \fpath{text.txt} 的修改时间比 \fpath{paper.pdf} 新就复用，否则用
+\cmd{lopdf} 重新提取。这意味着：术语生成不需要重新解析 PDF，瞬间可用。
+
+
+\litfigure{14-reader.png}{阅读器三栏。左：高亮列表；中：PDF.js 渲染的文档；右：笔记/选段翻译/术语三 tab 切换。
+三栏宽度可拖拽调节，状态自动持久化。}
+
+\begin{itemize}
+  \item \textbf{左栏}——本论文已有的全部高亮（按页码排序），点任一条跳到对应位置。
+  \item \textbf{中栏}——PDF 主体。基于 PDF.js + react-pdf-highlighter；继承系统深色
+    模式，渲染时会反相显示。左上角有缩放工具栏，支持以下操作：
+    \begin{itemize}
+      \item \kbd{Ctrl++} / \kbd{Ctrl+-}：逐级放大 / 缩小（步长 15\%）。
+      \item \kbd{Ctrl+0}：重置为 100\%。
+      \item \kbd{Ctrl+滚轮}：平滑缩放。
+      \item 工具栏的「适宽」按钮（\cmd{RotateCcw} 图标）恢复为页面宽度自适应。
+    \end{itemize}
+    缩放范围为 60\%--240\%，默认「适宽」模式。
+  \item \textbf{右栏}——三 tab 在线工具：\textbf{笔记}（Markdown）、\textbf{选段翻译}
+    、\textbf{术语}。
+\end{itemize}
+
+\section{高亮：文本选区 + 区域}
+
+两种高亮方式：
+
+\begin{description}
+  \item[选区高亮] 像普通 PDF 一样选中一段文字，松开鼠标即弹出小气泡，点「高亮」即可。
+    选区文本会被 OCR 不到的字符（连字、转行）规整成清晰文字写入高亮表。
+  \item[区域高亮 (\kbd{Alt+拖拽})] 按住 Alt 在 PDF 上拖一个矩形，会把矩形截图保存为
+    高亮——适合捕捉公式块、图表、流程图。
+\end{description}
+
+左栏每条高亮可以加评论（点铅笔图标）；评论用 Markdown 写。
+
+\section{DOI 引用导入}
+
+阅读 PDF 时，如果正文中出现可点击的 DOI 链接（如 \cmd{https://doi.org/10.xxxx/xxxx}），
+LitFolio 会自动拦截点击事件，弹出\textbf{引用导入对话框}，而不是跳转到外部浏览器。
+对话框会自动查询该 DOI 是否已存在于库中：
+
+\begin{itemize}
+  \item \textbf{已存在}——显示该论文的标题、作者和年份，点击「建立引用」即可在当前论文与
+    目标论文之间创建一条 \cmd{builds_on} 引用关系（自动去重）。
+  \item \textbf{不存在}——显示从 DOI 解析出的元数据预览，你需要选择或拖入对应的 PDF 文件，
+    点击「导入并建立引用」同时完成导入和引用链接。
+  \item \textbf{指向当前论文}——显示提示，禁用操作按钮。
+\end{itemize}
+
+\begin{tipbox}
+引用关系可以在知识图谱中可视化查看。你也可以在文献库列表中直接拖拽 PDF 到论文行上来快速绑定 PDF。
+\end{tipbox}
+
+\section{选段翻译}
+
+PDF 中选中正文后，切到右栏「选段翻译」tab，点「翻译选段」：
+
+\litfigure{15-reader-translate.png}{选段翻译。除了双语对照，还把段内出现的术语用紫色 chip 列出来——
+点击任一术语跳到「术语」tab 看完整定义。}
+
+输出结构是「双语对照 + 术语抽取 + 跨论文回指」三段。
+
+\subsubsection{选段翻译的内部流程}
+
+选段翻译并不是简单地调一次翻译 API，而是分三步执行：
+
+\begin{enumerate}
+  \item \textbf{术语匹配}——先检查选段文本中是否包含当前论文已有的术语（按归一化后的
+    术语做大小写不敏感的子串匹配）。命中则直接复用已有的定义和证据片段；未命中则走
+    实时提取：用三组正则分别捕获全大写缩写（如 SSIM）、Title Case 专有名词（如
+    MetaDesigner）和 1–3 词名词短语，再经 \cmd{is\_term\_candidate} 过滤器筛选。
+  \item \textbf{跨论文关联}——对每个术语在全库做 FTS5 搜索（最多返回 12 条），排除当前
+    论文后保留最多 3 篇关联论文。关联关系根据术语出现在目标论文的哪个段落来分类：
+    出现在 method 段 →「方法实现」、comparison 段 →「对比讨论」、其余 →「相关提及」。
+  \item \textbf{LLM 翻译}——将选段文本（截断至 2000 字符以内）交给翻译模型。prompt 中
+    会注入一份术语 glossary（包含匹配到的术语及其本地定义），要求 LLM 保留术语英文原文，
+    并在首次出现时以 \cmd{Term〔中文释义〕} 的格式标注。这样译文既通顺又不丢失术语锚点。
+\end{enumerate}
+
+最终前端将三项结果拼合展示：双语对照 + 紫色术语 chip 列表 + 跨论文链接。
+\begin{itemize}
+  \item \textbf{双语对照}——逐段渲染原文与译文。
+  \item \textbf{术语}——从这段里抽出的领域术语，每个带一句话本文解释；如果其它论文
+    也用到过同一术语，会标「跨论文复用 \cmd{N}」。
+  \item \textbf{跨论文回指}——当前论文之前讨论同一概念的位置（页码 + 行）；常用于
+    长文献的「我前面是不是已经看过这个？」场景。
+\end{itemize}
+
+\section{术语表与术语网络}
+
+\litfigure{16-reader-terms.png}{术语 tab。生成本文术语表后，每个术语展示「本文证据 / 跨论文复用」两节，
+便于跨论文复用与一致性检查。}
+
+「生成术语表」分\textbf{两阶段}执行：
+
+\begin{enumerate}
+  \item \textbf{候选提取}——本地 TF-IDF 统计筛选，不调用 LLM，瞬间完成。提取后界面
+    立即显示候选术语列表，每个术语的定义区域显示「等待模型生成解释」和旋转图标。
+  \item \textbf{定义生成}——将候选术语交给 LLM 逐条生成一句话定义。界面顶部会显示
+    「候选术语已生成，正在生成解释…」的进度提示。
+\end{enumerate}
+
+这样做的好处是：候选列表可以立刻查看和编辑（删除不需要的术语），不必等 LLM 全部跑完。
+生成后术语会缓存到 \fpath{papers/<id>/} 目录与 SQLite 表 \cmd{terms}，供后续选段翻译复用。
+
+\subsection{术语提取算法}
+
+术语生成并不是简单地把全文丢给 LLM 让它列术语。LitFolio 采用\textbf{本地统计筛选 +
+LLM 定义}的两阶段架构：先用不调网络的 TF-IDF 统计方法从全文中筛出候选术语，再让 LLM
+只为这些候选写一句话定义。这样做的好处是：省 token（不需要让 LLM 扫全文），且候选列表
+可复用于选段翻译时的术语匹配。
+
+\subsubsection{候选提取：加权 TF × IDF × 多因子评分}
+
+整个候选流程分四步：
+
+\begin{enumerate}
+  \item \textbf{加权分段}——论文的各个部分被赋予不同权重（标题 3.0、摘要 2.0、方法 2.0、
+    研究问题 1.5、数据集 1.5、对比 1.0、局限 1.0、TL;DR 1.0、PDF 全文 0.4）。术语在标题
+    或摘要中出现时权重更高，在正文中出现时权重较低。
+  \item \textbf{正则提取 + 过滤}——对每段文本做正则匹配：默认只捕获单个 token（专有名词、
+    全大写缩写、连字符复合词）；对「Full Name (ACRO)」缩写对则走专门的缩写识别路径，
+    允许全称最多 5 个词。每个候选必须通过 \cmd{is\_term\_candidate} 过滤器：首尾词不能是
+    虚词（with/from/of\ldots），3+ 词短语中间不能有连词/介词（and/or/with\ldots），纯小写
+    单词至少 4 字符且必须有大写或连字符才保留。
+  \item \textbf{TF-IDF 计算}——term frequency 是候选在各加权段中出现次数乘以段权重的累加；
+    document frequency 是候选在库里最近 500 篇论文中出现的篇数。IDF 公式为
+    $\ln\!\bigl((N+1)/(df+1)\bigr) + 1$。再乘以三个修正因子：
+    \begin{itemize}
+      \item \textbf{section\_hits}（$\sqrt{\min(3, \text{出现段数})}$）——出现在越多不同段落
+        里越可信。
+      \item \textbf{surface\_quality}——全大写缩写 $\times 2.0$、Title Case 多词 $\times 1.6$、
+        含连字符 $\times 1.3$、纯小写多词 $\times 0.7$。表面形式越像专业术语得分越高。
+      \item \textbf{abbrev\_bonus}（$\times 1.8$）——如果候选来自缩写对路径，额外加权。
+    \end{itemize}
+  \item \textbf{排序截断}——总分 $\geq 0.9$ 的候选按降序排列，取前 12 个。低于阈值的直接
+    丢弃（比如一次出现的纯小写 bigram 大约 0.7 分，刚好被过滤掉）。
+\end{enumerate}
+
+\subsubsection{缩写对识别}
+
+对于形如「Structural Similarity Index Measure (SSIM)」的文本，LitFolio 用专门的正则
+捕获全称+缩写，然后做两项检查：
+
+\begin{itemize}
+  \item \textbf{首字母匹配}——取全称各词首字母，与缩写逐字符做贪心匹配，至少一半命中才
+    接受。连字符被当作词界（「Retrieval-Augmented Generation」→ RAG 可以匹配）。
+  \item \textbf{全称精炼}——如果正则捕获的全称比缩写长，会从尾部截取恰好等于缩写长度的
+    词序列做首字母精确匹配；截不中则先去掉停用词（and/the/of）再试。例如
+    「average structural similarity index measure (SSIM)」会精炼为
+    「structural similarity index measure」。
+\end{itemize}
+
+缩写对只有缩写进入最终术语列表（全称不单独出现），但全称会保存为 LLM 定义的上下文。
+
+\subsubsection{作者名过滤}
+
+一个容易被忽略的噪声源是作者姓氏——「Chen」「Yang」「Li」这些常见姓氏在论文的作者栏里
+高频出现，满足 Title Case 专有名词的条件，会排到术语候选前面。LitFolio 在提取前先把当前
+论文所有作者的姓氏收集到一个 HashSet 中（按空格、连字符、句点拆分后小写化），候选归一化后
+如果命中就直接跳过。这对中文作者的拼音姓氏尤其重要——「Chen」「Wang」在作者栏里出现
+频率极高，不加过滤会把它们当成术语排到前面。
+
+\subsubsection{LLM 定义生成}
+
+候选确定后，把每个术语的「表面形式 + 全称（如有）+ 证据片段」拼成 prompt 交给 LLM，
+要求返回 JSON 格式的中文一句话定义。如果 LLM 调用失败或返回空，使用 fallback：
+\cmd{本文将 <term> 放在当前论证或方法上下文中使用。}
+
+\begin{tipbox}
+术语生成耗 token 比 TL;DR 多得多（要扫全文），建议绑性价比高的国内低价档对话模型，
+或者本地跑一个 7B 以上的开源模型。
+\end{tipbox}
+
+\section{结构化笔记卡片}
+
+「笔记」tab 已从单一文本框升级为\textbf{结构化卡片系统}。每篇论文默认有五个
+独立编辑的笔记分区，存储在 \cmd{paper\_note\_sections} 表中。
+
+\subsection{默认分区}
+
+\begin{description}
+  \item[Problem] 这篇论文解决什么问题。
+  \item[Method] 提出了什么方法。
+  \item[Key Numbers] 关键实验数据或指标。
+  \item[Limitations] 局限与未解决的问题。
+  \item[Thoughts] 你自己的想法和评论。
+\end{description}
+
+每个分区独立编辑、可折叠、可拖拽排序。排序结果通过 \cmd{sort\_order} 字段
+持久化。你可以添加自定义分区（如「实验想法」「相关工作」），自定义分区与
+默认分区享有相同的编辑和排序能力。
+
+\subsection{AI 自动填充机制}
+
+分区有一个 \cmd{source} 字段，标记内容来源：
+
+\begin{description}
+  \item[user] 你手动写入的内容。
+  \item[ai:tldr] 由速读（TL;DR）自动填充。
+  \item[ai:quick\_read] 由深读（Quick Read）自动填充。
+\end{description}
+
+填充规则是\textbf{只填空、不覆盖}：
+
+\begin{enumerate}
+  \item 运行速读时，LLM 返回的 \cmd{key\_findings} 数组被写入 \cmd{Key Numbers}
+    分区——但仅当该分区的 \cmd{content} 为空且 \cmd{source} 不是 \cmd{user} 时。
+  \item 运行深读时，LLM 返回的四段 JSON 被映射到对应分区：
+    \cmd{problem} → Problem、\cmd{method} → Method、\cmd{limitations} →
+    Limitations。同样只填空分区。
+  \item 如果你手动编辑过分区（\cmd{source = user}），AI 永远不会覆盖它。
+    即使你重新运行速读或深读，该分区也会被跳过。
+  \item AI 填充的内容追加时间戳前缀：\cmd{[2025-05-27 AI:TLDR] <内容>}。
+\end{enumerate}
+
+\subsection{分区与全文搜索}
+
+所有分区的 \cmd{content} 字段被纳入 \cmd{papers\_fts} FTS5 索引。这意味着你
+可以在搜索框中输入某个分区里写过的关键词来找到对应论文——即使标题和摘要中
+完全没有出现这个词。
+
+\begin{tipbox}
+分区的拖拽排序通过 HTML5 Drag and Drop 实现，排序结果写入 \cmd{sort\_order}
+字段。默认排序为 Problem → Method → Key Numbers → Limitations → Thoughts。
+\end{tipbox}
+
+\section{标注颜色语义}
+
+高亮颜色可以赋予语义含义，存储在 \cmd{highlights.label} 字段中。
+在「设置 → 标注颜色」中配置颜色-标签映射。默认映射：
+
+\begin{longtable}{p{2cm} p{3.5cm} p{7cm}}
+\toprule
+\textbf{颜色} & \textbf{标签} & \textbf{语义} \\
+\midrule
+\endhead
+黄色 & Key Finding & 关键发现、重要结论 \\
+紫色 & Method & 方法要点、算法细节 \\
+蓝色 & To Verify & 需要验证的声明、存疑数据 \\
+红色 & Disagree & 不认同的观点、有争议的假设 \\
+绿色 & Citable & 可直接引用的精彩表述 \\
+\bottomrule
+\end{longtable}
+
+\subsection{工作流}
+
+\begin{enumerate}
+  \item \textbf{创建高亮}——选中文本后弹出气泡菜单，菜单中每种颜色旁显示
+    对应标签名（如「黄色 · Key Finding」）。选择颜色即同时设置标签。
+  \item \textbf{筛选高亮}——阅读器左栏顶部增加一行标签筛选 chip。点击某个
+    chip 只显示该标签的高亮；再次点击取消筛选。可以多选（OR 语义）。
+  \item \textbf{AI 集成}——高亮摘要功能（对选中高亮调 LLM 生成总结）支持
+    按标签过滤。例如只对「Key Finding」标签的高亮做摘要，忽略「To Verify」的
+    噪声。
+  \item \textbf{导出集成}——Markdown 导出时，高亮按标签分组输出，每个标签
+    作为二级标题。
+\end{enumerate}
+
+\subsection{自定义标签}
+
+你可以在设置中修改颜色-标签映射：更改标签名、添加新颜色、删除不使用的映射。
+已有的高亮不受影响——标签名存储在每条高亮记录中，而非引用全局配置。
+
+\section{Markdown 笔记}
+
+「笔记」tab 底部仍保留自由文本 Markdown 编辑区，自动保存到
+\fpath{papers/<id>/note.md}。LitFolio 不强制你按某种模板写——你可以用任何
+Markdown 语法、嵌任意图片链接，文件后续都跟 PDF 一起被 WebDAV 同步。
+
+\section{PDF 搜索}
+
+\kbd{Ctrl+F}（macOS：\kbd{Cmd+F}）打开搜索框：
+
+\begin{itemize}
+  \item \kbd{Enter} 下一个，\kbd{Shift+Enter} 上一个
+  \item 匹配数会显示在搜索框右侧
+  \item \kbd{Esc} 关闭
+\end{itemize}
+
+\section{页面快捷键}
+
+阅读器中的其它常用键：
+
+\begin{itemize}
+  \item \kbd{j} / \kbd{k}——下一页 / 上一页
+  \item \kbd{1} / \kbd{2} / \kbd{3}——切换右栏 tab
+  \item \kbd{[} / \kbd{]}——拖动左/右栏宽度（步进 5\%）
+\end{itemize}
+
+完整快捷键表见 \textbf{第 11 章}。

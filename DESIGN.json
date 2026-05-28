@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-26T00:00:00Z",
+  "title": "Design System: LitFolio",
+  "extensions": {
+    "colorMeta": {
+      "deep-ink": {
+        "role": "neutral",
+        "displayName": "Deep Ink",
+        "canonical": "oklch(8% 0.008 280)",
+        "tonalRamp": ["#0a0a0f", "#141419", "#1e1e26", "#282833", "#3a3a47", "#52525e", "#6b6b78", "#8a8a96"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "oklch(12% 0.008 280)",
+        "tonalRamp": ["#0e0e14", "#121218", "#1a1a22", "#24242e", "#30303c", "#464652", "#5e5e6a", "#7a7a86"]
+      },
+      "elevated-panel": {
+        "role": "neutral",
+        "displayName": "Elevated Panel",
+        "canonical": "oklch(15% 0.008 280)",
+        "tonalRamp": ["#101016", "#16161e", "#1a1a23", "#24242f", "#30303d", "#484856", "#606070", "#7c7c8c"]
+      },
+      "quiet-line": {
+        "role": "neutral",
+        "displayName": "Quiet Line",
+        "canonical": "oklch(20% 0.008 280)",
+        "tonalRamp": ["#16161e", "#1e1e27", "#26262f", "#32323d", "#40404d", "#585866", "#70707e", "#8e8e9c"]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "oklch(46% 0.008 280)",
+        "tonalRamp": ["#2a2a34", "#3a3a46", "#4a4a58", "#5a5a68", "#6b6b78", "#80808e", "#9696a4", "#b0b0bc"]
+      },
+      "primary-text": {
+        "role": "neutral",
+        "displayName": "Primary Text",
+        "canonical": "oklch(93% 0.008 280)",
+        "tonalRamp": ["#5a5a66", "#7a7a86", "#9a9aa6", "#b8b8c4", "#d0d0dc", "#e8e8ee", "#f0f0f4", "#f6f6f8"]
+      },
+      "violet-mist": {
+        "role": "primary",
+        "displayName": "Violet Mist",
+        "canonical": "oklch(68% 0.18 290)",
+        "tonalRamp": ["#2d1f5e", "#4a3580", "#6b52a8", "#8b6fd0", "#a78bfa", "#bca4fb", "#d0bffd", "#e5dbfe"]
+      },
+      "arctic-blue": {
+        "role": "secondary",
+        "displayName": "Arctic Blue",
+        "canonical": "oklch(82% 0.10 230)",
+        "tonalRamp": ["#1a3a50", "#2a5570", "#3d7494", "#5494b8", "#7dd3fc", "#96dcfd", "#b2e6fe", "#d0f0ff"]
+      },
+      "signal-amber": {
+        "role": "tertiary",
+        "displayName": "Signal Amber",
+        "canonical": "oklch(80% 0.16 85)",
+        "tonalRamp": ["#4a3000", "#6b4a00", "#8c6600", "#b08500", "#fbbf24", "#fcce54", "#fddd84", "#feeeb4"]
+      },
+      "signal-emerald": {
+        "role": "tertiary",
+        "displayName": "Signal Emerald",
+        "canonical": "oklch(76% 0.17 160)",
+        "tonalRamp": ["#003a28", "#005a3e", "#007c56", "#1aa070", "#34d399", "#5ce0ad", "#88ecc2", "#b8f5da"]
+      },
+      "signal-red": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "oklch(65% 0.22 25)",
+        "tonalRamp": ["#4a0000", "#6e0000", "#940000", "#bc1010", "#f87171", "#f99090", "#fbb0b0", "#fdd0d0"]
+      },
+      "plum-glow": {
+        "role": "neutral",
+        "displayName": "Plum Glow",
+        "canonical": "oklch(14% 0.02 300)",
+        "tonalRamp": ["#0e0a14", "#14101c", "#1b1623", "#252030", "#322c40", "#4a4258", "#625a72", "#7e7690"]
+      },
+      "pdf-dark-bg": {
+        "role": "neutral",
+        "displayName": "PDF Dark Background",
+        "canonical": "oklch(12% 0.01 290)",
+        "tonalRamp": ["#0c0a12", "#110f18", "#15131d", "#1f1d28", "#2b2936", "#433f50", "#5b5768", "#777386"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page headings. One per view, always in the header. Serif texture is the brand signal."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Card titles, section headings within pages. Carries authority without display scale."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All readable text. Inter's OpenType alternates are active for optimized letterforms."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Section labels, field labels, metadata categories. Wide tracking and uppercase are the hierarchy signal."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Model names, DOIs, search term chips, note editing. Gives data a distinct texture."
+      }
+    },
+    "shadows": [
+      {
+        "name": "drawer",
+        "value": "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+        "purpose": "Separates the drawer overlay from the blurred scrim. The only shadow in the system."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-color",
+        "value": "transition: color 150ms, background-color 150ms, border-color 150ms",
+        "purpose": "Standard transition for all interactive state changes."
+      },
+      {
+        "name": "ease-opacity",
+        "value": "transition: opacity 150ms",
+        "purpose": "Fade for action buttons on group-hover, save-state indicators."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action per view. Violet background, near-black text.",
+      "html": "<button class=\"ds-btn-primary\">Import Paper</button>",
+      "css": ".ds-btn-primary { background: #a78bfa; color: #0a0a0f; padding: 6px 12px; border-radius: 6px; border: 1px solid #a78bfa; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; cursor: pointer; transition: background-color 150ms, border-color 150ms; } .ds-btn-primary:hover { background: #b497fd; border-color: #b497fd; } .ds-btn-primary:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.4); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Workhorse button for secondary actions. Warm paper with quiet line border.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { background: #121218; color: #e8e8ee; padding: 6px 12px; border-radius: 6px; border: 1px solid #26262f; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; cursor: pointer; transition: background-color 150ms; } .ds-btn-secondary:hover { background: #1a1a23; } .ds-btn-secondary:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.4); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Standard text input. Warm paper background, focus ring in violet.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search papers...\" />",
+      "css": ".ds-input { background: #121218; color: #e8e8ee; padding: 6px 10px; border-radius: 6px; border: 1px solid #26262f; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; outline: none; transition: box-shadow 150ms; } .ds-input::placeholder { color: #6b6b78; } .ds-input:focus { box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.4); }"
+    },
+    {
+      "name": "Card Panel",
+      "kind": "card",
+      "refersTo": "card-panel",
+      "description": "Elevated surface with glassmorphism. Used for workflow cards, profile cards, content containers.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Quick Read</h3><p class=\"ds-card-body\">Summarize the key findings of this paper.</p></div>",
+      "css": ".ds-card { background: rgba(26, 26, 35, 0.8); backdrop-filter: blur(12px); border: 1px solid #26262f; border-radius: 10px; padding: 16px 20px; } .ds-card-title { font-family: Lora, ui-serif, Georgia, serif; font-size: 18px; font-weight: 400; line-height: 1.3; color: #e8e8ee; margin: 0 0 8px 0; } .ds-card-body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: #e8e8ee; margin: 0; opacity: 0.85; }"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Sidebar navigation link. Active state uses violet tint background.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\">Library</a><a class=\"ds-nav-item\" href=\"#\">Ask</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; } .ds-nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: rgba(232, 232, 238, 0.8); text-decoration: none; transition: background-color 150ms, color 150ms; } .ds-nav-item:hover { background: #1a1a23; color: #e8e8ee; } .ds-nav-item-active { background: rgba(167, 139, 250, 0.09); color: #a78bfa; } .ds-nav-item-active:hover { background: rgba(167, 139, 250, 0.14); color: #a78bfa; }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Uppercase field/section label with wide tracking. The hierarchy signal for metadata.",
+      "html": "<span class=\"ds-label\">Reading Status</span>",
+      "css": ".ds-label { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 11px; line-height: 1.45; letter-spacing: 0.05em; text-transform: uppercase; color: #6b6b78; }"
+    },
+    {
+      "name": "Page Header",
+      "kind": "custom",
+      "refersTo": "card-panel",
+      "description": "Standard page header with serif heading and muted subtitle. One per page.",
+      "html": "<header class=\"ds-page-header\"><h1 class=\"ds-page-heading\">Library</h1><p class=\"ds-page-subtitle\">42 papers imported</p></header>",
+      "css": ".ds-page-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid #26262f; } .ds-page-heading { font-family: Lora, ui-serif, Georgia, serif; font-size: 24px; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; color: #e8e8ee; margin: 0; } .ds-page-subtitle { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: #6b6b78; margin: 0; }"
+    },
+    {
+      "name": "Search Term Chip",
+      "kind": "chip",
+      "refersTo": "card-panel",
+      "description": "Monospace chip for search terms and keywords. Distinct from metadata chips by typeface.",
+      "html": "<span class=\"ds-chip-term\">transformer attention</span>",
+      "css": ".ds-chip-term { font-family: JetBrains Mono, ui-monospace, monospace; font-size: 12px; line-height: 1.5; color: #e8e8ee; padding: 2px 8px; border-radius: 6px; border: 1px solid #26262f; background: rgba(38, 38, 47, 0.2); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Research Desk",
+    "overview": "A well-lit surface in a dim room. Papers spread flat, annotations visible, tools within reach. LitFolio's interface is a reading desk, not a dashboard: the content (papers, highlights, evidence) occupies the foreground, and the chrome recedes into near-darkness. Density is deliberate; every pixel serves the researcher's flow of import, read, ask, and retain.\n\nThis system rejects the patterns PRODUCT.md names explicitly: generic chatbot shells where output disappears into scrolling transcripts, dashboard-heavy SaaS styling that prioritizes decoration over reading, and magic-looking AI flows that hide source provenance. It also rejects the visual cliches of its category: no neon-on-black 'AI tool' aesthetic, no white-space-heavy 'productivity app' template. The reference benchmark is Linear: dense, keyboard-driven, minimal chrome, information-first with precise spacing.\n\nGlassmorphism is used deliberately on elevated surfaces (drawers, overlays, floating panels) to maintain the layered desk metaphor. Main content surfaces use tonal depth (paper, panel, ink) rather than blur.",
+    "keyCharacteristics": [
+      "Content-forward: the reading surface dominates; navigation and controls are narrow and quiet",
+      "Tonal depth through three background layers (ink, paper, panel), not through shadows",
+      "Violet accent used sparingly for state and emphasis, never for decoration",
+      "Functional transitions only; no entrance choreography or decorative motion",
+      "Dense typography with strong serif/sans contrast for hierarchy"
+    ],
+    "rules": [
+      {
+        "name": "The Rarity Rule",
+        "body": "The violet accent is the only color that signals interactivity. Its rarity is the point. If every other element is violet, the system has failed.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinted Neutral Rule",
+        "body": "No pure black (#000) or pure white (#fff) anywhere. Every neutral leans toward the plum undertone of the body gradient.",
+        "section": "colors"
+      },
+      {
+        "name": "The Serif Anchor Rule",
+        "body": "Every page has exactly one serif heading at text-2xl in the header. If a view has no serif heading, it has no visual anchor; add one.",
+        "section": "typography"
+      },
+      {
+        "name": "The Label Case Rule",
+        "body": "Section labels and field labels are always uppercase with 0.05em tracking. Never sentence case, never bold. The transform itself is the hierarchy signal.",
+        "section": "typography"
+      },
+      {
+        "name": "The Three-Layer Rule",
+        "body": "Every surface maps to ink, paper, or panel. If you need a fourth depth, you're over-nesting. Flatten.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Blur Boundary Rule",
+        "body": "Backdrop blur belongs to overlays and floating surfaces only. Main content never uses blur.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Accent Button Rule",
+        "body": "Each view has at most one Primary button visible at a time. If two primary actions compete, one must be downgraded to Secondary.",
+        "section": "components"
+      },
+      {
+        "name": "The Dense Row Rule",
+        "body": "List rows use px-6 py-3.5 padding. They are tighter than cards because they are content, not containers.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Use the three-layer tonal system (ink, paper, panel) for all depth decisions",
+      "Keep the violet accent to interactive elements and active states only",
+      "Use serif (Lora) for exactly one heading per page view, at text-2xl with tight tracking",
+      "Use text-[11px] uppercase tracking-wider for all section labels and field labels",
+      "Use backdrop blur on overlays and floating surfaces only",
+      "Use transition-colors duration-150 on all interactive state changes",
+      "Use Muted Ink (#6b6b78) for all secondary text, metadata, and timestamps",
+      "Use Signal Amber for dirty/unsaved state and Signal Emerald for saved state"
+    ],
+    "donts": [
+      "Use generic chatbot shells where output disappears into a scrolling transcript",
+      "Use dashboard-heavy SaaS styling that prioritizes decoration over reading and evidence",
+      "Use magic-looking AI flows that hide source provenance or silently degrade on failure",
+      "Use pure black (#000) or pure white (#fff)",
+      "Use gradient text (background-clip: text)",
+      "Use side-stripe borders (colored border-left > 1px) on cards, list items, or callouts",
+      "Use identical card grids with icon + heading + text repeated endlessly",
+      "Use modals as the first solution",
+      "Animate layout properties",
+      "Use bounce or elastic easing curves",
+      "Apply backdrop blur to main content areas",
+      "Use more than one Primary button per visible view",
+      "Use the violet accent for decoration, backgrounds, or large surfaces"
+    ]
+  }
+}

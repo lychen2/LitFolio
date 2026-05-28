@@ -1,0 +1,80 @@
+% Preface
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+\markboth{Preface}{Preface}
+
+\section*{About This Manual}
+
+LitFolio is a desktop workbench for research papers. It brings together
+arXiv browsing, PDF reading, highlight annotations, term extraction, multi-turn RAG
+conversation, knowledge graphs, topic survey generation, literature comparison,
+citation management, and WebDAV synchronization---all inside a single Tauri application,
+with every piece of data stored under the \fpath{\textasciitilde/Litera-Library/} directory
+on your own machine.
+
+This manual is written for three audiences:
+
+\begin{itemize}
+  \item \textbf{New users}---if you have never used LitFolio, start with Chapters 1--4.
+    You will go from importing an arXiv paper through deep reading, translation, and
+    the term network in about thirty minutes.
+  \item \textbf{Active researchers}---if you want to master topic surveys, multi-turn
+    RAG dialogue, knowledge graphs, WebDAV sync, and other advanced capabilities,
+    continue with Part II, Part III, and Chapter 12.
+  \item \textbf{Power users}---who need literature comparison, survey drafting, BibTeX
+    management, smart collections, the command palette, and other productivity tools.
+    Focus on Part III (Chapters 11--17).
+\end{itemize}
+
+\section*{What You Will Learn}
+
+\begin{enumerate}
+  \item Three import pathways (arXiv/DOI, local PDF, Semantic Scholar search),
+    batch folder import, and automatic deduplication.
+  \item The full reading workflow: list $\to$ TL;DR quick read $\to$ four-section deep
+    read $\to$ translation $\to$ open in PDF reader $\to$ highlights (with semantic
+    color labels) $\to$ structured note cards $\to$ term network.
+  \item Automatic BibTeX generation and citation formatting (APA/IEEE/GB/T 7714/Chicago),
+    with batch export to \cmd{.bib} or \cmd{.ris} files.
+  \item Synthesizing scattered papers into a topic survey, or asking questions like
+    ``Which papers discuss limitations of CPA?'' and getting answers with numbered
+    citations---including multi-turn follow-up conversation.
+  \item Knowledge graphs: paper-relationship networks, citation networks, and concept
+    maps, with AI-powered discovery of method evolution and cross-paper connections.
+  \item Advanced tools: structured multi-paper comparison, literature review draft
+    generation, similar-paper recommendations, reading queues, smart collections,
+    custom metadata fields, Markdown/Obsidian export, and the command palette
+    (\kbd{Ctrl+K}).
+  \item Configuring LLM endpoints, assigning different tasks to different models,
+    and synchronizing your entire library across machines via WebDAV.
+  \item The physical layout of data on disk, making it easy to back up, script, or
+    troubleshoot.
+\end{enumerate}
+
+\section*{Typographic Conventions}
+
+\begin{description}
+  \item[\textcolor{violet}{Violet}] is used for chapter headings and emphasis,
+    matching the primary interactive color in the product (DESIGN token \cmd{violet}).
+  \item[\kbd{Ctrl+F}] Keyboard shortcuts appear in rounded chips.
+  \item[\fpath{file.tsx}] File paths and code identifiers use monospace.
+  \item[\cmd{pnpm tauri dev}] Terminal commands likewise use monospace.
+\end{description}
+
+Two recurring callout boxes appear throughout the manual:
+
+\begin{tipbox}[Tip]
+Light-violet box: supplementary notes and quick-use tips. Safe to skip.
+\end{tipbox}
+
+\begin{warnbox}[Warning]
+Amber box: operations that are irreversible, overwrite data, or require careful
+understanding before proceeding. Please read these thoroughly.
+\end{warnbox}
+
+\section*{Feedback and Contributions}
+
+LitFolio is released under GPL-3.0-or-later. For bug reports, feature suggestions,
+and patches, please open an issue or pull request on the project repository.
+This manual lives in the same repository as the main codebase; corrections and
+additional use cases are always welcome.

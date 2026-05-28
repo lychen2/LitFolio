@@ -61,6 +61,34 @@ pub async fn paper_link_create(
 }
 
 #[tauri::command]
+pub async fn paper_link_create_or_get(
+    state: State<'_, Arc<AppState>>,
+    source_paper_id: String,
+    target_paper_id: String,
+    relation: String,
+    snippet: Option<String>,
+) -> Result<PaperLink, String> {
+    let repo = PaperRepo::new(&state.pool);
+    if repo.get(&source_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+        return Err("source paper not found".into());
+    }
+    if repo.get(&target_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+        return Err("target paper not found".into());
+    }
+    PaperLinkRepo::new(&state.pool)
+        .create_or_get(
+            &source_paper_id,
+            &target_paper_id,
+            &relation,
+            "user",
+            1.0,
+            snippet.as_deref(),
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn paper_link_delete(
     state: State<'_, Arc<AppState>>,
     id: i64,

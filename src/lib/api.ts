@@ -386,6 +386,7 @@ export interface RelatedPaperTerm {
 export interface ReaderPaperTerm {
   term: PaperTerm;
   related: RelatedPaperTerm[];
+  definition_status: "pending" | "ready";
 }
 
 export interface Highlight {
@@ -531,6 +532,7 @@ export const api = {
   arxivAddWithPdf: (arxivId: string) =>
     invoke<Paper>("arxiv_add_with_pdf", { arxivId }),
   prepareDoiDraft: (doi: string) => invoke<ArxivDraft>("prepare_doi_draft", { doi }),
+  paperFindByDoi: (doi: string) => invoke<Paper | null>("paper_find_by_doi", { doi }),
   prepareArxivDraft: (arxivId: string) => invoke<ArxivDraft>("prepare_arxiv_draft", { arxivId }),
   paperSaveWithPdf: (draft: ArxivDraft, sourcePdfPath: string) =>
     invoke<Paper>("paper_save_with_pdf", { draft, sourcePdfPath }),
@@ -591,6 +593,10 @@ export const api = {
     invoke<ReaderPaperTerm[]>("paper_terms_list", { paperId }),
   paperTermsGenerate: (paperId: string) =>
     invoke<ReaderPaperTerm[]>("paper_terms_generate", { paperId }),
+  paperTermsGenerateCandidates: (paperId: string) =>
+    invoke<ReaderPaperTerm[]>("paper_terms_generate_candidates", { paperId }),
+  paperTermsExplain: (paperId: string) =>
+    invoke<ReaderPaperTerm[]>("paper_terms_explain", { paperId }),
   paperTermAdd: (
     paperId: string,
     term: string,
@@ -654,6 +660,18 @@ export const api = {
     snippet?: string | null,
   ) =>
     invoke<PaperLink>("paper_link_create", {
+      sourcePaperId,
+      targetPaperId,
+      relation,
+      snippet: snippet ?? null,
+    }),
+  paperLinkCreateOrGet: (
+    sourcePaperId: string,
+    targetPaperId: string,
+    relation: string,
+    snippet?: string | null,
+  ) =>
+    invoke<PaperLink>("paper_link_create_or_get", {
       sourcePaperId,
       targetPaperId,
       relation,
