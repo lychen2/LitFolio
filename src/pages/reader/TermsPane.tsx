@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookMarked, Loader2, Orbit, Trash2, Link2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,7 @@ export function TermsPane({ paperId }: { paperId: string }) {
   const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [status, setStatus] = useState<"idle" | "extracting" | "explaining">("idle");
   const linkedPapers = useQuery({
     queryKey: ["paper-links", paperId],
     queryFn: () => api.paperLinksForPaper(paperId),
@@ -16,9 +18,22 @@ export function TermsPane({ paperId }: { paperId: string }) {
     queryKey: ["paper-terms", paperId],
     queryFn: () => api.paperTermsList(paperId),
   });
-  const generate = useMutation({
-    mutationFn: () => api.paperTermsGenerate(paperId),
-    onSuccess: () => list.refetch(),
+  const generateCandidates = useMutation({
+    mutationFn: () => api.paperTermsGenerateCandidates(paperId),
+    onMutate: () => setStatus("extracting"),
+    onSuccess: (data) => {
+      qc.setQueryData(["paper-terms", paperId], data);
+      setStatus("explaining");
+      explainTerms.mutate();
+    },
+    onError: () => setStatus("idle"),
+  });
+  const explainTerms = useMutation({
+    mutationFn: () => api.paperTermsExplain(paperId),
+    onSuccess: (data) => {
+      qc.setQueryData(["paper-terms", paperId], data);
+    },
+    onSettled: () => setStatus("idle"),
   });
   const remove = useMutation({
     mutationFn: (termId: number) => api.paperTermDelete(paperId, termId),
@@ -46,18 +61,30 @@ export function TermsPane({ paperId }: { paperId: string }) {
           </div>
         </div>
         <button
-          onClick={() => generate.mutate()}
-          disabled={generate.isPending}
+          onClick={() => generateCandidates.mutate()}
+          disabled={generateCandidates.isPending || explainTerms.isPending}
           className="litera-btn text-xs shrink-0"
         >
-          {generate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Orbit className="h-3.5 w-3.5" />}
+          {generateCandidates.isPending || explainTerms.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Orbit className="h-3.5 w-3.5" />}
           {list.data && list.data.length > 0 ? t("reader.termsRebuild") : t("reader.termsGenerate")}
         </button>
       </div>
 
-      {generate.error && (
+      {status !== "idle" && (
+        <div className="mb-3 text-xs text-litera-mute inline-flex items-center gap-2">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {status === "extracting" ? t("reader.termsExtracting") : t("reader.termsExplaining")}
+        </div>
+      )}
+
+      {generateCandidates.error && (
         <div className="mb-3 text-xs text-red-400/90 break-all">
-          {t("reader.termsGenerateFailed", { message: (generate.error as Error).message })}
+          {t("reader.termsGenerateFailed", { message: errorMessage(generateCandidates.error) })}
+        </div>
+      )}
+      {explainTerms.error && (
+        <div className="mb-3 text-xs text-red-400/90 break-all">
+          {t("reader.termsExplainFailed", { message: errorMessage(explainTerms.error) })}
         </div>
       )}
 
@@ -81,7 +108,14 @@ export function TermsPane({ paperId }: { paperId: string }) {
                 {item.term.term}
               </div>
               <div className="mt-1 text-xs leading-relaxed text-litera-accent2/90">
-                {item.term.local_definition}
+                {item.definition_status === "pending" ? (
+                  <span className="inline-flex items-center gap-1.5 text-litera-mute">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {t("reader.termsPendingDefinition")}
+                  </span>
+                ) : (
+                  item.term.local_definition
+                )}
               </div>
               {item.term.local_evidence && (
                 <div className="mt-2">
@@ -160,4 +194,16 @@ export function TermsPane({ paperId }: { paperId: string }) {
       )}
     </div>
   );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  try {
+    const json = JSON.stringify(error);
+    if (json && json !== "{}") return json;
+  } catch {
+    // fall through to an explicit unknown marker
+  }
+  return "unknown error";
 }

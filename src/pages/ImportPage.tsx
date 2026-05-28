@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,6 +13,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { TabButton } from "@/components/TabButton";
 import { ImportSidebar } from "./import/ImportSidebar";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
+import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 
 type Tab = "pdf" | "arxiv_doi" | "search";
 
@@ -148,6 +149,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const pdfDropRef = useRef<HTMLDivElement>(null);
 
   const trimmed = value.trim();
   const isArxiv = /^\d{4}\.\d{4,5}/.test(trimmed) || trimmed.toLowerCase().includes("arxiv");
@@ -256,6 +258,11 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
 
   const fetching = fetchMeta.isPending;
   const saving = saveWithPdf.isPending || autoDownload.isPending;
+  const handlePdfDrop = useCallback((paths: string[]) => {
+    if (paths.length > 0) setSelectedPdf(paths[0]);
+  }, []);
+
+  usePdfDropTarget(pdfDropRef, handlePdfDrop, !!draft && !saving);
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -300,7 +307,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
             )}
           </div>
 
-          <div className="border-t border-litera-line pt-4">
+          <div ref={pdfDropRef} className="border-t border-litera-line pt-4">
             <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("import.step3.label")}</div>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={pickPdf} disabled={saving} className="litera-btn text-sm disabled:opacity-50">

@@ -147,6 +147,28 @@ impl<'a> PaperTermRepo<'a> {
         row_to_paper_term(row)
     }
 
+    pub async fn update_definition(
+        &self,
+        paper_id: &str,
+        normalized_term: &str,
+        definition: &str,
+    ) -> Result<()> {
+        let now = Utc::now().timestamp();
+        sqlx::query(
+            "UPDATE paper_terms
+             SET local_definition = ?1, updated_at = ?2
+             WHERE paper_id = ?3 AND normalized_term = ?4",
+        )
+        .bind(definition)
+        .bind(now)
+        .bind(paper_id)
+        .bind(normalized_term)
+        .execute(self.pool)
+        .await
+        .context("update paper term definition")?;
+        Ok(())
+    }
+
     /// Delete one term row by id, scoped to a paper.
     pub async fn delete(&self, paper_id: &str, term_id: i64) -> Result<()> {
         sqlx::query("DELETE FROM paper_terms WHERE id = ?1 AND paper_id = ?2")

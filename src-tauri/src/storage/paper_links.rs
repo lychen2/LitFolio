@@ -93,6 +93,53 @@ impl<'a> PaperLinkRepo<'a> {
         self.get(id).await
     }
 
+    pub async fn create_or_get(
+        &self,
+        source_paper_id: &str,
+        target_paper_id: &str,
+        relation: &str,
+        source_type: &str,
+        confidence: f64,
+        snippet: Option<&str>,
+    ) -> Result<PaperLink> {
+        if let Some(existing) = self
+            .find(source_paper_id, target_paper_id, relation)
+            .await?
+        {
+            return Ok(existing);
+        }
+        self.create(
+            source_paper_id,
+            target_paper_id,
+            relation,
+            source_type,
+            confidence,
+            snippet,
+        )
+        .await
+    }
+
+    async fn find(
+        &self,
+        source_paper_id: &str,
+        target_paper_id: &str,
+        relation: &str,
+    ) -> Result<Option<PaperLink>> {
+        let row = sqlx::query(
+            "SELECT id, source_paper_id, target_paper_id, relation, source_type,
+                    confidence, snippet, created_at, updated_at
+             FROM paper_links
+             WHERE source_paper_id = ?1 AND target_paper_id = ?2 AND relation = ?3",
+        )
+        .bind(source_paper_id)
+        .bind(target_paper_id)
+        .bind(relation)
+        .fetch_optional(self.pool)
+        .await
+        .context("find paper link")?;
+        row.map(row_to_link).transpose()
+    }
+
     pub async fn get(&self, id: i64) -> Result<PaperLink> {
         let row = sqlx::query(
             "SELECT id, source_paper_id, target_paper_id, relation, source_type,

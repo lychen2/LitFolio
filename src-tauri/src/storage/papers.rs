@@ -75,6 +75,18 @@ impl<'a> PaperRepo<'a> {
         row.map(row_to_paper).transpose()
     }
 
+    pub async fn find_by_doi(&self, doi: &str) -> Result<Option<Paper>> {
+        let normalized = doi.trim().to_lowercase();
+        if normalized.is_empty() {
+            return Ok(None);
+        }
+        let row = sqlx::query("SELECT * FROM papers WHERE lower(trim(doi)) = ?1")
+            .bind(normalized)
+            .fetch_optional(self.pool)
+            .await?;
+        row.map(row_to_paper).transpose()
+    }
+
     pub async fn list_all_arxiv_ids(&self) -> Result<Vec<String>> {
         let rows = sqlx::query("SELECT arxiv_id FROM papers WHERE arxiv_id IS NOT NULL AND arxiv_id != ''")
             .fetch_all(self.pool)

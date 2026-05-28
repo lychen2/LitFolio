@@ -45,6 +45,9 @@ pub const GENERIC_STOPWORDS: &[&str] = &[
     "also", "again", "always", "ever", "even", "here", "however", "indeed",
     "just", "never", "not", "now", "only", "perhaps", "rather", "really",
     "still", "then", "there", "thus", "very", "well", "yet",
+    "additionally", "consequently", "finally", "furthermore", "meanwhile",
+    "moreover", "nevertheless", "nonetheless", "notably", "overall",
+    "particularly", "respectively", "similarly", "specifically", "therefore",
     "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
     "ten", "first", "second", "third", "next", "last", "previous",
     // overly generic academic filler — almost never a useful "term"
@@ -107,6 +110,9 @@ pub fn is_term_candidate_with(raw: &str, max_words: usize) -> bool {
     let has_hyphen = term.contains('-');
 
     if words.len() == 1 {
+        if lower[0].ends_with("ly") && !term.chars().all(|c| c.is_ascii_uppercase()) {
+            return false;
+        }
         // Acronyms ("AI", "CNN", "SSIM") are short by definition — allow
         // 2-8 chars of all-caps letters/digits with optional hyphen.
         let is_acronym = term.len() >= 2
@@ -257,6 +263,14 @@ mod tests {
     fn rejects_short_lowercase_singleton() {
         assert!(!is_term_candidate("data"));
         assert!(!is_term_candidate("model"));
+    }
+
+    #[test]
+    fn rejects_sentence_connectors_even_when_title_case() {
+        assert!(!is_term_candidate("Furthermore"));
+        assert!(!is_term_candidate("Moreover"));
+        assert!(!is_term_candidate("Therefore"));
+        assert!(!is_term_candidate("Traditionally"));
     }
 
     #[test]

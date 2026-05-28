@@ -4,7 +4,8 @@
 //! 1. Compute SHA-256 of file content (for dedup).
 //! 2. Try to read `/Title`, `/Author`, `/Subject`, `/Keywords` from the PDF
 //!    info dictionary via `lopdf`.
-//! 3. Scan first-page text for a DOI pattern as a fallback for missing title.
+//! 3. Scan first-page text for DOI/title signals when the PDF info
+//!    dictionary is incomplete.
 //! 4. Copy the file under `library/papers/{paper_id}/original.pdf`.
 
 use anyhow::{anyhow, Context, Result};
@@ -141,17 +142,19 @@ fn split_authors(s: &str) -> Vec<String> {
 
 fn first_page_text(doc: &lopdf::Document) -> Option<String> {
     let pages = doc.get_pages();
-    let (_, page_id) = pages.iter().next()?;
-    doc.extract_text(&[page_id.0]).ok()
+    let (page_number, _) = pages.iter().next()?;
+    doc.extract_text(&[*page_number]).ok()
 }
 
 fn find_doi(text: &str) -> Option<String> {
-    let re = regex::Regex::new(r"10\.\d{4,9}/\S+").ok()?;
-    re.find(text).map(|m| {
-        m.as_str()
-            .trim_end_matches(|c: char| ".,);]>}'\"".contains(c))
-            .to_string()
-    })
+    let re = regex::Regex::new(r"(?i)\b10\.\d{4,9}/[-._;()/:A-Z0-9]+").ok()?;
+    re.find(text).map(|m| clean_doi_match(m.as_str()))
+}
+
+fn clean_doi_match(raw: &str) -> String {
+    raw.trim()
+        .trim_end_matches(|c: char| ".,);]>}'\"".contains(c))
+        .to_string()
 }
 
 fn guess_title(text: &str) -> Option<String> {

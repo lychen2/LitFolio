@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Highlighter, Moon, Sun } from "lucide-react";
+import { Loader2, Highlighter, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
 import {
   PdfLoader, PdfHighlighter,
 } from "react-pdf-highlighter";
@@ -14,6 +14,14 @@ import { PdfTextHighlight } from "./PdfTextHighlight";
 import { PdfTermsOverlay, type PdfTermEntry } from "./PdfTermsOverlay";
 import { PdfSearchBar } from "./PdfSearchBar";
 import { FigureLinks } from "./FigureLinks";
+import { PdfDoiImportDialog } from "./PdfDoiImportDialog";
+import { PdfDoiLinkInterceptor } from "./PdfDoiLinkInterceptor";
+
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 2.4;
+const ZOOM_STEP = 0.15;
+const WHEEL_ZOOM_FACTOR = 0.0015;
+const DEFAULT_ZOOM = 1;
 
 /**
  * The middle pane: renders the bound PDF and lets the user highlight, search,
@@ -45,7 +53,10 @@ export const PdfPane = memo(function PdfPane({
     catch { return false; }
   });
   const [searchSignal, setSearchSignal] = useState(0);
+  const [zoom, setZoom] = useState<number | "page-width">("page-width");
+  const [doiImport, setDoiImport] = useState<string | null>(null);
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
+  const highlighterRef = useRef<PdfHighlighter<IHighlight> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textPushedRef = useRef<string | null>(null);
 
@@ -79,17 +90,42 @@ export const PdfPane = memo(function PdfPane({
   // typing in the notes pane).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as Node | null;
+      const insidePdf = target && containerRef.current?.contains(target);
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
-        const target = e.target as Node | null;
-        if (target && containerRef.current?.contains(target)) {
+        if (insidePdf) {
           e.preventDefault();
           setSearchSignal((n) => n + 1);
         }
+        return;
+      }
+      if (!insidePdf || !(e.ctrlKey || e.metaKey)) return;
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        setZoom((current) => nextZoom(current, ZOOM_STEP));
+      } else if (e.key === "-") {
+        e.preventDefault();
+        setZoom((current) => nextZoom(current, -ZOOM_STEP));
+      } else if (e.key === "0") {
+        e.preventDefault();
+        setZoom(DEFAULT_ZOOM);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((current) => wheelZoom(current, e.deltaY));
+    };
+    container.addEventListener("wheel", handler, { passive: false });
+    return () => container.removeEventListener("wheel", handler);
+  }, [pdfUrl]);
 
   const highlightsQ = useQuery({
     queryKey: ["highlights", paperId],
@@ -133,6 +169,12 @@ export const PdfPane = memo(function PdfPane({
       })),
     [highlightsQ.data],
   );
+  const pdfScaleValue = zoom === "page-width" ? "page-width" : String(zoom);
+  const zoomLabel = zoom === "page-width" ? t("reader.zoomFit") : `${Math.round(zoom * 100)}%`;
+
+  useEffect(() => {
+    highlighterRef.current?.handleScaleValue?.();
+  }, [pdfScaleValue]);
 
   useEffect(() => {
     if (!scrollRefCb) return;
@@ -153,6 +195,36 @@ export const PdfPane = memo(function PdfPane({
       className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}
       tabIndex={-1}
     >
+      <div className="absolute top-2 left-2 z-20 litera-overlay flex items-center gap-1 px-1.5 py-1">
+        <button
+          onClick={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
+          className="litera-btn text-xs px-1.5 py-0.5"
+          title={t("reader.zoomOutTitle")}
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => setZoom(DEFAULT_ZOOM)}
+          className="litera-btn text-[11px] px-2 py-0.5 min-w-12 justify-center"
+          title={t("reader.zoomResetTitle")}
+        >
+          {zoomLabel}
+        </button>
+        <button
+          onClick={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
+          className="litera-btn text-xs px-1.5 py-0.5"
+          title={t("reader.zoomInTitle")}
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => setZoom("page-width")}
+          className="litera-btn text-xs px-1.5 py-0.5"
+          title={t("reader.zoomFitTitle")}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
       <button
         onClick={() => setDark((d) => !d)}
@@ -187,10 +259,11 @@ export const PdfPane = memo(function PdfPane({
           return (
             <>
               <PdfHighlighter
+                ref={highlighterRef}
                 pdfDocument={pdfDocument}
                 highlights={highlights}
                 enableAreaSelection={(e) => e.altKey}
-                pdfScaleValue="page-width"
+                pdfScaleValue={pdfScaleValue}
                 onScrollChange={() => { /* noop */ }}
                 scrollRef={(fn) => { scrollFnRef.current = fn; }}
                 onSelectionFinished={(position, content, hideTipAndSelection) => (
@@ -222,10 +295,16 @@ export const PdfPane = memo(function PdfPane({
                 )}
               />
               <FigureLinks pdfDocument={pdfDocument} pdfUrl={pdfUrl} />
+              <PdfDoiLinkInterceptor containerRef={containerRef} onDoi={setDoiImport} />
             </>
           );
         }}
       </PdfLoader>
+      <PdfDoiImportDialog
+        doi={doiImport}
+        sourcePaperId={paperId}
+        onClose={() => setDoiImport(null)}
+      />
       <PdfTermsOverlay containerRef={containerRef} terms={termEntries} />
       {(create.error || addTerm.error) && (
         <div className="absolute top-2 right-2 text-xs text-red-400/90 bg-litera-paper border border-red-400/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
@@ -312,6 +391,18 @@ function PdfLoadError({ error, onRetry }: { error?: Error; onRetry?: () => void 
       </div>
     </div>
   );
+}
+
+function nextZoom(current: number | "page-width", delta: number): number {
+  const base = current === "page-width" ? DEFAULT_ZOOM : current;
+  const value = Math.round((base + delta) * 100) / 100;
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+}
+
+function wheelZoom(current: number | "page-width", deltaY: number): number {
+  const base = current === "page-width" ? DEFAULT_ZOOM : current;
+  const value = base * Math.exp(-deltaY * WHEEL_ZOOM_FACTOR);
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
 /** Walk every page and concatenate its text via pdfjs's getTextContent API. */
