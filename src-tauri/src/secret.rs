@@ -85,7 +85,10 @@ mod inmem {
 }
 
 #[cfg(not(test))]
-pub use real::{delete, get, put};
+pub use real::{get, put};
+#[cfg(not(test))]
+#[allow(unused_imports)]
+pub use real::delete;
 #[cfg(test)]
 pub use inmem::{get, put};
 #[cfg(test)]

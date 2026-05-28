@@ -4,7 +4,9 @@
 
 mod client;
 mod concept_extract;
+pub mod json_utils;
 mod library_qa;
+pub mod prompts;
 pub mod link_discover;
 pub mod lit_review;
 mod models;

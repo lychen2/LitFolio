@@ -14,7 +14,7 @@ mod secret;
 mod storage;
 
 use anyhow::Result;
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
@@ -32,7 +32,11 @@ pub struct AppState {
     /// defense that stops a malicious server from pivoting us into the local
     /// network or AWS metadata.
     pub http_external: reqwest::Client,
-    pub batch_cancel: StdMutex<Option<CancellationToken>>,
+    /// Holds the in-flight batch's cancel token (if any). `AsyncMutex` rather
+    /// than `std::sync::Mutex` because the batch command handlers hold this
+    /// guard around `.await` points (sqlx writes, HTTP calls). A blocking
+    /// guard there would pin a tokio worker thread.
+    pub batch_cancel: AsyncMutex<Option<CancellationToken>>,
     pub sync_lock: AsyncMutex<()>,
 }
 
@@ -101,7 +105,7 @@ async fn bootstrap_state() -> Result<Arc<AppState>> {
         paths,
         http,
         http_external,
-        batch_cancel: StdMutex::new(None),
+        batch_cancel: AsyncMutex::new(None),
         sync_lock: AsyncMutex::new(()),
     }))
 }

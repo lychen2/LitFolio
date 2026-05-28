@@ -158,31 +158,8 @@ pub async fn annotate_survey(
 }
 
 fn parse_annotations(raw: &str) -> Result<AnnotationsReply> {
-    let body = strip_code_fence(raw.trim());
-    if let Ok(s) = serde_json::from_str::<AnnotationsReply>(body) {
-        return Ok(s);
-    }
-    if let (Some(lo), Some(hi)) = (body.find('{'), body.rfind('}')) {
-        if hi > lo {
-            let slice = &body[lo..=hi];
-            if let Ok(s) = serde_json::from_str::<AnnotationsReply>(slice) {
-                return Ok(s);
-            }
-        }
-    }
-    Err(anyhow!("could not extract annotations JSON from LLM reply"))
-}
-
-fn strip_code_fence(s: &str) -> &str {
-    let s = s.trim();
-    let stripped = s
-        .strip_prefix("```json")
-        .or_else(|| s.strip_prefix("```"))
-        .unwrap_or(s);
-    stripped
-        .trim_start_matches('\n')
-        .trim_end_matches("```")
-        .trim()
+    crate::ai::json_utils::parse_lenient::<AnnotationsReply>(raw)
+        .map_err(|_| anyhow!("could not extract annotations JSON from LLM reply"))
 }
 
 fn truncate(s: &str, n: usize) -> String {

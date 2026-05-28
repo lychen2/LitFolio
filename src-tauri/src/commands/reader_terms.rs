@@ -593,17 +593,16 @@ async fn explain_terms(
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let user_content = format!(
-        "Paper title: {}\n\nTerms:\n{}\n\nReturn ONLY JSON: {{\"definitions\": [{{\"term\": \"...\", \"definition\": \"...\"}}]}}.\nRules:\n- Write Chinese definitions.\n- Each definition must be one short sentence.\n- Explain how the term is used in this paper, not a generic dictionary entry.\n- For acronyms with a known full form, surface the full form in the first clause of the definition (e.g. \"SSIM (Structural Similarity Index Measure) 在本文中…\").\n- Do not include terms that are not in the input list.",
-        paper.title, items
-    );
+    let user_content = crate::ai::prompts::EXPLAIN_TERMS_USER
+        .replace("{title}", &paper.title)
+        .replace("{items}", &items);
     let resp = chat_complete(
         &state.http,
         &profile,
         &[
             ChatMessage {
                 role: "system".into(),
-                content: "You explain technical terms for an academic reading workspace.".into(),
+                content: crate::ai::prompts::EXPLAIN_TERMS_SYSTEM.into(),
             },
             ChatMessage {
                 role: "user".into(),
@@ -852,25 +851,7 @@ fn truncate(text: &str, max_chars: usize) -> String {
 }
 
 fn parse_json_lenient(raw: &str) -> serde_json::Value {
-    let trimmed = raw.trim();
-    let body = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```"))
-        .unwrap_or(trimmed)
-        .trim_start_matches('\n')
-        .trim_end_matches("```")
-        .trim();
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
-        return value;
-    }
-    if let (Some(start), Some(end)) = (body.find('{'), body.rfind('}')) {
-        if start < end {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&body[start..=end]) {
-                return value;
-            }
-        }
-    }
-    serde_json::json!({})
+    crate::ai::json_utils::parse_lenient_value(raw)
 }
 
 fn definitions_array(value: &serde_json::Value) -> Option<&Vec<serde_json::Value>> {
