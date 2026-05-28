@@ -1,11 +1,22 @@
 //! LLM profile + config persistence.
 //!
 //! Stored at `<library_root>/litera.config.json`. The format is intentionally
-//! plain so users can hand-edit it.
+//! plain so users can hand-edit it. **Secrets are not stored in the JSON.**
+//! `api_key` is pushed to the OS keychain via [`crate::secret`] on save and
+//! lazily pulled back on load — the JSON file only ever sees an empty string
+//! for the api_key field, so accidentally syncing this file (WebDAV, dotfile
+//! repo) cannot leak credentials.
+//!
+//! Old configs that pre-date this change still load: when we see a non-empty
+//! api_key during load, we migrate it to the keychain on the fly and rewrite
+//! the JSON without the secret. If the keychain isn't available (headless
+//! Linux without Secret Service, broken DBus, etc.) we leave the key in JSON
+//! and log a warning so the app remains usable.
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::secret;
 use crate::storage::LibraryPaths;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,8 +152,49 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
         return Ok(LlmConfig::default());
     }
     let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
-    let cfg: LlmConfig =
+    let mut cfg: LlmConfig =
         serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    let mut migrated = false;
+    for profile in &mut cfg.profiles {
+        if profile.api_key.is_empty() {
+            // No secret in JSON — fetch from keychain. Failure is non-fatal:
+            // the user just gets a "missing api key" error from the LLM call.
+            match secret::get(&secret::llm_account(&profile.name)) {
+                Ok(Some(key)) => profile.api_key = key,
+                Ok(None) => {}
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    profile = %profile.name,
+                    "keychain read failed; profile will use whatever api_key is in JSON"
+                ),
+            }
+        } else {
+            // Legacy plaintext config — migrate to keychain on first load and
+            // rewrite the JSON to scrub the secret out. If push fails, we keep
+            // the JSON as-is so the user doesn't get locked out.
+            match secret::put(&secret::llm_account(&profile.name), &profile.api_key) {
+                Ok(()) => migrated = true,
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    profile = %profile.name,
+                    "keychain migration failed; leaving api_key in JSON"
+                ),
+            }
+        }
+    }
+    if migrated {
+        let mut sanitized = cfg.clone();
+        for p in &mut sanitized.profiles {
+            p.api_key.clear();
+        }
+        if let Ok(body) = serde_json::to_vec_pretty(&sanitized) {
+            if let Err(e) = std::fs::write(&path, body) {
+                tracing::warn!(error = %e, path = %path.display(), "rewriting sanitized config failed");
+            } else {
+                tracing::info!("migrated LLM api_keys from JSON to OS keychain");
+            }
+        }
+    }
     Ok(cfg)
 }
 
@@ -151,7 +203,25 @@ pub fn save_config(paths: &LibraryPaths, cfg: &LlmConfig) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let body = serde_json::to_vec_pretty(cfg)?;
+    let mut to_persist = cfg.clone();
+    for profile in &mut to_persist.profiles {
+        if profile.api_key.is_empty() {
+            // Empty api_key on save means "keep whatever's in the keychain".
+            // We deliberately do not delete the keychain entry — the UI sends
+            // back a blank field when the user only edits chat_model, and
+            // we'd clobber their key.
+            continue;
+        }
+        match secret::put(&secret::llm_account(&profile.name), &profile.api_key) {
+            Ok(()) => profile.api_key.clear(),
+            Err(e) => tracing::warn!(
+                error = %e,
+                profile = %profile.name,
+                "keychain put failed; api_key will be written to JSON as a fallback"
+            ),
+        }
+    }
+    let body = serde_json::to_vec_pretty(&to_persist)?;
     std::fs::write(&path, body)?;
     Ok(())
 }

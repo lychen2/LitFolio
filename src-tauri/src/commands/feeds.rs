@@ -36,7 +36,7 @@ pub async fn feed_add(
     if url.is_empty() {
         return Err("feed URL is required".into());
     }
-    let fetched = fetch_feed(&state.http, &url, None, None)
+    let fetched = fetch_feed(&state.http_external, &url, None, None)
         .await
         .map_err(|e| e.to_string())?;
     let title = fetched
@@ -86,7 +86,7 @@ pub async fn feed_refresh(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "feed not found".to_string())?;
     let fetched_result = fetch_feed(
-        &state.http,
+        &state.http_external,
         &feed.url,
         feed.etag.as_deref(),
         feed.last_modified.as_deref(),

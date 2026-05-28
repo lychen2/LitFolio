@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { open as openInSystem } from "@tauri-apps/plugin-shell";
 
 export interface Paper {
   id: string;
@@ -988,8 +987,4 @@ export async function pickSinglePdf(): Promise<string | null> {
   });
   if (!sel) return null;
   return Array.isArray(sel) ? sel[0] : sel;
-}
-
-export async function openPdfInSystem(path: string): Promise<void> {
-  await openInSystem(path);
 }

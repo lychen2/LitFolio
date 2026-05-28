@@ -422,12 +422,21 @@ pub async fn import_pdf_files(
     let mut failed = Vec::new();
     for p in paths {
         let path = PathBuf::from(&p);
+        // Validate before launching the blocking task: rejects /etc/passwd,
+        // non-PDFs, files renamed to look like PDFs, and sources that already
+        // live inside the library. We pass the canonical source onward.
+        let canon_source = match library.validate_external_pdf(&path) {
+            Ok(c) => c,
+            Err(e) => {
+                failed.push(PdfFailure { path: p, error: e.to_string() });
+                continue;
+            }
+        };
         let paper_id = Ulid::new().to_string();
         let library_clone = library.clone();
-        let path_clone = path.clone();
         let id_clone = paper_id.clone();
         let result = tokio::task::spawn_blocking(move || {
-            import_pdf_file(&path_clone, &id_clone, &library_clone)
+            import_pdf_file(&canon_source, &id_clone, &library_clone)
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -843,29 +852,66 @@ pub async fn arxiv_add_draft(
     Ok(paper)
 }
 
+/// Maximum PDF download size. arXiv preprints typically run 1-20 MB; the long
+/// tail of high-resolution scans tops out around 100 MB. Anything beyond 200 MB
+/// is almost certainly an attacker streaming junk to OOM the host or a
+/// misconfigured server pumping HTML/zip — either way we'd rather fail fast
+/// than buffer a multi-gigabyte response.
+pub(crate) const PDF_DOWNLOAD_MAX_BYTES: usize = 200 * 1024 * 1024;
+
 pub(crate) async fn download_pdf(
     http: &reqwest::Client,
     url: &str,
     dest: &std::path::Path,
 ) -> anyhow::Result<u64> {
     use std::io::Write;
-    let resp = http.get(url).send().await?;
+    let mut resp = http.get(url).send().await?;
     if !resp.status().is_success() {
         anyhow::bail!("PDF download returned {}", resp.status());
     }
-    let bytes = resp.bytes().await?;
-    if bytes.len() < 1024 {
+    if let Some(ct) = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+    {
+        let lc = ct.to_ascii_lowercase();
+        let acceptable = lc.starts_with("application/pdf")
+            || lc.starts_with("application/octet-stream")
+            || lc.starts_with("binary/octet-stream");
+        if !acceptable {
+            anyhow::bail!("expected PDF, server returned Content-Type {ct}");
+        }
+    }
+    // Pre-allocate based on Content-Length when present, but never trust it past the cap.
+    let hint = resp
+        .content_length()
+        .map(|n| n.min(PDF_DOWNLOAD_MAX_BYTES as u64) as usize)
+        .unwrap_or(64 * 1024);
+    let mut buf: Vec<u8> = Vec::with_capacity(hint);
+    while let Some(chunk) = resp.chunk().await? {
+        if buf.len().saturating_add(chunk.len()) > PDF_DOWNLOAD_MAX_BYTES {
+            anyhow::bail!(
+                "PDF exceeds {} MB hard cap",
+                PDF_DOWNLOAD_MAX_BYTES / (1024 * 1024)
+            );
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    if buf.len() < 1024 {
         anyhow::bail!(
             "PDF response too small ({} bytes), likely not a valid PDF",
-            bytes.len()
+            buf.len()
         );
+    }
+    if &buf[..5] != b"%PDF-" {
+        anyhow::bail!("response does not look like a PDF (missing %PDF- header)");
     }
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let mut f = std::fs::File::create(dest)?;
-    f.write_all(&bytes)?;
-    Ok(bytes.len() as u64)
+    f.write_all(&buf)?;
+    Ok(buf.len() as u64)
 }
 
 #[tauri::command]
@@ -890,7 +936,7 @@ pub async fn arxiv_add_with_pdf(
     let pdf_url = format!("https://arxiv.org/pdf/{stripped}.pdf");
     let paper_id = Ulid::new().to_string();
     let pdf_path = state.paths.paper_dir(&paper_id).join("original.pdf");
-    download_pdf(&state.http, &pdf_url, &pdf_path)
+    download_pdf(&state.http_external, &pdf_url, &pdf_path)
         .await
         .map_err(|e| format!("failed to download arXiv PDF: {e}"))?;
     let mut paper = draft.into_paper();
@@ -932,12 +978,16 @@ pub async fn paper_save_with_pdf(
     draft: PaperDraft,
     source_pdf_path: String,
 ) -> Result<Paper, String> {
+    let canon_source = state
+        .paths
+        .validate_external_pdf(Path::new(&source_pdf_path))
+        .map_err(|e| format!("拒绝导入: {e}"))?;
     let paper_id = Ulid::new().to_string();
     let dest = state.paths.paper_dir(&paper_id).join("original.pdf");
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::copy(&source_pdf_path, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    std::fs::copy(&canon_source, &dest).map_err(|e| format!("copy PDF: {e}"))?;
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(dest.display().to_string());
@@ -959,11 +1009,15 @@ pub async fn paper_attach_pdf(
     if repo.get(&id).await.map_err(|e| e.to_string())?.is_none() {
         return Err(format!("paper {id} not found"));
     }
+    let canon_source = state
+        .paths
+        .validate_external_pdf(Path::new(&source_pdf_path))
+        .map_err(|e| format!("拒绝绑定: {e}"))?;
     let dest = state.paths.paper_dir(&id).join("original.pdf");
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create paper dir: {e}"))?;
     }
-    std::fs::copy(&source_pdf_path, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    std::fs::copy(&canon_source, &dest).map_err(|e| format!("copy PDF: {e}"))?;
     let dest_str = dest.display().to_string();
     repo.update_pdf_path(&id, &dest_str)
         .await
