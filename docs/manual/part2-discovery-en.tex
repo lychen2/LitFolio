@@ -346,16 +346,18 @@ The entire process has four steps:
     results are merged by paper\_id. The sorting rule during merging is: \textbf{number of matched
     terms} (papers matched by more search terms rank higher) $>$ descending year $>$ descending
     import time. This way, papers that are "relevant from multiple semantic angles" take priority
-    over papers that score high on only one term. If all expanded queries return empty, a fallback
-    FTS5 search using the original question is performed.
+    over papers that score high on only one term. If all expanded queries return empty, a
+    \textbf{degraded search chain} kicks in: raw question AND search $\rightarrow$ all-term OR
+    fuzzy matching $\rightarrow$ CJK keyword split fuzzy search $\rightarrow$ final fallback to
+    recent library papers, ensuring the LLM always has some context to work with.
   \item \textbf{Evidence Assembly}---Each recalled paper is compressed into a snippet of no more
     than 1800 characters, assembled by priority: TL;DR $\to$ Abstract $\to$ Problem $\to$ Method
     $\to$ Comparison $\to$ Limitations $\to$ Key Findings $\to$ User highlights (up to 3, each 240
     characters). All snippets combined do not exceed 14,000 characters; excess is truncated.
   \item \textbf{LLM Answer}---The system prompt enforces: answer only based on the provided
-    evidence, annotate each fact with a \cmd{[N]} citation reference, explicitly state "no relevant
-    literature found" when evidence is insufficient rather than guessing, and reply in Chinese. If
-    the retrieval results are empty, a fixed prompt message is returned without calling the LLM.
+    evidence, annotate each fact with a \cmd{[N]} citation reference; when retrieved papers are
+    not directly relevant, the LLM honestly states "these papers do not directly address your
+    question." Answers are rendered in rich Markdown format (bold, italic, lists, headings).
 \end{enumerate}
 
 \section{Multi-Turn Chat Interface}
@@ -453,11 +455,12 @@ terms, answer, and evidence sources}. This note is synced along with the library
 sync.
 
 \begin{tipbox}
-RAG answer quality depends directly on your library's coverage---if there are no relevant papers
-in your library, the answer will honestly state "no obviously relevant literature found." This is
-a \textbf{feature}: it will not fabricate references to papers you have not read. In multi-turn
-conversations, if the first turn finds no literature, subsequent follow-ups will not fabricate
-references either.
+LitFolio uses a \textbf{degraded search} strategy——first rewrites the question to precise English
+terms for AND matching, then falls back to raw question search, OR fuzzy matching, CJK keyword
+splitting, and finally recent library papers. This means the answer \textbf{always has some papers
+to work with}. If the retrieved papers are not directly relevant, the LLM honestly states they
+do not address your question rather than fabricating connections. In multi-turn conversations,
+follow-ups work from the same retrieved context.
 \end{tipbox}
 
 % =====================================================================
