@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
-            bundles: "--bundles deb,rpm"
+            bundles: "--bundles deb,rpm,appimage"
           - platform: windows-2025
             bundles: "--bundles nsis,msi"
 
@@ -49,6 +49,11 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libfuse2 \
             libssl-dev
 
       - name: Install frontend dependencies
