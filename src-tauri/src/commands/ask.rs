@@ -97,6 +97,38 @@ pub async fn library_ask(
             used_terms.push(trimmed.clone());
         }
     }
+    if papers.is_empty() && !expanded_terms.is_empty() {
+        // Raw question also missed — try broad OR search across all term words.
+        let all_words = expanded_terms.join(" ");
+        let or_hits = repo
+            .search_or(&all_words, source_limit)
+            .await
+            .unwrap_or_default();
+        if !or_hits.is_empty() {
+            papers = or_hits;
+        }
+    }
+    if papers.is_empty() {
+        // All exact searches missed — try fuzzy by splitting the question into
+        // short phrases (for Chinese: strip stop words, split on grammar particles).
+        let fuzzy = fuzzy_phrases(&trimmed);
+        if !fuzzy.is_empty() {
+            let fuzzy_hits = repo
+                .search_or(&fuzzy.join(" "), source_limit)
+                .await
+                .unwrap_or_default();
+            if !fuzzy_hits.is_empty() {
+                papers = fuzzy_hits;
+            }
+        }
+    }
+    if papers.is_empty() {
+        // Last resort: return recent papers so the LLM has something to work with.
+        papers = repo
+            .list_recent(source_limit)
+            .await
+            .unwrap_or_default();
+    }
     if papers.is_empty() {
         return Ok(empty_result(used_terms));
     }
@@ -258,6 +290,41 @@ fn write_source(out: &mut String, index: usize, source: &AskSource) {
     out.push_str("```text\n");
     out.push_str(source.snippet.trim());
     out.push_str("\n```\n\n");
+}
+
+/// Split a Chinese question into meaningful keyword phrases by stripping
+/// common grammar particles and stop words. Used as a last-ditch fuzzy
+/// search when the exact AND/OR strategies miss.
+fn fuzzy_phrases(question: &str) -> Vec<String> {
+    let stop: &[char] = &[
+        '的', '是', '了', '在', '和', '与', '及', '对', '把', '被', '从',
+        '而', '且', '但', '或', '也', '都', '就', '着', '过', '之',
+        '不', '要', '会', '能', '可', '以', '到', '为', '上', '中', '下',
+        '有', '来', '去', '说', '想', '看', '用', '这', '那', '哪',
+        '呢', '吗', '啊', '吧', '么', '嘛', '呀', '哦',
+        '？', '？', '，', '。', '！', '：', '；', '“', '”', '（', '）',
+        '、', '《', '》', '…', '—', ' ', '\t', '\n', '\r',
+    ];
+    let mut phrases = Vec::new();
+    let mut current = String::new();
+    for ch in question.chars() {
+        if stop.contains(&ch) {
+            let trimmed = current.trim();
+            if !trimmed.is_empty() {
+                phrases.push(trimmed.to_string());
+            }
+            current = String::new();
+        } else {
+            current.push(ch);
+        }
+    }
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        phrases.push(trimmed.to_string());
+    }
+    // Keep only phrases with ≥2 meaningful characters
+    phrases.retain(|p| p.chars().filter(|c| !c.is_ascii_whitespace()).count() >= 2);
+    phrases
 }
 
 #[cfg(test)]

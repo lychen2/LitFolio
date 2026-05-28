@@ -171,7 +171,7 @@ async fn translate_selection(
 ) -> Result<ReaderTranslateResult> {
     let glossary = format_glossary(terms);
     let user_content = format!(
-        "Target language: {target_lang}\nPaper title: {}\n\nSelection:\n{}\n\nGlossary:\n{}\n\nReturn ONLY JSON: {{\"translation\": \"...\"}}.\nRules:\n- Translate faithfully.\n- Keep every glossary term in English and wrap it as Term〔中文释义〕 on first mention.\n- Keep acronyms and terminology consistent.\n- Do not summarize or omit technical detail.",
+        "Target language: {target_lang}\nPaper title: {}\n\nSelection:\n{}\n\nGlossary:\n{}\n\nOutput exactly this JSON and nothing else:\n{{\"translation\": \"...\"}}\nReplace ... with your translation. No markdown, no explanation.",
         paper.title, selection, glossary
     );
     let resp = chat_complete(
@@ -189,8 +189,13 @@ async fn translate_selection(
         ],
     )
     .await?;
+    let translation = parse_translation(&resp.content);
+    if translation.trim().is_empty() {
+        let snippet: String = resp.content.trim().chars().take(120).collect();
+        return Err(anyhow!("empty translation — model returned {} chars: {snippet}", resp.content.trim().chars().count()));
+    }
     Ok(ReaderTranslateResult {
-        translation: parse_translation(&resp.content),
+        translation,
         terms: terms.to_vec(),
         model: resp.model,
         prompt_tokens: resp.prompt_tokens,
@@ -210,7 +215,7 @@ async fn summarize_highlight(
     selection: &str,
 ) -> Result<HighlightSummaryResult> {
     let user_content = format!(
-        "Paper title: {}\n\nHighlighted passage:\n{}\n\nReturn ONLY JSON: {{\"summary\": \"...\"}}.\nRules:\n- Write exactly one sentence in Chinese.\n- Keep the sentence under 36 Chinese characters when possible.\n- Capture the main claim, method, or result of this passage.\n- Do not add facts not present in the passage.",
+        "Paper title: {}\n\nHighlighted passage:\n{}\n\nOutput exactly this JSON and nothing else:\n{{\"summary\": \"...\"}}\nReplace ... with one Chinese sentence (≤36 chars), capturing the main claim. No markdown, no explanation.",
         paper.title, selection
     );
     let resp = chat_complete(
@@ -252,12 +257,42 @@ fn format_glossary(terms: &[TermInsight]) -> String {
 
 fn parse_translation(raw: &str) -> String {
     let parsed = parse_json_lenient(raw);
-    parsed
-        .get("translation")
-        .and_then(|value| value.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string()
+    if let Some(value) = parsed.get("translation").and_then(|v| v.as_str()) {
+        let t = value.trim();
+        if let Some(filtered) = filter_placeholder(t) {
+            return filtered.to_string();
+        }
+    }
+    // JSON extraction failed — try raw text fallback.
+    let body = strip_code_fence(raw.trim());
+    let fallback = body
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or(body)
+        .trim();
+    if let Some(filtered) = filter_placeholder(fallback) {
+        return filtered.to_string();
+    }
+    String::new()
+}
+
+/// Reject text that looks like the model echoed the prompt template.
+fn filter_placeholder(s: &str) -> Option<&str> {
+    let lower = s.to_lowercase();
+    // Generic placeholders the model might echo verbatim.
+    for skip in &["...", "…"] {
+        if lower == *skip {
+            return None;
+        }
+    }
+    if lower.contains("put the") || lower.contains("replace") {
+        return None;
+    }
+    if s.chars().count() <= 3 && !s.chars().any(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    Some(s)
 }
 
 fn parse_json_lenient(raw: &str) -> serde_json::Value {
@@ -266,8 +301,8 @@ fn parse_json_lenient(raw: &str) -> serde_json::Value {
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
         return value;
     }
-    if let (Some(start), Some(end)) = (body.find('{'), body.rfind('}')) {
-        if start < end {
+    if let Some(end) = body.rfind('}') {
+        if let Some(start) = body[..end].rfind('{') {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&body[start..=end]) {
                 return value;
             }

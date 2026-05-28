@@ -177,9 +177,9 @@ function ProfilesTab({
         </div>
       ) : (
         <ul className="space-y-3 litera-stagger">
-          {draft.profiles.map((p) => (
+          {draft.profiles.map((p, i) => (
             <ProfileCard
-              key={p.name}
+              key={`profile-${i}`}
               profile={p}
               isActive={draft.active === p.name}
               onChange={(np, oldName) => onUpsert(np, oldName)}

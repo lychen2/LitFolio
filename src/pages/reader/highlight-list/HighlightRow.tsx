@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Languages, Loader2, MessageSquare, Trash2 } from "lucide-react";
 import { api, type Highlight } from "@/lib/api";
+import { errorMessage } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
 import { MIN_SUMMARY_CHARS, WESTERN_TEXT_STYLE } from "../HighlightList";
 
@@ -133,10 +134,10 @@ export function HighlightRow({
         />
       )}
       {summarize.error && (
-        <ErrorText message={(summarize.error as Error).message} />
+        <ErrorText message={errorMessage(summarize.error)} />
       )}
       {translate.error && (
-        <ErrorText message={(translate.error as Error).message} />
+        <ErrorText message={errorMessage(translate.error)} />
       )}
     </li>
   );
@@ -309,7 +310,7 @@ function ActionButton({
 function ErrorText({ message }: { message: string }) {
   return (
     <div className="mt-2 text-[11px] text-red-400/90 break-all">
-      ✕ {message}
+      ✕ {message || "Unknown error"}
     </div>
   );
 }
