@@ -7,6 +7,9 @@ export const zh = {
   "nav.ask": "提问",
   "nav.settings": "设置",
   "shell.footer": "",
+  "shell.showNav": "显示导航栏（鼠标移到最左侧）",
+  "shell.pinNav": "固定导航栏",
+  "shell.unpinNav": "自动隐藏导航栏",
 
   "common.open": "打开",
   "common.translate": "翻译",
