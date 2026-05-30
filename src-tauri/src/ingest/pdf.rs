@@ -146,6 +146,28 @@ fn first_page_text(doc: &lopdf::Document) -> Option<String> {
     doc.extract_text(&[*page_number]).ok()
 }
 
+/// Extract body text from every page of a PDF on disk. Used as a fallback
+/// when the higher-quality pdf.js extraction (saved as `text.txt` by the
+/// reader) is not yet available — e.g. the user has not opened this paper
+/// in the reader but wants a TLDR / QuickRead anyway.
+///
+/// Quality caveat: lopdf is much weaker than pdf.js on academic PDFs that
+/// use CMap-encoded fonts or subset font tables. Scanned image PDFs return
+/// empty. Caller should treat an empty Ok as "no body extractable".
+pub fn extract_full_text_from_path(pdf_path: &Path) -> Result<String> {
+    let bytes = std::fs::read(pdf_path).with_context(|| format!("read {}", pdf_path.display()))?;
+    let doc = lopdf::Document::load_mem(&bytes)
+        .with_context(|| format!("parse pdf {}", pdf_path.display()))?;
+    let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
+    if pages.is_empty() {
+        return Err(anyhow!("pdf has no pages: {}", pdf_path.display()));
+    }
+    let text = doc
+        .extract_text(&pages)
+        .with_context(|| format!("extract text from {}", pdf_path.display()))?;
+    Ok(text)
+}
+
 fn find_doi(text: &str) -> Option<String> {
     let re = regex::Regex::new(r"(?i)\b10\.\d{4,9}/[-._;()/:A-Z0-9]+").ok()?;
     re.find(text).map(|m| clean_doi_match(m.as_str()))

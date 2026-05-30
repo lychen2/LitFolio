@@ -6,8 +6,7 @@ use chrono::Utc;
 use std::path::{Path, PathBuf};
 
 use crate::storage::{
-    notes, HighlightRepo, LibraryPaths, Paper, PaperRepo, PaperTermRepo, TagRepo,
-    FolderRepo,
+    notes, FolderRepo, HighlightRepo, LibraryPaths, Paper, PaperRepo, PaperTermRepo, TagRepo,
 };
 
 /// Summary of an export run.
@@ -118,10 +117,7 @@ pub async fn export_paper_md(
     if !highlights.is_empty() {
         md.push_str("## Highlights\n\n");
         for h in &highlights {
-            md.push_str(&format!(
-                "- **p.{}** ({}): {}\n",
-                h.page, h.color, h.text
-            ));
+            md.push_str(&format!("- **p.{}** ({}): {}\n", h.page, h.color, h.text));
             if let Some(ref note) = h.note {
                 if !note.is_empty() {
                     md.push_str(&format!("  - Note: {}\n", note));
@@ -135,10 +131,7 @@ pub async fn export_paper_md(
     if !terms.is_empty() {
         md.push_str("## Terms\n\n");
         for t in &terms {
-            md.push_str(&format!(
-                "- **[[{}]]**: {}\n",
-                t.term, t.local_definition
-            ));
+            md.push_str(&format!("- **[[{}]]**: {}\n", t.term, t.local_definition));
             if !t.local_evidence.is_empty() {
                 md.push_str(&format!("  - Evidence: {}\n", t.local_evidence));
             }
@@ -151,8 +144,7 @@ pub async fn export_paper_md(
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create export dir {}", parent.display()))?;
     }
-    std::fs::write(&out_path, &md)
-        .with_context(|| format!("write {}", out_path.display()))?;
+    std::fs::write(&out_path, &md).with_context(|| format!("write {}", out_path.display()))?;
 
     // Update last_exported_at.
     PaperRepo::new(pool)

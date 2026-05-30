@@ -34,7 +34,10 @@ pub async fn build_term_insights(
     paper: &Paper,
     selection: &str,
 ) -> Result<Vec<TermInsight>> {
-    let terms = match_terms(selection, &term_repo.list_by_paper(&paper.id).await.unwrap_or_default());
+    let terms = match_terms(
+        selection,
+        &term_repo.list_by_paper(&paper.id).await.unwrap_or_default(),
+    );
     let terms = if terms.is_empty() {
         extract_terms(selection)
             .into_iter()
@@ -54,9 +57,9 @@ pub async fn build_term_insights(
             continue;
         }
         insights.push(TermInsight {
-            local_definition: term
-                .stored_definition()
-                .unwrap_or_else(|| derive_local_definition(&term_text, &local_evidence, linked_papers.first())),
+            local_definition: term.stored_definition().unwrap_or_else(|| {
+                derive_local_definition(&term_text, &local_evidence, linked_papers.first())
+            }),
             local_evidence,
             linked_papers,
             term: term_text,
@@ -110,8 +113,9 @@ fn extract_terms(selection: &str) -> Vec<String> {
     // patterns broad.
     let acronym_re = Regex::new(r"\b[A-Z][A-Z0-9-]{1,}\b").expect("valid acronym regex");
     let title_re = Regex::new(r"\b[A-Z][a-z]{3,}\b").expect("valid title regex");
-    let phrase_re = Regex::new(r"\b(?:[A-Z][a-z]+(?:[- ][A-Za-z0-9]+){0,3}|[a-z]+(?:[- ][a-z]+){1,3})\b")
-        .expect("valid phrase regex");
+    let phrase_re =
+        Regex::new(r"\b(?:[A-Z][a-z]+(?:[- ][A-Za-z0-9]+){0,3}|[a-z]+(?:[- ][a-z]+){1,3})\b")
+            .expect("valid phrase regex");
     let mut seen = BTreeSet::new();
     for cap in acronym_re.find_iter(selection) {
         push_term(&mut seen, cap.as_str());
@@ -216,7 +220,10 @@ fn derive_local_definition(term: &str, evidence: &str, linked: Option<&LinkedPap
         return format!("当前论文在这段上下文里把 {term} 放在该论证链中使用。");
     }
     if let Some(paper) = linked {
-        return format!("{term} 在库内其他论文中也出现过，可从「{}」继续回看。", paper.title);
+        return format!(
+            "{term} 在库内其他论文中也出现过，可从「{}」继续回看。",
+            paper.title
+        );
     }
     format!("{term} 是本次选段中的关键术语。")
 }
@@ -249,7 +256,8 @@ mod tests {
 
     #[test]
     fn extracts_terms_from_selection() {
-        let terms = extract_terms("We compare Transformer encoders with CNN baselines on ImageNet.");
+        let terms =
+            extract_terms("We compare Transformer encoders with CNN baselines on ImageNet.");
         assert!(terms.iter().any(|term| term == "Transformer"));
         assert!(terms.iter().any(|term| term == "CNN"));
     }

@@ -26,9 +26,36 @@ pub struct QuickReadResult {
     pub completion_tokens: u32,
 }
 
-const TLDR_SYSTEM: &str = "You are a research assistant. Read the supplied paper metadata (title, authors, abstract) and produce a JSON object with these exact fields:\n\n{\n  \"tldr\": \"one sentence (<=40 words) capturing the paper's main contribution\",\n  \"key_findings\": [\"3 to 5 short bullets, each <=20 words\"]\n}\n\nReturn ONLY the JSON, no prose. Use the requested output language.";
+const TLDR_SYSTEM: &str = "You are a research assistant. Read the supplied paper (title, authors, abstract, and — when present — a head+tail excerpt of the full PDF body) and produce a JSON object with these exact fields:\n\n{\n  \"tldr\": \"one sentence (<=40 words) capturing the paper's main contribution\",\n  \"key_findings\": [\"3 to 5 short bullets, each <=20 words\"]\n}\n\nWhen body text is provided, ground every claim in it; the body may be truncated, so do not assume you saw the entire paper. Return ONLY the JSON, no prose. Use the requested output language.";
 
-const QUICKREAD_SYSTEM: &str = "You are a senior researcher reviewing a paper for a colleague who wants to decide whether to read it in depth. Read the supplied paper metadata (title, authors, abstract) and produce a JSON object that explains the paper's contribution and limits.\n\nFields (use plain prose paragraphs, NOT bullet lists, each 2-4 sentences):\n\n{\n  \"problem\":      \"What problem does the paper try to solve? Why is it hard or important? Be concrete.\",\n  \"method\":       \"What did the authors propose to solve it? Name the core technique, dataset, key design choices.\",\n  \"comparison\":   \"How is this different from prior or competing approaches? What advantage do the authors claim? Cite the prior approach by name if known.\",\n  \"limitations\":  \"What did the paper NOT solve, or what gaps remain to fully solve the problem? Include weaknesses the authors admit AND ones a critical reader would raise.\"\n}\n\nUse the requested output language for every field. Return ONLY the JSON object, no markdown fence, no prose around it.";
+const QUICKREAD_SYSTEM: &str = "You are a senior researcher reviewing a paper for a colleague who wants to decide whether to read it in depth. Read the supplied paper (title, authors, abstract, and — when present — a head+tail excerpt of the full PDF body) and produce a JSON object that explains the paper's contribution and limits.\n\nFields (use plain prose paragraphs, NOT bullet lists, each 2-4 sentences):\n\n{\n  \"problem\":      \"What problem does the paper try to solve? Why is it hard or important? Be concrete.\",\n  \"method\":       \"What did the authors propose to solve it? Name the core technique, dataset, key design choices.\",\n  \"comparison\":   \"How is this different from prior or competing approaches? What advantage do the authors claim? Cite the prior approach by name if known.\",\n  \"limitations\":  \"What did the paper NOT solve, or what gaps remain to fully solve the problem? Include weaknesses the authors admit AND ones a critical reader would raise.\"\n}\n\nWhen body text is provided, prefer evidence from it over speculation; the body may be truncated, so do not invent details about sections you cannot see. Use the requested output language for every field. Return ONLY the JSON object, no markdown fence, no prose around it.";
+
+/// Character budget for PDF body text sent to the LLM. Large enough to fit
+/// a typical research paper (~10–20k tokens once the abstract and metadata
+/// are accounted for), small enough to leave room for the system prompt
+/// and JSON output without blowing past 32k-context model windows.
+pub const PDF_BODY_BUDGET_CHARS: usize = 60_000;
+
+/// Truncate body text to roughly `PDF_BODY_BUDGET_CHARS` codepoints,
+/// keeping the head (intro + method) and tail (conclusion + limitations)
+/// while dropping the middle. Returns the original string unchanged when
+/// it already fits — the fast path avoids the O(n) `chars().count()` walk
+/// since UTF-8 char count is bounded above by byte length.
+pub fn fit_pdf_body(text: &str) -> String {
+    if text.len() <= PDF_BODY_BUDGET_CHARS {
+        return text.to_string();
+    }
+    let total = text.chars().count();
+    if total <= PDF_BODY_BUDGET_CHARS {
+        return text.to_string();
+    }
+    let head_chars = (PDF_BODY_BUDGET_CHARS * 7) / 10;
+    let tail_chars = PDF_BODY_BUDGET_CHARS - head_chars;
+    let head: String = text.chars().take(head_chars).collect();
+    let tail: String = text.chars().skip(total - tail_chars).collect();
+    let omitted = total - head_chars - tail_chars;
+    format!("{head}\n\n[... {omitted} characters truncated ...]\n\n{tail}")
+}
 
 pub async fn summarize_paper_text(
     client: &reqwest::Client,
@@ -38,6 +65,7 @@ pub async fn summarize_paper_text(
     venue: Option<&str>,
     year: Option<i32>,
     abstract_text: Option<&str>,
+    body_text: Option<&str>,
     extra_context: Option<&str>,
     output_language: &str,
 ) -> Result<TldrResult> {
@@ -47,6 +75,7 @@ pub async fn summarize_paper_text(
         venue,
         year,
         abstract_text,
+        body_text,
         extra_context,
         output_language,
     );
@@ -99,6 +128,7 @@ pub async fn quick_read_paper_text(
     venue: Option<&str>,
     year: Option<i32>,
     abstract_text: Option<&str>,
+    body_text: Option<&str>,
     extra_context: Option<&str>,
     output_language: &str,
 ) -> Result<QuickReadResult> {
@@ -108,6 +138,7 @@ pub async fn quick_read_paper_text(
         venue,
         year,
         abstract_text,
+        body_text,
         extra_context,
         output_language,
     );
@@ -164,6 +195,7 @@ fn format_user_prompt(
     venue: Option<&str>,
     year: Option<i32>,
     abstract_text: Option<&str>,
+    body_text: Option<&str>,
     extra: Option<&str>,
     output_language: &str,
 ) -> String {
@@ -189,6 +221,11 @@ fn format_user_prompt(
         s.push_str(a);
     } else {
         s.push_str("\n(No abstract available; infer from title.)");
+    }
+    if let Some(body) = body_text.map(str::trim).filter(|b| !b.is_empty()) {
+        let fitted = fit_pdf_body(body);
+        s.push_str("\n\nFull text (extracted from PDF; may be a head+tail excerpt if the paper was long):\n");
+        s.push_str(&fitted);
     }
     if let Some(e) = extra {
         s.push_str("\n\nAdditional context:\n");
@@ -259,5 +296,58 @@ mod tests {
         let raw = "Sure, here you go:\n{\"problem\":\"yes\"}\nThanks!";
         let v = parse_json_lenient(raw);
         assert_eq!(v["problem"], "yes");
+    }
+
+    #[test]
+    fn fit_pdf_body_passes_short_text_through_unchanged() {
+        let short = "abc".repeat(100);
+        assert_eq!(fit_pdf_body(&short), short);
+    }
+
+    #[test]
+    fn fit_pdf_body_truncates_with_head_and_tail() {
+        let total = PDF_BODY_BUDGET_CHARS * 2;
+        let body: String = (0..total)
+            .map(|i| (b'a' + (i % 26) as u8) as char)
+            .collect();
+        let fitted = fit_pdf_body(&body);
+        // Truncated output must be shorter than input (large enough margin to
+        // accommodate the marker text) and must contain the truncation marker.
+        assert!(fitted.chars().count() < total);
+        assert!(fitted.contains("truncated"));
+        // First few chars should match the original head; last few should
+        // match the original tail — proves we kept both ends, not the middle.
+        let original_head: String = body.chars().take(50).collect();
+        let original_tail: String = body
+            .chars()
+            .rev()
+            .take(50)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
+        assert!(fitted.starts_with(&original_head));
+        assert!(fitted.ends_with(&original_tail));
+    }
+
+    #[test]
+    fn fit_pdf_body_handles_multibyte_chars_without_panicking() {
+        // PDF_BODY_BUDGET_CHARS + 100 Chinese characters = 3× bytes, exceeds
+        // both the byte fast-path AND the char budget — must truncate, must
+        // not panic at UTF-8 boundaries.
+        let body: String = "字".repeat(PDF_BODY_BUDGET_CHARS + 100);
+        let fitted = fit_pdf_body(&body);
+        assert!(fitted.chars().count() < body.chars().count());
+        assert!(fitted.contains("truncated"));
+    }
+
+    #[test]
+    fn fit_pdf_body_keeps_input_when_bytes_exceed_budget_but_chars_do_not() {
+        // 30k Chinese chars = 90k bytes (over the byte fast-path) but only
+        // 30k codepoints — well under the 60k char budget. The function
+        // should fall back to the char-count check and return unchanged.
+        let body: String = "字".repeat(PDF_BODY_BUDGET_CHARS / 2);
+        let fitted = fit_pdf_body(&body);
+        assert_eq!(fitted, body);
     }
 }

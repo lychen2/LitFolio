@@ -247,7 +247,11 @@ fn condition_to_sql(
     }
 }
 
-async fn execute_paper_query(pool: &Pool, where_clause: &str, params: &[String]) -> Result<Vec<Paper>> {
+async fn execute_paper_query(
+    pool: &Pool,
+    where_clause: &str,
+    params: &[String],
+) -> Result<Vec<Paper>> {
     // Build the full SQL dynamically. We need to bind params sequentially.
     let sql = format!(
         "SELECT p.id, p.title, p.authors_json, p.year, p.venue, p.doi, p.arxiv_id,

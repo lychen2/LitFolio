@@ -12,6 +12,7 @@ use ulid::Ulid;
 
 use super::db::Pool;
 use super::feed_defaults::DEFAULT_FEEDS;
+use crate::ingest::PaperDraft;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feed {
@@ -47,6 +48,9 @@ pub struct FeedItem {
     pub fetched_at: i64,
     pub seen: bool,
     pub imported_paper_id: Option<String>,
+    pub metadata: Option<PaperDraft>,
+    pub metadata_source: Option<String>,
+    pub metadata_checked_at: Option<i64>,
 }
 
 /// Parsed entry from feed-rs that the ingest layer hands to the repo.
@@ -216,6 +220,20 @@ impl<'a> FeedRepo<'a> {
         Ok((after - before).max(0) as usize)
     }
 
+    pub async fn get_item(&self, item_id: &str) -> Result<Option<FeedItem>> {
+        let row = sqlx::query(
+            "SELECT id, feed_id, entry_id, title, link, summary, authors_json,
+                    published_at, fetched_at, seen, imported_paper_id,
+                    metadata_json, metadata_source, metadata_checked_at
+             FROM feed_items WHERE id = ?1",
+        )
+        .bind(item_id)
+        .fetch_optional(self.pool)
+        .await
+        .context("get feed_item")?;
+        row.map(row_to_feed_item).transpose()
+    }
+
     pub async fn list_items(
         &self,
         feed_id: Option<i64>,
@@ -228,7 +246,8 @@ impl<'a> FeedRepo<'a> {
         // positional order on some sqlite + sqlx combinations.
         let mut sql = String::from(
             "SELECT id, feed_id, entry_id, title, link, summary, authors_json,
-                    published_at, fetched_at, seen, imported_paper_id
+                    published_at, fetched_at, seen, imported_paper_id,
+                    metadata_json, metadata_source, metadata_checked_at
              FROM feed_items",
         );
         let mut clauses: Vec<&'static str> = Vec::new();
@@ -251,6 +270,46 @@ impl<'a> FeedRepo<'a> {
         q = q.bind(limit).bind(offset);
         let rows = q.fetch_all(self.pool).await.context("list feed_items")?;
         rows.into_iter().map(row_to_feed_item).collect()
+    }
+
+    pub async fn list_unchecked_items(&self, limit: i64) -> Result<Vec<FeedItem>> {
+        let rows = sqlx::query(
+            "SELECT id, feed_id, entry_id, title, link, summary, authors_json,
+                    published_at, fetched_at, seen, imported_paper_id,
+                    metadata_json, metadata_source, metadata_checked_at
+             FROM feed_items
+             WHERE metadata_checked_at IS NULL
+             ORDER BY COALESCE(published_at, fetched_at) DESC
+             LIMIT ?1",
+        )
+        .bind(limit.clamp(1, 500))
+        .fetch_all(self.pool)
+        .await
+        .context("list unchecked feed metadata")?;
+        rows.into_iter().map(row_to_feed_item).collect()
+    }
+
+    pub async fn save_item_metadata(
+        &self,
+        item_id: &str,
+        metadata: Option<&PaperDraft>,
+        source: Option<&str>,
+    ) -> Result<()> {
+        let now = Utc::now().timestamp();
+        let metadata_json = metadata.map(serde_json::to_string).transpose()?;
+        sqlx::query(
+            "UPDATE feed_items
+             SET metadata_json = ?2, metadata_source = ?3, metadata_checked_at = ?4
+             WHERE id = ?1",
+        )
+        .bind(item_id)
+        .bind(metadata_json)
+        .bind(source)
+        .bind(now)
+        .execute(self.pool)
+        .await
+        .context("save feed item metadata")?;
+        Ok(())
     }
 
     pub async fn set_item_seen(&self, item_id: &str, seen: bool) -> Result<()> {
@@ -392,6 +451,8 @@ fn row_to_feed_item(row: sqlx::sqlite::SqliteRow) -> Result<FeedItem> {
     let authors_raw: String = row.try_get("authors_json")?;
     let authors: Vec<String> = serde_json::from_str(&authors_raw).unwrap_or_default();
     let seen: i64 = row.try_get("seen")?;
+    let metadata_raw: Option<String> = row.try_get("metadata_json").ok();
+    let metadata = metadata_raw.and_then(|raw| serde_json::from_str(&raw).ok());
     Ok(FeedItem {
         id: row.try_get("id")?,
         feed_id: row.try_get("feed_id")?,
@@ -404,6 +465,9 @@ fn row_to_feed_item(row: sqlx::sqlite::SqliteRow) -> Result<FeedItem> {
         fetched_at: row.try_get("fetched_at")?,
         seen: seen != 0,
         imported_paper_id: row.try_get("imported_paper_id").ok(),
+        metadata,
+        metadata_source: row.try_get("metadata_source").ok(),
+        metadata_checked_at: row.try_get("metadata_checked_at").ok(),
     })
 }
 
@@ -465,6 +529,12 @@ mod tests {
         // "First"'s 2023 unix ts), so "Second" sorts first.
         assert_eq!(entries[0].title, "Second");
         assert_eq!(entries[1].title, "First");
+
+        let fetched = repo.get_item(&entries[1].id).await.unwrap().unwrap();
+        assert_eq!(fetched.entry_id, "a");
+        assert_eq!(fetched.link.as_deref(), Some("https://example.com/a"));
+        assert!(fetched.summary.as_deref().unwrap_or_default().is_empty());
+        assert_eq!(fetched.authors, vec!["Alice"]);
 
         repo.set_item_seen(&entries[1].id, true).await.unwrap();
         let unread = repo.list_items(Some(feed.id), true, 10, 0).await.unwrap();

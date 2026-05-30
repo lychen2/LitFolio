@@ -1,22 +1,22 @@
-import { memo, useCallback, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { memo, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   LibraryBig, FileText, Sparkles, Loader2, BookOpen, X, Search,
   AlertTriangle, Wrench, Compass, Layers, Tag as TagIcon, Plus, Trash2,
-  Circle, CircleDot, CircleCheck, Star, Languages, Paperclip, RefreshCw, Clock,
+  Circle, CircleDot, CircleCheck, Star, Languages, Clock,
   PenLine,
 } from "lucide-react";
-import { api, pickSinglePdf, type Paper, type QuickReadResult, type ReadStatus } from "@/lib/api";
+import { api, type Paper, type QuickReadResult, type ReadStatus, type Tag } from "@/lib/api";
 import { FolderPicker } from "./library/FolderPicker";
 import { FolderSidebar } from "./library/FolderSidebar";
 import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
 import { ReadingQueue } from "./library/ReadingQueue";
+import { PaperActions } from "./library/PaperActions";
+import { usePaperActions } from "./library/usePaperActions";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { useI18n } from "@/i18n/I18nProvider";
-import { llmLanguageNameFor } from "@/i18n/dict";
-import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
+import { errorMessageOr } from "@/lib/error";
 
 const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread:  { labelKey: "common.unread",  icon: Circle,      tone: "text-litera-mute" },
@@ -39,13 +39,20 @@ export function LibraryPage() {
     queryKey: ["papers", "list", folderId, smartCollectionId, trimmed],
     queryFn: () => {
       if (smartCollectionId != null) return api.smartCollectionQueryPapers(smartCollectionId);
-      if (folderId != null) return api.papersInFolder(folderId, 500);
+      if (folderId != null) return api.papersInFolder(folderId, 500, trimmed || undefined);
       return trimmed ? api.papersSearch(trimmed, 200) : api.papersRecent(200);
     },
   });
-  const papers = (folderId == null && smartCollectionId == null) || !trimmed
+  const papers = smartCollectionId == null || !trimmed
     ? rawPapers
     : rawPapers?.filter((paper) => matchesPaper(paper, trimmed));
+  const paperIds = papers?.map((paper) => paper.id) ?? [];
+  const tagsQ = useQuery({
+    queryKey: ["paper-tags", "batch", paperIds],
+    queryFn: () => api.papersBatchTags(paperIds),
+    enabled: paperIds.length > 0,
+  });
+  const tagsByPaper = tagsQ.data ?? {};
 
   const [reading, setReading] = useState<Paper | null>(null);
   const [preview, setPreview] = useState<Paper | null>(null);
@@ -129,6 +136,7 @@ export function LibraryPage() {
           ) : (
             <VirtualPaperList
               papers={papers}
+              tagsByPaper={tagsByPaper}
               onInspect={setPreview}
               onQuickRead={setReading}
             />
@@ -204,9 +212,10 @@ function NoResults({ q }: { q: string }) {
 }
 
 function VirtualPaperList({
-  papers, onInspect, onQuickRead,
+  papers, tagsByPaper, onInspect, onQuickRead,
 }: {
   papers: Paper[];
+  tagsByPaper: Record<string, Tag[]>;
   onInspect: (p: Paper) => void;
   onQuickRead: (p: Paper) => void;
 }) {
@@ -238,6 +247,7 @@ function VirtualPaperList({
           >
             <PaperRow
               p={papers[vi.index]}
+              tags={tagsByPaper[papers[vi.index].id] ?? []}
               onInspect={onInspect}
               onQuickRead={onQuickRead}
             />
@@ -253,63 +263,16 @@ function VirtualPaperList({
 // row keeps its own react-query state; only papers whose `p` reference
 // actually changes will re-render.
 const PaperRow = memo(function PaperRow({
-  p, onInspect, onQuickRead,
+  p, tags, onInspect, onQuickRead,
 }: {
   p: Paper;
+  tags: Tag[];
   onInspect: (p: Paper) => void;
   onQuickRead: (p: Paper) => void;
 }) {
-  const qc = useQueryClient();
-  const { t, lang } = useI18n();
-  const rowRef = useRef<HTMLLIElement>(null);
-  const tldr = useMutation({
-    mutationFn: () => api.paperTldr(p.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
-  });
-  const translate = useMutation({
-    mutationFn: () => api.paperTranslate(p.id, llmLanguageNameFor(lang)),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
-      qc.invalidateQueries({ queryKey: ["paper", p.id] });
-    },
-  });
-  const attachPdf = useMutation({
-    mutationFn: async (sourcePath?: string) => {
-      const src = sourcePath ?? await pickSinglePdf();
-      if (!src) return null;
-      return api.paperAttachPdf(p.id, src);
-    },
-    onSuccess: (paper) => {
-      if (paper) {
-        qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
-        qc.invalidateQueries({ queryKey: ["paper", p.id] });
-      }
-    },
-  });
-  const del = useMutation({
-    mutationFn: () => api.paperDelete(p.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
-  });
-  const tagsQ = useQuery({
-    queryKey: ["paper-tags", p.id],
-    queryFn: () => api.paperTags(p.id),
-  });
-
-  const canOpenPdf = !!p.pdf_path;
-  const openMut = useMutation({ mutationFn: () => api.paperOpenPdf(p.id) });
-  const [confirming, setConfirming] = useState(false);
-  const handlePdfDrop = useCallback((paths: string[]) => {
-    const sourcePath = paths[0];
-    if (!sourcePath) return Promise.resolve();
-    return attachPdf.mutateAsync(sourcePath).then(() => undefined);
-  }, [attachPdf]);
-
-  usePdfDropTarget(rowRef, handlePdfDrop, !attachPdf.isPending);
-
-  function openPdf() {
-    if (!p.pdf_path) return;
-    openMut.mutate();
-  }
+  const { t } = useI18n();
+  const actions = usePaperActions(p);
+  const { rowRef, tldr, translate, attachPdf, del, openMut } = actions;
 
   return (
     <li ref={rowRef} className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
@@ -357,109 +320,10 @@ const PaperRow = memo(function PaperRow({
               <BookOpen className="h-3 w-3" /> {t("library.hasDeepRead")}
             </div>
           )}
-          <TagChipsRow paperId={p.id} tags={tagsQ.data ?? []} />
+          <TagChipsRow paperId={p.id} tags={tags} />
           <FolderPicker paperId={p.id} />
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-          {/* Primary row: Open/Attach + Read */}
-          <div className="flex items-center gap-1.5">
-            {canOpenPdf ? (
-              <button
-                onClick={openPdf}
-                disabled={openMut.isPending}
-                className="litera-btn text-xs whitespace-nowrap disabled:opacity-60"
-                title={t("library.openPdfTitle")}
-              >
-                {openMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                {t("library.openPdf")}
-              </button>
-            ) : (
-              <button
-                onClick={() => attachPdf.mutate(undefined)}
-                disabled={attachPdf.isPending}
-                className="litera-btn-primary text-xs whitespace-nowrap disabled:opacity-50"
-                title={t("library.attachPdfTitle")}
-              >
-                {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-                {t("library.attachPdf")}
-              </button>
-            )}
-            {canOpenPdf && (
-              <Link
-                to={`/reader/${p.id}`}
-                className="litera-btn text-xs whitespace-nowrap"
-                title={t("library.readPdfTitle")}
-              >
-                <BookOpen className="h-3.5 w-3.5" /> {t("library.readPdf")}
-              </Link>
-            )}
-          </div>
-          {/* Secondary row: compact icon-only buttons */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => translate.mutate()}
-              disabled={translate.isPending}
-              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
-              title={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
-            >
-              {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              onClick={() => tldr.mutate()}
-              disabled={tldr.isPending}
-              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
-              title={t("library.tldrTitle")}
-            >
-              {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              onClick={() => onQuickRead(p)}
-              className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel transition-colors"
-              title={t("library.deepReadTitle")}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-            </button>
-            {/* Hover-only actions */}
-            {canOpenPdf && (
-              <button
-                onClick={() => attachPdf.mutate(undefined)}
-                disabled={attachPdf.isPending}
-                className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={t("library.attachPdfTitle")}
-              >
-                {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              </button>
-            )}
-            {confirming ? (
-              <>
-                <button
-                  onClick={() => { setConfirming(false); del.mutate(); }}
-                  disabled={del.isPending}
-                  className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
-                  title={t("library.confirmDelete", { title: p.title, id: p.id })}
-                >
-                  {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                  {t("common.delete")}
-                </button>
-                <button
-                  onClick={() => setConfirming(false)}
-                  className="px-1.5 py-0.5 rounded text-[10px] text-litera-mute hover:text-litera-text"
-                >
-                  {t("common.cancel")}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setConfirming(true)}
-                disabled={del.isPending}
-                className="p-1.5 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={t("library.deleteTitle")}
-              >
-                {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              </button>
-            )}
-          </div>
-        </div>
+        <PaperActions p={p} actions={actions} onQuickRead={onQuickRead} />
       </div>
       {tldr.error && (
         <div className="ml-7 mt-1 text-xs text-red-400/90">✕ {(tldr.error as Error).message}</div>
@@ -699,7 +563,7 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
           {result && <ResultBody r={result} />}
           {m.error && (
             <div className="text-sm text-red-400/90 border border-red-400/30 rounded p-3">
-              ✕ {errorMessage(m.error, t("reader.unknownError"))}
+              ✕ {errorMessageOr(m.error, t("reader.unknownError"))}
             </div>
           )}
         </div>
@@ -708,11 +572,6 @@ function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void
   );
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  const message = String(error ?? "").trim();
-  return message || fallback;
-}
 
 function ResultBody({ r }: { r: QuickReadResult }) {
   const { t } = useI18n();

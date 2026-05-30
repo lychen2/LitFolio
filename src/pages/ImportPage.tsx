@@ -14,6 +14,7 @@ import { TabButton } from "@/components/TabButton";
 import { ImportSidebar } from "./import/ImportSidebar";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
+import { extractIdentifier } from "@/lib/identifier";
 
 type Tab = "pdf" | "arxiv_doi" | "search";
 
@@ -37,7 +38,7 @@ export function ImportPage() {
     title: params.get("title"),
     prefill: params.get("link") ? extractIdentifier(params.get("link")!) : null,
   };
-  const [tab, setTab] = useState<Tab>(source.prefill ? "arxiv_doi" : "arxiv_doi");
+  const [tab, setTab] = useState<Tab>(source.prefill ? "arxiv_doi" : "pdf");
 
   return (
     <section className="h-full flex flex-col">
@@ -116,18 +117,6 @@ function ImportSourceBanner({ source }: { source: ImportSource }) {
   );
 }
 
-/// Best-effort pull an arXiv ID or DOI out of the source link so the user
-/// doesn't have to paste it. Anything we don't recognise leaves the input
-/// blank and the user can type the identifier by hand.
-function extractIdentifier(url: string): string | null {
-  const arxiv = url.match(/arxiv\.org\/(?:abs|pdf|html|format)\/([\w\-./]+?)(?:v\d+)?(?:\.pdf)?(?:[?#].*)?$/i);
-  if (arxiv) return arxiv[1];
-  const doi = url.match(/doi\.org\/(10\.\d{4,9}\/[^\s?#]+)/i);
-  if (doi) return doi[1];
-  return null;
-}
-
-
 function LibraryStats() {
   const t = useT();
   const { data: count } = useQuery({ queryKey: ["papers", "count"], queryFn: api.papersCount });
@@ -166,6 +155,14 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
     }
   }
 
+  function applyDraft(nextDraft: ArxivDraft, kind?: "arxiv" | "doi" | null) {
+    setDraft(nextDraft);
+    setSourceKind(kind ?? (nextDraft.arxiv_id ? "arxiv" : nextDraft.doi ? "doi" : null));
+    setValue(nextDraft.arxiv_id ?? nextDraft.doi ?? value);
+    setError(null);
+    setSuccess(null);
+  }
+
   const fetchMeta = useMutation({
     mutationFn: async (v: string): Promise<{ draft: ArxivDraft; kind: "arxiv" | "doi" }> => {
       const looksArxiv = /^\d{4}\.\d{4,5}/.test(v) || v.toLowerCase().includes("arxiv");
@@ -181,25 +178,31 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
       }
       throw new Error(t("import.error.invalidId"));
     },
-    onSuccess: ({ draft, kind }) => {
-      setDraft(draft);
-      setSourceKind(kind);
-      setError(null);
-      setSuccess(null);
-    },
+    onSuccess: ({ draft, kind }) => applyDraft(draft, kind),
     onError: (e: Error) => setError(e.message),
   });
 
-  // Auto-fetch metadata when the page was opened with a prefilled ID (e.g.
-  // navigated in from a feed item). Pulling `mutate` out keeps the deps
-  // stable so eslint doesn't complain.
+  const prepareFeedDraft = useMutation({
+    mutationFn: (itemId: string) => api.feedItemPrepareDraft(itemId),
+    onSuccess: (preparedDraft) => applyDraft(preparedDraft),
+    onError: () => {
+      if (source.prefill) {
+        setValue(source.prefill);
+        fetchMeta.mutate(source.prefill);
+      }
+    },
+  });
+
+  const { mutate: prepareFeedDraftMutate } = prepareFeedDraft;
   const { mutate: fetchMetaMutate } = fetchMeta;
   useEffect(() => {
-    if (source.prefill) {
+    if (source.fromFeedItem) {
+      prepareFeedDraftMutate(source.fromFeedItem);
+    } else if (source.prefill) {
       setValue(source.prefill);
       fetchMetaMutate(source.prefill);
     }
-  }, [source.prefill, fetchMetaMutate]);
+  }, [source.fromFeedItem, source.prefill, prepareFeedDraftMutate, fetchMetaMutate]);
 
   const saveWithPdf = useMutation({
     mutationFn: () => {
@@ -256,7 +259,7 @@ function ArxivDoiTab({ source }: { source: ImportSource }) {
     }
   }
 
-  const fetching = fetchMeta.isPending;
+  const fetching = fetchMeta.isPending || prepareFeedDraft.isPending;
   const saving = saveWithPdf.isPending || autoDownload.isPending;
   const handlePdfDrop = useCallback((paths: string[]) => {
     if (paths.length > 0) setSelectedPdf(paths[0]);

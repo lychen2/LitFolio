@@ -1,5 +1,7 @@
 //! Tag CRUD + paper-tag attach/detach.
 
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use sqlx::Row;
 
@@ -95,6 +97,38 @@ impl<'a> TagRepo<'a> {
         .fetch_all(self.pool)
         .await?;
         rows.into_iter().map(row_to_tag).collect()
+    }
+
+    pub async fn for_papers(&self, paper_ids: &[String]) -> Result<HashMap<String, Vec<Tag>>> {
+        let mut tags_by_paper = paper_ids
+            .iter()
+            .map(|id| (id.clone(), Vec::new()))
+            .collect::<HashMap<_, _>>();
+        if paper_ids.is_empty() {
+            return Ok(tags_by_paper);
+        }
+
+        let placeholders: String = paper_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT pt.paper_id, t.id, t.name, t.parent_id, t.color
+             FROM paper_tags pt JOIN tags t ON t.id = pt.tag_id
+             WHERE pt.paper_id IN ({})
+             ORDER BY pt.paper_id, t.name COLLATE NOCASE",
+            placeholders
+        );
+        let mut query = sqlx::query(&sql);
+        for paper_id in paper_ids {
+            query = query.bind(paper_id);
+        }
+        let rows = query.fetch_all(self.pool).await?;
+        for row in rows {
+            let paper_id: String = row.try_get("paper_id")?;
+            tags_by_paper
+                .entry(paper_id)
+                .or_default()
+                .push(row_to_tag(row)?);
+        }
+        Ok(tags_by_paper)
     }
 }
 

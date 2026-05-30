@@ -1,6 +1,6 @@
 //! Literature review draft generation from a group of papers.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::client::{chat_complete, ChatMessage};
@@ -103,7 +103,11 @@ pub async fn generate_review(
     })
 }
 
-fn format_papers_prompt(papers: &[Paper], grouping: GroupingStrategy, output_language: &str) -> String {
+fn format_papers_prompt(
+    papers: &[Paper],
+    grouping: GroupingStrategy,
+    output_language: &str,
+) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "Generate a literature review using {}.\n\

@@ -88,9 +88,11 @@ impl<'a> PaperRepo<'a> {
     }
 
     pub async fn list_all_arxiv_ids(&self) -> Result<Vec<String>> {
-        let rows = sqlx::query("SELECT arxiv_id FROM papers WHERE arxiv_id IS NOT NULL AND arxiv_id != ''")
-            .fetch_all(self.pool)
-            .await?;
+        let rows = sqlx::query(
+            "SELECT arxiv_id FROM papers WHERE arxiv_id IS NOT NULL AND arxiv_id != ''",
+        )
+        .fetch_all(self.pool)
+        .await?;
         Ok(rows
             .into_iter()
             .filter_map(|r| r.try_get::<String, _>("arxiv_id").ok())
@@ -126,53 +128,52 @@ impl<'a> PaperRepo<'a> {
         rows.into_iter().map(row_to_paper).collect()
     }
 
-    /// Full-text search across title / authors / abstract / tldr via the
-    /// `papers_fts` virtual table. `query` is a raw FTS5 MATCH expression;
-    /// special characters are escaped to be tolerant of user input.
-    /// Full-text search across title / authors / abstract / tldr via the
-    /// `papers_fts` virtual table. `query` is a raw FTS5 MATCH expression;
-    /// special characters are escaped to be tolerant of user input.
-    pub async fn search(&self, query: &str, limit: i64) -> Result<Vec<Paper>> {
-        let escaped = escape_fts(query);
+    pub async fn search_by_folder(
+        &self,
+        folder_id: i64,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<Paper>> {
+        let escaped = super::retrieval::escape_fts(query);
         if escaped.is_empty() {
-            return self.list_recent(limit).await;
+            return self.list_by_folder(folder_id, limit).await;
         }
         let rows = sqlx::query(
             "SELECT p.* FROM papers p
+             JOIN paper_folders pf ON pf.paper_id = p.id
              JOIN papers_fts f ON f.rowid = p.rowid
-             WHERE papers_fts MATCH ?1
+             WHERE pf.folder_id = ?1 AND papers_fts MATCH ?2
              ORDER BY bm25(papers_fts), p.added_at DESC
-             LIMIT ?2",
+             LIMIT ?3",
         )
-        .bind(&escaped)
+        .bind(folder_id)
+        .bind(escaped)
         .bind(limit)
         .fetch_all(self.pool)
-        .await
-        .with_context(|| format!("search papers query={escaped}"))?;
+        .await?;
         rows.into_iter().map(row_to_paper).collect()
+    }
+
+    /// Full-text search across title / authors / abstract / tldr via the
+    /// `papers_fts` virtual table. Delegates to [`super::retrieval`] for
+    /// FTS5 query building and execution.
+    pub async fn search(&self, query: &str, limit: i64) -> Result<Vec<Paper>> {
+        let escaped = super::retrieval::escape_fts(query);
+        if escaped.is_empty() {
+            return self.list_recent(limit).await;
+        }
+        super::retrieval::search_papers(self.pool, &escaped, limit).await
     }
 
     /// Broader OR-based search — each whitespace-separated token is an
     /// independent prefix query. Used as a fallback when the strict AND
     /// search returns nothing.
     pub async fn search_or(&self, query: &str, limit: i64) -> Result<Vec<Paper>> {
-        let escaped = escape_fts_or(query);
+        let escaped = super::retrieval::escape_fts_or(query);
         if escaped.is_empty() {
             return self.list_recent(limit).await;
         }
-        let rows = sqlx::query(
-            "SELECT p.* FROM papers p
-             JOIN papers_fts f ON f.rowid = p.rowid
-             WHERE papers_fts MATCH ?1
-             ORDER BY bm25(papers_fts), p.added_at DESC
-             LIMIT ?2",
-        )
-        .bind(&escaped)
-        .bind(limit)
-        .fetch_all(self.pool)
-        .await
-        .with_context(|| format!("search_or papers query={escaped}"))?;
-        rows.into_iter().map(row_to_paper).collect()
+        super::retrieval::search_papers_or(self.pool, &escaped, limit).await
     }
 
     pub async fn count(&self) -> Result<i64> {
@@ -284,7 +285,12 @@ impl<'a> PaperRepo<'a> {
         Ok(())
     }
 
-    pub async fn update_title_venue(&self, id: &str, title: &str, venue: Option<&str>) -> Result<()> {
+    pub async fn update_title_venue(
+        &self,
+        id: &str,
+        title: &str,
+        venue: Option<&str>,
+    ) -> Result<()> {
         let now = Utc::now().timestamp();
         sqlx::query("UPDATE papers SET title = ?1, venue = ?2, updated_at = ?3 WHERE id = ?4")
             .bind(title)
@@ -330,46 +336,7 @@ impl<'a> PaperRepo<'a> {
     }
 }
 
-/// Sanitize raw user input for an FTS5 MATCH query. Each whitespace-separated
-/// token is quoted as a phrase + prefix-matched. FTS5 phrase quoting already
-/// neutralizes operator characters inside `"…"`, so we only need to drop the
-/// double-quote itself (which would otherwise terminate the phrase) and skip
-/// purely punctuation tokens. This preserves research-domain tokens like
-/// `BERT-base`, `R3.0`, `IEEE 802.11`, where the previous "strip all special
-/// chars" approach collapsed them into meaningless soup.
-fn escape_fts(input: &str) -> String {
-    let pieces: Vec<String> = input
-        .split_whitespace()
-        .map(sanitize_fts_token)
-        .filter(|s| !s.is_empty())
-        .map(|s| format!("\"{s}\"*"))
-        .collect();
-    pieces.join(" AND ")
-}
-
-fn escape_fts_or(input: &str) -> String {
-    let pieces: Vec<String> = input
-        .split_whitespace()
-        .map(sanitize_fts_token)
-        .filter(|s| !s.is_empty())
-        .map(|s| format!("\"{s}\"*"))
-        .collect();
-    pieces.join(" OR ")
-}
-
-fn sanitize_fts_token(token: &str) -> String {
-    // Strip the phrase-terminator and trim leading/trailing punctuation that
-    // FTS5 still treats as a tokenizer boundary even inside quotes. Internal
-    // `-`, `.`, `/` survive — they are valid inside a phrase.
-    token
-        .chars()
-        .filter(|c| *c != '"')
-        .collect::<String>()
-        .trim_matches(|c: char| matches!(c, '(' | ')' | ':' | ',' | ';' | '!' | '?'))
-        .to_string()
-}
-
-pub(super) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
+pub(crate) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
     let authors_raw: Option<String> = row.try_get("authors_json").ok();
     let authors: Vec<String> = authors_raw
         .as_deref()
@@ -508,22 +475,6 @@ mod tests {
         let hits = repo.search("zzz_no_match", 10).await.unwrap();
         assert!(hits.is_empty());
         std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn escape_fts_handles_empty_and_special() {
-        assert_eq!(escape_fts(""), "");
-        assert_eq!(escape_fts("   "), "");
-        assert_eq!(escape_fts("foo bar"), "\"foo\"* AND \"bar\"*");
-        // BERT-base survives — hyphen is now preserved inside the phrase quotes,
-        // so research-domain tokens stop collapsing into meaningless soup.
-        assert_eq!(escape_fts("BERT-base"), "\"BERT-base\"*");
-        assert_eq!(escape_fts("R3.0"), "\"R3.0\"*");
-        // Trailing/leading punctuation still gets trimmed so `foo,` matches `foo`.
-        assert_eq!(escape_fts("(foo)"), "\"foo\"*");
-        // Quotes are the only character we must scrub — they'd terminate the
-        // surrounding phrase.
-        assert_eq!(escape_fts("hi\"there"), "\"hithere\"*");
     }
 
     #[tokio::test]

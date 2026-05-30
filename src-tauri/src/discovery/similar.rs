@@ -121,9 +121,7 @@ pub async fn find_similar(
         ));
     };
 
-    let url = format!(
-        "{BASE}/{seed}?fields={FIELDS}&limit=20",
-    );
+    let url = format!("{BASE}/{seed}?fields={FIELDS}&limit=20",);
 
     let resp = http
         .get(&url)
@@ -139,7 +137,10 @@ pub async fn find_similar(
         ));
     }
 
-    let body: S2Response = resp.json().await.context("decode S2 recommendations JSON")?;
+    let body: S2Response = resp
+        .json()
+        .await
+        .context("decode S2 recommendations JSON")?;
     let recs: Vec<Recommendation> = body
         .recommended_papers
         .into_iter()
@@ -172,10 +173,7 @@ pub async fn find_similar(
     Ok(filtered)
 }
 
-async fn get_cached(
-    pool: &SqlitePool,
-    paper_id: &str,
-) -> Result<Option<Vec<Recommendation>>> {
+async fn get_cached(pool: &SqlitePool, paper_id: &str) -> Result<Option<Vec<Recommendation>>> {
     let row = sqlx::query_scalar::<_, String>(
         "SELECT results_json FROM recommendation_cache WHERE paper_id = ?1 AND fetched_at > ?2",
     )
@@ -194,11 +192,7 @@ async fn get_cached(
     }
 }
 
-async fn cache_results(
-    pool: &SqlitePool,
-    paper_id: &str,
-    recs: &[Recommendation],
-) -> Result<()> {
+async fn cache_results(pool: &SqlitePool, paper_id: &str, recs: &[Recommendation]) -> Result<()> {
     let json = serde_json::to_string(recs)?;
     sqlx::query(
         "INSERT OR REPLACE INTO recommendation_cache (paper_id, results_json, fetched_at) VALUES (?1, ?2, ?3)",
@@ -242,9 +236,13 @@ mod tests {
             year: Some(2024),
             venue: Some("ICML".into()),
             authors: vec![
-                S2Author { name: Some("Alice".into()) },
+                S2Author {
+                    name: Some("Alice".into()),
+                },
                 S2Author { name: None },
-                S2Author { name: Some("Bob".into()) },
+                S2Author {
+                    name: Some("Bob".into()),
+                },
             ],
             external_ids: Some(S2ExternalIds {
                 doi: Some("10.1234/test".into()),

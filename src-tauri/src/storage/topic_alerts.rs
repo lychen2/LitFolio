@@ -152,7 +152,11 @@ impl<'a> TopicAlertRepo<'a> {
         Ok(id)
     }
 
-    pub async fn list_results(&self, alert_id: i64, unseen_only: bool) -> Result<Vec<TopicAlertResult>> {
+    pub async fn list_results(
+        &self,
+        alert_id: i64,
+        unseen_only: bool,
+    ) -> Result<Vec<TopicAlertResult>> {
         let sql = if unseen_only {
             "SELECT id, alert_id, paper_doi, paper_arxiv_id, title, authors, year, abstract_text, seen, added_at
              FROM topic_alert_results WHERE alert_id = ?1 AND seen = 0 ORDER BY added_at DESC"
@@ -199,25 +203,22 @@ impl<'a> TopicAlertRepo<'a> {
     /// Check if a paper (by DOI or arXiv ID) already exists in any alert results.
     pub async fn result_exists(&self, doi: Option<&str>, arxiv_id: Option<&str>) -> Result<bool> {
         if let Some(d) = doi {
-            let row = sqlx::query(
-                "SELECT 1 FROM topic_alert_results WHERE paper_doi = ?1 LIMIT 1",
-            )
-            .bind(d)
-            .fetch_optional(self.pool)
-            .await
-            .context("check result exists by doi")?;
+            let row = sqlx::query("SELECT 1 FROM topic_alert_results WHERE paper_doi = ?1 LIMIT 1")
+                .bind(d)
+                .fetch_optional(self.pool)
+                .await
+                .context("check result exists by doi")?;
             if row.is_some() {
                 return Ok(true);
             }
         }
         if let Some(a) = arxiv_id {
-            let row = sqlx::query(
-                "SELECT 1 FROM topic_alert_results WHERE paper_arxiv_id = ?1 LIMIT 1",
-            )
-            .bind(a)
-            .fetch_optional(self.pool)
-            .await
-            .context("check result exists by arxiv")?;
+            let row =
+                sqlx::query("SELECT 1 FROM topic_alert_results WHERE paper_arxiv_id = ?1 LIMIT 1")
+                    .bind(a)
+                    .fetch_optional(self.pool)
+                    .await
+                    .context("check result exists by arxiv")?;
             if row.is_some() {
                 return Ok(true);
             }

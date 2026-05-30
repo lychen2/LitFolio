@@ -173,7 +173,10 @@ mod tests {
 
     #[test]
     fn significant_word_skips_articles() {
-        assert_eq!(first_significant_word("The Attention Mechanism"), "attention");
+        assert_eq!(
+            first_significant_word("The Attention Mechanism"),
+            "attention"
+        );
         assert_eq!(first_significant_word("A Study of"), "study");
     }
 }

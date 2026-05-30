@@ -157,12 +157,7 @@ impl<'a> ConceptRepo<'a> {
 
     // ── Paper-Concept Links ─────────────────────────────────────────────
 
-    pub async fn link_paper(
-        &self,
-        paper_id: &str,
-        concept_id: i64,
-        relevance: f64,
-    ) -> Result<()> {
+    pub async fn link_paper(&self, paper_id: &str, concept_id: i64, relevance: f64) -> Result<()> {
         sqlx::query(
             "INSERT OR REPLACE INTO paper_concepts (paper_id, concept_id, relevance) VALUES (?1, ?2, ?3)",
         )
@@ -230,7 +225,11 @@ impl<'a> ConceptRepo<'a> {
     // ── Graph Integration ───────────────────────────────────────────────
 
     /// Merge concept nodes and concept-to-concept edges into GraphData.
-    pub async fn merge_into_graph(&self, graph: &mut GraphData, filter: &GraphFilter) -> Result<()> {
+    pub async fn merge_into_graph(
+        &self,
+        graph: &mut GraphData,
+        filter: &GraphFilter,
+    ) -> Result<()> {
         if !filter.include_concepts.unwrap_or(true) {
             return Ok(());
         }
@@ -256,7 +255,9 @@ impl<'a> ConceptRepo<'a> {
         // Add concept-to-concept edges
         let relations_filter = filter.relations.as_deref();
         for r in &relations {
-            if !concept_ids.contains(&r.source_concept_id) || !concept_ids.contains(&r.target_concept_id) {
+            if !concept_ids.contains(&r.source_concept_id)
+                || !concept_ids.contains(&r.target_concept_id)
+            {
                 continue;
             }
             if let Some(allowed) = relations_filter {

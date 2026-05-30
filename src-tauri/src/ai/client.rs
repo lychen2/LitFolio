@@ -66,8 +66,6 @@ struct Choice {
 struct Delta {
     #[serde(default)]
     content: Option<String>,
-    #[serde(default)]
-    role: Option<String>,
     /// DeepSeek reasoning models emit chain-of-thought in this field.
     #[serde(default)]
     reasoning_content: Option<String>,
@@ -79,8 +77,6 @@ struct Usage {
     prompt_tokens: u32,
     #[serde(default)]
     completion_tokens: u32,
-    #[serde(default)]
-    total_tokens: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -117,7 +113,13 @@ pub async fn chat_complete(
         // deepseek-reasoner) put thinking in `reasoning_content` and answer
         // in `content` — they get `thinking: None` so their reasoning is
         // preserved.
-        thinking: if is_reasoning_model(&profile.chat_model) { None } else { Some(ThinkingConfig { r#type: "disabled".into() }) },
+        thinking: if is_reasoning_model(&profile.chat_model) {
+            None
+        } else {
+            Some(ThinkingConfig {
+                r#type: "disabled".into(),
+            })
+        },
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {
@@ -223,7 +225,10 @@ fn request_shape(model: &str, max_tokens: u32, temperature: f32) -> RequestShape
 
 fn uses_completion_token_limit(model: &str) -> bool {
     let lower = model.to_ascii_lowercase();
-    lower.starts_with("gpt-5") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")
+    lower.starts_with("gpt-5")
+        || lower.starts_with("o1")
+        || lower.starts_with("o3")
+        || lower.starts_with("o4")
 }
 
 /// Reasoning-native models put chain-of-thought in `reasoning_content` and

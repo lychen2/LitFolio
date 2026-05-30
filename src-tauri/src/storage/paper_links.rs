@@ -233,84 +233,120 @@ impl<'a> PaperLinkRepo<'a> {
     }
 
     pub async fn graph_data(&self, filter: &GraphFilter) -> Result<GraphData> {
-        // 1. Build WHERE clauses for paper_links
-        let min_conf = filter.min_confidence.unwrap_or(0.0);
-        let links = self.list_all().await?;
-        let filtered_links: Vec<PaperLink> = links
-            .into_iter()
-            .filter(|l| {
-                l.confidence >= min_conf
-                    && filter
-                        .relations
-                        .as_ref()
-                        .map(|rs| rs.contains(&l.relation))
-                        .unwrap_or(true)
-                    && filter
-                        .paper_ids
-                        .as_ref()
-                        .map(|pids| {
-                            pids.contains(&l.source_paper_id) || pids.contains(&l.target_paper_id)
-                        })
-                        .unwrap_or(true)
-            })
-            .collect();
+        let filtered_links = self.filtered_links(filter).await?;
 
-        // 2. Collect all paper IDs referenced in links
         let mut paper_ids: HashSet<String> = HashSet::new();
-        for l in &filtered_links {
-            paper_ids.insert(l.source_paper_id.clone());
-            paper_ids.insert(l.target_paper_id.clone());
+        for link in &filtered_links {
+            paper_ids.insert(link.source_paper_id.clone());
+            paper_ids.insert(link.target_paper_id.clone());
         }
 
-        // 3. Query paper metadata
-        let mut nodes = Vec::new();
-        let mut edges = Vec::new();
-        let mut paper_meta: HashMap<String, (String, Option<i32>, Option<String>)> = HashMap::new();
+        let mut nodes = self.paper_nodes(&paper_ids).await?;
+        let mut edges = filtered_links
+            .iter()
+            .map(|link| GraphEdge {
+                id: format!("link:{}", link.id),
+                source: link.source_paper_id.clone(),
+                target: link.target_paper_id.clone(),
+                edge_type: link.relation.clone(),
+                source_type: link.source_type.clone(),
+                confidence: link.confidence,
+                snippet: link.snippet.clone(),
+            })
+            .collect::<Vec<_>>();
 
-        for pid in &paper_ids {
-            if let Ok(row) = sqlx::query(
-                "SELECT id, title, year, read_status FROM papers WHERE id = ?1",
-            )
-            .bind(pid)
-            .fetch_one(self.pool)
-            .await
-            {
-                let title: String = row.try_get("title")?;
-                let year: Option<i32> = row.try_get("year").ok();
-                let rs: Option<String> = row.try_get("read_status").ok();
-                paper_meta.insert(pid.clone(), (title.clone(), year, rs.clone()));
-                nodes.push(GraphNode {
-                    id: pid.clone(),
-                    node_type: "paper".into(),
-                    label: title,
-                    sublabel: year.map(|y| y.to_string()),
-                    year,
-                    read_status: rs,
-                    paper_count: None,
-                });
-            }
-        }
-
-        // 4. Build edges from paper_links
-        for l in &filtered_links {
-            edges.push(GraphEdge {
-                id: format!("link:{}", l.id),
-                source: l.source_paper_id.clone(),
-                target: l.target_paper_id.clone(),
-                edge_type: l.relation.clone(),
-                source_type: l.source_type.clone(),
-                confidence: l.confidence,
-                snippet: l.snippet.clone(),
-            });
-        }
-
-        // 5. Add concept nodes from paper_terms (if requested)
         if filter.include_concepts.unwrap_or(true) && !paper_ids.is_empty() {
             let concept_edges = self.build_concept_nodes(&paper_ids, &mut nodes).await?;
             edges.extend(concept_edges);
         }
 
         Ok(GraphData { nodes, edges })
+    }
+
+    async fn filtered_links(&self, filter: &GraphFilter) -> Result<Vec<PaperLink>> {
+        if filter
+            .relations
+            .as_ref()
+            .is_some_and(|relations| relations.is_empty())
+            || filter
+                .paper_ids
+                .as_ref()
+                .is_some_and(|paper_ids| paper_ids.is_empty())
+        {
+            return Ok(Vec::new());
+        }
+
+        let mut clauses = vec!["confidence >= ?".to_string()];
+        if let Some(relations) = &filter.relations {
+            let placeholders = relations.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            clauses.push(format!("relation IN ({placeholders})"));
+        }
+        if let Some(paper_ids) = &filter.paper_ids {
+            let placeholders = paper_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            clauses.push(format!(
+                "(source_paper_id IN ({placeholders}) OR target_paper_id IN ({placeholders}))"
+            ));
+        }
+
+        let sql = format!(
+            "SELECT id, source_paper_id, target_paper_id, relation, source_type,
+                    confidence, snippet, created_at, updated_at
+             FROM paper_links WHERE {} ORDER BY updated_at DESC",
+            clauses.join(" AND ")
+        );
+        let mut query = sqlx::query(&sql).bind(filter.min_confidence.unwrap_or(0.0));
+        if let Some(relations) = &filter.relations {
+            for relation in relations {
+                query = query.bind(relation);
+            }
+        }
+        if let Some(paper_ids) = &filter.paper_ids {
+            for paper_id in paper_ids {
+                query = query.bind(paper_id);
+            }
+            for paper_id in paper_ids {
+                query = query.bind(paper_id);
+            }
+        }
+        let rows = query
+            .fetch_all(self.pool)
+            .await
+            .context("query graph links")?;
+        rows.into_iter().map(row_to_link).collect()
+    }
+
+    async fn paper_nodes(&self, paper_ids: &HashSet<String>) -> Result<Vec<GraphNode>> {
+        if paper_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = paper_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql =
+            format!("SELECT id, title, year, read_status FROM papers WHERE id IN ({placeholders})");
+        let mut query = sqlx::query(&sql);
+        for paper_id in paper_ids {
+            query = query.bind(paper_id);
+        }
+        let rows = query
+            .fetch_all(self.pool)
+            .await
+            .context("query graph papers")?;
+        rows.into_iter()
+            .map(|row| {
+                let id: String = row.try_get("id")?;
+                let title: String = row.try_get("title")?;
+                let year: Option<i32> = row.try_get("year").ok();
+                let read_status: Option<String> = row.try_get("read_status").ok();
+                Ok(GraphNode {
+                    id,
+                    node_type: "paper".into(),
+                    label: title,
+                    sublabel: year.map(|y| y.to_string()),
+                    year,
+                    read_status,
+                    paper_count: None,
+                })
+            })
+            .collect()
     }
 
     async fn build_concept_nodes(
@@ -335,57 +371,114 @@ impl<'a> PaperLinkRepo<'a> {
             query = query.bind(pid);
         }
         let concept_rows = query.fetch_all(self.pool).await.context("query concepts")?;
-
-        let mut edges = Vec::new();
+        let mut concepts = Vec::new();
         for row in concept_rows {
-            let term: String = row.try_get("normalized_term")?;
-            let cnt: i32 = row.try_get("cnt")?;
-            let concept_id = format!("concept:{}", term);
+            concepts.push((
+                row.try_get::<String, _>("normalized_term")?,
+                row.try_get::<i32, _>("cnt")?,
+            ));
+        }
+        if concepts.is_empty() {
+            return Ok(Vec::new());
+        }
 
-            // Get a display definition from the first paper that has this term
-            let def_row = sqlx::query(
-                "SELECT local_definition FROM paper_terms
-                 WHERE normalized_term = ?1 LIMIT 1",
-            )
-            .bind(&term)
-            .fetch_optional(self.pool)
-            .await?;
-            let definition: Option<String> =
-                def_row.and_then(|r| r.try_get("local_definition").ok());
-
+        let terms = concepts
+            .iter()
+            .map(|(term, _)| term.clone())
+            .collect::<Vec<_>>();
+        let definitions = self.concept_definitions(&terms).await?;
+        for (term, cnt) in &concepts {
             nodes.push(GraphNode {
-                id: concept_id.clone(),
+                id: format!("concept:{}", term),
                 node_type: "concept".into(),
                 label: term.clone(),
-                sublabel: definition,
+                sublabel: definitions.get(term).cloned().flatten(),
                 year: None,
                 read_status: None,
-                paper_count: Some(cnt),
+                paper_count: Some(*cnt),
             });
-
-            // Create edges from papers to this concept
-            let term_papers = sqlx::query(
-                "SELECT paper_id FROM paper_terms WHERE normalized_term = ?1",
-            )
-            .bind(&term)
-            .fetch_all(self.pool)
-            .await?;
-            for tr in term_papers {
-                let pid: String = tr.try_get("paper_id")?;
-                if paper_ids.contains(&pid) {
-                    edges.push(GraphEdge {
-                        id: format!("term:{}:{}", pid, term),
-                        source: pid,
-                        target: concept_id.clone(),
-                        edge_type: "has_concept".into(),
-                        source_type: "derived".into(),
-                        confidence: 1.0,
-                        snippet: None,
-                    });
-                }
-            }
         }
-        Ok(edges)
+
+        self.concept_edges(paper_ids, &terms).await
+    }
+
+    async fn concept_definitions(
+        &self,
+        terms: &[String],
+    ) -> Result<HashMap<String, Option<String>>> {
+        if terms.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = terms.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT normalized_term, MIN(local_definition) AS local_definition
+             FROM paper_terms
+             WHERE normalized_term IN ({placeholders}) AND local_definition IS NOT NULL
+             GROUP BY normalized_term"
+        );
+        let mut query = sqlx::query(&sql);
+        for term in terms {
+            query = query.bind(term);
+        }
+        let rows = query
+            .fetch_all(self.pool)
+            .await
+            .context("query concept definitions")?;
+        let mut definitions = terms
+            .iter()
+            .map(|term| (term.clone(), None))
+            .collect::<HashMap<_, _>>();
+        for row in rows {
+            definitions.insert(
+                row.try_get("normalized_term")?,
+                row.try_get("local_definition").ok(),
+            );
+        }
+        Ok(definitions)
+    }
+
+    async fn concept_edges(
+        &self,
+        paper_ids: &HashSet<String>,
+        terms: &[String],
+    ) -> Result<Vec<GraphEdge>> {
+        if paper_ids.is_empty() || terms.is_empty() {
+            return Ok(Vec::new());
+        }
+        let paper_placeholders = paper_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let term_placeholders = terms.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT paper_id, normalized_term
+             FROM paper_terms
+             WHERE paper_id IN ({paper_placeholders})
+               AND normalized_term IN ({term_placeholders})"
+        );
+        let mut query = sqlx::query(&sql);
+        for paper_id in paper_ids {
+            query = query.bind(paper_id);
+        }
+        for term in terms {
+            query = query.bind(term);
+        }
+        let rows = query
+            .fetch_all(self.pool)
+            .await
+            .context("query concept edges")?;
+        rows.into_iter()
+            .map(|row| {
+                let paper_id: String = row.try_get("paper_id")?;
+                let term: String = row.try_get("normalized_term")?;
+                Ok(GraphEdge {
+                    id: format!("term:{}:{}", paper_id, term),
+                    source: paper_id,
+                    target: format!("concept:{}", term),
+                    edge_type: "has_concept".into(),
+                    source_type: "derived".into(),
+                    confidence: 1.0,
+                    snippet: None,
+                })
+            })
+            .collect()
     }
 }
 

@@ -38,7 +38,7 @@ export function PaperDetailDrawer({
       >
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-litera-accent2">library metadata</div>
+            <div className="text-[11px] uppercase tracking-wider text-litera-accent2">{t("paper.detail.metadata")}</div>
             <h2 className="font-serif text-xl leading-tight mt-1">{paper.title}</h2>
             {paper.title_translated && <p className="text-sm text-litera-accent mt-2">{paper.title_translated}</p>}
           </div>
@@ -54,7 +54,7 @@ export function PaperDetailDrawer({
             className="litera-btn text-xs disabled:opacity-50"
           >
             {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-            翻译标题和摘要
+            {t("paper.detail.translateTitleAbstract")}
           </button>
           {paper.bibtex && (
             <button
@@ -96,7 +96,7 @@ export function PaperDetailDrawer({
           </div>
           {paper.pdf_path && (
             <Link to={`/reader/${paper.id}`} className="litera-btn-primary text-xs">
-              <BookOpen className="h-3.5 w-3.5" /> 阅读 PDF
+              <BookOpen className="h-3.5 w-3.5" /> {t("library.readPdf")}
             </Link>
           )}
         </div>
@@ -117,10 +117,10 @@ export function PaperDetailDrawer({
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
           <Meta paper={paper} />
-          <Section title="摘要" body={paper.abstract_text ?? "(无摘要)"} />
-          {paper.abstract_translated && <Section title="摘要译文" body={paper.abstract_translated} accent />}
-          {paper.tldr && <Section title="速读" body={paper.tldr} accent />}
-          {paper.key_findings.length > 0 && <Section title="关键发现" body={paper.key_findings.join("\n")} />}
+          <Section title={t("paper.detail.abstract")} body={paper.abstract_text ?? t("paper.detail.noAbstract")} />
+          {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
+          {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
+          {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
           <CustomFieldsSection paperId={paper.id} />
           {translate.error && <ErrorLine error={translate.error} />}
         </div>
@@ -130,21 +130,22 @@ export function PaperDetailDrawer({
 }
 
 function Meta({ paper }: { paper: Paper }) {
+  const t = useT();
   return (
     <dl className="grid grid-cols-[92px_1fr] gap-x-3 gap-y-2 text-sm">
-      <dt className="text-litera-mute">作者</dt>
-      <dd>{paper.authors.join(", ") || "(unknown)"}</dd>
-      <dt className="text-litera-mute">年份</dt>
-      <dd>{paper.year ?? "(unknown)"}</dd>
+      <dt className="text-litera-mute">{t("paper.detail.authors")}</dt>
+      <dd>{paper.authors.join(", ") || t("paper.detail.unknown")}</dd>
+      <dt className="text-litera-mute">{t("paper.detail.year")}</dt>
+      <dd>{paper.year ?? t("paper.detail.unknown")}</dd>
       <dt className="text-litera-mute">Venue</dt>
-      <dd>{paper.venue ?? "(unknown)"}</dd>
+      <dd>{paper.venue ?? t("paper.detail.unknown")}</dd>
       <dt className="text-litera-mute">DOI</dt>
-      <dd className="font-mono">{paper.doi ?? "(none)"}</dd>
+      <dd className="font-mono">{paper.doi ?? t("common.none")}</dd>
       <dt className="text-litera-mute">arXiv</dt>
-      <dd>{paper.arxiv_id ? <ArxivLink id={paper.arxiv_id} /> : "(none)"}</dd>
+      <dd>{paper.arxiv_id ? <ArxivLink id={paper.arxiv_id} /> : t("common.none")}</dd>
       <dt className="text-litera-mute">PDF</dt>
       <dd className="font-mono break-all flex items-start gap-1">
-        {paper.pdf_path ? <><FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{paper.pdf_path}</> : "(none)"}
+        {paper.pdf_path ? <><FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{paper.pdf_path}</> : t("common.none")}
       </dd>
     </dl>
   );
@@ -176,8 +177,9 @@ function Section({ title, body, accent }: { title: string; body: string; accent?
 }
 
 function ErrorLine({ error }: { error: unknown }) {
+  const t = useT();
   const message = error instanceof Error ? error.message : String(error);
-  return <div className="text-sm text-red-400/90">✕ 翻译失败: {message}</div>;
+  return <div className="text-sm text-red-400/90">✕ {t("paper.detail.translateFailed")}: {message}</div>;
 }
 
 function CustomFieldsSection({ paperId }: { paperId: string }) {
@@ -232,7 +234,7 @@ function CustomFieldsSection({ paperId }: { paperId: string }) {
                         onChange={(e) => setEditValue(e.target.value)}
                         className="litera-input text-xs py-0.5 flex-1"
                       >
-                        <option value="">--</option>
+                        <option value="">{t("paper.detail.emptyValue")}</option>
                         {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : def.field_type === "date" ? (
@@ -261,7 +263,7 @@ function CustomFieldsSection({ paperId }: { paperId: string }) {
                       disabled={setMut.isPending}
                       className="litera-btn-primary text-[10px] px-2 py-0.5"
                     >
-                      OK
+                      {t("common.save")}
                     </button>
                     <button onClick={() => setEditingId(null)} className="text-litera-mute text-[10px]">✕</button>
                   </div>

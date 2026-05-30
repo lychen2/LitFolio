@@ -21,6 +21,17 @@ struct CrossRefResponse {
 }
 
 #[derive(Debug, Deserialize)]
+struct CrossRefSearchResponse {
+    message: CrossRefSearchMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct CrossRefSearchMessage {
+    #[serde(default)]
+    items: Vec<CrossRefMessage>,
+}
+
+#[derive(Debug, Deserialize)]
 struct CrossRefMessage {
     #[serde(default)]
     title: Vec<String>,
@@ -80,7 +91,43 @@ fn first_year(m: &CrossRefMessage) -> Option<i32> {
 
 fn strip_jats(s: &str) -> String {
     let re = regex::Regex::new(r"<[^>]+>").unwrap();
-    re.replace_all(s, "").trim().to_string()
+    let stripped = re.replace_all(s, " ");
+    stripped.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Search CrossRef by title and return the top result's normalized metadata.
+pub async fn search_doi_by_title(
+    client: &reqwest::Client,
+    title: &str,
+) -> Result<Option<PaperDraft>> {
+    let query = title.trim();
+    if query.is_empty() {
+        return Ok(None);
+    }
+    let url = format!("{CROSSREF_BASE}?query.title={}&rows=3", urlencode(query));
+    let resp = client
+        .get(&url)
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("CrossRef returned {status}: {body}"));
+    }
+    let body: CrossRefSearchResponse = resp.json().await.context("decode CrossRef JSON")?;
+    Ok(body
+        .message
+        .items
+        .into_iter()
+        .filter_map(crossref_message_to_draft)
+        .find(|draft| {
+            draft
+                .doi
+                .as_deref()
+                .is_some_and(|doi| doi.starts_with("10."))
+        }))
 }
 
 /// Fetch metadata for a DOI. Accepts either a bare DOI ("10.x/y") or a URL.
@@ -99,22 +146,31 @@ pub async fn fetch_doi(client: &reqwest::Client, doi_or_url: &str) -> Result<Pap
         return Err(anyhow!("CrossRef returned {status}: {body}"));
     }
     let body: CrossRefResponse = resp.json().await.context("decode CrossRef JSON")?;
-    let m = body.message;
-    let title = m
-        .title
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "(untitled)".into());
+    Ok(
+        crossref_message_to_draft(body.message).unwrap_or(PaperDraft {
+            title: "(untitled)".into(),
+            authors: vec![],
+            year: None,
+            venue: None,
+            doi: Some(doi),
+            arxiv_id: None,
+            abstract_text: None,
+        }),
+    )
+}
+
+fn crossref_message_to_draft(m: CrossRefMessage) -> Option<PaperDraft> {
+    let title = m.title.first().cloned()?;
     let authors: Vec<String> = m.author.iter().filter_map(|a| a.display()).collect();
     let venue = m.container_title.first().cloned();
     let year = first_year(&m);
     let abstract_text = m.abstract_text.as_deref().map(strip_jats);
-    Ok(PaperDraft {
+    Some(PaperDraft {
         title,
         authors,
         year,
         venue,
-        doi: Some(m.doi.unwrap_or(doi)),
+        doi: m.doi,
         arxiv_id: None,
         abstract_text,
     })

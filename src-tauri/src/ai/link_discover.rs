@@ -70,10 +70,7 @@ pub async fn discover_links(
     Ok(all_links)
 }
 
-fn build_batches(
-    papers: &[Paper],
-    term_map: &HashMap<String, Vec<String>>,
-) -> Vec<Vec<Paper>> {
+fn build_batches(papers: &[Paper], term_map: &HashMap<String, Vec<String>>) -> Vec<Vec<Paper>> {
     if papers.len() <= MAX_BATCH {
         return vec![papers.to_vec()];
     }
@@ -166,7 +163,11 @@ fn build_prompt(papers: &[Paper], term_map: &HashMap<String, Vec<String>>) -> St
             .collect();
         if matching.len() >= 2 {
             let indices: Vec<String> = matching.iter().map(|i| (i + 1).to_string()).collect();
-            shared.push(format!("- \"{}\" appears in papers [{}]", term, indices.join(", ")));
+            shared.push(format!(
+                "- \"{}\" appears in papers [{}]",
+                term,
+                indices.join(", ")
+            ));
         }
     }
     if !shared.is_empty() {
@@ -175,13 +176,15 @@ fn build_prompt(papers: &[Paper], term_map: &HashMap<String, Vec<String>>) -> St
         lines.push(String::new());
     }
 
-    lines.push("Return a JSON array of relationships. Focus on substantive intellectual connections.".to_string());
+    lines.push(
+        "Return a JSON array of relationships. Focus on substantive intellectual connections."
+            .to_string(),
+    );
     lines.join("\n")
 }
 
 fn parse_discovered_links(json_str: &str, batch: &[Paper]) -> Vec<DiscoveredLink> {
-    let valid_ids: std::collections::HashSet<&str> =
-        batch.iter().map(|p| p.id.as_str()).collect();
+    let valid_ids: std::collections::HashSet<&str> = batch.iter().map(|p| p.id.as_str()).collect();
 
     // Try to extract JSON array from the response
     let json_start = json_str.find('[').unwrap_or(0);
@@ -202,7 +205,10 @@ fn parse_discovered_links(json_str: &str, batch: &[Paper]) -> Vec<DiscoveredLink
     for item in arr {
         let src = item.get("source_id").and_then(|v| v.as_str()).unwrap_or("");
         let tgt = item.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
-        let rel = item.get("relation").and_then(|v| v.as_str()).unwrap_or("related");
+        let rel = item
+            .get("relation")
+            .and_then(|v| v.as_str())
+            .unwrap_or("related");
         let conf = item
             .get("confidence")
             .and_then(|v| v.as_f64())

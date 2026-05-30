@@ -6,6 +6,7 @@ import {
 import { api } from "@/lib/api";
 import { EMPTY_SYNC_CONFIG, syncApi, type SyncConfig, type SyncReport } from "@/lib/syncApi";
 import { useT } from "@/i18n/I18nProvider";
+import { errorMessageOr } from "@/lib/error";
 
 export function SyncPanel() {
   const t = useT();
@@ -181,10 +182,10 @@ export function SyncPanel() {
             {t("settings.sync.warning")}
           </div>
 
-          {save.error && <ErrorText message={errorMessage(save.error)} />}
-          {test.error && <ErrorText message={errorMessage(test.error)} />}
-          {push.error && <ErrorText message={errorMessage(push.error)} />}
-          {pull.error && <ErrorText message={errorMessage(pull.error)} />}
+          {save.error && <ErrorText message={syncErrorMessage(save.error)} />}
+          {test.error && <ErrorText message={syncErrorMessage(test.error)} />}
+          {push.error && <ErrorText message={syncErrorMessage(push.error)} />}
+          {pull.error && <ErrorText message={syncErrorMessage(pull.error)} />}
 
           {save.isSuccess && <InfoText message={t("settings.sync.saved")} />}
           {test.isSuccess && (
@@ -238,14 +239,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error.trim() !== "") return error;
-  if (error instanceof Error && error.message.trim() !== "") return error.message;
-  if (error && typeof error === "object") {
-    const message = Reflect.get(error, "message");
-    if (typeof message === "string" && message.trim() !== "") return message;
-    const cause = Reflect.get(error, "cause");
-    if (typeof cause === "string" && cause.trim() !== "") return cause;
-  }
-  return "Unknown sync error";
+function syncErrorMessage(error: unknown): string {
+  return errorMessageOr(error, "Unknown sync error");
 }

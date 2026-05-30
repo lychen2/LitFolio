@@ -41,6 +41,36 @@ impl LibraryPaths {
     pub fn note_file(&self, paper_id: &str) -> PathBuf {
         self.notes_dir().join(format!("{paper_id}.md"))
     }
+    /// Where the body text extracted from the paper's PDF lives. Written by
+    /// `paper_set_pdf_text` after pdfjs renders in the reader, also used as
+    /// a cache when we have to fall back to lopdf extraction for papers
+    /// that have never been opened in the reader.
+    pub fn pdf_text_file(&self, paper_id: &str) -> PathBuf {
+        self.paper_dir(paper_id).join("text.txt")
+    }
+    /// Read cached body text for a paper. Returns None when the file is
+    /// missing, unreadable, or only whitespace — i.e. anything the
+    /// summarizer should treat as "no body available".
+    pub fn read_pdf_text(&self, paper_id: &str) -> Option<String> {
+        let path = self.pdf_text_file(paper_id);
+        let raw = std::fs::read_to_string(&path).ok()?;
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+    /// Persist body text next to the paper. Used by the lopdf fallback so
+    /// the next TLDR/QuickRead skips re-extraction. Best-effort: a write
+    /// failure is logged by the caller but not fatal.
+    pub fn write_pdf_text(&self, paper_id: &str, body: &str) -> Result<()> {
+        let dir = self.paper_dir(paper_id);
+        std::fs::create_dir_all(&dir).map_err(|e| anyhow!("create {}: {e}", dir.display()))?;
+        let path = self.pdf_text_file(paper_id);
+        std::fs::write(&path, body).map_err(|e| anyhow!("write {}: {e}", path.display()))?;
+        Ok(())
+    }
 
     pub fn ensure(&self) -> Result<()> {
         ensure_dir(&self.root)?;
@@ -81,10 +111,17 @@ impl LibraryPaths {
     /// `paper_save_with_pdf` with `/etc/passwd` no longer slips through, because
     /// `/etc/passwd` does not start with the `%PDF-` header.
     pub fn validate_external_pdf(&self, candidate: &Path) -> Result<PathBuf> {
-        let canon = std::fs::canonicalize(candidate)
-            .map_err(|e| anyhow!("PDF source {} cannot be canonicalized: {e}", candidate.display()))?;
+        let canon = std::fs::canonicalize(candidate).map_err(|e| {
+            anyhow!(
+                "PDF source {} cannot be canonicalized: {e}",
+                candidate.display()
+            )
+        })?;
         if !canon.is_file() {
-            return Err(anyhow!("PDF source {} is not a regular file", canon.display()));
+            return Err(anyhow!(
+                "PDF source {} is not a regular file",
+                canon.display()
+            ));
         }
         let ext = canon
             .extension()
@@ -94,7 +131,11 @@ impl LibraryPaths {
         if ext != "pdf" {
             return Err(anyhow!(
                 "only .pdf files are accepted (got .{})",
-                if ext.is_empty() { "<none>".to_string() } else { ext }
+                if ext.is_empty() {
+                    "<none>".to_string()
+                } else {
+                    ext
+                }
             ));
         }
         // Reject sources that already live in our library — there is no
@@ -244,7 +285,10 @@ mod tests {
         let inside = paths.paper_dir("abc").join("original.pdf");
         fs::create_dir_all(inside.parent().unwrap()).unwrap();
         fs::write(&inside, b"%PDF-1.4 stub").unwrap();
-        let err = paths.validate_external_pdf(&inside).unwrap_err().to_string();
+        let err = paths
+            .validate_external_pdf(&inside)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("already inside"), "got: {err}");
         fs::remove_dir_all(&tmp).ok();
     }

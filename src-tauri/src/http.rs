@@ -30,7 +30,6 @@ pub fn build_api_client() -> Result<Client> {
     Ok(Client::builder()
         .user_agent(USER_AGENT)
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(120))
         .redirect(redirect::Policy::none())
         .build()?)
 }

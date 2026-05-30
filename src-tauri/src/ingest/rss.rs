@@ -51,7 +51,20 @@ pub async fn fetch_feed(
         });
     }
     if !resp.status().is_success() {
-        return Err(anyhow!("upstream {} returned HTTP {}", url, resp.status()));
+        let status = resp.status();
+        // Peek at the body to detect Cloudflare / bot-protection challenges so
+        // the user gets an actionable error instead of a bare HTTP status code.
+        let body_hint = resp.text().await.unwrap_or_default();
+        if body_hint.contains("challenges.cloudflare.com")
+            || body_hint.contains("cf_chl_opt")
+            || body_hint.contains("Just a moment")
+        {
+            return Err(anyhow!(
+                "{url} is behind bot protection (Cloudflare challenge); LitFolio cannot fetch it directly.\n\
+                 Try downloading the feed XML in a browser and importing the file, or use a feed proxy."
+            ));
+        }
+        return Err(anyhow!("upstream {url} returned HTTP {status}"));
     }
     let new_etag = resp
         .headers()
@@ -104,7 +117,8 @@ pub async fn fetch_feed(
                 .map(|p| p.name.clone())
                 .filter(|n| !n.is_empty())
                 .collect();
-            let published_at = e.published.or(e.updated).map(|dt| dt.timestamp());
+            let published_at =
+                preferred_feed_timestamp(e.updated, e.published).map(|dt| dt.timestamp());
             NewFeedItem {
                 entry_id,
                 title,
@@ -127,12 +141,37 @@ pub async fn fetch_feed(
     })
 }
 
+fn preferred_feed_timestamp(
+    updated: Option<chrono::DateTime<chrono::Utc>>,
+    published: Option<chrono::DateTime<chrono::Utc>>,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    updated.or(published)
+}
+
 /// Crude HTML → text for feed summaries. We don't render rich HTML in the UI,
 /// so just collapse tags + whitespace and cap length.
+/// Pre-processes formula-related tags (<sub> → _, <sup> → ^) so math notation
+/// survives in plaintext abstracts.
 fn strip_html(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
+    let s = input.to_string();
+
+    // Strip inline formatting tags that are commonly nested inside formula
+    // markup (<i> variables, <b> vectors), keeping their inner text.
+    let fmt_re = regex::Regex::new(r"</?(?:i|b|em|strong)\b[^>]*>").unwrap();
+    let s = fmt_re.replace_all(&s, "").into_owned();
+
+    // Convert <sub>text</sub> → _text and <sup>text</sup> → ^text so
+    // chemical formulas (H<sub>2</sub>O) and math variables (k<sub>x</sub>)
+    // remain readable. Process sub/sup before the general tag strip so their
+    // inner content (including nested tags already removed above) is preserved.
+    let sub_re = regex::Regex::new(r"<sub[^>]*>(.*?)</sub>").unwrap();
+    let s = sub_re.replace_all(&s, "_$1").into_owned();
+    let sup_re = regex::Regex::new(r"<sup[^>]*>(.*?)</sup>").unwrap();
+    let s = sup_re.replace_all(&s, "^$1").into_owned();
+
+    let mut out = String::with_capacity(s.len());
     let mut in_tag = false;
-    for c in input.chars() {
+    for c in s.chars() {
         match c {
             '<' => in_tag = true,
             '>' => in_tag = false,
@@ -154,8 +193,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn preferred_timestamp_uses_updated_before_published() {
+        let published = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+            .unwrap()
+            .to_utc();
+        let updated = chrono::DateTime::parse_from_rfc3339("2026-05-01T00:00:00Z")
+            .unwrap()
+            .to_utc();
+        assert_eq!(
+            preferred_feed_timestamp(Some(updated), Some(published)),
+            Some(updated)
+        );
+        assert_eq!(
+            preferred_feed_timestamp(None, Some(published)),
+            Some(published)
+        );
+    }
+
+    #[test]
     fn strip_html_keeps_text_only() {
         assert_eq!(strip_html("<p>Hello <b>world</b>!</p>"), "Hello world!");
         assert_eq!(strip_html("  multiple\n\nspaces  "), "multiple spaces");
+    }
+
+    #[test]
+    fn strip_html_preserves_sub_and_sup() {
+        assert_eq!(strip_html("H<sub>2</sub>O"), "H_2O");
+        assert_eq!(strip_html("k<sub><i>x</i></sub>"), "k_x");
+        assert_eq!(strip_html("E=mc<sup>2</sup>"), "E=mc^2");
+        assert_eq!(strip_html("10<sup>3</sup> cells"), "10^3 cells");
+    }
+
+    #[test]
+    fn strip_html_handles_formula_in_context() {
+        let input = "<p>We measured <i>k</i><sub>x</sub> via <b>SPP</b> at 4NA/<i>λ</i>.</p>";
+        assert_eq!(strip_html(input), "We measured k_x via SPP at 4NA/λ.");
     }
 }

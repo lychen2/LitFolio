@@ -4,9 +4,7 @@ use anyhow::Result;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::ai::{active_profile_for_task, load_config, TaskKind};
-use crate::storage::{
-    GraphData, GraphFilter, PaperLink, PaperLinkRepo, PaperRepo, PaperTermRepo,
-};
+use crate::storage::{GraphData, GraphFilter, PaperLink, PaperLinkRepo, PaperRepo, PaperTermRepo};
 use crate::AppState;
 
 #[derive(serde::Serialize)]
@@ -41,10 +39,20 @@ pub async fn paper_link_create(
 ) -> Result<PaperLink, String> {
     // Validate both papers exist
     let repo = PaperRepo::new(&state.pool);
-    if repo.get(&source_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+    if repo
+        .get(&source_paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_none()
+    {
         return Err("source paper not found".into());
     }
-    if repo.get(&target_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+    if repo
+        .get(&target_paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_none()
+    {
         return Err("target paper not found".into());
     }
     PaperLinkRepo::new(&state.pool)
@@ -69,10 +77,20 @@ pub async fn paper_link_create_or_get(
     snippet: Option<String>,
 ) -> Result<PaperLink, String> {
     let repo = PaperRepo::new(&state.pool);
-    if repo.get(&source_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+    if repo
+        .get(&source_paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_none()
+    {
         return Err("source paper not found".into());
     }
-    if repo.get(&target_paper_id).await.map_err(|e| e.to_string())?.is_none() {
+    if repo
+        .get(&target_paper_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_none()
+    {
         return Err("target paper not found".into());
     }
     PaperLinkRepo::new(&state.pool)
@@ -89,10 +107,7 @@ pub async fn paper_link_create_or_get(
 }
 
 #[tauri::command]
-pub async fn paper_link_delete(
-    state: State<'_, Arc<AppState>>,
-    id: i64,
-) -> Result<(), String> {
+pub async fn paper_link_delete(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
     PaperLinkRepo::new(&state.pool)
         .delete(id)
         .await
@@ -201,10 +216,7 @@ pub async fn ai_discover_links(
 }
 
 #[tauri::command]
-pub async fn ai_accept_link(
-    state: State<'_, Arc<AppState>>,
-    link_id: i64,
-) -> Result<(), String> {
+pub async fn ai_accept_link(state: State<'_, Arc<AppState>>, link_id: i64) -> Result<(), String> {
     PaperLinkRepo::new(&state.pool)
         .accept_ai_link(link_id)
         .await
@@ -212,10 +224,7 @@ pub async fn ai_accept_link(
 }
 
 #[tauri::command]
-pub async fn ai_reject_link(
-    state: State<'_, Arc<AppState>>,
-    link_id: i64,
-) -> Result<(), String> {
+pub async fn ai_reject_link(state: State<'_, Arc<AppState>>, link_id: i64) -> Result<(), String> {
     PaperLinkRepo::new(&state.pool)
         .delete(link_id)
         .await

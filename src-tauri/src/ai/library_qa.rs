@@ -102,12 +102,10 @@ pub async fn answer_library_question(
         format!("Question:\n{trimmed}\n\nSources (numbered, cite by these numbers):\n{context}");
 
     // Build messages with windowed conversation history
-    let mut messages = vec![
-        ChatMessage {
-            role: "system".into(),
-            content: SYSTEM_PROMPT.into(),
-        },
-    ];
+    let mut messages = vec![ChatMessage {
+        role: "system".into(),
+        content: SYSTEM_PROMPT.into(),
+    }];
 
     // Window conversation history: keep last MAX_HISTORY_TURNS turns,
     // summarize older turns into a condensed context message.
@@ -134,12 +132,7 @@ pub async fn answer_library_question(
         content: user,
     });
 
-    let resp = chat_complete(
-        client,
-        profile,
-        &messages,
-    )
-    .await?;
+    let resp = chat_complete(client, profile, &messages).await?;
     let retrieved_count = sources.len();
     Ok(AskLibraryResult {
         answer: resp.content,
@@ -152,7 +145,11 @@ pub async fn answer_library_question(
     })
 }
 
-fn build_sources(papers: &[Paper], highlights: &HashMap<String, Vec<Highlight>>, terms: &[String]) -> Vec<AskSource> {
+fn build_sources(
+    papers: &[Paper],
+    highlights: &HashMap<String, Vec<Highlight>>,
+    terms: &[String],
+) -> Vec<AskSource> {
     papers
         .iter()
         .filter_map(|p| {
@@ -180,10 +177,25 @@ fn paper_snippet(p: &Paper, highlights: &[Highlight], terms: &[String]) -> Strin
 
     // Conditionally include detailed sections only when query terms appear in them.
     let terms_lower: Vec<String> = terms.iter().map(|t| t.to_lowercase()).collect();
-    push_if_relevant(&mut parts, "Problem", p.research_question.as_deref(), &terms_lower);
+    push_if_relevant(
+        &mut parts,
+        "Problem",
+        p.research_question.as_deref(),
+        &terms_lower,
+    );
     push_if_relevant(&mut parts, "Method", p.method.as_deref(), &terms_lower);
-    push_if_relevant(&mut parts, "Comparison", p.comparison.as_deref(), &terms_lower);
-    push_if_relevant(&mut parts, "Limitations", p.limitations.as_deref(), &terms_lower);
+    push_if_relevant(
+        &mut parts,
+        "Comparison",
+        p.comparison.as_deref(),
+        &terms_lower,
+    );
+    push_if_relevant(
+        &mut parts,
+        "Limitations",
+        p.limitations.as_deref(),
+        &terms_lower,
+    );
 
     if !p.key_findings.is_empty() {
         parts.push(format!("Key findings: {}", p.key_findings.join("; ")));
