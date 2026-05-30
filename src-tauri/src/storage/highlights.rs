@@ -320,35 +320,36 @@ mod tests {
         let list = repo.list_by_paper("A").await.unwrap();
         assert!(list[0].note.is_none());
 
-        repo
-            .update_translation(
-                &h1.id,
-                &HighlightTranslationUpdate {
-                    text: "你好",
-                    target_lang: "Chinese",
-                    model: "test-model",
-                    translated_at: 42,
-                },
-            )
-            .await
-            .unwrap();
+        repo.update_translation(
+            &h1.id,
+            &HighlightTranslationUpdate {
+                text: "你好",
+                target_lang: "Chinese",
+                model: "test-model",
+                translated_at: 42,
+            },
+        )
+        .await
+        .unwrap();
         let translated = repo.get(&h1.id).await.unwrap().unwrap();
         assert_eq!(translated.translation_text.as_deref(), Some("你好"));
-        assert_eq!(translated.translation_target_lang.as_deref(), Some("Chinese"));
+        assert_eq!(
+            translated.translation_target_lang.as_deref(),
+            Some("Chinese")
+        );
         assert_eq!(translated.translation_model.as_deref(), Some("test-model"));
         assert_eq!(translated.translated_at, Some(42));
 
-        repo
-            .update_summary(
-                &h1.id,
-                &HighlightSummaryUpdate {
-                    text: "一句话总结",
-                    model: "summary-model",
-                    summarized_at: 99,
-                },
-            )
-            .await
-            .unwrap();
+        repo.update_summary(
+            &h1.id,
+            &HighlightSummaryUpdate {
+                text: "一句话总结",
+                model: "summary-model",
+                summarized_at: 99,
+            },
+        )
+        .await
+        .unwrap();
         let summarized = repo.get(&h1.id).await.unwrap().unwrap();
         assert_eq!(summarized.summary_text.as_deref(), Some("一句话总结"));
         assert_eq!(summarized.summary_model.as_deref(), Some("summary-model"));
@@ -358,8 +359,8 @@ mod tests {
         assert_eq!(repo.list_by_paper("A").await.unwrap().len(), 1);
 
         assert!(repo.update_note("nonexistent", Some("x")).await.is_err());
-        assert!(
-            repo.update_translation(
+        assert!(repo
+            .update_translation(
                 "nonexistent",
                 &HighlightTranslationUpdate {
                     text: "x",
@@ -369,10 +370,9 @@ mod tests {
                 },
             )
             .await
-            .is_err()
-        );
-        assert!(
-            repo.update_summary(
+            .is_err());
+        assert!(repo
+            .update_summary(
                 "nonexistent",
                 &HighlightSummaryUpdate {
                     text: "x",
@@ -381,8 +381,7 @@ mod tests {
                 },
             )
             .await
-            .is_err()
-        );
+            .is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 

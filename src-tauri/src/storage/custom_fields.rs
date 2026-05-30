@@ -110,12 +110,7 @@ impl<'a> CustomFieldRepo<'a> {
             .collect())
     }
 
-    pub async fn set_paper_field(
-        &self,
-        paper_id: &str,
-        field_id: i64,
-        value: &str,
-    ) -> Result<()> {
+    pub async fn set_paper_field(&self, paper_id: &str, field_id: i64, value: &str) -> Result<()> {
         sqlx::query(
             "INSERT INTO paper_custom_fields (paper_id, field_id, value) VALUES (?1, ?2, ?3)
              ON CONFLICT(paper_id, field_id) DO UPDATE SET value = ?3",

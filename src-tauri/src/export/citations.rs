@@ -81,7 +81,10 @@ fn format_citation(paper: &Paper, style: CitationStyle) -> String {
 
 fn format_apa(p: &Paper) -> String {
     let authors = format_authors_apa(&p.authors);
-    let year = p.year.map(|y| y.to_string()).unwrap_or_else(|| "n.d.".into());
+    let year = p
+        .year
+        .map(|y| y.to_string())
+        .unwrap_or_else(|| "n.d.".into());
     let venue = p.venue.as_deref().unwrap_or("");
     let doi = p
         .doi
@@ -139,7 +142,10 @@ fn format_authors_gbt(authors: &[String]) -> String {
 
 fn format_chicago(p: &Paper) -> String {
     let authors = format_authors_chicago(&p.authors);
-    let year = p.year.map(|y| y.to_string()).unwrap_or_else(|| "n.d.".into());
+    let year = p
+        .year
+        .map(|y| y.to_string())
+        .unwrap_or_else(|| "n.d.".into());
     let venue = p.venue.as_deref().unwrap_or("");
     let doi = p
         .doi

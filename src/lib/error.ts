@@ -3,6 +3,7 @@ export function errorMessage(error: unknown): string {
   if (typeof error === "string") return error;
   const e = error as Record<string, unknown>;
   if (typeof e.message === "string" && (e.message as string).length > 0) return e.message as string;
+  if (typeof e.cause === "string" && (e.cause as string).length > 0) return e.cause as string;
   if (typeof e.toString === "function") {
     try {
       return (e.toString as () => string)();
@@ -11,4 +12,9 @@ export function errorMessage(error: unknown): string {
     }
   }
   return "";
+}
+
+export function errorMessageOr(error: unknown, fallback: string): string {
+  const message = errorMessage(error).trim();
+  return message || fallback;
 }

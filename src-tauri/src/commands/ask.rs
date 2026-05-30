@@ -23,7 +23,7 @@ use crate::ai::{
     active_profile_for_task, answer_library_question, empty_result, expand_search_query,
     load_config, AskLibraryResult, AskSource, TaskKind,
 };
-use crate::storage::{knowledge, HighlightRepo, Paper, PaperRepo};
+use crate::storage::{knowledge, retrieval, HighlightRepo, Paper, PaperRepo};
 use crate::AppState;
 
 const DEFAULT_SOURCE_LIMIT: i64 = 8;
@@ -56,6 +56,7 @@ pub async fn library_ask(
     question: String,
     limit: Option<i64>,
     conversation_history: Option<Vec<ConversationMessage>>,
+    pinned_paper_ids: Option<Vec<String>>,
 ) -> Result<AskLibraryResult, String> {
     let trimmed = question.trim().to_string();
     if trimmed.is_empty() {
@@ -65,6 +66,58 @@ pub async fn library_ask(
     let profile = active_profile_for_task(&cfg, TaskKind::Ask).map_err(|e| e.to_string())?;
     let source_limit = normalize_limit(limit);
     let repo = PaperRepo::new(&state.pool);
+
+    // User-pinned mode: skip retrieval entirely and answer only from the
+    // papers the user @-mentioned in the composer. Highlights for those
+    // papers are still loaded so the LLM sees marked passages.
+    let pinned_ids: Vec<String> = pinned_paper_ids
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if !pinned_ids.is_empty() {
+        let mut papers: Vec<Paper> = Vec::with_capacity(pinned_ids.len());
+        for id in &pinned_ids {
+            match repo.get(id).await {
+                Ok(Some(p)) => papers.push(p),
+                Ok(None) => tracing::warn!(paper_id = %id, "pinned paper not found; skipping"),
+                Err(e) => tracing::warn!(paper_id = %id, error = %e, "pinned paper load failed"),
+            }
+        }
+        if papers.is_empty() {
+            return Err("pinned papers not found".into());
+        }
+        let highlight_repo = HighlightRepo::new(&state.pool);
+        let mut highlights = HashMap::new();
+        for p in &papers {
+            if let Ok(hs) = highlight_repo.list_by_paper(&p.id).await {
+                if !hs.is_empty() {
+                    highlights.insert(p.id.clone(), hs);
+                }
+            }
+        }
+        let history = conversation_history.unwrap_or_default();
+        let ai_history: Vec<crate::ai::ChatMessage> = history
+            .iter()
+            .map(|m| crate::ai::ChatMessage {
+                role: m.role.clone(),
+                content: m.content.clone(),
+            })
+            .collect();
+        // Empty terms signal "no retrieval was performed" to the note exporter.
+        return answer_library_question(
+            &state.http,
+            &profile,
+            &trimmed,
+            &papers,
+            &highlights,
+            &[],
+            &ai_history,
+        )
+        .await
+        .map_err(|e| e.to_string());
+    }
 
     // Step 1: LLM query rewrite. Best-effort — if it fails (offline, key invalid,
     // model not configured), we still want retrieval to function.
@@ -79,7 +132,7 @@ pub async fn library_ask(
             .await
             .unwrap_or_default()
     } else {
-        multi_term_search(&repo, &expanded_terms, source_limit).await
+        retrieval::search_papers_multi_term(&state.pool, &expanded_terms, source_limit).await
     };
     let mut used_terms = if expanded_terms.is_empty() {
         vec![trimmed.clone()]
@@ -124,10 +177,7 @@ pub async fn library_ask(
     }
     if papers.is_empty() {
         // Last resort: return recent papers so the LLM has something to work with.
-        papers = repo
-            .list_recent(source_limit)
-            .await
-            .unwrap_or_default();
+        papers = repo.list_recent(source_limit).await.unwrap_or_default();
     }
     if papers.is_empty() {
         return Ok(empty_result(used_terms));
@@ -182,44 +232,9 @@ pub async fn ask_save_as_note(
     }
     let slug = note_slug(question);
     let content = render_note(&input, Utc::now().format("%Y-%m-%d %H:%M UTC").to_string());
-    let path = knowledge::save_markdown(&state.paths, &slug, &content).map_err(|e| e.to_string())?;
+    let path =
+        knowledge::save_markdown(&state.paths, &slug, &content).map_err(|e| e.to_string())?;
     Ok(SaveAskNoteResult { path })
-}
-
-/// Fan out per-term FTS5 searches and merge by paper_id. Score = number of distinct
-/// terms that retrieved a given paper; ties broken by year DESC then added_at DESC.
-/// This gives "papers that match many of the LLM-rewritten terms" priority over
-/// "papers that happened to score high in one term's bm25".
-async fn multi_term_search(repo: &PaperRepo<'_>, terms: &[String], limit: i64) -> Vec<Paper> {
-    // Over-fetch per term so the merge has enough candidates to surface multi-term
-    // matches even when one term's bm25 ordering pushes them down.
-    let per_term_limit = (limit * 3).max(8);
-    let mut scored: HashMap<String, (Paper, u32)> = HashMap::new();
-    for term in terms {
-        let term = term.trim();
-        if term.is_empty() {
-            continue;
-        }
-        if let Ok(hits) = repo.search(term, per_term_limit).await {
-            for p in hits {
-                scored
-                    .entry(p.id.clone())
-                    .and_modify(|(_, s)| *s += 1)
-                    .or_insert((p, 1));
-            }
-        }
-    }
-    let mut entries: Vec<(Paper, u32)> = scored.into_values().collect();
-    entries.sort_by(|a, b| {
-        b.1.cmp(&a.1)
-            .then_with(|| b.0.year.unwrap_or(0).cmp(&a.0.year.unwrap_or(0)))
-            .then_with(|| b.0.added_at.cmp(&a.0.added_at))
-    });
-    entries
-        .into_iter()
-        .take(limit as usize)
-        .map(|(p, _)| p)
-        .collect()
 }
 
 fn normalize_limit(limit: Option<i64>) -> i64 {
@@ -297,13 +312,11 @@ fn write_source(out: &mut String, index: usize, source: &AskSource) {
 /// search when the exact AND/OR strategies miss.
 fn fuzzy_phrases(question: &str) -> Vec<String> {
     let stop: &[char] = &[
-        '的', '是', '了', '在', '和', '与', '及', '对', '把', '被', '从',
-        '而', '且', '但', '或', '也', '都', '就', '着', '过', '之',
-        '不', '要', '会', '能', '可', '以', '到', '为', '上', '中', '下',
-        '有', '来', '去', '说', '想', '看', '用', '这', '那', '哪',
-        '呢', '吗', '啊', '吧', '么', '嘛', '呀', '哦',
-        '？', '？', '，', '。', '！', '：', '；', '“', '”', '（', '）',
-        '、', '《', '》', '…', '—', ' ', '\t', '\n', '\r',
+        '的', '是', '了', '在', '和', '与', '及', '对', '把', '被', '从', '而', '且', '但', '或',
+        '也', '都', '就', '着', '过', '之', '不', '要', '会', '能', '可', '以', '到', '为', '上',
+        '中', '下', '有', '来', '去', '说', '想', '看', '用', '这', '那', '哪', '呢', '吗', '啊',
+        '吧', '么', '嘛', '呀', '哦', '？', '？', '，', '。', '！', '：', '；', '“', '”', '（',
+        '）', '、', '《', '》', '…', '—', ' ', '\t', '\n', '\r',
     ];
     let mut phrases = Vec::new();
     let mut current = String::new();

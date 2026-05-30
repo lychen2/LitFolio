@@ -7,7 +7,9 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::ai::{chat_complete, list_models, load_config, save_config, ChatMessage, LlmConfig, LlmProfile};
+use crate::ai::{
+    chat_complete, list_models, load_config, save_config, ChatMessage, LlmConfig, LlmProfile,
+};
 
 use super::AppState;
 

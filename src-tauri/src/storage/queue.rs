@@ -64,7 +64,13 @@ impl<'a> QueueRepo<'a> {
             .collect())
     }
 
-    pub async fn add(&self, paper_id: &str, priority: i32, target_date: Option<i64>, note: Option<&str>) -> Result<()> {
+    pub async fn add(
+        &self,
+        paper_id: &str,
+        priority: i32,
+        target_date: Option<i64>,
+        note: Option<&str>,
+    ) -> Result<()> {
         let added_at = Utc::now().timestamp();
         sqlx::query(
             "INSERT OR IGNORE INTO reading_queue (paper_id, priority, target_date, note, added_at)
@@ -90,7 +96,13 @@ impl<'a> QueueRepo<'a> {
         Ok(())
     }
 
-    pub async fn update(&self, paper_id: &str, priority: i32, target_date: Option<i64>, note: Option<&str>) -> Result<()> {
+    pub async fn update(
+        &self,
+        paper_id: &str,
+        priority: i32,
+        target_date: Option<i64>,
+        note: Option<&str>,
+    ) -> Result<()> {
         let res = sqlx::query(
             "UPDATE reading_queue SET priority = ?1, target_date = ?2, note = ?3 WHERE paper_id = ?4",
         )
@@ -120,13 +132,12 @@ impl<'a> QueueRepo<'a> {
     }
 
     pub async fn contains(&self, paper_id: &str) -> Result<bool> {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM reading_queue WHERE paper_id = ?1",
-        )
-        .bind(paper_id)
-        .fetch_one(self.pool)
-        .await
-        .context("check queue membership")?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM reading_queue WHERE paper_id = ?1")
+                .bind(paper_id)
+                .fetch_one(self.pool)
+                .await
+                .context("check queue membership")?;
         Ok(count > 0)
     }
 }
@@ -187,7 +198,9 @@ mod tests {
         seed_paper(&pool, "B", "Paper B").await;
         let repo = QueueRepo::new(&pool);
 
-        repo.add("A", 10, None, Some("high priority")).await.unwrap();
+        repo.add("A", 10, None, Some("high priority"))
+            .await
+            .unwrap();
         repo.add("B", 5, None, None).await.unwrap();
 
         let list = repo.list().await.unwrap();
@@ -219,7 +232,9 @@ mod tests {
         repo.add("B", 2, None, None).await.unwrap();
         repo.add("C", 3, None, None).await.unwrap();
 
-        repo.reorder(&["B".into(), "A".into(), "C".into()]).await.unwrap();
+        repo.reorder(&["B".into(), "A".into(), "C".into()])
+            .await
+            .unwrap();
         let list = repo.list().await.unwrap();
         assert_eq!(list[0].paper_id, "B"); // highest priority after reorder
         assert_eq!(list[1].paper_id, "A");

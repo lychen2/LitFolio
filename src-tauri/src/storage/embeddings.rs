@@ -16,7 +16,12 @@ impl<'a> EmbeddingRepo<'a> {
     }
 
     /// Get a cached embedding if it exists and the content hash matches.
-    pub async fn get(&self, paper_id: &str, model: &str, content_hash: &str) -> Result<Option<Vec<f32>>> {
+    pub async fn get(
+        &self,
+        paper_id: &str,
+        model: &str,
+        content_hash: &str,
+    ) -> Result<Option<Vec<f32>>> {
         let row = sqlx::query(
             "SELECT embedding FROM paper_embeddings WHERE paper_id = ?1 AND model = ?2 AND content_hash = ?3",
         )
@@ -34,7 +39,13 @@ impl<'a> EmbeddingRepo<'a> {
     }
 
     /// Store an embedding.
-    pub async fn set(&self, paper_id: &str, model: &str, content_hash: &str, embedding: &[f32]) -> Result<()> {
+    pub async fn set(
+        &self,
+        paper_id: &str,
+        model: &str,
+        content_hash: &str,
+        embedding: &[f32],
+    ) -> Result<()> {
         let now = Utc::now().timestamp();
         let blob = f32_vec_to_bytes(embedding);
         sqlx::query(

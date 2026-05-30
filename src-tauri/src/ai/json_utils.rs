@@ -73,17 +73,24 @@ mod tests {
         let raw = r#"{"name":"foo","count":3}"#;
         assert_eq!(
             parse_lenient::<Item>(raw).unwrap(),
-            Item { name: "foo".into(), count: 3 }
+            Item {
+                name: "foo".into(),
+                count: 3
+            }
         );
     }
 
     #[test]
     fn parses_fenced_json() {
-        let raw = "Here's the answer:\n```json\n{\"name\":\"foo\",\"count\":3}\n```\nHope that helps!";
+        let raw =
+            "Here's the answer:\n```json\n{\"name\":\"foo\",\"count\":3}\n```\nHope that helps!";
         // Direct parse fails (prose around), substring fallback succeeds.
         assert_eq!(
             parse_lenient::<Item>(raw).unwrap(),
-            Item { name: "foo".into(), count: 3 }
+            Item {
+                name: "foo".into(),
+                count: 3
+            }
         );
     }
 
@@ -92,7 +99,10 @@ mod tests {
         let raw = "Sure thing — {\"name\":\"foo\",\"count\":3} is what you want.";
         assert_eq!(
             parse_lenient::<Item>(raw).unwrap(),
-            Item { name: "foo".into(), count: 3 }
+            Item {
+                name: "foo".into(),
+                count: 3
+            }
         );
     }
 

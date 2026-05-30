@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  BookMarked, FileText, LibraryBig, Loader2, MessagesSquare, Search, Send, User, Bot,
+  BookMarked, FileText, LibraryBig, Loader2, MessagesSquare, Search, User, Bot,
 } from "lucide-react";
 import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { renderMarkdown } from "@/lib/markdown";
 import { WorkflowCard } from "./ask/WorkflowCard";
+import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
 
 const SOURCE_LIMIT = 8;
 
@@ -18,8 +19,8 @@ interface ConversationTurn {
 
 export function AskPage() {
   const t = useT();
-  const [question, setQuestion] = useState("");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [pinnedPapers, setPinnedPapers] = useState<PinnedPaper[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when conversation updates
@@ -28,22 +29,20 @@ export function AskPage() {
   }, [conversation]);
 
   const ask = useMutation({
-    mutationFn: (nextQuestion: string) => {
+    mutationFn: ({ question, pinnedIds }: { question: string; pinnedIds: string[] }) => {
       // Build conversation history for the API
       const history = conversation.map((turn) => ({
         role: turn.role,
         content: turn.content,
       }));
-      return api.libraryAsk(nextQuestion, SOURCE_LIMIT, history);
+      return api.libraryAsk(question, SOURCE_LIMIT, history, pinnedIds);
     },
-    onSuccess: (nextResult, nextQuestion) => {
-      // Add user question and assistant response to conversation
+    onSuccess: (nextResult, vars) => {
       setConversation((prev) => [
         ...prev,
-        { role: "user", content: nextQuestion },
+        { role: "user", content: vars.question },
         { role: "assistant", content: nextResult.answer, result: nextResult },
       ]);
-      setQuestion("");
     },
   });
 
@@ -58,10 +57,11 @@ export function AskPage() {
       }),
   });
 
-  function submit() {
-    const nextQuestion = question.trim();
-    if (!nextQuestion || ask.isPending) return;
-    ask.mutate(nextQuestion);
+  function handleSubmit(question: string, pinnedIds: string[]) {
+    // Clear stale error from a previous failed mutation so the ✕ banner
+    // doesn't linger across follow-up attempts.
+    ask.reset();
+    ask.mutate({ question, pinnedIds });
   }
 
   function saveNote(turn: ConversationTurn) {
@@ -74,7 +74,8 @@ export function AskPage() {
 
   function clearConversation() {
     setConversation([]);
-    setQuestion("");
+    setPinnedPapers([]);
+    ask.reset();
   }
 
   const hasConversation = conversation.length > 0;
@@ -187,27 +188,14 @@ export function AskPage() {
       {/* Input area */}
       <div className="border-t border-litera-line px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex gap-3">
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
-              }}
-              placeholder={hasConversation ? t("ask.followUpPlaceholder") : t("ask.placeholder")}
-              className="flex-1 min-h-[60px] max-h-[120px] resize-none litera-panel p-3 text-sm leading-relaxed text-litera-text outline-none placeholder:text-litera-mute"
-              rows={2}
-            />
-            <button
-              onClick={submit}
-              disabled={ask.isPending || !question.trim()}
-              className="self-end litera-btn-primary px-4 py-3 disabled:opacity-50"
-            >
-              {ask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
-          </div>
-          <div className="mt-2 text-[11px] text-litera-mute">{t("ask.inputHint")}</div>
-          {ask.error && <div className="mt-2 text-sm text-red-400/90 break-all">✕ {(ask.error as Error).message}</div>}
+          <AskComposer
+            onSubmit={handleSubmit}
+            isPending={ask.isPending}
+            errorMessage={ask.error ? (ask.error as Error).message : null}
+            pinnedPapers={pinnedPapers}
+            setPinnedPapers={setPinnedPapers}
+            placeholder={hasConversation ? t("ask.followUpPlaceholder") : t("ask.placeholder")}
+          />
         </div>
       </div>
     </section>

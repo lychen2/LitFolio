@@ -55,7 +55,11 @@ impl<'a> PaperTermRepo<'a> {
         paper_id: &str,
         terms: &[NewPaperTerm],
     ) -> Result<Vec<PaperTerm>> {
-        let mut tx = self.pool.begin().await.context("begin replace paper terms")?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("begin replace paper terms")?;
         sqlx::query("DELETE FROM paper_terms WHERE paper_id = ?1")
             .bind(paper_id)
             .execute(&mut *tx)

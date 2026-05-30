@@ -11,13 +11,14 @@
 
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::ingest::fetch_feed;
 use crate::storage::{FeedItem, FeedRepo, FeedWithCounts};
 use crate::AppState;
 
 const MAX_PAGE_LIMIT: i64 = 200;
+const FEED_METADATA_BACKFILL_LIMIT: i64 = 100;
 
 #[tauri::command]
 pub async fn feeds_list(state: State<'_, Arc<AppState>>) -> Result<Vec<FeedWithCounts>, String> {
@@ -127,6 +128,7 @@ pub async fn feed_refresh(
 
 #[tauri::command]
 pub async fn feed_refresh_all(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
 ) -> Result<FeedRefreshAllSummary, String> {
     let repo = FeedRepo::new(&state.pool);
@@ -149,6 +151,19 @@ pub async fn feed_refresh_all(
             }
         }
     }
+    let app_for_backfill = app.clone();
+    let state_for_backfill = state.inner().clone();
+    tauri::async_runtime::spawn(async move {
+        let checked = super::feed_metadata::backfill_unchecked_feed_metadata(
+            &state_for_backfill,
+            FEED_METADATA_BACKFILL_LIMIT,
+        )
+        .await;
+        let _ = app_for_backfill.emit(
+            "feed-metadata-backfill-done",
+            serde_json::json!({ "checked": checked }),
+        );
+    });
     Ok(summary)
 }
 
@@ -227,5 +242,6 @@ pub struct FeedRefreshAllSummary {
     pub unchanged: i64,
     pub failed: i64,
     pub new_items: i64,
+    pub metadata_checked: i64,
     pub errors: Vec<String>,
 }

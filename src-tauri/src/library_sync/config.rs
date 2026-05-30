@@ -63,10 +63,11 @@ pub fn load_config() -> Result<SyncConfig> {
             ),
         }
     } else {
-        // Legacy: password was stored plaintext in JSON. Migrate it to the
-        // keychain, then rewrite the JSON without the secret. On migration
-        // failure we leave the JSON alone so the user keeps working.
-        match secret::put(secret::WEBDAV_ACCOUNT, &cfg.webdav.password) {
+        // Legacy: password was stored plaintext in JSON. Roundtrip-verify the
+        // keychain write before clearing the JSON copy — otherwise a no-op
+        // backend (keyring crate with no platform feature) would silently
+        // throw away the only copy of the password.
+        match migrate_secret(secret::WEBDAV_ACCOUNT, &cfg.webdav.password) {
             Ok(()) => {
                 let mut sanitized = cfg.clone();
                 sanitized.webdav.password.clear();
@@ -78,7 +79,7 @@ pub fn load_config() -> Result<SyncConfig> {
             }
             Err(e) => tracing::warn!(
                 error = %e,
-                "keychain migration failed; leaving webdav password in JSON"
+                "keychain migration roundtrip failed; leaving webdav password in JSON"
             ),
         }
     }
@@ -89,15 +90,28 @@ pub fn save_config(cfg: &SyncConfig) -> Result<()> {
     let path = config_file()?;
     let mut to_persist = cfg.clone();
     if !to_persist.webdav.password.is_empty() {
-        match secret::put(secret::WEBDAV_ACCOUNT, &to_persist.webdav.password) {
+        match migrate_secret(secret::WEBDAV_ACCOUNT, &to_persist.webdav.password) {
             Ok(()) => to_persist.webdav.password.clear(),
             Err(e) => tracing::warn!(
                 error = %e,
-                "keychain put failed; webdav password will be written to JSON as a fallback"
+                "keychain put/verify failed; webdav password will be written to JSON as a fallback"
             ),
         }
     }
     save_config_at(&path, &to_persist)
+}
+
+/// Push `value` into the keychain under `account` and require an immediate
+/// readback to match. See `ai::profile::migrate_secret` for the rationale —
+/// kept here as a small duplicate so the sync layer has no upward dependency
+/// on the LLM layer.
+fn migrate_secret(account: &str, value: &str) -> Result<()> {
+    secret::put(account, value).context("keychain put")?;
+    match secret::get(account)? {
+        Some(echoed) if echoed == value => Ok(()),
+        Some(_) => Err(anyhow!("keychain readback did not match written value")),
+        None => Err(anyhow!("keychain readback returned no value after put")),
+    }
 }
 
 pub fn configured_webdav(cfg: &SyncConfig) -> Result<WebDavConfig> {

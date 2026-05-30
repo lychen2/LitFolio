@@ -125,19 +125,13 @@ pub enum TaskKind {
     LitReview,
 }
 
+#[cfg(test)]
 impl LlmConfig {
     pub fn upsert(&mut self, p: LlmProfile) {
         if let Some(slot) = self.profiles.iter_mut().find(|x| x.name == p.name) {
             *slot = p;
         } else {
             self.profiles.push(p);
-        }
-    }
-
-    pub fn remove(&mut self, name: &str) {
-        self.profiles.retain(|p| p.name != name);
-        if self.active.as_deref() == Some(name) {
-            self.active = None;
         }
     }
 }
@@ -154,7 +148,12 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
     let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
     let mut cfg: LlmConfig =
         serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
-    let mut migrated = false;
+    // Names of profiles whose plaintext api_key migrated to the keychain AND
+    // round-tripped — i.e. we wrote it and immediately read back the same
+    // value. Only those entries get their JSON field cleared. A backend that
+    // silently accepts writes but stores nothing (keyring crate with no
+    // platform feature flag) would otherwise vaporise the user's key.
+    let mut migrated_names: Vec<String> = Vec::new();
     for profile in &mut cfg.profiles {
         if profile.api_key.is_empty() {
             // No secret in JSON — fetch from keychain. Failure is non-fatal:
@@ -169,29 +168,34 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
                 ),
             }
         } else {
-            // Legacy plaintext config — migrate to keychain on first load and
-            // rewrite the JSON to scrub the secret out. If push fails, we keep
-            // the JSON as-is so the user doesn't get locked out.
-            match secret::put(&secret::llm_account(&profile.name), &profile.api_key) {
-                Ok(()) => migrated = true,
+            // Legacy plaintext config — migrate to keychain with a roundtrip
+            // check. Without the readback step a no-op backend would let us
+            // clear the JSON copy before the value is actually retrievable.
+            match migrate_secret(&secret::llm_account(&profile.name), &profile.api_key) {
+                Ok(()) => migrated_names.push(profile.name.clone()),
                 Err(e) => tracing::warn!(
                     error = %e,
                     profile = %profile.name,
-                    "keychain migration failed; leaving api_key in JSON"
+                    "keychain migration roundtrip failed; leaving api_key in JSON"
                 ),
             }
         }
     }
-    if migrated {
+    if !migrated_names.is_empty() {
         let mut sanitized = cfg.clone();
         for p in &mut sanitized.profiles {
-            p.api_key.clear();
+            if migrated_names.contains(&p.name) {
+                p.api_key.clear();
+            }
         }
         if let Ok(body) = serde_json::to_vec_pretty(&sanitized) {
             if let Err(e) = std::fs::write(&path, body) {
                 tracing::warn!(error = %e, path = %path.display(), "rewriting sanitized config failed");
             } else {
-                tracing::info!("migrated LLM api_keys from JSON to OS keychain");
+                tracing::info!(
+                    profiles = migrated_names.len(),
+                    "migrated LLM api_keys from JSON to OS keychain"
+                );
             }
         }
     }
@@ -212,18 +216,34 @@ pub fn save_config(paths: &LibraryPaths, cfg: &LlmConfig) -> Result<()> {
             // we'd clobber their key.
             continue;
         }
-        match secret::put(&secret::llm_account(&profile.name), &profile.api_key) {
+        // Roundtrip: write then read back. Only clear the JSON copy if the
+        // keychain echoes the value we wrote — a mock backend that swallows
+        // writes silently would otherwise lose the key permanently.
+        match migrate_secret(&secret::llm_account(&profile.name), &profile.api_key) {
             Ok(()) => profile.api_key.clear(),
             Err(e) => tracing::warn!(
                 error = %e,
                 profile = %profile.name,
-                "keychain put failed; api_key will be written to JSON as a fallback"
+                "keychain put/verify failed; api_key will be written to JSON as a fallback"
             ),
         }
     }
     let body = serde_json::to_vec_pretty(&to_persist)?;
     std::fs::write(&path, body)?;
     Ok(())
+}
+
+/// Push `value` into the keychain under `account`, then read it back and
+/// require the readback to match. Returns Ok only when the keychain has
+/// observably stored exactly what we wrote. Callers who would otherwise
+/// scrub a plaintext fallback should gate that scrub on this returning Ok.
+fn migrate_secret(account: &str, value: &str) -> Result<()> {
+    secret::put(account, value).context("keychain put")?;
+    match secret::get(account)? {
+        Some(echoed) if echoed == value => Ok(()),
+        Some(_) => Err(anyhow!("keychain readback did not match written value")),
+        None => Err(anyhow!("keychain readback returned no value after put")),
+    }
 }
 
 pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
@@ -414,5 +434,86 @@ mod tests {
         let cfg = LlmConfig::default();
         let err = active_profile(&cfg).expect_err("empty config should error");
         assert!(err.to_string().contains("no LLM profile"));
+    }
+
+    #[test]
+    fn save_keeps_plaintext_when_keychain_silently_drops() {
+        // The bug this guards against: keyring 3.x with no platform feature
+        // returns Ok from put() but stores nothing. Without the roundtrip
+        // check we would clear profile.api_key from JSON and have nowhere to
+        // read it back from — the user's key would vanish.
+        let (paths, dir) = tmp_paths();
+        crate::secret::set_fault_mode(crate::secret::FaultMode::SilentDropOnPut);
+        let mut cfg = LlmConfig::default();
+        let mut p = sample_profile("dropguard");
+        p.api_key = "sk-must-survive".into();
+        cfg.upsert(p);
+        save_config(&paths, &cfg).unwrap();
+        crate::secret::set_fault_mode(crate::secret::FaultMode::None);
+
+        let raw = std::fs::read_to_string(paths.config_file()).unwrap();
+        let parsed: LlmConfig = serde_json::from_str(&raw).unwrap();
+        assert_eq!(
+            parsed.profiles[0].api_key, "sk-must-survive",
+            "plaintext key must survive when keychain silently drops the write"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn load_migration_keeps_plaintext_when_silent_drop() {
+        // Legacy plaintext config + broken keychain: load_config must NOT
+        // sanitize the JSON. The single remaining copy of the key is on
+        // disk; clearing it loses the credential forever.
+        let (paths, dir) = tmp_paths();
+        let mut cfg = LlmConfig::default();
+        let mut p = sample_profile("legacy");
+        p.api_key = "sk-legacy-secret".into();
+        cfg.upsert(p);
+        let body = serde_json::to_vec_pretty(&cfg).unwrap();
+        std::fs::write(paths.config_file(), body).unwrap();
+
+        crate::secret::set_fault_mode(crate::secret::FaultMode::SilentDropOnPut);
+        let _loaded = load_config(&paths).unwrap();
+        crate::secret::set_fault_mode(crate::secret::FaultMode::None);
+
+        let raw = std::fs::read_to_string(paths.config_file()).unwrap();
+        let parsed: LlmConfig = serde_json::from_str(&raw).unwrap();
+        assert_eq!(
+            parsed.profiles[0].api_key, "sk-legacy-secret",
+            "broken migration must leave the plaintext key in the JSON"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn migration_clears_only_successfully_round_tripped_profiles() {
+        // Positive multi-profile path: two legacy plaintext profiles, both
+        // migrate cleanly under the working in-mem backend → both JSON
+        // copies are cleared. The negative case (broken backend leaves
+        // every JSON copy alone) is covered by
+        // load_migration_keeps_plaintext_when_silent_drop.
+        let (paths, dir) = tmp_paths();
+        let mut cfg = LlmConfig::default();
+        let mut a = sample_profile("profile-a");
+        a.api_key = "sk-a".into();
+        let mut b = sample_profile("profile-b");
+        b.api_key = "sk-b".into();
+        cfg.upsert(a);
+        cfg.upsert(b);
+        let body = serde_json::to_vec_pretty(&cfg).unwrap();
+        std::fs::write(paths.config_file(), body).unwrap();
+
+        let _loaded = load_config(&paths).unwrap();
+        let raw = std::fs::read_to_string(paths.config_file()).unwrap();
+        let parsed: LlmConfig = serde_json::from_str(&raw).unwrap();
+        for p in &parsed.profiles {
+            assert!(
+                p.api_key.is_empty(),
+                "profile {} should have JSON api_key cleared after successful migration",
+                p.name
+            );
+        }
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

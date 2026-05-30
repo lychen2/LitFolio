@@ -3,8 +3,9 @@
 #![allow(dead_code, unused_imports)]
 
 mod comparisons;
-mod db;
+pub mod concepts;
 pub mod custom_fields;
+mod db;
 pub mod dedup;
 pub mod embeddings;
 mod feed_defaults;
@@ -20,10 +21,9 @@ mod paper_terms;
 mod papers;
 mod paths;
 pub mod queue;
-pub mod search;
+pub mod retrieval;
 pub mod smart_collections;
 mod tags;
-pub mod concepts;
 pub mod topic_alerts;
 
 pub use comparisons::{ComparisonRepo, PaperComparison};
@@ -42,7 +42,7 @@ pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
 pub use paths::{default_library_root, LibraryPaths};
 pub use queue::{QueueEntry, QueueRepo};
-pub use search::{unified_search, UnifiedSearchResult};
+pub use retrieval::{unified_search, UnifiedSearchResult};
 pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};
 pub use tags::{TagRepo, TagWithCount};
 pub use topic_alerts::{TopicAlert, TopicAlertRepo, TopicAlertResult};

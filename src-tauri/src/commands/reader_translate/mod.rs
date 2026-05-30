@@ -7,7 +7,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::ai::{active_profile_for_task, chat_complete, load_config, ChatMessage, LlmProfile, TaskKind};
+use crate::ai::{
+    active_profile_for_task, chat_complete, load_config, ChatMessage, LlmProfile, TaskKind,
+};
 use crate::storage::{
     Highlight, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate, Paper, PaperRepo,
     PaperTermRepo,
@@ -41,7 +43,9 @@ pub async fn reader_translate_selection(
     }
     let repo = PaperRepo::new(&state.pool);
     let term_repo = PaperTermRepo::new(&state.pool);
-    let paper = load_paper(&repo, &paper_id).await.map_err(|e| e.to_string())?;
+    let paper = load_paper(&repo, &paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let clipped = truncate(text, MAX_SELECTION_CHARS);
     let terms = build_term_insights(&repo, &term_repo, &paper, &clipped)
         .await
@@ -193,7 +197,10 @@ async fn translate_selection(
     let translation = parse_translation(&resp.content);
     if translation.trim().is_empty() {
         let snippet: String = resp.content.trim().chars().take(120).collect();
-        return Err(anyhow!("empty translation — model returned {} chars: {snippet}", resp.content.trim().chars().count()));
+        return Err(anyhow!(
+            "empty translation — model returned {} chars: {snippet}",
+            resp.content.trim().chars().count()
+        ));
     }
     Ok(ReaderTranslateResult {
         translation,

@@ -59,17 +59,46 @@ mod real {
 mod inmem {
     use anyhow::Result;
     use once_cell::sync::Lazy;
+    use std::cell::Cell;
     use std::collections::HashMap;
     use std::sync::Mutex;
 
-    static STORE: Lazy<Mutex<HashMap<String, String>>> =
-        Lazy::new(|| Mutex::new(HashMap::new()));
+    static STORE: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+    /// Per-thread fault injection so tests can simulate broken keychain
+    /// backends without writing real platform code. The real bug we are
+    /// guarding against — the `keyring` crate falling back to a mock backend
+    /// when no platform feature is enabled — silently accepts writes but
+    /// returns nothing on read; `SilentDropOnPut` reproduces that exact
+    /// shape so our roundtrip check can be tested for real.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum FaultMode {
+        None,
+        SilentDropOnPut,
+        ReadFails,
+    }
+
+    thread_local! {
+        static FAULT: Cell<FaultMode> = const { Cell::new(FaultMode::None) };
+    }
+
+    pub fn set_fault_mode(mode: FaultMode) {
+        FAULT.with(|c| c.set(mode));
+    }
 
     pub fn get(account: &str) -> Result<Option<String>> {
+        if FAULT.with(|c| c.get()) == FaultMode::ReadFails {
+            return Err(anyhow::anyhow!("simulated keychain read failure"));
+        }
         Ok(STORE.lock().unwrap().get(account).cloned())
     }
 
     pub fn put(account: &str, value: &str) -> Result<()> {
+        if FAULT.with(|c| c.get()) == FaultMode::SilentDropOnPut {
+            // Pretend success but never persist. Mirrors keyring 3.x with no
+            // backend feature enabled.
+            return Ok(());
+        }
         STORE
             .lock()
             .unwrap()
@@ -84,14 +113,13 @@ mod inmem {
     }
 }
 
-#[cfg(not(test))]
-pub use real::{get, put};
-#[cfg(not(test))]
-#[allow(unused_imports)]
-pub use real::delete;
-#[cfg(test)]
-pub use inmem::{get, put};
 #[cfg(test)]
 #[allow(unused_imports)]
 pub use inmem::delete;
-
+#[cfg(test)]
+pub use inmem::{get, put, set_fault_mode, FaultMode};
+#[cfg(not(test))]
+#[allow(unused_imports)]
+pub use real::delete;
+#[cfg(not(test))]
+pub use real::{get, put};

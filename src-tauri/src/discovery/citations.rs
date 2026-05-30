@@ -185,7 +185,16 @@ async fn get_cached(pool: &SqlitePool, paper_id: &str) -> Result<Option<Citation
     let mut references = Vec::new();
     let mut citations = Vec::new();
 
-    for (cited_paper_id, cited_title, cited_authors, cited_year, cited_venue, cited_doi, direction) in rows {
+    for (
+        cited_paper_id,
+        cited_title,
+        cited_authors,
+        cited_year,
+        cited_venue,
+        cited_doi,
+        direction,
+    ) in rows
+    {
         let authors: Vec<String> = cited_authors
             .as_ref()
             .and_then(|a| serde_json::from_str(a).ok())

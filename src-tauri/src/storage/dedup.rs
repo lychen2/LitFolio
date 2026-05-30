@@ -1,5 +1,7 @@
 //! Paper deduplication: find and merge duplicate papers.
 
+use std::collections::{HashMap, HashSet};
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -114,53 +116,153 @@ pub async fn scan_all_duplicates(pool: &Pool) -> Result<Vec<DuplicatePair>> {
     .await
     .context("scan all papers for dedup")?;
 
-    let papers: Vec<Paper> = rows
-        .into_iter()
-        .map(|r| row_to_paper(r))
-        .collect::<Result<_>>()?;
-
+    let papers: Vec<Paper> = rows.into_iter().map(row_to_paper).collect::<Result<_>>()?;
+    let by_id = papers
+        .iter()
+        .map(|paper| (paper.id.clone(), paper))
+        .collect::<HashMap<_, _>>();
     let mut pairs = Vec::new();
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
 
-    for (i, paper) in papers.iter().enumerate() {
-        for other in papers.iter().skip(i + 1) {
-            let key = if paper.id < other.id {
-                format!("{}:{}", paper.id, other.id)
-            } else {
-                format!("{}:{}", other.id, paper.id)
-            };
-            if seen.contains(&key) {
-                continue;
-            }
+    add_exact_duplicate_pairs(pool, &by_id, "doi", "doi_match", &mut seen, &mut pairs).await?;
+    add_exact_duplicate_pairs(
+        pool,
+        &by_id,
+        "arxiv_id",
+        "arxiv_match",
+        &mut seen,
+        &mut pairs,
+    )
+    .await?;
+    add_title_duplicate_pairs(&papers, &mut seen, &mut pairs);
 
-            if let Some(reason) = check_duplicate_reason(paper, other) {
-                seen.insert(key);
-                pairs.push(DuplicatePair {
-                    paper_a: paper.clone(),
-                    paper_b: other.clone(),
-                    reason,
-                });
-            }
+    Ok(pairs)
+}
+
+async fn add_exact_duplicate_pairs(
+    pool: &Pool,
+    by_id: &HashMap<String, &Paper>,
+    column: &str,
+    reason: &str,
+    seen: &mut HashSet<String>,
+    pairs: &mut Vec<DuplicatePair>,
+) -> Result<()> {
+    let sql = format!(
+        "SELECT lower(trim({column})) AS key, group_concat(id, char(31)) AS ids
+         FROM papers
+         WHERE {column} IS NOT NULL AND trim({column}) != ''
+         GROUP BY key HAVING COUNT(*) > 1"
+    );
+    let rows = sqlx::query(&sql)
+        .fetch_all(pool)
+        .await
+        .with_context(|| format!("scan duplicate {column}"))?;
+    for row in rows {
+        let ids: String = row.try_get("ids")?;
+        add_duplicate_group(ids.split('\u{1f}'), by_id, reason, seen, pairs);
+    }
+    Ok(())
+}
+
+fn add_title_duplicate_pairs(
+    papers: &[Paper],
+    seen: &mut HashSet<String>,
+    pairs: &mut Vec<DuplicatePair>,
+) {
+    let mut buckets: HashMap<usize, Vec<(&Paper, String)>> = HashMap::new();
+    for paper in papers {
+        let normalized = normalize_title(&paper.title);
+        if normalized.len() >= 5 {
+            buckets
+                .entry(normalized.len() / 10)
+                .or_default()
+                .push((paper, normalized));
         }
     }
 
-    Ok(pairs)
+    let mut keys = buckets.keys().copied().collect::<Vec<_>>();
+    keys.sort_unstable();
+    for bucket in keys {
+        let mut candidates = Vec::new();
+        for nearby in bucket.saturating_sub(1)..=bucket + 1 {
+            if let Some(items) = buckets.get(&nearby) {
+                candidates.extend(items.iter());
+            }
+        }
+        if let Some(items) = buckets.get(&bucket) {
+            for (paper, title_norm) in items {
+                for (other, other_norm) in candidates.iter().copied() {
+                    if paper.id >= other.id {
+                        continue;
+                    }
+                    let len_ratio = title_norm.len() as f64 / other_norm.len().max(1) as f64;
+                    if !(0.80..=1.20).contains(&len_ratio) {
+                        continue;
+                    }
+                    let dist = levenshtein(title_norm, other_norm);
+                    let max_len = title_norm.len().max(other_norm.len()) as f64;
+                    if max_len > 0.0 && (dist as f64 / max_len) < 0.15 {
+                        push_pair(paper, other, "title_similar", seen, pairs);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn add_duplicate_group<'a>(
+    ids: impl Iterator<Item = &'a str>,
+    by_id: &HashMap<String, &Paper>,
+    reason: &str,
+    seen: &mut HashSet<String>,
+    pairs: &mut Vec<DuplicatePair>,
+) {
+    let papers = ids
+        .filter_map(|id| by_id.get(id).copied())
+        .collect::<Vec<_>>();
+    for (i, paper) in papers.iter().enumerate() {
+        for other in papers.iter().skip(i + 1) {
+            push_pair(paper, other, reason, seen, pairs);
+        }
+    }
+}
+
+fn push_pair(
+    paper: &Paper,
+    other: &Paper,
+    reason: &str,
+    seen: &mut HashSet<String>,
+    pairs: &mut Vec<DuplicatePair>,
+) {
+    let key = pair_key(&paper.id, &other.id);
+    if !seen.insert(key) {
+        return;
+    }
+    pairs.push(DuplicatePair {
+        paper_a: paper.clone(),
+        paper_b: other.clone(),
+        reason: reason.into(),
+    });
+}
+
+fn pair_key(a: &str, b: &str) -> String {
+    if a < b {
+        format!("{}:{}", a, b)
+    } else {
+        format!("{}:{}", b, a)
+    }
 }
 
 fn check_duplicate_reason(a: &Paper, b: &Paper) -> Option<String> {
     // DOI match
     if let (Some(ref doi_a), Some(ref doi_b)) = (&a.doi, &b.doi) {
-        if !doi_a.trim().is_empty()
-            && doi_a.trim().to_lowercase() == doi_b.trim().to_lowercase()
-        {
+        if !doi_a.trim().is_empty() && doi_a.trim().to_lowercase() == doi_b.trim().to_lowercase() {
             return Some("doi_match".into());
         }
     }
     // arXiv ID match
     if let (Some(ref arx_a), Some(ref arx_b)) = (&a.arxiv_id, &b.arxiv_id) {
-        if !arx_a.trim().is_empty()
-            && arx_a.trim().to_lowercase() == arx_b.trim().to_lowercase()
-        {
+        if !arx_a.trim().is_empty() && arx_a.trim().to_lowercase() == arx_b.trim().to_lowercase() {
             return Some("arxiv_match".into());
         }
     }
@@ -240,9 +342,9 @@ pub async fn merge_papers(pool: &Pool, keep_id: &str, merge_id: &str) -> Result<
 
     // Transfer note sections
     sqlx::query(
-        "UPDATE note_sections SET paper_id = ?1
+        "UPDATE paper_note_sections SET paper_id = ?1
          WHERE paper_id = ?2
-           AND id NOT IN (SELECT id FROM note_sections WHERE paper_id = ?1)",
+           AND id NOT IN (SELECT id FROM paper_note_sections WHERE paper_id = ?1)",
     )
     .bind(keep_id)
     .bind(merge_id)
@@ -251,13 +353,13 @@ pub async fn merge_papers(pool: &Pool, keep_id: &str, merge_id: &str) -> Result<
     .context("merge note sections")?;
 
     // Transfer paper links
-    sqlx::query("UPDATE paper_links SET source_id = ?1 WHERE source_id = ?2")
+    sqlx::query("UPDATE paper_links SET source_paper_id = ?1 WHERE source_paper_id = ?2")
         .bind(keep_id)
         .bind(merge_id)
         .execute(&mut *tx)
         .await
         .context("merge links source")?;
-    sqlx::query("UPDATE paper_links SET target_id = ?1 WHERE target_id = ?2")
+    sqlx::query("UPDATE paper_links SET target_paper_id = ?1 WHERE target_paper_id = ?2")
         .bind(keep_id)
         .bind(merge_id)
         .execute(&mut *tx)

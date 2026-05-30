@@ -1,8 +1,8 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, AlertTriangle, ClipboardCopy, Columns2, X } from "lucide-react";
-import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+import { ArrowLeft, AlertTriangle, ClipboardCopy, Columns2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { HighlightList } from "./reader/HighlightList";
@@ -91,6 +91,24 @@ function ReaderSinglePane({
   const currentHighlightIdx = useRef<number>(-1);
   const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
 
+  // Collapsible side panels so the PDF can take the full width when the reader
+  // wants a bigger page. Driven imperatively via panel refs; collapse state is
+  // mirrored into React so the toolbar toggles can show the right icon.
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const rightPanelRef = useRef<ImperativePanelHandle>(null);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const toggleLeft = useCallback(() => {
+    const panel = leftPanelRef.current;
+    if (!panel) return;
+    panel.isCollapsed() ? panel.expand() : panel.collapse();
+  }, []);
+  const toggleRight = useCallback(() => {
+    const panel = rightPanelRef.current;
+    if (!panel) return;
+    panel.isCollapsed() ? panel.expand() : panel.collapse();
+  }, []);
+
   const handleScrollRef = useCallback((fn: (id: string) => void) => {
     scrollFn.current = fn;
   }, []);
@@ -178,6 +196,24 @@ function ReaderSinglePane({
               <ClipboardCopy className="h-3.5 w-3.5" />
             </button>
           )}
+          <button
+            onClick={toggleLeft}
+            className={`litera-btn text-xs shrink-0 ${leftCollapsed ? "" : "bg-litera-accent/15 text-litera-accent border-litera-accent/30"}`}
+            title={t("reader.toggleHighlights")}
+            aria-label={t("reader.toggleHighlights")}
+            aria-pressed={!leftCollapsed}
+          >
+            {leftCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={toggleRight}
+            className={`litera-btn text-xs shrink-0 ${rightCollapsed ? "" : "bg-litera-accent/15 text-litera-accent border-litera-accent/30"}`}
+            title={t("reader.toggleWorkspace")}
+            aria-label={t("reader.toggleWorkspace")}
+            aria-pressed={!rightCollapsed}
+          >
+            {rightCollapsed ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
+          </button>
           {onOpenSplit && (
             <button
               onClick={() => {
@@ -214,10 +250,19 @@ function ReaderSinglePane({
         <PanelGroup direction="horizontal" autoSaveId={compact ? undefined : "litera-reader-layout"}>
           {!compact && (
             <>
-              <Panel defaultSize={16} minSize={10} maxSize={24}>
+              <Panel
+                ref={leftPanelRef}
+                defaultSize={16}
+                minSize={10}
+                maxSize={24}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setLeftCollapsed(true)}
+                onExpand={() => setLeftCollapsed(false)}
+              >
                 <HighlightList paperId={paperId} onJump={handleJump} highlightsRef={highlightsRef} />
               </Panel>
-              <PanelResizeHandle className="w-2 relative group/handle cursor-col-resize">
+              <PanelResizeHandle className={`w-2 relative group/handle cursor-col-resize ${leftCollapsed ? "hidden" : ""}`}>
                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-litera-line group-hover/handle:bg-litera-accent/40 transition-colors" />
               </PanelResizeHandle>
             </>
@@ -225,10 +270,19 @@ function ReaderSinglePane({
           <Panel defaultSize={compact ? 65 : 52} minSize={30}>
             <PdfPane paperId={paperId} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
           </Panel>
-          <PanelResizeHandle className="w-2 relative group/handle cursor-col-resize">
+          <PanelResizeHandle className={`w-2 relative group/handle cursor-col-resize ${rightCollapsed ? "hidden" : ""}`}>
             <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-litera-line group-hover/handle:bg-litera-accent/40 transition-colors" />
           </PanelResizeHandle>
-          <Panel defaultSize={compact ? 35 : 28} minSize={15} maxSize={45}>
+          <Panel
+            ref={compact ? undefined : rightPanelRef}
+            defaultSize={compact ? 35 : 28}
+            minSize={15}
+            maxSize={45}
+            collapsible={!compact}
+            collapsedSize={0}
+            onCollapse={() => setRightCollapsed(true)}
+            onExpand={() => setRightCollapsed(false)}
+          >
             <ReaderWorkspacePane
               paperId={paperId}
               activeTab={activeTab}

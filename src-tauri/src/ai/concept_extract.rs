@@ -3,8 +3,8 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage, ChatResponse};
-use super::profile::{active_profile_for_task, load_config, LlmProfile};
+use super::client::{chat_complete, ChatMessage};
+use super::profile::{active_profile_for_task, load_config};
 use super::TaskKind;
 use crate::storage::LibraryPaths;
 
@@ -30,8 +30,7 @@ pub async fn extract_concepts(
     paper_text: &str,
 ) -> Result<Vec<ExtractedConcept>> {
     let cfg = load_config(paths).context("load LLM config")?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Tldr)
-        .context("no LLM profile")?;
+    let profile = active_profile_for_task(&cfg, TaskKind::Tldr).context("no LLM profile")?;
 
     let text_preview: String = paper_text.chars().take(8000).collect();
 
@@ -49,10 +48,7 @@ Focus on:
 
 Return ONLY the JSON array, no markdown fences."#;
 
-    let user = format!(
-        "Paper: {}\n\nText:\n{}",
-        paper_title, text_preview
-    );
+    let user = format!("Paper: {}\n\nText:\n{}", paper_title, text_preview);
 
     let messages = vec![
         ChatMessage {

@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLink, Eye, EyeOff, Inbox, Languages, Loader2, Plus, Radio, RefreshCw,
   Rss, Trash2, X,
 } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { open as openInBrowser } from "@tauri-apps/plugin-shell";
 import {
   api,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { extractSourceIdentifier } from "@/lib/identifier";
 
 /// RSS / Atom subscription page. Layout mirrors BrowsePage:
 ///   left  — feeds list + "+ 订阅" input
@@ -32,10 +34,26 @@ export function FeedsPage() {
   const [onlyUnread, setOnlyUnread] = useState(false);
 
   const qc = useQueryClient();
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    listen("feed-metadata-backfill-done", () => {
+      qc.invalidateQueries({ queryKey: ["feed-items"] });
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [qc]);
+
   const feedsQ = useQuery({
     queryKey: ["feeds"],
     queryFn: api.feedsList,
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
   const itemsQ = useQuery({
     queryKey: ["feed-items", selectedFeedId, onlyUnread],
@@ -46,6 +64,7 @@ export function FeedsPage() {
         limit: 100,
       }),
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const refreshAll = useMutation({
@@ -163,9 +182,9 @@ function FeedListSidebar({
   });
 
   function submit() {
-    const t = url.trim();
-    if (!t) return;
-    add.mutate(t);
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+    add.mutate(trimmedUrl);
   }
 
   return (
@@ -444,17 +463,17 @@ function ItemsList({
 /// profile and returns title + abstract). Falls back gracefully when the
 /// upstream feed doesn't carry an arXiv ID or DOI.
 function feedItemToDraft(item: FeedItem): ArxivDraft {
+  if (item.metadata) return item.metadata;
   const link = item.link ?? "";
-  const arxivMatch = link.match(/arxiv\.org\/(?:abs|pdf|html|format)\/([\w\-./]+?)(?:v\d+)?(?:\.pdf)?(?:[?#].*)?$/i);
-  const doiMatch = link.match(/doi\.org\/(10\.\d{4,9}\/[^\s?#]+)/i);
+  const { arxivId, doi } = extractSourceIdentifier(link);
   const year = item.published_at ? new Date(item.published_at * 1000).getUTCFullYear() : null;
   return {
     title: item.title,
     authors: item.authors,
     year,
     venue: null,
-    doi: doiMatch ? doiMatch[1] : null,
-    arxiv_id: arxivMatch ? arxivMatch[1] : null,
+    doi,
+    arxiv_id: arxivId,
     abstract_text: item.summary,
   };
 }
@@ -491,15 +510,17 @@ function ItemRow({
   }
 
   function importToLibrary() {
-    if (!item.link) return;
     const params = new URLSearchParams({
       fromFeedItem: item.id,
-      link: item.link,
       title: item.title,
     });
+    if (item.link) params.set("link", item.link);
     navigate(`/import?${params.toString()}`);
   }
 
+  const displayTitle = item.metadata?.title ?? item.title;
+  const displayAuthors = item.metadata?.authors?.length ? item.metadata.authors : item.authors;
+  const displaySummary = item.metadata?.abstract_text ?? item.summary;
   const published = item.published_at ? new Date(item.published_at * 1000) : null;
 
   return (
@@ -512,7 +533,7 @@ function ItemRow({
             title={t("feeds.viewMeta")}
           >
             {!item.seen && <span className="inline-block h-1.5 w-1.5 rounded-full bg-litera-accent mr-2 align-middle" />}
-            {item.title}
+            {displayTitle}
             {item.imported_paper_id && (
               <span className="ml-2 text-[10px] text-emerald-400/90 align-middle">{t("feeds.imported")}</span>
             )}
@@ -523,15 +544,15 @@ function ItemRow({
           <div className="text-[11px] text-litera-mute mt-1 flex items-center gap-2 flex-wrap">
             <span className="truncate max-w-[200px]">{feedTitle}</span>
             {published && <span>· {published.toISOString().slice(0, 10)}</span>}
-            {item.authors.length > 0 && (
+            {displayAuthors.length > 0 && (
               <span className="truncate max-w-[280px]">
-                · {item.authors.slice(0, 3).join(", ")}{item.authors.length > 3 ? " et al." : ""}
+                · {displayAuthors.slice(0, 3).join(", ")}{displayAuthors.length > 3 ? " et al." : ""}
               </span>
             )}
           </div>
-          {item.summary && (
+          {displaySummary && (
             <p className="text-[12px] text-litera-text/70 mt-2 line-clamp-2 leading-relaxed">
-              {item.summary}
+              {displaySummary}
             </p>
           )}
           {translation?.abstract_text && (
@@ -563,7 +584,7 @@ function ItemRow({
               {t("common.open")}
             </button>
           )}
-          {item.link && !item.imported_paper_id && (
+          {!item.imported_paper_id && (
             <button
               onClick={importToLibrary}
               className="litera-btn-primary text-xs whitespace-nowrap"
@@ -609,18 +630,18 @@ function FeedItemDetailDrawer({
     onSuccess: onTranslated,
   });
   const draft = useMemo(() => feedItemToDraft(item), [item]);
+  const detailSummary = draft.abstract_text ?? item.summary ?? t("feeds.noSummary");
   const published = item.published_at ? new Date(item.published_at * 1000) : null;
 
   function openExternal() {
     if (item.link) openInBrowser(item.link).catch(() => undefined);
   }
   function importToLibrary() {
-    if (!item.link) return;
     const params = new URLSearchParams({
       fromFeedItem: item.id,
-      link: item.link,
       title: item.title,
     });
+    if (item.link) params.set("link", item.link);
     navigate(`/import?${params.toString()}`);
   }
 
@@ -633,7 +654,7 @@ function FeedItemDetailDrawer({
         <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-litera-accent2">RSS metadata</div>
-            <h2 className="font-serif text-xl leading-tight mt-1">{item.title}</h2>
+            <h2 className="font-serif text-xl leading-tight mt-1">{draft.title}</h2>
             {translation?.title && (
               <p className="text-sm text-litera-accent mt-2">{translation.title}</p>
             )}
@@ -657,7 +678,7 @@ function FeedItemDetailDrawer({
               <ExternalLink className="h-3.5 w-3.5" /> {t("feeds.openExternal")}
             </button>
           )}
-          {item.link && !item.imported_paper_id && (
+          {!item.imported_paper_id && (
             <button onClick={importToLibrary} className="litera-btn-primary text-xs">
               {t("feeds.importBtnLong")}
             </button>
@@ -671,7 +692,7 @@ function FeedItemDetailDrawer({
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
           <Meta item={item} feedTitle={feedTitle} draft={draft} published={published} />
-          <Section title={t("feeds.summarySection")} body={item.summary || t("feeds.noSummary")} />
+          <Section title={t("feeds.summarySection")} body={detailSummary} />
           {translation?.abstract_text && <Section title={t("feeds.summaryTranslationSection")} body={translation.abstract_text} accent />}
           {translate.error && (
             <div className="text-sm text-red-400/90">✕ {t("feeds.translateFailedPrefix", { message: (translate.error as Error).message })}</div>
