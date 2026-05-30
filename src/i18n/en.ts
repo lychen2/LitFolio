@@ -9,6 +9,9 @@ export const en: Record<TKey, string> = {
   "nav.ask": "Ask",
   "nav.settings": "Settings",
   "shell.footer": "",
+  "shell.showNav": "Show navigation (move cursor to the far left)",
+  "shell.pinNav": "Pin navigation",
+  "shell.unpinNav": "Auto-hide navigation",
 
   "common.open": "Open",
   "common.translate": "Translate",

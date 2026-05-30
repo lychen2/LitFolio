@@ -69,22 +69,21 @@ jobs:
           releaseBody: |
             ## What's new in ${{ github.ref_name }}
 
-            ### Fixed
-            - DeepSeek V4 / reasoning models: chain-of-thought no longer leaks into translate/summary/ask answers. `thinking:disabled` for chat models, reasoning preserved for R1/o1/o3.
-            - Translation JSON extraction now uses `rfind('{')` — resilient to leading prose or reasoning text with embedded braces.
-            - Empty translation results now return a clear error instead of silent failure.
-            - Library QA degraded search chain (AND → raw question → OR → fuzzy CJK phrase → recent-paper fallback) — no more dead "no papers found" page.
-            - Settings: typing a provider name no longer loses input focus.
-            - Error display: robust `errorMessage()` helper handles Tauri v2's varied error shapes.
-            - Manual: fixed blank first page caused by `titlepage` environment.
-
             ### Added
-            - Markdown rendering for AI answers (bold, italic, lists, headings, code blocks).
-            - `search_or` method for broader FTS5 recall.
-            - `fuzzy_phrases` for Chinese question tokenization.
+            - Reader full-width mode: the global navigation sidebar auto-hides on the reader page so the PDF gets the whole window. Slam the cursor to the far-left edge to slide it back in, or pin it open (preference is remembered).
+            - Reader: collapsible highlights and notes panels — toggle them from the toolbar to give the PDF even more room; layout is persisted.
 
             ### Changed
-            - Version bump to 0.3.2.
+            - Faster knowledge graph: `graph_data` now batches its queries instead of one SELECT per paper/concept.
+            - Faster duplicate scan: exact DOI/arXiv matches use SQL grouping and title comparison is length-bucketed (no more full O(N²) sweep).
+            - Library tags load in a single batched call instead of one request per row.
+            - Folder import runs up to 4 PDFs concurrently.
+            - In-folder search is pushed down to the backend instead of filtering on the client.
+
+            ### Fixed
+            - Duplicate merge referenced stale table/column names and could fail mid-merge.
+            - Reader/Settings: localized previously hardcoded strings and tightened i18n typing; added an i18n consistency check.
+            - Cleaner startup error handling and removal of dead code paths flagged after dropping a blanket allow.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true
