@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             bundles: "--bundles deb,rpm,appimage"
           - platform: windows-2025
             bundles: "--bundles nsis,msi"
@@ -41,7 +41,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,7 +53,7 @@ jobs:
             curl \
             wget \
             file \
-            libfuse2 \
+            libfuse2t64 \
             libssl-dev
 
       - name: Install frontend dependencies
