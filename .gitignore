@@ -34,6 +34,11 @@ pnpm-debug.log*
 docs/manual/*.aux
 docs/manual/*.out
 docs/manual/*.toc
+docs/*
+!docs/manual/
+docs/manual/*
+!docs/manual/manual.pdf
+!docs/manual/manual-en.pdf
 
 # user library samples
 sample-library/

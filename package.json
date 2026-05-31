@@ -1,7 +1,7 @@
 {
   "name": "litfolio-desktop",
   "private": true,
-  "version": "0.3.3",
+  "version": "0.3.4",
   "type": "module",
   "description": "LitFolio — local-first literature management with LLM-powered summarization",
   "scripts": {
@@ -13,7 +13,10 @@
     "tauri:build": "tauri build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "test": "vitest run"
+    "lint:strict": "eslint src --ext .ts,.tsx --max-warnings=0",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "bundle:report": "node scripts/bundle-report.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
@@ -24,6 +27,7 @@
     "@tauri-apps/plugin-fs": "^2.0.3",
     "@tauri-apps/plugin-shell": "^2.0.1",
     "clsx": "^2.1.1",
+    "katex": "^0.17.0",
     "lucide-react": "^0.460.0",
     "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
@@ -36,7 +40,9 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tauri-apps/cli": "^2.1.0",
+    "@types/katex": "^0.16.8",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
@@ -46,6 +52,7 @@
     "eslint": "^9.15.0",
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^14.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",

@@ -98,7 +98,7 @@ fn matches_initials(words: &[&str], acro_chars: &[char]) -> bool {
     words.iter().zip(acro_chars.iter()).all(|(word, ch)| {
         word.chars()
             .next()
-            .map_or(false, |c| c.to_ascii_lowercase() == *ch)
+            .is_some_and(|c| c.to_ascii_lowercase() == *ch)
     })
 }
 

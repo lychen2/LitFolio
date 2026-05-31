@@ -7,7 +7,7 @@ use tauri::State;
 
 use crate::ai::{
     active_profile_for_task, load_config, quick_read_paper_text, summarize_paper_text,
-    QuickReadResult, TaskKind, TldrResult,
+    PaperSummaryRequest, QuickReadResult, TaskKind, TldrResult,
 };
 use crate::ingest::PaperDraft;
 use crate::storage::{LibraryPaths, PaperRepo};
@@ -62,20 +62,19 @@ pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<T
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let body = load_or_extract_pdf_body(&state.paths, &id, paper.pdf_path.as_deref()).await;
-    let result = summarize_paper_text(
-        &state.http,
-        &prof,
-        &paper.title,
-        &paper.authors,
-        paper.venue.as_deref(),
-        paper.year,
-        paper.abstract_text.as_deref(),
-        body.as_deref(),
-        None,
+    let request = PaperSummaryRequest {
+        title: &paper.title,
+        authors: &paper.authors,
+        venue: paper.venue.as_deref(),
+        year: paper.year,
+        abstract_text: paper.abstract_text.as_deref(),
+        body_text: body.as_deref(),
+        extra_context: None,
         output_language,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    };
+    let result = summarize_paper_text(&state.http, &prof, &request)
+        .await
+        .map_err(|e| e.to_string())?;
     repo.update_tldr(&id, &result.tldr, &result.key_findings)
         .await
         .map_err(|e| e.to_string())?;
@@ -99,20 +98,19 @@ pub async fn paper_quick_read(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let body = load_or_extract_pdf_body(&state.paths, &id, paper.pdf_path.as_deref()).await;
-    let result = quick_read_paper_text(
-        &state.http,
-        &prof,
-        &paper.title,
-        &paper.authors,
-        paper.venue.as_deref(),
-        paper.year,
-        paper.abstract_text.as_deref(),
-        body.as_deref(),
-        None,
+    let request = PaperSummaryRequest {
+        title: &paper.title,
+        authors: &paper.authors,
+        venue: paper.venue.as_deref(),
+        year: paper.year,
+        abstract_text: paper.abstract_text.as_deref(),
+        body_text: body.as_deref(),
+        extra_context: None,
         output_language,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    };
+    let result = quick_read_paper_text(&state.http, &prof, &request)
+        .await
+        .map_err(|e| e.to_string())?;
     repo.update_quick_read(
         &id,
         &result.problem,

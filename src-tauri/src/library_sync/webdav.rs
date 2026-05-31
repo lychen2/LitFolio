@@ -224,3 +224,6 @@ fn ensure_mkcol_status(status: u16, remote_dir: &str) -> Result<()> {
         "WebDAV MKCOL for {remote_dir} failed with HTTP {status}"
     ))
 }
+
+#[cfg(test)]
+mod tests;

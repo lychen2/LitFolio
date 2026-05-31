@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { BookMarked, Languages, Loader2, Orbit, Quote } from "lucide-react";
 import { api, type ReaderTranslateResult } from "@/lib/api";
 import { errorMessage } from "@/lib/error";
+import { MarkdownView } from "@/components/MarkdownView";
 import { useT } from "@/i18n/I18nProvider";
 
 export function SelectionTranslatePane({
@@ -19,6 +20,7 @@ export function SelectionTranslatePane({
     mutationFn: (text: string) => api.readerTranslateSelection(paperId, text),
     retry: false,
   });
+  const requestTranslation = translate.mutate;
 
   useEffect(() => {
     const trimmed = selectionText.trim();
@@ -26,8 +28,8 @@ export function SelectionTranslatePane({
       return;
     }
     lastRequested.current = trimmed;
-    translate.mutate(trimmed);
-  }, [selectionText]);
+    requestTranslation(trimmed);
+  }, [requestTranslation, selectionText]);
 
   if (!selectionText.trim()) {
     return (
@@ -95,7 +97,10 @@ function TranslateResultView({
         <div className="text-xs uppercase tracking-wider text-litera-mute mb-2 flex items-center gap-1.5">
           <Languages className="h-3.5 w-3.5 text-litera-accent" /> {t("reader.translated")}
         </div>
-        <p className="text-sm leading-relaxed text-litera-text whitespace-pre-wrap">{result.translation}</p>
+        <MarkdownView
+          content={result.translation}
+          className="text-sm leading-relaxed text-litera-text markdown-body"
+        />
         <div className="mt-3 pt-3 border-t border-litera-line text-[11px] text-litera-mute">
           {result.model} · {result.prompt_tokens + result.completion_tokens} tk
         </div>

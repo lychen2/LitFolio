@@ -9,6 +9,7 @@ import { HighlightList } from "./reader/HighlightList";
 import { PdfPane } from "./reader/PdfPane";
 import { ReaderWorkspacePane, type ReaderWorkspaceTab } from "./reader/ReaderWorkspacePane";
 import { ReaderOnboarding } from "./reader/ReaderOnboarding";
+import { MessageScreen } from "./reader/ReaderMessageScreen";
 
 /**
  * Three-pane PDF reader with optional split view.
@@ -293,26 +294,5 @@ function ReaderSinglePane({
         </PanelGroup>
       </div>
     </div>
-  );
-}
-
-function MessageScreen({ icon, title, subtitle, backLink }: {
-  icon?: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  backLink: string;
-}) {
-  const t = useT();
-  return (
-    <section className="h-full grid place-items-center text-center">
-      <div>
-        {icon && <div className="mb-2 flex justify-center">{icon}</div>}
-        <div className="text-sm text-litera-text">{title}</div>
-        {subtitle && <div className="text-xs text-litera-mute mt-1">{subtitle}</div>}
-        <Link to={backLink} className="litera-btn text-xs mt-4 inline-flex">
-          <ArrowLeft className="h-3.5 w-3.5" /> {t("reader.backToLibrary")}
-        </Link>
-      </div>
-    </section>
   );
 }

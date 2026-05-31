@@ -1,10 +1,11 @@
+mod explain;
 mod terms;
+mod translate;
 
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::ai::{
@@ -16,19 +17,12 @@ use crate::storage::{
 };
 use crate::AppState;
 
-use self::terms::{build_term_insights, TermInsight};
+use self::terms::build_term_insights;
+use translate::translate_selection;
+pub use translate::ReaderTranslateResult;
 
 const MAX_SELECTION_CHARS: usize = 2_000;
 const MIN_SUMMARY_CHARS: usize = 240;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReaderTranslateResult {
-    pub translation: String,
-    pub terms: Vec<TermInsight>,
-    pub model: String,
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-}
 
 #[tauri::command]
 pub async fn reader_translate_selection(
@@ -152,63 +146,28 @@ pub async fn highlight_summarize(
         .map_err(|e| e.to_string())
 }
 
-async fn load_paper(repo: &PaperRepo<'_>, paper_id: &str) -> Result<Paper> {
+#[tauri::command]
+pub async fn highlight_explain(
+    state: State<'_, Arc<AppState>>,
+    highlight_id: String,
+) -> Result<Highlight, String> {
+    explain::highlight_explain_impl(state, highlight_id).await
+}
+
+pub(super) async fn load_paper(repo: &PaperRepo<'_>, paper_id: &str) -> Result<Paper> {
     repo.get(paper_id)
         .await
         .map_err(|e| anyhow!(e))?
         .ok_or_else(|| anyhow!("paper not found"))
 }
 
-async fn load_highlight(repo: &HighlightRepo<'_>, highlight_id: &str) -> Result<Highlight> {
+pub(super) async fn load_highlight(
+    repo: &HighlightRepo<'_>,
+    highlight_id: &str,
+) -> Result<Highlight> {
     repo.get(highlight_id)
         .await?
         .ok_or_else(|| anyhow!("highlight not found"))
-}
-
-async fn translate_selection(
-    client: &reqwest::Client,
-    profile: &LlmProfile,
-    paper: &Paper,
-    selection: &str,
-    terms: &[TermInsight],
-    target_lang: &str,
-) -> Result<ReaderTranslateResult> {
-    let glossary = format_glossary(terms);
-    let user_content = crate::ai::prompts::READER_TRANSLATE_USER
-        .replace("{lang}", target_lang)
-        .replace("{title}", &paper.title)
-        .replace("{selection}", selection)
-        .replace("{glossary}", &glossary);
-    let resp = chat_complete(
-        client,
-        profile,
-        &[
-            ChatMessage {
-                role: "system".into(),
-                content: crate::ai::prompts::READER_TRANSLATE_SYSTEM.into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_content,
-            },
-        ],
-    )
-    .await?;
-    let translation = parse_translation(&resp.content);
-    if translation.trim().is_empty() {
-        let snippet: String = resp.content.trim().chars().take(120).collect();
-        return Err(anyhow!(
-            "empty translation — model returned {} chars: {snippet}",
-            resp.content.trim().chars().count()
-        ));
-    }
-    Ok(ReaderTranslateResult {
-        translation,
-        terms: terms.to_vec(),
-        model: resp.model,
-        prompt_tokens: resp.prompt_tokens,
-        completion_tokens: resp.completion_tokens,
-    })
 }
 
 struct HighlightSummaryResult {
@@ -249,57 +208,6 @@ async fn summarize_highlight(
             .to_string(),
         model: resp.model,
     })
-}
-
-fn format_glossary(terms: &[TermInsight]) -> String {
-    if terms.is_empty() {
-        return "No glossary terms matched in this passage.".into();
-    }
-    terms
-        .iter()
-        .map(|term| format!("- {} | local: {}", term.term, term.local_definition))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn parse_translation(raw: &str) -> String {
-    let parsed = parse_json_lenient(raw);
-    if let Some(value) = parsed.get("translation").and_then(|v| v.as_str()) {
-        let t = value.trim();
-        if let Some(filtered) = filter_placeholder(t) {
-            return filtered.to_string();
-        }
-    }
-    // JSON extraction failed — try raw text fallback.
-    let body = strip_code_fence(raw.trim());
-    let fallback = body
-        .lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or(body)
-        .trim();
-    if let Some(filtered) = filter_placeholder(fallback) {
-        return filtered.to_string();
-    }
-    String::new()
-}
-
-/// Reject text that looks like the model echoed the prompt template.
-fn filter_placeholder(s: &str) -> Option<&str> {
-    let lower = s.to_lowercase();
-    // Generic placeholders the model might echo verbatim.
-    for skip in &["...", "…"] {
-        if lower == *skip {
-            return None;
-        }
-    }
-    if lower.contains("put the") || lower.contains("replace") {
-        return None;
-    }
-    if s.chars().count() <= 3 && !s.chars().any(|c| c.is_ascii_alphabetic()) {
-        return None;
-    }
-    Some(s)
 }
 
 fn parse_json_lenient(raw: &str) -> serde_json::Value {

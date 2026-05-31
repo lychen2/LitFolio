@@ -11,16 +11,15 @@ mod index;
 mod ingest;
 mod library_sync;
 mod secret;
+mod startup;
 mod storage;
 
-use anyhow::Result;
-use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
-use storage::{default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
+use storage::{LibraryPaths, Pool};
 
 pub struct AppState {
     pub pool: Pool,
@@ -38,86 +37,6 @@ pub struct AppState {
     /// guard there would pin a tokio worker thread.
     pub batch_cancel: AsyncMutex<Option<CancellationToken>>,
     pub sync_lock: AsyncMutex<()>,
-}
-
-async fn bootstrap_state() -> Result<Arc<AppState>> {
-    let root = default_library_root()?;
-    let paths = LibraryPaths::new(root);
-    paths.ensure()?;
-    let pool = open_pool(&paths.db_file()).await?;
-    run_migrations(&pool).await?;
-    let feed_repo = storage::FeedRepo::new(&pool);
-    let repaired = feed_repo.repair_default_feed_urls().await.unwrap_or(0);
-    if repaired > 0 {
-        tracing::info!(repaired, "repaired legacy default RSS feed urls");
-    }
-    let seeded = feed_repo.seed_defaults_if_empty().await.unwrap_or(0);
-    if seeded > 0 {
-        tracing::info!(seeded, "seeded default RSS feeds");
-    }
-    // Seed default manual PDFs if the library is empty.
-    let paper_repo = storage::PaperRepo::new(&pool);
-    let paper_count = paper_repo.list_recent(1).await.unwrap_or_default().len();
-    if paper_count == 0 {
-        if let Ok(exe) = std::env::current_exe() {
-            let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
-            // macOS: Contents/MacOS/exe -> Contents/Resources
-            // Windows/Linux: same directory as exe
-            let res_dir = if cfg!(target_os = "macos") {
-                exe_dir.join("../Resources")
-            } else {
-                exe_dir.to_path_buf()
-            };
-            let manuals = [
-                ("manual.pdf", "LitFolio 用户手册 (中文版)", "LitFolio"),
-                (
-                    "manual-en.pdf",
-                    "LitFolio User Manual (English)",
-                    "LitFolio",
-                ),
-            ];
-            for (filename, title, venue) in &manuals {
-                let src = res_dir.join(filename);
-                if src.exists() {
-                    let paper_id = ulid::Ulid::new().to_string();
-                    let _ = ingest::import_pdf_file(&src, &paper_id, &paths);
-                    let _ = paper_repo
-                        .update_title_venue(&paper_id, title, Some(venue))
-                        .await;
-                    let _ = paper_repo
-                        .set_read_status(&paper_id, storage::ReadStatus::Read)
-                        .await;
-                    if let Ok(Some(p)) = paper_repo.get(&paper_id).await {
-                        let _ = paper_repo
-                            .update_bibtex(&p.id, &bibtex::generate_bibtex(&p))
-                            .await;
-                    }
-                    tracing::info!(filename, "seeded default manual");
-                }
-            }
-        }
-    }
-    // Backfill BibTeX for papers that predate the bibtex column.
-    let need_bib = paper_repo.list_needing_bibtex().await.unwrap_or_default();
-    if !need_bib.is_empty() {
-        let n = need_bib.len();
-        for p in &need_bib {
-            let bib = bibtex::generate_bibtex(p);
-            let _ = paper_repo.update_bibtex(&p.id, &bib).await;
-        }
-        tracing::info!(count = n, "backfilled BibTeX entries");
-    }
-    let http = http::build_api_client()?;
-    let http_external = http::build_external_client()?;
-    tracing::info!(root = %paths.root.display(), "library ready");
-    Ok(Arc::new(AppState {
-        pool,
-        paths,
-        http,
-        http_external,
-        batch_cancel: AsyncMutex::new(None),
-        sync_lock: AsyncMutex::new(()),
-    }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -144,6 +63,7 @@ pub fn run() {
             commands::papers::paper_get,
             commands::papers::paper_set_read_status,
             commands::papers::paper_delete,
+            commands::papers::paper_enrich_from_doi,
             commands::tags::tags_list,
             commands::tags::tag_create,
             commands::tags::tag_rename,
@@ -177,7 +97,7 @@ pub fn run() {
             commands::pdf::local::paper_save_with_pdf,
             commands::pdf::local::paper_attach_pdf,
             commands::pdf::local::paper_open_pdf,
-            commands::pdf::local::paper_read_pdf_bytes,
+            commands::pdf::local::paper_pdf_asset_path,
             commands::llm::llm_get_config,
             commands::llm::llm_save_config,
             commands::llm::llm_test,
@@ -193,9 +113,9 @@ pub fn run() {
             commands::batch::batch_attach_tag,
             commands::batch::batch_set_status,
             commands::batch::batch_delete,
-            commands::batch::batch_tldr,
-            commands::batch::batch_quick_read,
-            commands::batch::batch_translate,
+            commands::batch::ai::batch_tldr,
+            commands::batch::ai::batch_quick_read,
+            commands::batch::ai::batch_translate,
             commands::batch::batch_cancel,
             commands::highlights::highlight_create,
             commands::highlights::highlight_list,
@@ -211,6 +131,7 @@ pub fn run() {
             commands::reader_terms::paper_set_pdf_text,
             commands::reader_translate::highlight_summarize,
             commands::reader_translate::highlight_translate,
+            commands::reader_translate::highlight_explain,
             commands::notes::note_get,
             commands::notes::note_save,
             commands::reader_translate::reader_translate_selection,
@@ -300,7 +221,7 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match bootstrap_state().await {
+                match startup::bootstrap_state().await {
                     Ok(state) => {
                         handle.manage(state);
                         tracing::info!("LitFolio backend booted");

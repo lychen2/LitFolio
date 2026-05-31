@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 use tokio::task::JoinSet;
 use ulid::Ulid;
 
@@ -9,6 +9,7 @@ use super::common::{
     attach_imported_pdf_to_existing, existing_paper_for_draft, PdfFailure, PdfImportSummary,
 };
 use crate::bibtex::generate_bibtex;
+use crate::commands::events::emit_or_warn;
 use crate::ingest::{fetch_doi, import_pdf_file};
 use crate::storage::{LibraryPaths, Paper, PaperRepo, Pool};
 use crate::AppState;
@@ -33,9 +34,10 @@ pub async fn import_folder(
     let pool = state.pool.clone();
 
     // 1. Scan directory recursively for PDFs
-    let _ = app.emit(
+    emit_or_warn(
+        &app,
         "folder-import-progress",
-        FolderImportProgress {
+        &FolderImportProgress {
             phase: "scanning".into(),
             done: 0,
             total: 0,
@@ -77,9 +79,10 @@ pub async fn import_folder(
                 Ok(paper) => imported.push(paper),
                 Err(failure) => failed.push(failure),
             }
-            let _ = app.emit(
+            emit_or_warn(
+                &app,
                 "folder-import-progress",
-                FolderImportProgress {
+                &FolderImportProgress {
                     phase: "importing".into(),
                     done,
                     total,
@@ -90,9 +93,10 @@ pub async fn import_folder(
         }
     }
 
-    let _ = app.emit(
+    emit_or_warn(
+        &app,
         "folder-import-progress",
-        FolderImportProgress {
+        &FolderImportProgress {
             phase: "done".into(),
             done: total,
             total,
@@ -177,7 +181,7 @@ async fn import_one_folder_pdf(
     }
 }
 
-fn pdf_failure(path: &PathBuf, error: String) -> PdfFailure {
+fn pdf_failure(path: &Path, error: String) -> PdfFailure {
     PdfFailure {
         path: path.display().to_string(),
         error,
@@ -194,7 +198,7 @@ fn walk_pdfs(dir: &PathBuf) -> Vec<PathBuf> {
                 result.extend(walk_pdfs(&path));
             } else if path
                 .extension()
-                .map_or(false, |e| e.eq_ignore_ascii_case("pdf"))
+                .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
             {
                 result.push(path);
             }
@@ -205,7 +209,7 @@ fn walk_pdfs(dir: &PathBuf) -> Vec<PathBuf> {
 
 /// Try to extract metadata from a filename like `Author_Year_Title.pdf` or
 /// `Author - Year - Title.pdf` or `Author (Year) Title.pdf`.
-fn parse_filename_heuristic(path: &PathBuf) -> Option<(String, Vec<String>, Option<i32>)> {
+fn parse_filename_heuristic(path: &Path) -> Option<(String, Vec<String>, Option<i32>)> {
     let stem = path.file_stem()?.to_string_lossy().to_string();
 
     // Pattern: Author_Year_Title  or  Author - Year - Title
@@ -215,7 +219,7 @@ fn parse_filename_heuristic(path: &PathBuf) -> Option<(String, Vec<String>, Opti
         let year = parts[1].trim().parse::<i32>().ok();
         if year.is_some() {
             let authors: Vec<String> = parts[0]
-                .split(|c: char| c == '&' || c == ',')
+                .split(['&', ','])
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
@@ -230,7 +234,7 @@ fn parse_filename_heuristic(path: &PathBuf) -> Option<(String, Vec<String>, Opti
         let year = caps.get(2)?.as_str().parse::<i32>().ok();
         let title = caps.get(3)?.as_str().replace('_', " ").trim().to_string();
         let authors: Vec<String> = author_str
-            .split(|c: char| c == '&' || c == ',')
+            .split(['&', ','])
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();

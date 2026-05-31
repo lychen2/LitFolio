@@ -2,10 +2,12 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::{Component, Path, PathBuf};
 
 pub const MANIFEST_FILE_NAME: &str = ".litera-sync-manifest.json";
-
+const SYNC_MANIFEST_VERSION: u8 = 1;
+const SHA256_HEX_LEN: usize = 64;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifestFile {
     pub path: String,
@@ -101,10 +103,21 @@ pub fn manifest_bytes(manifest: &SyncManifest) -> Result<Vec<u8>> {
 }
 
 pub fn manifest_from_bytes(bytes: &[u8]) -> Result<SyncManifest> {
-    serde_json::from_slice(bytes).context("parse sync manifest")
+    let manifest: SyncManifest = serde_json::from_slice(bytes).context("parse sync manifest")?;
+    validate_manifest(&manifest)?;
+    Ok(manifest)
 }
 
 pub fn stage_downloaded_file(snapshot: &Snapshot, file: &ManifestFile, bytes: &[u8]) -> Result<()> {
+    validate_manifest_file(file)?;
+    if bytes.len() as u64 != file.size {
+        return Err(anyhow!(
+            "size mismatch for {}: expected {}, got {}",
+            file.path,
+            file.size,
+            bytes.len()
+        ));
+    }
     let actual = hash_hex(bytes);
     if actual != file.sha256 {
         return Err(anyhow!(
@@ -130,10 +143,55 @@ pub fn replace_library_root(target_root: &Path, snapshot_root: &Path) -> Result<
 
 fn empty_manifest() -> SyncManifest {
     SyncManifest {
-        version: 1,
+        version: SYNC_MANIFEST_VERSION,
         generated_at: String::new(),
         files: Vec::new(),
     }
+}
+
+fn validate_manifest(manifest: &SyncManifest) -> Result<()> {
+    if manifest.version != SYNC_MANIFEST_VERSION {
+        return Err(anyhow!(
+            "unsupported sync manifest version {}",
+            manifest.version
+        ));
+    }
+    let mut seen = HashSet::new();
+    for file in &manifest.files {
+        validate_manifest_file(file)?;
+        if !seen.insert(file.path.as_str()) {
+            return Err(anyhow!("duplicate sync manifest path {}", file.path));
+        }
+    }
+    Ok(())
+}
+
+fn validate_manifest_file(file: &ManifestFile) -> Result<()> {
+    validate_manifest_path(&file.path)?;
+    if !is_sha256_hex(&file.sha256) {
+        return Err(anyhow!("invalid sha256 for {}", file.path));
+    }
+    Ok(())
+}
+
+fn validate_manifest_path(path: &str) -> Result<()> {
+    if path.is_empty() || path.contains('\\') {
+        return Err(anyhow!("invalid sync manifest path {}", path));
+    }
+    let parsed = Path::new(path);
+    if parsed.is_absolute() {
+        return Err(anyhow!("sync manifest path must be relative: {}", path));
+    }
+    for component in parsed.components() {
+        if !matches!(component, Component::Normal(_)) {
+            return Err(anyhow!("unsafe sync manifest path {}", path));
+        }
+    }
+    Ok(())
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == SHA256_HEX_LEN && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn ensure_root(root: &Path) -> Result<()> {
@@ -239,34 +297,4 @@ fn hash_hex(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn snapshot_skips_sqlite_sidecars() {
-        let root = std::env::temp_dir().join(format!("litera-sync-local-{}", ulid::Ulid::new()));
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("library.db"), b"db").unwrap();
-        std::fs::write(root.join("library.db-wal"), b"wal").unwrap();
-        std::fs::write(root.join("papers.txt"), b"note").unwrap();
-        let snapshot = create_snapshot(&root).unwrap();
-        assert_eq!(snapshot.manifest.files.len(), 2);
-        std::fs::remove_dir_all(&root).ok();
-    }
-
-    #[test]
-    fn manifest_roundtrip() {
-        let manifest = SyncManifest {
-            version: 1,
-            generated_at: "now".into(),
-            files: vec![ManifestFile {
-                path: "papers/a/original.pdf".into(),
-                size: 3,
-                sha256: "abc".into(),
-            }],
-        };
-        let bytes = manifest_bytes(&manifest).unwrap();
-        let parsed = manifest_from_bytes(&bytes).unwrap();
-        assert_eq!(parsed.files[0].path, manifest.files[0].path);
-    }
-}
+mod tests;

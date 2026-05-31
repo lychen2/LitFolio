@@ -34,7 +34,9 @@ pub use dedup::{find_duplicate, merge_papers, scan_all_duplicates, DuplicatePair
 pub use embeddings::EmbeddingRepo;
 pub use feeds::{Feed, FeedItem, FeedRepo, FeedWithCounts, NewFeedItem};
 pub use folders::{FolderRepo, FolderWithCount};
-pub use highlights::{HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate};
+pub use highlights::{
+    HighlightExplanationUpdate, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate,
+};
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
@@ -45,4 +47,4 @@ pub use queue::{QueueEntry, QueueRepo};
 pub use retrieval::{unified_search, UnifiedSearchResult};
 pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};
 pub use tags::{TagRepo, TagWithCount};
-pub use topic_alerts::{TopicAlert, TopicAlertRepo, TopicAlertResult};
+pub use topic_alerts::{TopicAlert, TopicAlertRepo, TopicAlertResult, TopicAlertResultInsert};

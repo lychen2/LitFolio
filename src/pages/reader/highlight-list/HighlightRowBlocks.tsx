@@ -1,0 +1,128 @@
+import { useState, type ReactNode } from "react";
+import { Languages, Lightbulb, Loader2, MessageSquare } from "lucide-react";
+import { MarkdownView } from "@/components/MarkdownView";
+import { useT } from "@/i18n/I18nProvider";
+import { WESTERN_TEXT_STYLE } from "../HighlightList";
+import { normalizePreview } from "./highlightRowUtils";
+
+export function MetaTextBlock({
+  icon,
+  label,
+  model,
+  text,
+}: {
+  icon?: ReactNode;
+  label: string;
+  model: string | null;
+  text: string;
+}) {
+  return (
+    <div className="mt-1.5 text-[11px] text-litera-accent2/90">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-litera-mute mb-1">
+        {icon}
+        {label}
+        {model ? <span className="normal-case tracking-normal text-litera-mute/80">{model}</span> : null}
+      </div>
+      <p className="leading-5 whitespace-pre-wrap">{text}</p>
+    </div>
+  );
+}
+
+export function TranslationIcon() {
+  return <Languages className="h-3 w-3" />;
+}
+
+export function ExplanationBlock({ model, text }: { model: string | null; text: string }) {
+  const t = useT();
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-2 p-2.5 rounded-md bg-amber-400/5 border border-amber-400/15">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-400/80">
+        <Lightbulb className="h-3 w-3" />
+        {t("reader.explainLabel")}
+        {model ? <span className="normal-case tracking-normal text-litera-mute/70 ml-1">{model}</span> : null}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="ml-auto text-[10px] text-litera-accent hover:text-litera-accent2 transition-colors"
+        >
+          {expanded ? t("reader.collapseExplanation") : t("reader.expandExplanation")}
+        </button>
+      </div>
+      {expanded && (
+        <MarkdownView
+          content={text}
+          className="mt-1.5 text-xs leading-relaxed text-litera-text markdown-body"
+        />
+      )}
+    </div>
+  );
+}
+
+export function OriginalBlock({ text }: { text: string }) {
+  return (
+    <p
+      lang="en"
+      className="text-[11px] leading-5 text-litera-text whitespace-pre-wrap"
+      style={WESTERN_TEXT_STYLE}
+    >
+      {normalizePreview(text)}
+    </p>
+  );
+}
+
+export function NoteBlock({ note }: { note: string }) {
+  const t = useT();
+  return (
+    <div className="mt-2 text-[11px] text-litera-accent2/90">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-litera-mute mb-1">
+        <MessageSquare className="h-3 w-3" /> {t("reader.comment")}
+      </div>
+      <p className="leading-5 whitespace-pre-wrap">{note}</p>
+    </div>
+  );
+}
+
+export function NoteEditor({
+  draftNote,
+  isSaving,
+  onCancel,
+  onChange,
+  onSave,
+}: {
+  draftNote: string;
+  isSaving: boolean;
+  onCancel: () => void;
+  onChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-2 space-y-1.5">
+      <textarea
+        autoFocus
+        value={draftNote}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={t("reader.commentPlaceholder")}
+        className="litera-input w-full text-xs h-16 resize-none"
+      />
+      <div className="flex gap-1.5">
+        <button onClick={onSave} disabled={isSaving} className="litera-btn-primary text-[11px] px-2 py-0.5">
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          {t("common.save")}
+        </button>
+        <button onClick={onCancel} className="litera-btn text-[11px] px-2 py-0.5">
+          {t("common.cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ErrorText({ message }: { message: string }) {
+  return (
+    <div className="mt-2 text-[11px] text-red-400/90 break-all">
+      ✕ {message || "Unknown error"}
+    </div>
+  );
+}

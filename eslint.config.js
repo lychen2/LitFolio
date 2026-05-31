@@ -25,8 +25,23 @@ export default [
     rules: {
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "no-unused-vars": "off",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: "Use the centralized MarkdownView wrapper instead of page-level HTML injection.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/components/MarkdownView.tsx"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   { ignores: ["dist", "node_modules", "src-tauri/target"] },

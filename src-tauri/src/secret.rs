@@ -56,6 +56,17 @@ mod real {
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
+pub use inmem::delete;
+#[cfg(test)]
+pub use inmem::{get, put, set_fault_mode, FaultMode};
+#[cfg(not(test))]
+#[allow(unused_imports)]
+pub use real::delete;
+#[cfg(not(test))]
+pub use real::{get, put};
+
+#[cfg(test)]
 mod inmem {
     use anyhow::Result;
     use once_cell::sync::Lazy;
@@ -112,14 +123,3 @@ mod inmem {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[allow(unused_imports)]
-pub use inmem::delete;
-#[cfg(test)]
-pub use inmem::{get, put, set_fault_mode, FaultMode};
-#[cfg(not(test))]
-#[allow(unused_imports)]
-pub use real::delete;
-#[cfg(not(test))]
-pub use real::{get, put};

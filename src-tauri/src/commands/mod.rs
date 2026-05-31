@@ -7,6 +7,7 @@ pub mod concepts;
 pub mod custom_fields;
 pub mod discovery;
 pub mod duplicates;
+pub(crate) mod events;
 pub mod export;
 pub mod feed_metadata;
 pub mod feeds;

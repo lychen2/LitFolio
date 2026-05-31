@@ -34,6 +34,16 @@ pub struct TopicAlertResult {
     pub added_at: i64,
 }
 
+pub struct TopicAlertResultInsert<'a> {
+    pub alert_id: i64,
+    pub paper_doi: Option<&'a str>,
+    pub paper_arxiv_id: Option<&'a str>,
+    pub title: &'a str,
+    pub authors: Option<&'a str>,
+    pub year: Option<i32>,
+    pub abstract_text: Option<&'a str>,
+}
+
 pub struct TopicAlertRepo<'a> {
     pool: &'a Pool,
 }
@@ -121,29 +131,20 @@ impl<'a> TopicAlertRepo<'a> {
 
     // ── Alert Results ──────────────────────────────────────────────────
 
-    pub async fn add_result(
-        &self,
-        alert_id: i64,
-        paper_doi: Option<&str>,
-        paper_arxiv_id: Option<&str>,
-        title: &str,
-        authors: Option<&str>,
-        year: Option<i32>,
-        abstract_text: Option<&str>,
-    ) -> Result<i64> {
+    pub async fn add_result(&self, result: &TopicAlertResultInsert<'_>) -> Result<i64> {
         let now = Utc::now().timestamp();
         let id = sqlx::query(
             "INSERT INTO topic_alert_results
              (alert_id, paper_doi, paper_arxiv_id, title, authors, year, abstract_text, added_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )
-        .bind(alert_id)
-        .bind(paper_doi)
-        .bind(paper_arxiv_id)
-        .bind(title)
-        .bind(authors)
-        .bind(year)
-        .bind(abstract_text)
+        .bind(result.alert_id)
+        .bind(result.paper_doi)
+        .bind(result.paper_arxiv_id)
+        .bind(result.title)
+        .bind(result.authors)
+        .bind(result.year)
+        .bind(result.abstract_text)
         .bind(now)
         .execute(self.pool)
         .await

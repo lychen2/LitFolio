@@ -49,7 +49,7 @@ impl<'a> ComparisonRepo<'a> {
             .bind(id)
             .fetch_optional(self.pool)
             .await?;
-        Ok(row.map(row_to_comparison).transpose()?)
+        row.map(row_to_comparison).transpose()
     }
 
     pub async fn list_all(&self) -> Result<Vec<PaperComparison>> {

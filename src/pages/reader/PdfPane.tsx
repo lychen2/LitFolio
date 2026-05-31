@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Highlighter, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { Loader2 } from "lucide-react";
 import {
   PdfLoader, PdfHighlighter,
 } from "react-pdf-highlighter";
@@ -16,19 +17,23 @@ import { PdfSearchBar } from "./PdfSearchBar";
 import { FigureLinks } from "./FigureLinks";
 import { PdfDoiImportDialog } from "./PdfDoiImportDialog";
 import { PdfDoiLinkInterceptor } from "./PdfDoiLinkInterceptor";
-
-const MIN_ZOOM = 0.6;
-const MAX_ZOOM = 2.4;
-const ZOOM_STEP = 0.15;
-const WHEEL_ZOOM_FACTOR = 0.0015;
-const DEFAULT_ZOOM = 1;
+import {
+  Center,
+  PdfLoadError,
+  PdfMutationError,
+  PdfStatusBadge,
+  PdfToolbar,
+  SelectionActions,
+} from "./PdfPaneChrome";
+import { DEFAULT_ZOOM, nextZoom, wheelZoom, ZOOM_STEP, type PdfZoom } from "./PdfPaneZoom";
+import { extractPdfText } from "./pdfTextExtraction";
 
 /**
  * The middle pane: renders the bound PDF and lets the user highlight, search,
  * translate, and mark terms inside the document.
  *
- * - Reads the PDF bytes via Tauri's fs plugin (works around webview CSP that
- *   blocks file:// URLs) and feeds them to PDF.js as a blob URL.
+ * - Feeds PDF.js a Tauri asset URL so large PDFs do not cross the invoke IPC
+ *   boundary as a serialized byte array.
  * - Existing highlights are pulled from highlight_list and rendered as
  *   yellow text overlays. Backend stores the full ScaledPosition JSON in
  *   `rect_json` so we can map round-trip without losing precision.
@@ -53,7 +58,7 @@ export const PdfPane = memo(function PdfPane({
     catch { return false; }
   });
   const [searchSignal, setSearchSignal] = useState(0);
-  const [zoom, setZoom] = useState<number | "page-width">("page-width");
+  const [zoom, setZoom] = useState<PdfZoom>("page-width");
   const [doiImport, setDoiImport] = useState<string | null>(null);
   const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
   const highlighterRef = useRef<PdfHighlighter<IHighlight> | null>(null);
@@ -66,23 +71,18 @@ export const PdfPane = memo(function PdfPane({
 
   useEffect(() => {
     let cancelled = false;
-    let revoke: string | null = null;
     setPdfUrl(null);
     setLoadErr(null);
     (async () => {
       try {
-        const bytes = await api.paperReadPdfBytes(paperId);
+        const path = await api.paperPdfAssetPath(paperId);
         if (cancelled) return;
-        const arr = new Uint8Array(bytes);
-        const blob = new Blob([arr], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        revoke = url;
-        setPdfUrl(url);
+        setPdfUrl(convertFileSrc(path));
       } catch (e) {
         if (!cancelled) setLoadErr((e as Error).message);
       }
     })();
-    return () => { cancelled = true; if (revoke) URL.revokeObjectURL(revoke); };
+    return () => { cancelled = true; };
   }, [paperId]);
 
   // Ctrl+F → open the search bar. Only fires when the PDF pane has the
@@ -195,45 +195,16 @@ export const PdfPane = memo(function PdfPane({
       className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}
       tabIndex={-1}
     >
-      <div className="absolute top-2 left-2 z-20 litera-overlay flex items-center gap-1 px-1.5 py-1">
-        <button
-          onClick={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
-          className="litera-btn text-xs px-1.5 py-0.5"
-          title={t("reader.zoomOutTitle")}
-        >
-          <Minus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => setZoom(DEFAULT_ZOOM)}
-          className="litera-btn text-[11px] px-2 py-0.5 min-w-12 justify-center"
-          title={t("reader.zoomResetTitle")}
-        >
-          {zoomLabel}
-        </button>
-        <button
-          onClick={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
-          className="litera-btn text-xs px-1.5 py-0.5"
-          title={t("reader.zoomInTitle")}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => setZoom("page-width")}
-          className="litera-btn text-xs px-1.5 py-0.5"
-          title={t("reader.zoomFitTitle")}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <PdfToolbar
+        dark={dark}
+        zoomLabel={zoomLabel}
+        onZoomOut={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
+        onZoomReset={() => setZoom(DEFAULT_ZOOM)}
+        onZoomIn={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
+        onZoomFit={() => setZoom("page-width")}
+        onToggleDark={() => setDark((d) => !d)}
+      />
       <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
-      <button
-        onClick={() => setDark((d) => !d)}
-        className="absolute top-2 right-2 z-20 litera-btn text-xs"
-        title={dark ? t("reader.lightModeTitle") : t("reader.darkModeTitle")}
-      >
-        {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-        {dark ? t("reader.lightMode") : t("reader.darkMode")}
-      </button>
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}
@@ -306,125 +277,17 @@ export const PdfPane = memo(function PdfPane({
         onClose={() => setDoiImport(null)}
       />
       <PdfTermsOverlay containerRef={containerRef} terms={termEntries} />
-      {(create.error || addTerm.error) && (
-        <div className="absolute top-2 right-2 text-xs text-red-400/90 bg-litera-paper border border-red-400/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
-          <span>✕ {(create.error as Error | undefined)?.message || (addTerm.error as Error | undefined)?.message}</span>
-          <button
-            onClick={() => { if (create.error) create.reset(); if (addTerm.error) addTerm.reset(); }}
-            className="text-litera-mute hover:text-litera-text transition-colors"
-          >
-            {t("common.retry")}
-          </button>
-        </div>
-      )}
+      <PdfMutationError
+        createError={create.error}
+        termError={addTerm.error}
+        onRetry={() => {
+          if (create.error) create.reset();
+          if (addTerm.error) addTerm.reset();
+        }}
+      />
       {highlightsQ.data && (
-        <div className="absolute bottom-2 left-2 text-[11px] text-litera-mute bg-litera-paper/80 border border-litera-line rounded px-2 py-0.5 inline-flex items-center gap-2 pointer-events-none">
-          <span className="inline-flex items-center gap-1">
-            <Highlighter className="h-3 w-3 text-amber-400" />
-            {highlightsQ.data.length} {t("reader.highlights")}
-          </span>
-          <span>·</span>
-          <span>{termEntries.length} {t("reader.terms")}</span>
-        </div>
+        <PdfStatusBadge highlights={highlightsQ.data.length} terms={termEntries.length} />
       )}
     </div>
   );
 });
-
-function SelectionActions({
-  onHighlight,
-  onTranslate,
-  onAddTerm,
-  pending,
-}: {
-  onHighlight: () => void;
-  onTranslate: () => void;
-  onAddTerm: () => void;
-  pending: boolean;
-}) {
-  const t = useT();
-  return (
-    <div className="litera-overlay p-1.5 flex items-center gap-1.5 litera-slide-up">
-      <button onClick={onHighlight} className="litera-btn-primary text-xs px-2 py-1">
-        {t("reader.addHighlight")}
-      </button>
-      <button onClick={onTranslate} className="litera-btn text-xs px-2 py-1">
-        {t("reader.translateSelection")}
-      </button>
-      <button
-        onClick={onAddTerm}
-        disabled={pending}
-        className="litera-btn text-xs px-2 py-1"
-      >
-        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-        {t("reader.addTerm")}
-      </button>
-    </div>
-  );
-}
-
-function Center({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="h-full grid place-items-center text-sm text-litera-mute">
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function PdfLoadError({ error, onRetry }: { error?: Error; onRetry?: () => void }) {
-  const t = useT();
-  return (
-    <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
-      <div>
-        <div className="font-medium mb-1">✕ {t("reader.pdfRenderFailed")}</div>
-        <div className="text-xs text-litera-mute font-mono break-all">
-          {error?.message || String(error) || t("reader.unknownError")}
-        </div>
-        {onRetry && (
-          <button onClick={onRetry} className="litera-btn text-xs px-3 py-1 mt-3">
-            {t("common.retry")}
-          </button>
-        )}
-        <div className="text-[11px] text-litera-mute mt-2">
-          {t("reader.openConsole")}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function nextZoom(current: number | "page-width", delta: number): number {
-  const base = current === "page-width" ? DEFAULT_ZOOM : current;
-  const value = Math.round((base + delta) * 100) / 100;
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-}
-
-function wheelZoom(current: number | "page-width", deltaY: number): number {
-  const base = current === "page-width" ? DEFAULT_ZOOM : current;
-  const value = base * Math.exp(-deltaY * WHEEL_ZOOM_FACTOR);
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-}
-
-/** Walk every page and concatenate its text via pdfjs's getTextContent API. */
-async function extractPdfText(pdfDocument: {
-  numPages: number;
-  getPage(n: number): Promise<unknown>;
-}): Promise<string> {
-  const out: string[] = [];
-  for (let i = 1; i <= pdfDocument.numPages; i++) {
-    try {
-      const page = (await pdfDocument.getPage(i)) as { getTextContent(): Promise<{ items: unknown[] }> };
-      const content = await page.getTextContent();
-      const buf: string[] = [];
-      for (const raw of content.items) {
-        const item = raw as { str?: string; hasEOL?: boolean };
-        if (typeof item.str === "string") buf.push(item.str);
-        if (item.hasEOL) buf.push("\n");
-      }
-      out.push(buf.join(" "));
-    } catch (err) {
-      console.warn(`[PdfPane] getTextContent page ${i} failed`, err);
-    }
-  }
-  return out.join("\n\n");
-}

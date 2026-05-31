@@ -97,7 +97,7 @@ fn parse_terms(content: &str) -> Result<Vec<String>> {
     }
     // Last resort: split by commas / newlines so the user still gets something useful
     let fallback: Vec<String> = content
-        .split(|c: char| c == ',' || c == '\n' || c == ';')
+        .split([',', '\n', ';'])
         .map(|s| {
             s.trim()
                 .trim_matches(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-')

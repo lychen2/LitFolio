@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn f32_roundtrip() {
-        let original: Vec<f32> = vec![1.0, -0.5, 3.14, 0.0];
+        let original: Vec<f32> = vec![1.0, -0.5, 3.125, 0.0];
         let bytes = f32_vec_to_bytes(&original);
         let restored = bytes_to_f32_vec(&bytes);
         assert_eq!(original.len(), restored.len());

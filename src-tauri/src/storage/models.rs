@@ -92,6 +92,9 @@ pub struct Highlight {
     pub translation_target_lang: Option<String>,
     pub translation_model: Option<String>,
     pub translated_at: Option<i64>,
+    pub explanation_text: Option<String>,
+    pub explanation_model: Option<String>,
+    pub explained_at: Option<i64>,
     pub created_at: i64,
 }
 

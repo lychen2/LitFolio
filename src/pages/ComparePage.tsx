@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { api, type PaperComparison } from "@/lib/api";
+import { MarkdownView } from "@/components/MarkdownView";
 
 export function ComparePage() {
   const qc = useQueryClient();
@@ -137,52 +138,11 @@ function ComparisonDetail({
           className="w-full h-[60vh] px-4 py-3 text-sm font-mono bg-litera-panel border border-litera-line rounded-md text-litera-text"
         />
       ) : (
-        <div
+        <MarkdownView
+          content={comparison.content}
           className="prose prose-sm max-w-none dark:prose-invert"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(comparison.content) }}
         />
       )}
     </div>
   );
-}
-
-/** Minimal Markdown-to-HTML for comparison tables. */
-function renderMarkdown(md: string): string {
-  // Convert markdown tables to HTML tables.
-  const lines = md.split("\n");
-  let html = "";
-  let inTable = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
-      if (!inTable) {
-        html += '<table class="w-full border-collapse text-sm">';
-        inTable = true;
-      }
-      // Skip separator rows (|---|---|).
-      if (/^\|[\s-:|]+\|$/.test(trimmed)) continue;
-      const cells = trimmed
-        .split("|")
-        .slice(1, -1)
-        .map((c) => c.trim());
-      const tag = html.includes("<tbody>") ? "td" : "th";
-      html += "<tr>" + cells.map((c) => `<${tag} class="border border-litera-line px-3 py-2 text-left">${c}</${tag}>`).join("") + "</tr>";
-      if (tag === "th") html += "<tbody>";
-    } else {
-      if (inTable) {
-        html += "</tbody></table>";
-        inTable = false;
-      }
-      if (trimmed.startsWith("# ")) {
-        html += `<h2 class="text-lg font-medium mt-4 mb-2">${trimmed.slice(2)}</h2>`;
-      } else if (trimmed.startsWith("## ")) {
-        html += `<h3 class="text-base font-medium mt-3 mb-1">${trimmed.slice(3)}</h3>`;
-      } else if (trimmed) {
-        html += `<p class="text-sm text-litera-text leading-relaxed">${trimmed}</p>`;
-      }
-    }
-  }
-  if (inTable) html += "</tbody></table>";
-  return html;
 }

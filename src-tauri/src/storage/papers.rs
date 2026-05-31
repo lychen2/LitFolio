@@ -1,11 +1,17 @@
 //! Paper CRUD repository.
 
 use anyhow::{Context, Result};
-use chrono::Utc;
 use sqlx::Row;
 
 use super::db::Pool;
-use super::models::{Paper, ReadStatus};
+use super::models::Paper;
+
+mod rows;
+#[cfg(test)]
+mod tests;
+mod updates;
+
+pub(crate) use rows::row_to_paper;
 
 pub struct PaperRepo<'a> {
     pool: &'a Pool,
@@ -52,7 +58,7 @@ impl<'a> PaperRepo<'a> {
         .bind(&p.limitations)
         .bind(&p.comparison)
         .bind(&p.bibtex)
-        .bind(&p.last_exported_at)
+        .bind(p.last_exported_at)
         .execute(self.pool)
         .await
         .context("insert paper")?;
@@ -183,332 +189,11 @@ impl<'a> PaperRepo<'a> {
         Ok(c)
     }
 
-    pub async fn set_read_status(&self, id: &str, status: ReadStatus) -> Result<()> {
-        let now = Utc::now().timestamp();
-        sqlx::query("UPDATE papers SET read_status = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(status.as_str())
-            .bind(now)
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn update_tldr(&self, id: &str, tldr: &str, findings: &[String]) -> Result<()> {
-        let now = Utc::now().timestamp();
-        let findings_json = serde_json::to_string(findings)?;
-        sqlx::query(
-            "UPDATE papers SET tldr = ?1, key_findings_json = ?2, updated_at = ?3 WHERE id = ?4",
-        )
-        .bind(tldr)
-        .bind(findings_json)
-        .bind(now)
-        .bind(id)
-        .execute(self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn update_quick_read(
-        &self,
-        id: &str,
-        problem: &str,
-        method: &str,
-        comparison: &str,
-        limitations: &str,
-    ) -> Result<()> {
-        let now = Utc::now().timestamp();
-        sqlx::query(
-            "UPDATE papers SET research_question = ?1, method = ?2, comparison = ?3,
-                                limitations = ?4, updated_at = ?5 WHERE id = ?6",
-        )
-        .bind(problem)
-        .bind(method)
-        .bind(comparison)
-        .bind(limitations)
-        .bind(now)
-        .bind(id)
-        .execute(self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn update_translation(
-        &self,
-        id: &str,
-        title_tx: &str,
-        abstract_tx: &str,
-        lang: &str,
-    ) -> Result<()> {
-        let now = Utc::now().timestamp();
-        sqlx::query(
-            "UPDATE papers SET title_translated = ?1, abstract_translated = ?2,
-                                translate_target_lang = ?3, translated_at = ?4,
-                                updated_at = ?4 WHERE id = ?5",
-        )
-        .bind(title_tx)
-        .bind(abstract_tx)
-        .bind(lang)
-        .bind(now)
-        .bind(id)
-        .execute(self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn update_pdf_path(&self, id: &str, pdf_path: &str) -> Result<()> {
-        if pdf_path.is_empty() {
-            return Err(anyhow::anyhow!("pdf_path must not be empty"));
-        }
-        let now = Utc::now().timestamp();
-        let res = sqlx::query("UPDATE papers SET pdf_path = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(pdf_path)
-            .bind(now)
-            .bind(id)
-            .execute(self.pool)
-            .await
-            .context("update pdf_path")?;
-        if res.rows_affected() == 0 {
-            return Err(anyhow::anyhow!("paper {id} not found"));
-        }
-        Ok(())
-    }
-
-    pub async fn update_bibtex(&self, id: &str, bibtex: &str) -> Result<()> {
-        let now = Utc::now().timestamp();
-        sqlx::query("UPDATE papers SET bibtex = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(bibtex)
-            .bind(now)
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn update_title_venue(
-        &self,
-        id: &str,
-        title: &str,
-        venue: Option<&str>,
-    ) -> Result<()> {
-        let now = Utc::now().timestamp();
-        sqlx::query("UPDATE papers SET title = ?1, venue = ?2, updated_at = ?3 WHERE id = ?4")
-            .bind(title)
-            .bind(venue)
-            .bind(now)
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn list_needing_bibtex(&self) -> Result<Vec<Paper>> {
-        let rows = sqlx::query("SELECT * FROM papers WHERE bibtex IS NULL")
-            .fetch_all(self.pool)
-            .await?;
-        rows.into_iter().map(row_to_paper).collect()
-    }
-
-    pub async fn update_last_exported_at(&self, id: &str, ts: i64) -> Result<()> {
-        sqlx::query("UPDATE papers SET last_exported_at = ?1 WHERE id = ?2")
-            .bind(ts)
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn list_needing_export(&self) -> Result<Vec<Paper>> {
-        let rows = sqlx::query(
-            "SELECT * FROM papers WHERE last_exported_at IS NULL OR updated_at > last_exported_at",
-        )
-        .fetch_all(self.pool)
-        .await?;
-        rows.into_iter().map(row_to_paper).collect()
-    }
-
     pub async fn delete(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM papers WHERE id = ?1")
             .bind(id)
             .execute(self.pool)
             .await?;
         Ok(())
-    }
-}
-
-pub(crate) fn row_to_paper(row: sqlx::sqlite::SqliteRow) -> Result<Paper> {
-    let authors_raw: Option<String> = row.try_get("authors_json").ok();
-    let authors: Vec<String> = authors_raw
-        .as_deref()
-        .map(|s| serde_json::from_str(s).unwrap_or_default())
-        .unwrap_or_default();
-    let findings_raw: Option<String> = row.try_get("key_findings_json").ok();
-    let key_findings: Vec<String> = findings_raw
-        .as_deref()
-        .map(|s| serde_json::from_str(s).unwrap_or_default())
-        .unwrap_or_default();
-    let status_str: String = row.try_get("read_status")?;
-    Ok(Paper {
-        id: row.try_get("id")?,
-        title: row.try_get("title")?,
-        authors,
-        year: row.try_get("year").ok(),
-        venue: row.try_get("venue").ok(),
-        doi: row.try_get("doi").ok(),
-        arxiv_id: row.try_get("arxiv_id").ok(),
-        abstract_text: row.try_get("abstract").ok(),
-        pdf_path: row.try_get("pdf_path").ok(),
-        note_path: row.try_get("note_path").ok(),
-        added_at: row.try_get("added_at")?,
-        updated_at: row.try_get("updated_at")?,
-        read_status: ReadStatus::from_db(&status_str),
-        tldr: row.try_get("tldr").ok(),
-        research_question: row.try_get("research_question").ok(),
-        method: row.try_get("method").ok(),
-        dataset: row.try_get("dataset").ok(),
-        key_findings,
-        limitations: row.try_get("limitations").ok(),
-        comparison: row.try_get("comparison").ok(),
-        title_translated: row.try_get("title_translated").ok(),
-        abstract_translated: row.try_get("abstract_translated").ok(),
-        translate_target_lang: row.try_get("translate_target_lang").ok(),
-        translated_at: row.try_get("translated_at").ok(),
-        bibtex: row.try_get("bibtex").ok(),
-        last_exported_at: row.try_get("last_exported_at").ok(),
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::storage::db::{open_pool, run_migrations};
-    use std::path::PathBuf;
-
-    async fn temp_pool() -> (Pool, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("litera-paper-{}", ulid::Ulid::new()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let db = dir.join("library.db");
-        let pool = open_pool(&db).await.unwrap();
-        run_migrations(&pool).await.unwrap();
-        (pool, dir)
-    }
-
-    fn sample(id: &str) -> Paper {
-        let now = Utc::now().timestamp();
-        Paper {
-            id: id.into(),
-            title: "Attention Is All You Need".into(),
-            authors: vec!["Vaswani et al.".into()],
-            year: Some(2017),
-            venue: Some("NeurIPS".into()),
-            doi: Some(format!("10.1234/{id}")),
-            arxiv_id: Some(format!("1706.{id}")),
-            abstract_text: Some("seq2seq with attention".into()),
-            pdf_path: Some(format!("/tmp/test-{id}.pdf")),
-            note_path: None,
-            added_at: now,
-            updated_at: now,
-            read_status: ReadStatus::Unread,
-            tldr: None,
-            research_question: None,
-            method: None,
-            dataset: None,
-            key_findings: vec![],
-            limitations: None,
-            comparison: None,
-            title_translated: None,
-            abstract_translated: None,
-            translate_target_lang: None,
-            translated_at: None,
-            bibtex: None,
-            last_exported_at: None,
-        }
-    }
-
-    #[tokio::test]
-    async fn insert_get_list_count_roundtrip() {
-        let (pool, dir) = temp_pool().await;
-        let repo = PaperRepo::new(&pool);
-        repo.insert(&sample("A")).await.unwrap();
-        repo.insert(&sample("B")).await.unwrap();
-        assert_eq!(repo.count().await.unwrap(), 2);
-        let fetched = repo.get("A").await.unwrap().unwrap();
-        assert_eq!(fetched.title, "Attention Is All You Need");
-        let recent = repo.list_recent(10).await.unwrap();
-        assert_eq!(recent.len(), 2);
-        repo.set_read_status("A", ReadStatus::Read).await.unwrap();
-        let updated = repo.get("A").await.unwrap().unwrap();
-        assert_eq!(updated.read_status, ReadStatus::Read);
-        repo.delete("B").await.unwrap();
-        assert_eq!(repo.count().await.unwrap(), 1);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[tokio::test]
-    async fn update_quick_read_persists_all_four() {
-        let (pool, dir) = temp_pool().await;
-        let repo = PaperRepo::new(&pool);
-        repo.insert(&sample("Q")).await.unwrap();
-        repo.update_quick_read("Q", "P", "M", "C", "L")
-            .await
-            .unwrap();
-        let p = repo.get("Q").await.unwrap().unwrap();
-        assert_eq!(p.research_question.as_deref(), Some("P"));
-        assert_eq!(p.method.as_deref(), Some("M"));
-        assert_eq!(p.comparison.as_deref(), Some("C"));
-        assert_eq!(p.limitations.as_deref(), Some("L"));
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[tokio::test]
-    async fn search_finds_inserted_paper() {
-        let (pool, dir) = temp_pool().await;
-        let repo = PaperRepo::new(&pool);
-        let mut p = sample("S");
-        p.title = "Diffusion Models for Image Synthesis".into();
-        p.abstract_text = Some("we train denoising networks".into());
-        repo.insert(&p).await.unwrap();
-        let hits = repo.search("diffusion", 10).await.unwrap();
-        assert_eq!(hits.len(), 1);
-        let hits = repo.search("denoising image", 10).await.unwrap();
-        assert_eq!(hits.len(), 1);
-        let hits = repo.search("zzz_no_match", 10).await.unwrap();
-        assert!(hits.is_empty());
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[tokio::test]
-    async fn update_translation_roundtrip() {
-        let (pool, dir) = temp_pool().await;
-        let repo = PaperRepo::new(&pool);
-        repo.insert(&sample("T")).await.unwrap();
-        repo.update_translation("T", "标题", "摘要内容", "Chinese")
-            .await
-            .unwrap();
-        let p = repo.get("T").await.unwrap().unwrap();
-        assert_eq!(p.title_translated.as_deref(), Some("标题"));
-        assert_eq!(p.abstract_translated.as_deref(), Some("摘要内容"));
-        assert_eq!(p.translate_target_lang.as_deref(), Some("Chinese"));
-        assert!(p.translated_at.is_some());
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[tokio::test]
-    async fn update_pdf_path_swaps_path_and_rejects_empty_or_missing() {
-        let (pool, dir) = temp_pool().await;
-        let repo = PaperRepo::new(&pool);
-        repo.insert(&sample("P")).await.unwrap();
-        repo.update_pdf_path("P", "/tmp/new-location.pdf")
-            .await
-            .unwrap();
-        let p = repo.get("P").await.unwrap().unwrap();
-        assert_eq!(p.pdf_path.as_deref(), Some("/tmp/new-location.pdf"));
-
-        assert!(repo.update_pdf_path("P", "").await.is_err());
-        assert!(repo
-            .update_pdf_path("does-not-exist", "/tmp/x.pdf")
-            .await
-            .is_err());
-        std::fs::remove_dir_all(&dir).ok();
     }
 }

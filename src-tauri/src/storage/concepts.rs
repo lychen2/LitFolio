@@ -3,10 +3,14 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 
 use super::db::Pool;
 use super::paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode};
+
+mod graph;
+mod rows;
+
+use rows::{row_to_concept, row_to_paper_concept, row_to_relation};
 
 /// A reusable concept extracted across papers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +78,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_optional(self.pool)
         .await
         .context("get concept")?;
-        Ok(row.map(|r| row_to_concept(&r)))
+        row.as_ref().map(row_to_concept).transpose()
     }
 
     pub async fn find_by_name(&self, name: &str) -> Result<Option<Concept>> {
@@ -85,7 +89,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_optional(self.pool)
         .await
         .context("find concept by name")?;
-        Ok(row.map(|r| row_to_concept(&r)))
+        row.as_ref().map(row_to_concept).transpose()
     }
 
     pub async fn list_all(&self) -> Result<Vec<Concept>> {
@@ -95,7 +99,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_all(self.pool)
         .await
         .context("list concepts")?;
-        Ok(rows.iter().map(|r| row_to_concept(r)).collect())
+        rows.iter().map(row_to_concept).collect()
     }
 
     pub async fn delete(&self, id: i64) -> Result<()> {
@@ -143,7 +147,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_all(self.pool)
         .await
         .context("list concept relations")?;
-        Ok(rows.iter().map(|r| row_to_relation(r)).collect())
+        rows.iter().map(row_to_relation).collect()
     }
 
     pub async fn delete_relation(&self, id: i64) -> Result<()> {
@@ -180,15 +184,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_all(self.pool)
         .await
         .context("concepts for paper")?;
-        Ok(rows
-            .iter()
-            .map(|r| PaperConcept {
-                paper_id: r.try_get("paper_id").unwrap_or_default(),
-                concept_id: r.try_get("concept_id").unwrap_or(0),
-                concept_name: r.try_get("concept_name").unwrap_or_default(),
-                relevance: r.try_get("relevance").unwrap_or(1.0),
-            })
-            .collect())
+        rows.iter().map(row_to_paper_concept).collect()
     }
 
     pub async fn papers_for_concept(&self, concept_id: i64) -> Result<Vec<PaperConcept>> {
@@ -201,15 +197,7 @@ impl<'a> ConceptRepo<'a> {
         .fetch_all(self.pool)
         .await
         .context("papers for concept")?;
-        Ok(rows
-            .iter()
-            .map(|r| PaperConcept {
-                paper_id: r.try_get("paper_id").unwrap_or_default(),
-                concept_id: r.try_get("concept_id").unwrap_or(0),
-                concept_name: r.try_get("concept_name").unwrap_or_default(),
-                relevance: r.try_get("relevance").unwrap_or(1.0),
-            })
-            .collect())
+        rows.iter().map(row_to_paper_concept).collect()
     }
 
     pub async fn unlink_paper(&self, paper_id: &str, concept_id: i64) -> Result<()> {
@@ -220,100 +208,5 @@ impl<'a> ConceptRepo<'a> {
             .await
             .context("unlink paper concept")?;
         Ok(())
-    }
-
-    // ── Graph Integration ───────────────────────────────────────────────
-
-    /// Merge concept nodes and concept-to-concept edges into GraphData.
-    pub async fn merge_into_graph(
-        &self,
-        graph: &mut GraphData,
-        filter: &GraphFilter,
-    ) -> Result<()> {
-        if !filter.include_concepts.unwrap_or(true) {
-            return Ok(());
-        }
-
-        let concepts = self.list_all().await?;
-        let relations = self.list_relations().await?;
-
-        // Add concept nodes
-        let mut concept_ids = std::collections::HashSet::new();
-        for c in &concepts {
-            concept_ids.insert(c.id);
-            graph.nodes.push(GraphNode {
-                id: format!("concept:{}", c.id),
-                node_type: "concept".to_string(),
-                label: c.name.clone(),
-                sublabel: c.description.clone(),
-                year: None,
-                read_status: None,
-                paper_count: None,
-            });
-        }
-
-        // Add concept-to-concept edges
-        let relations_filter = filter.relations.as_deref();
-        for r in &relations {
-            if !concept_ids.contains(&r.source_concept_id)
-                || !concept_ids.contains(&r.target_concept_id)
-            {
-                continue;
-            }
-            if let Some(allowed) = relations_filter {
-                if !allowed.contains(&r.relation) {
-                    continue;
-                }
-            }
-            graph.edges.push(GraphEdge {
-                id: format!("cr:{}", r.id),
-                source: format!("concept:{}", r.source_concept_id),
-                target: format!("concept:{}", r.target_concept_id),
-                edge_type: r.relation.clone(),
-                source_type: "user".to_string(),
-                confidence: 1.0,
-                snippet: r.snippet.clone(),
-            });
-        }
-
-        // Add paper-to-concept edges
-        for c in &concepts {
-            let papers = self.papers_for_concept(c.id).await?;
-            for pc in &papers {
-                graph.edges.push(GraphEdge {
-                    id: format!("pc:{}:{}", pc.paper_id, pc.concept_id),
-                    source: pc.paper_id.clone(),
-                    target: format!("concept:{}", pc.concept_id),
-                    edge_type: "discusses".to_string(),
-                    source_type: "derived".to_string(),
-                    confidence: pc.relevance,
-                    snippet: None,
-                });
-            }
-        }
-
-        Ok(())
-    }
-}
-
-fn row_to_concept(r: &sqlx::sqlite::SqliteRow) -> Concept {
-    Concept {
-        id: r.try_get("id").unwrap_or(0),
-        name: r.try_get("name").unwrap_or_default(),
-        description: r.try_get("description").unwrap_or(None),
-        source: r.try_get("source").unwrap_or_else(|_| "ai".into()),
-        created_at: r.try_get("created_at").unwrap_or(0),
-    }
-}
-
-fn row_to_relation(r: &sqlx::sqlite::SqliteRow) -> ConceptRelation {
-    ConceptRelation {
-        id: r.try_get("id").unwrap_or(0),
-        source_concept_id: r.try_get("source_concept_id").unwrap_or(0),
-        target_concept_id: r.try_get("target_concept_id").unwrap_or(0),
-        relation: r.try_get("relation").unwrap_or_default(),
-        evidence_paper_id: r.try_get("evidence_paper_id").unwrap_or(None),
-        snippet: r.try_get("snippet").unwrap_or(None),
-        created_at: r.try_get("created_at").unwrap_or(0),
     }
 }

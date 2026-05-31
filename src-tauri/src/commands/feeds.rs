@@ -11,8 +11,9 @@
 
 use std::sync::Arc;
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
+use super::events::emit_or_warn;
 use crate::ingest::fetch_feed;
 use crate::storage::{FeedItem, FeedRepo, FeedWithCounts};
 use crate::AppState;
@@ -97,7 +98,9 @@ pub async fn feed_refresh(
         Ok(f) => f,
         Err(e) => {
             let msg = e.to_string();
-            let _ = repo.record_error(id, &msg).await;
+            if let Err(error) = repo.record_error(id, &msg).await {
+                tracing::warn!(%error, feed_id = id, "failed to record feed refresh error");
+            }
             return Err(msg);
         }
     };
@@ -159,9 +162,10 @@ pub async fn feed_refresh_all(
             FEED_METADATA_BACKFILL_LIMIT,
         )
         .await;
-        let _ = app_for_backfill.emit(
+        emit_or_warn(
+            &app_for_backfill,
             "feed-metadata-backfill-done",
-            serde_json::json!({ "checked": checked }),
+            &serde_json::json!({ "checked": checked }),
         );
     });
     Ok(summary)

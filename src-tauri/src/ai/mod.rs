@@ -26,7 +26,9 @@ pub use profile::{
     TaskKind,
 };
 pub use query_expand::{expand_search_query, ExpandedQuery};
-pub use summarize::{quick_read_paper_text, summarize_paper_text, QuickReadResult, TldrResult};
+pub use summarize::{
+    quick_read_paper_text, summarize_paper_text, PaperSummaryRequest, QuickReadResult, TldrResult,
+};
 pub use topic_survey::{plan_survey, PiHint, SubareaSpec, SurveySkeleton};
 pub use topic_survey_annotate::{annotate_survey, AnnotateInputPaper, SurveyAnnotation};
 pub use translate::{translate_paper_text, TranslationResult};

@@ -20,7 +20,7 @@ export function ProfileCard({
   const [showKey, setShowKey] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
-  useEffect(() => { setLocal(profile); setFetchedModels(null); setConfirmingDelete(false); }, [profile.name]);
+  useEffect(() => { setLocal(profile); setFetchedModels(null); setConfirmingDelete(false); }, [profile]);
 
   const test = useMutation({ mutationFn: (p: LlmProfile) => api.llmTest(p) });
   const listModels = useMutation({
