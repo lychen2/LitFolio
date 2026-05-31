@@ -166,14 +166,13 @@ mod tests {
             .await
             .unwrap()
             .expect("stored paper");
+        let canon_library_root = std::fs::canonicalize(&library_root).unwrap();
         assert_eq!(stored.title, "Integration PDF");
-        assert!(stored
-            .pdf_path
-            .as_deref()
-            .unwrap()
-            .starts_with(library_root.to_str().unwrap()));
+        assert!(
+            std::path::Path::new(stored.pdf_path.as_deref().unwrap()).starts_with(&library_root)
+        );
         let asset_path = paper_pdf_asset_path_inner(&state, &paper.id).await.unwrap();
-        assert!(asset_path.starts_with(library_root.to_str().unwrap()));
+        assert!(std::path::Path::new(&asset_path).starts_with(&canon_library_root));
 
         let highlight_repo = HighlightRepo::new(&state.pool);
         let rect = serde_json::json!({

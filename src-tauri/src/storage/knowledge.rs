@@ -23,7 +23,8 @@ mod tests {
         let paths = LibraryPaths::new(&root);
         paths.ensure().unwrap();
         let path = save_markdown(&paths, "test-note", "# Test").unwrap();
-        assert!(path.ends_with("knowledge/test-note.md"));
+        assert!(std::path::Path::new(&path)
+            .ends_with(std::path::Path::new("knowledge").join("test-note.md")));
         std::fs::remove_dir_all(root).ok();
     }
 }
