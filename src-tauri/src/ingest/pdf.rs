@@ -133,7 +133,7 @@ fn decode_text(obj: &lopdf::Object) -> Option<String> {
 }
 
 fn split_authors(s: &str) -> Vec<String> {
-    s.split(|c| c == ',' || c == ';')
+    s.split([',', ';'])
         .flat_map(|p| p.split(" and "))
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())

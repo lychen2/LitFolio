@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/i18n/I18nProvider";
 import { api, type GraphFilter } from "@/lib/api";
+import { errorMessage } from "@/lib/error";
 import { GraphToolbar } from "./graph/GraphToolbar";
 import { NetworkGraphView } from "./graph/NetworkGraphView";
 import { MindmapView } from "./graph/MindmapView";
@@ -25,6 +26,7 @@ export function GraphPage() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [extractingConcepts, setExtractingConcepts] = useState(false);
+  const [conceptRunSummary, setConceptRunSummary] = useState<string | null>(null);
   const [centerConcept, setCenterConcept] = useState<string | null>(null);
 
   // Measure container
@@ -81,18 +83,29 @@ export function GraphPage() {
 
   const handleExtractConcepts = useCallback(async () => {
     setExtractingConcepts(true);
+    setConceptRunSummary(null);
     try {
       // Get all papers and extract concepts from each
       const papers = await api.papersRecent(100);
       let totalExtracted = 0;
+      const failures: string[] = [];
       for (const paper of papers) {
         try {
           const count = await api.conceptExtractAndStore(paper.id);
           totalExtracted += count;
-        } catch {
-          // Skip papers that fail extraction
+        } catch (error) {
+          const title = paper.title || paper.id;
+          const message = errorMessage(error);
+          console.error("concept extraction failed", { paperId: paper.id, title, error });
+          failures.push(`${title}: ${message}`);
         }
       }
+      const summary = `Extracted ${totalExtracted} concepts from ${papers.length - failures.length}/${papers.length} papers.`;
+      setConceptRunSummary(
+        failures.length === 0
+          ? summary
+          : `${summary} Failed ${failures.length}: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "; ..." : ""}`,
+      );
       qc.invalidateQueries({ queryKey: ["graph"] });
       qc.invalidateQueries({ queryKey: ["concepts"] });
     } finally {
@@ -132,6 +145,11 @@ export function GraphPage() {
         aiRunning={aiRunning}
         extractingConcepts={extractingConcepts}
       />
+      {conceptRunSummary && (
+        <div className="border-b border-litera-line px-6 py-2 text-xs text-litera-mute">
+          {conceptRunSummary}
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0">
         {/* Graph area */}

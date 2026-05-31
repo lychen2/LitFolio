@@ -6,7 +6,8 @@ export function errorMessage(error: unknown): string {
   if (typeof e.cause === "string" && (e.cause as string).length > 0) return e.cause as string;
   if (typeof e.toString === "function") {
     try {
-      return (e.toString as () => string)();
+      const text = (e.toString as () => string)();
+      return text === "[object Object]" ? "" : text;
     } catch {
       // ignore
     }

@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use tauri::State;
 
-use crate::ingest::search_semantic_scholar;
-use crate::storage::{TopicAlert, TopicAlertRepo, TopicAlertResult};
+use crate::ingest::{search_semantic_scholar, SearchResult};
+use crate::storage::{TopicAlert, TopicAlertRepo, TopicAlertResult, TopicAlertResultInsert};
 use crate::AppState;
 
 #[tauri::command]
@@ -96,29 +96,7 @@ pub async fn topic_alert_run(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut added = 0usize;
-
-    for r in &results {
-        let doi = r.draft.doi.as_deref();
-        let arxiv_id = r.draft.arxiv_id.as_deref();
-
-        if repo.result_exists(doi, arxiv_id).await.unwrap_or(false) {
-            continue;
-        }
-
-        let _ = repo
-            .add_result(
-                alert_id,
-                doi,
-                arxiv_id,
-                &r.draft.title,
-                Some(&r.draft.authors.join(", ")),
-                r.draft.year,
-                r.draft.abstract_text.as_deref(),
-            )
-            .await;
-        added += 1;
-    }
+    let added = add_alert_results(&repo, alert_id, &results).await?;
 
     repo.update_last_run(alert_id)
         .await
@@ -135,32 +113,47 @@ pub async fn topic_alert_run_all(state: State<'_, Arc<AppState>>) -> Result<usiz
     for alert in pending {
         let results = search_semantic_scholar(&state.http, &alert.query, 20)
             .await
-            .unwrap_or_default();
+            .map_err(|e| format!("run alert {}: {e}", alert.id))?;
 
-        for r in &results {
-            let doi = r.draft.doi.as_deref();
-            let arxiv_id = r.draft.arxiv_id.as_deref();
-
-            if repo.result_exists(doi, arxiv_id).await.unwrap_or(false) {
-                continue;
-            }
-
-            let _ = repo
-                .add_result(
-                    alert.id,
-                    doi,
-                    arxiv_id,
-                    &r.draft.title,
-                    Some(&r.draft.authors.join(", ")),
-                    r.draft.year,
-                    r.draft.abstract_text.as_deref(),
-                )
-                .await;
-            total_added += 1;
-        }
-
-        let _ = repo.update_last_run(alert.id).await;
+        total_added += add_alert_results(&repo, alert.id, &results).await?;
+        repo.update_last_run(alert.id)
+            .await
+            .map_err(|e| format!("update alert {} last_run_at: {e}", alert.id))?;
     }
 
     Ok(total_added)
+}
+
+async fn add_alert_results(
+    repo: &TopicAlertRepo<'_>,
+    alert_id: i64,
+    results: &[SearchResult],
+) -> Result<usize, String> {
+    let mut added = 0usize;
+    for result in results {
+        let doi = result.draft.doi.as_deref();
+        let arxiv_id = result.draft.arxiv_id.as_deref();
+        if repo
+            .result_exists(doi, arxiv_id)
+            .await
+            .map_err(|e| format!("check alert {alert_id} duplicate result: {e}"))?
+        {
+            continue;
+        }
+        let authors = result.draft.authors.join(", ");
+        let insert = TopicAlertResultInsert {
+            alert_id,
+            paper_doi: doi,
+            paper_arxiv_id: arxiv_id,
+            title: &result.draft.title,
+            authors: Some(&authors),
+            year: result.draft.year,
+            abstract_text: result.draft.abstract_text.as_deref(),
+        };
+        repo.add_result(&insert)
+            .await
+            .map_err(|e| format!("add alert {alert_id} result '{}': {e}", result.draft.title))?;
+        added += 1;
+    }
+    Ok(added)
 }

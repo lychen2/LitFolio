@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
-import { renderMarkdown } from "@/lib/markdown";
+import { MarkdownView } from "@/components/MarkdownView";
 import { WorkflowCard } from "./ask/WorkflowCard";
 import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
 
@@ -131,9 +131,9 @@ export function AskPage() {
                         {turn.content}
                       </div>
                     ) : (
-                      <div
+                      <MarkdownView
+                        content={turn.content}
                         className="text-sm leading-relaxed text-litera-text prose-a:text-litera-accent"
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.content) }}
                       />
                     )}
                     {turn.result && (

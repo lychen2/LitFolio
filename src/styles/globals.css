@@ -63,40 +63,6 @@
     color: var(--litera-text);
   }
 
-  /* PDF.js viewer pages render white (correct for PDFs) but the container background
-     and gaps between pages need explicit colors so they don't blend into the dark
-     app theme or stay transparent-white. Also force selectable text layer above
-     the canvas so highlight selection works. */
-  .pdfViewer {
-    background: var(--litera-panel);
-  }
-  .pdfViewer .page {
-    background: white;
-    margin: 8px auto;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  }
-
-  /* Dark-mode PDF: invert the canvas (white→black, black→white) and rotate the hue
-     so any embedded color photos / figures keep roughly the right tone instead of
-     becoming the photographic negative. The text layer is transparent so it doesn't
-     need inversion. Toggle the parent class .litera-pdf-dark on/off to control.
-     Use a descendant selector — PDF.js wraps the canvas in .canvasWrapper, so a
-     direct-child selector misses it. */
-  .litera-pdf-dark .pdfViewer .page {
-    background: var(--litera-paper);
-  }
-  .litera-pdf-dark .pdfViewer .page canvas {
-    filter: invert(0.92) hue-rotate(180deg);
-  }
-  .litera-pdf-dark .textLayer ::selection {
-    background: color-mix(in srgb, var(--litera-accent2) 50%, transparent);
-  }
-  .litera-pdf-dark .textLayer .highlight.selected,
-  .litera-pdf-dark .textLayer .highlight.appended {
-    background: color-mix(in srgb, var(--litera-accent2) 38%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--litera-accent2) 88%, transparent);
-  }
-
   @keyframes litera-fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -252,46 +218,4 @@
                litera-slide-up 250ms var(--spring-smooth) both;
   }
 
-  /* Per-page overlay container for term decorations. Sits on top of the
-     canvas/textLayer but is pointer-events:none so PDF selection passes
-     through. Individual overlays inherit that — hover detection uses
-     elementsFromPoint to find them anyway. */
-  .litera-term-layer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-  }
-  .litera-term-overlay {
-    position: absolute;
-    border-bottom: 1px dotted color-mix(in srgb, var(--litera-accent) 85%, transparent);
-    background-color: color-mix(in srgb, var(--litera-accent) 8%, transparent);
-    border-radius: 2px;
-    pointer-events: none;
-  }
-
-  /* Floating term tooltip — positioned by JS via inline left/top. Translate
-     centers the bubble horizontally on the underlined token and lifts it just
-     above the line. */
-  .litera-term-tooltip {
-    position: absolute;
-    z-index: 30;
-    max-width: 22rem;
-    min-width: 12rem;
-    transform: translate(-50%, calc(-100% - 10px));
-    @apply litera-overlay px-3 py-2 text-xs leading-relaxed;
-    animation: litera-fade-in 150ms var(--ease-out-quart) both;
-  }
-
-  /* In-document search hits: a soft outline so it stays readable against any
-     PDF background, plus a stronger ring on the currently-active hit. */
-  .litera-pdf-find-hit {
-    background-color: rgba(245, 196, 24, 0.45);
-    border-radius: 2px;
-    padding: 0 1px;
-  }
-  .litera-pdf-find-active {
-    background-color: rgba(245, 196, 24, 0.85);
-    outline: 2px solid rgba(245, 196, 24, 0.95);
-  }
 }

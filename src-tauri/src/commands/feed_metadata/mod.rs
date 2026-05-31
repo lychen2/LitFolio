@@ -57,9 +57,9 @@ pub async fn backfill_unchecked_feed_metadata(state: &AppState, limit: i64) -> u
     checked
 }
 
-async fn resolve_feed_item_metadata<'a>(
+async fn resolve_feed_item_metadata(
     state: &AppState,
-    item: &'a FeedItem,
+    item: &FeedItem,
 ) -> (Option<PaperDraft>, Option<&'static str>) {
     let corpus = feed_item_corpus(item);
     if let Some(arxiv_id) = extract_arxiv_id(&corpus) {
@@ -84,7 +84,7 @@ async fn resolve_feed_item_metadata<'a>(
     }
 
     if let Ok(Some(draft)) = search_doi_by_title(&state.http, &item.title).await {
-        if is_confident_crossref_title(&item, &draft) {
+        if is_confident_crossref_title(item, &draft) {
             if let Some(doi) = draft.doi.as_deref() {
                 if let Ok(crossref) = fetch_doi(&state.http, doi).await {
                     return (Some(crossref), Some("crossref_title"));

@@ -1,0 +1,74 @@
+/* PDF.js viewer pages render white (correct for PDFs) but the container background
+   and gaps between pages need explicit colors so they don't blend into the dark
+   app theme or stay transparent-white. */
+.pdfViewer {
+  background: var(--litera-panel);
+}
+.pdfViewer .page {
+  background: white;
+  margin: 8px auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Dark-mode PDF: invert the canvas and rotate hue so embedded color media keeps
+   roughly the right tone instead of becoming the photographic negative. */
+.litera-pdf-dark .pdfViewer .page {
+  background: var(--litera-paper);
+}
+.litera-pdf-dark .pdfViewer .page canvas {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+.litera-pdf-dark .textLayer ::selection {
+  background: color-mix(in srgb, var(--litera-accent2) 50%, transparent);
+}
+.litera-pdf-dark .textLayer .highlight.selected,
+.litera-pdf-dark .textLayer .highlight.appended {
+  background: color-mix(in srgb, var(--litera-accent2) 38%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--litera-accent2) 88%, transparent);
+}
+.litera-term-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.litera-term-overlay {
+  position: absolute;
+  border-bottom: 1px dotted color-mix(in srgb, var(--litera-accent) 85%, transparent);
+  background-color: color-mix(in srgb, var(--litera-accent) 8%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.litera-term-tooltip {
+  position: absolute;
+  z-index: 30;
+  max-width: 22rem;
+  min-width: 12rem;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--litera-line);
+  border-radius: var(--litera-radius);
+  background: color-mix(in srgb, var(--litera-panel) 80%, transparent);
+  color: var(--litera-text);
+  font-size: 0.75rem;
+  line-height: 1.625;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  backdrop-filter: blur(8px);
+  animation: litera-fade-in 150ms var(--ease-out-quart) both;
+}
+.litera-pdf-find-hit {
+  background-color: rgba(245, 196, 24, 0.45);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.litera-pdf-find-active {
+  background-color: rgba(245, 196, 24, 0.85);
+  outline: 2px solid rgba(245, 196, 24, 0.95);
+}
+.markdown-body .katex {
+  color: var(--litera-text);
+  font-size: 1.05em;
+}
+.markdown-body .katex-display {
+  margin: 0.75em 0;
+}

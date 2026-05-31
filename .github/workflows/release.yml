@@ -39,6 +39,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-24.04'
@@ -59,6 +61,44 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint:strict
+
+      - name: Frontend tests
+        run: pnpm test
+
+      - name: Install Playwright browsers (Linux)
+        if: matrix.platform == 'ubuntu-24.04'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Playwright browsers (Windows)
+        if: matrix.platform == 'windows-2025'
+        run: pnpm exec playwright install chromium
+
+      - name: Browser smoke test
+        run: pnpm run test:e2e
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Bundle report
+        run: pnpm run bundle:report
+
+      - name: Rust format
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -70,20 +110,26 @@ jobs:
             ## What's new in ${{ github.ref_name }}
 
             ### Added
-            - Reader full-width mode: the global navigation sidebar auto-hides on the reader page so the PDF gets the whole window. Slam the cursor to the far-left edge to slide it back in, or pin it open (preference is remembered).
-            - Reader: collapsible highlights and notes panels — toggle them from the toolbar to give the PDF even more room; layout is persisted.
+            - CI workflow for pull requests and `main` pushes, covering frontend checks, Rust checks, and app smoke tests.
+            - Playwright smoke coverage for the Vite/Tauri mock shell.
+            - Runtime schema validation around high-value frontend API boundaries.
+            - Migration regression coverage for upgrading older library databases.
+            - Bundle reporting as a release quality gate.
 
             ### Changed
-            - Faster knowledge graph: `graph_data` now batches its queries instead of one SELECT per paper/concept.
-            - Faster duplicate scan: exact DOI/arXiv matches use SQL grouping and title comparison is length-bucketed (no more full O(N²) sweep).
-            - Library tags load in a single batched call instead of one request per row.
-            - Folder import runs up to 4 PDFs concurrently.
-            - In-folder search is pushed down to the backend instead of filtering on the client.
+            - Release builds now run typecheck, strict lint, frontend tests, browser smoke tests, bundle report, Rust formatting, clippy, and Rust tests before publishing artifacts.
+            - Tauri security policy is tightened with an explicit CSP and a narrowed asset protocol scope.
+            - Markdown rendering is centralized through the shared safe renderer, including KaTeX support and XSS regression tests.
+            - Large frontend, API, storage, command, sync, and AI modules were split by domain to reduce coupling and review risk.
+            - PDF loading now uses the Tauri asset protocol path instead of returning full PDF byte arrays through invoke.
+            - Library sync, WebDAV, startup, and event paths now expose clearer failure details.
 
             ### Fixed
-            - Duplicate merge referenced stale table/column names and could fail mid-merge.
-            - Reader/Settings: localized previously hardcoded strings and tightened i18n typing; added an i18n consistency check.
-            - Cleaner startup error handling and removal of dead code paths flagged after dropping a blanket allow.
+            - Rust formatting and clippy warnings are clean under `-D warnings`.
+            - Markdown table cells, raw HTML-like input, fenced code blocks, and math rendering no longer rely on scattered page-local HTML builders.
+            - Graph concept extraction reports partial failures instead of silently skipping failed papers.
+            - Highlight explanation data is covered by schema migration and storage tests.
+            - Several stale compatibility paths and dead command wrappers were removed.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true

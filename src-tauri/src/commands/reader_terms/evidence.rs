@@ -113,7 +113,7 @@ fn ascii_word_matches<'a>(text: &'a str, needle: &'a str) -> impl Iterator<Item 
 fn is_ascii_word_hit(text: &str, start: usize, len: usize) -> bool {
     let before = text[..start].chars().next_back();
     let after = text[start + len..].chars().next();
-    !before.map_or(false, is_ascii_word_char) && !after.map_or(false, is_ascii_word_char)
+    !before.is_some_and(is_ascii_word_char) && !after.is_some_and(is_ascii_word_char)
 }
 
 fn is_ascii_word_char(ch: char) -> bool {

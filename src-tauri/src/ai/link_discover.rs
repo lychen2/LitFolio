@@ -79,7 +79,7 @@ fn build_batches(papers: &[Paper], term_map: &HashMap<String, Vec<String>>) -> V
     let mut clusters: Vec<Vec<Paper>> = Vec::new();
     let mut assigned = std::collections::HashSet::new();
 
-    for (_term, pids) in term_map {
+    for pids in term_map.values() {
         if pids.len() < 2 {
             continue;
         }
@@ -112,10 +112,8 @@ fn build_batches(papers: &[Paper], term_map: &HashMap<String, Vec<String>>) -> V
     let mut merged = Vec::new();
     let mut current = Vec::new();
     for cluster in clusters {
-        if current.len() + cluster.len() > MAX_BATCH {
-            if !current.is_empty() {
-                merged.push(std::mem::take(&mut current));
-            }
+        if current.len() + cluster.len() > MAX_BATCH && !current.is_empty() {
+            merged.push(std::mem::take(&mut current));
         }
         current.extend(cluster);
     }

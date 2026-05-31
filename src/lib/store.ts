@@ -6,12 +6,19 @@ export interface UiState {
   setThreePane: (next: Partial<UiState["threePane"]>) => void;
 }
 
+export function mergeThreePane(
+  current: UiState["threePane"],
+  next: Partial<UiState["threePane"]>,
+): UiState["threePane"] {
+  return { ...current, ...next };
+}
+
 export const useUi = create<UiState>()(
   persist(
     (set) => ({
       threePane: { listW: 280, notesW: 380 },
       setThreePane: (next) =>
-        set((s) => ({ threePane: { ...s.threePane, ...next } })),
+        set((s) => ({ threePane: mergeThreePane(s.threePane, next) })),
     }),
     { name: "litera.ui" },
   ),

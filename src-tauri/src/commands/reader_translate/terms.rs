@@ -41,7 +41,7 @@ pub async fn build_term_insights(
     let terms = if terms.is_empty() {
         extract_terms(selection)
             .into_iter()
-            .map(|term| StoredOrRawTerm::Raw(term))
+            .map(StoredOrRawTerm::Raw)
             .collect()
     } else {
         terms

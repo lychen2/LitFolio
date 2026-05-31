@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
+use super::events::emit_or_warn;
 use crate::ai::{
     active_profile_for_task, annotate_survey, load_config, plan_survey, AnnotateInputPaper,
     LlmConfig, PiHint, SurveyAnnotation, SurveySkeleton, TaskKind,
@@ -76,14 +77,19 @@ pub async fn topic_survey(
         .map_err(|e| survey_error("选择综述模型", "未解析", e))?;
     let profile_label = format!("{} / {}", prof.name, prof.chat_model);
 
-    let _ = app.emit("topic-survey-progress", json!({ "phase": "planning" }));
+    emit_or_warn(
+        &app,
+        "topic-survey-progress",
+        &json!({ "phase": "planning" }),
+    );
     let skeleton = plan_survey(&state.http, &prof, &topic)
         .await
         .map_err(|e| survey_error("规划领域结构", &profile_label, e))?;
 
-    let _ = app.emit(
+    emit_or_warn(
+        &app,
         "topic-survey-progress",
-        json!({
+        &json!({
             "phase": "grounding",
             "subarea_total": skeleton.subareas.len(),
         }),
@@ -93,13 +99,17 @@ pub async fn topic_survey(
         .map_err(|e| survey_error("Semantic Scholar 检索", &profile_label, e))?;
 
     let annotation = if want_annotate {
-        let _ = app.emit("topic-survey-progress", json!({ "phase": "annotating" }));
+        emit_or_warn(
+            &app,
+            "topic-survey-progress",
+            &json!({ "phase": "annotating" }),
+        );
         try_annotate(&state.http, &cfg, &grounded).await
     } else {
         None
     };
 
-    let _ = app.emit("topic-survey-progress", json!({ "phase": "done" }));
+    emit_or_warn(&app, "topic-survey-progress", &json!({ "phase": "done" }));
     Ok(assemble(&topic, skeleton, grounded, annotation))
 }
 

@@ -34,7 +34,7 @@ pub fn parse_bibtex(text: &str) -> Vec<PaperDraft> {
 fn read_balanced_braces<I: Iterator<Item = char>>(it: &mut std::iter::Peekable<I>) -> String {
     let mut depth = 1;
     let mut out = String::new();
-    while let Some(c) = it.next() {
+    for c in it.by_ref() {
         match c {
             '{' => {
                 depth += 1;

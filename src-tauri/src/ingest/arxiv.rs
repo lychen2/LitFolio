@@ -134,9 +134,8 @@ fn collapse_whitespace(s: &str) -> String {
 
 /// Parse all entries in an arXiv Atom feed.
 pub(crate) fn parse_atom_entries(xml: &str) -> Vec<PaperDraft> {
-    let mut entries = xml.split("<entry>").skip(1);
     let mut out = Vec::new();
-    while let Some(raw) = entries.next() {
+    for raw in xml.split("<entry>").skip(1) {
         let entry = match raw.find("</entry>") {
             Some(end) => &raw[..end],
             None => raw,

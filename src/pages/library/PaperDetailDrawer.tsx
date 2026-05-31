@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen, ClipboardCopy, Download, ExternalLink, FileText, Languages, Loader2, Quote, Sparkles, X,
 } from "lucide-react";
@@ -9,9 +9,12 @@ import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { SimilarPapersPanel } from "./SimilarPapersPanel";
+import { DoiEnrichRow } from "./DoiEnrichRow";
+import { CustomFieldsSection } from "./PaperCustomFieldsSection";
+import { CopyCitationDropdown } from "./CopyCitationDropdown";
 
 export function PaperDetailDrawer({
-  paper, onClose,
+  paper: paperProp, onClose,
 }: {
   paper: Paper;
   onClose: () => void;
@@ -19,6 +22,10 @@ export function PaperDetailDrawer({
   const qc = useQueryClient();
   const { lang } = useI18n();
   const t = useT();
+  // Metadata enrichment (manual DOI fetch) returns an updated paper; show it
+  // immediately rather than waiting for the parent list to re-feed the prop.
+  const [override, setOverride] = useState<Paper | null>(null);
+  const paper = override ?? paperProp;
   const [showSimilar, setShowSimilar] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showCiteDropdown, setShowCiteDropdown] = useState(false);
@@ -116,7 +123,7 @@ export function PaperDetailDrawer({
         )}
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
-          <Meta paper={paper} />
+          <Meta paper={paper} onEnriched={setOverride} />
           <Section title={t("paper.detail.abstract")} body={paper.abstract_text ?? t("paper.detail.noAbstract")} />
           {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
           {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
@@ -129,7 +136,7 @@ export function PaperDetailDrawer({
   );
 }
 
-function Meta({ paper }: { paper: Paper }) {
+function Meta({ paper, onEnriched }: { paper: Paper; onEnriched: (updated: Paper) => void }) {
   const t = useT();
   return (
     <dl className="grid grid-cols-[92px_1fr] gap-x-3 gap-y-2 text-sm">
@@ -139,8 +146,8 @@ function Meta({ paper }: { paper: Paper }) {
       <dd>{paper.year ?? t("paper.detail.unknown")}</dd>
       <dt className="text-litera-mute">Venue</dt>
       <dd>{paper.venue ?? t("paper.detail.unknown")}</dd>
-      <dt className="text-litera-mute">DOI</dt>
-      <dd className="font-mono">{paper.doi ?? t("common.none")}</dd>
+      <dt className="text-litera-mute pt-1">DOI</dt>
+      <DoiEnrichRow paper={paper} onEnriched={onEnriched} />
       <dt className="text-litera-mute">arXiv</dt>
       <dd>{paper.arxiv_id ? <ArxivLink id={paper.arxiv_id} /> : t("common.none")}</dd>
       <dt className="text-litera-mute">PDF</dt>
@@ -180,149 +187,4 @@ function ErrorLine({ error }: { error: unknown }) {
   const t = useT();
   const message = error instanceof Error ? error.message : String(error);
   return <div className="text-sm text-red-400/90">✕ {t("paper.detail.translateFailed")}: {message}</div>;
-}
-
-function CustomFieldsSection({ paperId }: { paperId: string }) {
-  const t = useT();
-  const qc = useQueryClient();
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
-
-  const { data: defs = [] } = useQuery({
-    queryKey: ["custom-field-defs"],
-    queryFn: api.customFieldDefsList,
-  });
-  const { data: fields = [] } = useQuery({
-    queryKey: ["paper-custom-fields", paperId],
-    queryFn: () => api.paperCustomFieldsGet(paperId),
-  });
-
-  const setMut = useMutation({
-    mutationFn: ({ fieldId, value }: { fieldId: number; value: string }) =>
-      api.paperCustomFieldSet(paperId, fieldId, value),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["paper-custom-fields", paperId] });
-      setEditingId(null);
-    },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (fieldId: number) => api.paperCustomFieldDelete(paperId, fieldId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["paper-custom-fields", paperId] }),
-  });
-
-  if (defs.length === 0) return null;
-
-  const fieldMap = new Map(fields.map((f) => [f.field_id, f]));
-
-  return (
-    <section>
-      <h3 className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("customFields.title")}</h3>
-      <dl className="space-y-2">
-        {defs.map((def) => {
-          const existing = fieldMap.get(def.id);
-          const isEditing = editingId === def.id;
-          return (
-            <div key={def.id} className="flex items-center gap-2 text-sm">
-              <dt className="text-litera-mute w-28 shrink-0">{def.name}</dt>
-              <dd className="flex-1 min-w-0">
-                {isEditing ? (
-                  <div className="flex items-center gap-1">
-                    {def.field_type === "select" && def.options ? (
-                      <select
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="litera-input text-xs py-0.5 flex-1"
-                      >
-                        <option value="">{t("paper.detail.emptyValue")}</option>
-                        {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : def.field_type === "date" ? (
-                      <input
-                        type="date"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="litera-input text-xs py-0.5 flex-1"
-                      />
-                    ) : def.field_type === "number" ? (
-                      <input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="litera-input text-xs py-0.5 flex-1"
-                      />
-                    ) : (
-                      <input
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="litera-input text-xs py-0.5 flex-1"
-                      />
-                    )}
-                    <button
-                      onClick={() => setMut.mutate({ fieldId: def.id, value: editValue })}
-                      disabled={setMut.isPending}
-                      className="litera-btn-primary text-[10px] px-2 py-0.5"
-                    >
-                      {t("common.save")}
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="text-litera-mute text-[10px]">✕</button>
-                  </div>
-                ) : (
-                  <span
-                    className="cursor-pointer hover:text-litera-accent"
-                    onClick={() => {
-                      setEditingId(def.id);
-                      setEditValue(existing?.value ?? "");
-                    }}
-                  >
-                    {existing?.value || <span className="text-litera-mute italic">--</span>}
-                  </span>
-                )}
-              </dd>
-              {existing && !isEditing && (
-                <button
-                  onClick={() => deleteMut.mutate(def.id)}
-                  className="text-litera-mute hover:text-red-400 text-[10px]"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </dl>
-    </section>
-  );
-}
-
-const CITE_STYLES = [
-  { value: "apa", label: "APA" },
-  { value: "ieee", label: "IEEE" },
-  { value: "gb/t7714", label: "GB/T 7714" },
-  { value: "chicago", label: "Chicago" },
-] as const;
-
-function CopyCitationDropdown({ paper, onClose }: { paper: Paper; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy(style: string) {
-    const text = await api.exportCitations([paper.id], style);
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => { setCopied(false); onClose(); }, 1200);
-  }
-
-  return (
-    <div className="absolute right-0 top-full mt-1 z-10 bg-litera-paper border border-litera-line rounded-lg shadow-lg py-1 min-w-[140px]">
-      {CITE_STYLES.map((s) => (
-        <button
-          key={s.value}
-          onClick={() => handleCopy(s.value)}
-          className="w-full px-3 py-1.5 text-xs text-left text-litera-text hover:bg-litera-panel transition-colors"
-        >
-          {copied ? "✓" : s.label}
-        </button>
-      ))}
-    </div>
-  );
 }

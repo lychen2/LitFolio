@@ -4,8 +4,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::client::{chat_complete, ChatMessage};
+use super::json_utils::parse_lenient_value;
 use super::profile::LlmProfile;
-use super::summarize::parse_json_lenient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslationResult {
@@ -49,7 +49,7 @@ pub async fn translate_paper_text(
         ],
     )
     .await?;
-    let v = parse_json_lenient(&resp.content);
+    let v = parse_lenient_value(&resp.content);
     let title_tx = v
         .get("title")
         .and_then(|x| x.as_str())
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn parses_translation_json() {
-        let v = parse_json_lenient(r#"{"title":"标题","abstract":"摘要"}"#);
+        let v = parse_lenient_value(r#"{"title":"标题","abstract":"摘要"}"#);
         assert_eq!(v["title"], "标题");
         assert_eq!(v["abstract"], "摘要");
     }

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
+use super::events::emit_or_warn;
 use crate::ai::{active_profile_for_task, load_config, TaskKind};
 use crate::storage::{GraphData, GraphFilter, PaperLink, PaperLinkRepo, PaperRepo, PaperTermRepo};
 use crate::AppState;
@@ -175,9 +176,10 @@ pub async fn ai_discover_links(
             .push(t.paper_id.clone());
     }
 
-    let _ = app.emit(
+    emit_or_warn(
+        &app,
         "ai-link-progress",
-        serde_json::json!({ "phase": "start", "total": total }),
+        &serde_json::json!({ "phase": "start", "total": total }),
     );
 
     let discovered = crate::ai::discover_links(&http, &prof, &papers, &term_map)
@@ -203,9 +205,10 @@ pub async fn ai_discover_links(
         .await
         .map_err(|e| e.to_string())?;
 
-    let _ = app.emit(
+    emit_or_warn(
+        &app,
         "ai-link-progress",
-        serde_json::json!({ "phase": "done", "created": created }),
+        &serde_json::json!({ "phase": "done", "created": created }),
     );
 
     Ok(LinkBatchSummary {
