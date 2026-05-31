@@ -160,11 +160,10 @@ mod tests {
 
         assert_eq!(summary.imported.len(), 1);
         assert_eq!(summary.failed.len(), 1);
-        assert!(summary.imported[0]
-            .pdf_path
-            .as_deref()
-            .unwrap()
-            .starts_with(library_root.to_str().unwrap()));
+        assert!(
+            std::path::Path::new(summary.imported[0].pdf_path.as_deref().unwrap())
+                .starts_with(&library_root)
+        );
         assert!(summary.failed[0].error.contains("%PDF- header"));
         state.pool.close().await;
         std::fs::remove_dir_all(library_root).ok();
