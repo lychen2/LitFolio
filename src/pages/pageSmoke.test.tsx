@@ -49,7 +49,7 @@ function renderPage(element: React.ReactElement, path: string, route = path) {
     },
   });
   return renderToString(
-    <I18nProvider>
+    <I18nProvider lang="zh">
       <QueryClientProvider client={client}>
         <StaticRouter location={path}>
           <Routes>
