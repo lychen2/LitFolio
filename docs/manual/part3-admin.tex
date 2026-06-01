@@ -384,17 +384,21 @@ LitFolio 把所有 LLM 调用归到 \textbf{6 个任务（task）}：
 
 \subsubsection{速读 TL;DR}
 
-输入：标题 + 作者（前 6 位）+ 摘要。prompt 要求返回 JSON：\cmd{\detokenize{{"tldr": "一句话，
-不超过 40 词", "key_findings": ["3–5 条，每条不超过 20 词"]}}}。输出语言跟随用户
-设置。JSON 解析有三级容错（直接解析 → 提取 \cmd{\{...\}} 子串 → 空对象兜底）。
+输入：标题 + 作者（前 6 位）+ 摘要 + PDF 全文。长论文正文会按 60\,000 字符预算截断
+（前 70\% + 后 30\%），保留引言/方法与结论/局限两端信息。如果尚无
+\fpath{papers/<id>/text.txt} 正文缓存，LitFolio 会用 \cmd{lopdf} 即时提取并缓存。
+prompt 要求返回 JSON：\cmd{\detokenize{{"tldr": "一句话，不超过 40 词", "key_findings": ["3–5 条，每条不超过 20 词"]}}}。
+输出语言跟随用户设置；system prompt 要求 LLM 在有正文时基于正文作答，同时承认正文可能被截断。
+JSON 解析有三级容错（直接解析 → 提取 \cmd{\{...\}} 子串 → 空对象兜底）。
 结果写入 \cmd{papers} 表缓存，再次点击不会重调 LLM。
 
 \subsubsection{深读 Quick Read}
 
-输入与 TL;DR 相同（标题 + 作者 + 摘要），但 prompt 更细致：要求返回四段结构化 JSON
-（problem / method / comparison / limitations），每段 2–4 句散文体，不能用 bullet。
-system prompt 以「资深审稿人替同事判断该不该细读」的角色定位，引导 LLM 给出有判断力
-的评价，而非泛泛概括。
+输入与 TL;DR 相同（标题 + 作者 + 摘要 + PDF 全文，截断到 60\,000 字符），但 prompt 更细致：
+要求返回四段结构化 JSON（problem / method / comparison / limitations），每段 2–4 句散文体，
+不能用 bullet。system prompt 以「资深审稿人替同事判断该不该细读」的角色定位，要求 LLM
+优先基于正文证据，而不是只根据摘要推断。因此深读四段现在会参考方法、实验、结论与局限等
+正文信息，而非泛泛概括。
 
 \subsubsection{翻译}
 
@@ -420,8 +424,8 @@ LitFolio 的同步是「整库快照」语义，不是细粒度增量。具体�
 方向也能回滚——但请认真对待这个操作，特别是当两台机器都有未推送变更时。
 \end{warnbox}
 
-「整库覆盖」而不是增量合并的设计选择，是因为论文库的修改大多是 PDF 与笔记，
-冲突时哪一边胜出的语义对用户难以解释；只暴露「整体推/整体拉」与「自动备份」
+选择整库覆盖而非增量合并，是因为论文库的修改大多是 PDF 与笔记，
+冲突时哪一边胜出很难向用户解释清楚；只暴露「整体推/整体拉」与「自动备份」
 反而更可预测。
 
 \section{导出设置}
@@ -472,8 +476,8 @@ LitFolio 的同步是「整库快照」语义，不是细粒度增量。具体�
 \chapter{数据与文件布局}
 \label{ch:data}
 
-LitFolio 信奉「数据是用户的」。所有信息以可读格式落在 \fpath{\textasciitilde/Litera-Library/}，
-你不依赖 LitFolio 一样能用脚本访问。
+LitFolio 的设计原则是数据归用户所有。所有信息以可读格式落在 \fpath{\textasciitilde/Litera-Library/}，
+即使不用 LitFolio，你也能用脚本直接访问。
 
 \section{顶层结构}
 
@@ -487,7 +491,7 @@ LitFolio 信奉「数据是用户的」。所有信息以可读格式落在 \fpa
 \ \ \ \ \ \ paper.pdf\\
 \ \ \ \ \ \ meta.json\\
 \ \ \ \ \ \ note.md\\
-\ \ \ \ \ \ pdf-text.txt\\
+\ \ \ \ \ \ text.txt\\
 \ \ notes/\\
 \ \ \ \ ask/\hfill\textnormal{\small 「保存为笔记」的 Ask 结果}\\
 \ \ backups/\\
@@ -557,8 +561,8 @@ LitFolio 信奉「数据是用户的」。所有信息以可读格式落在 \fpa
   \item[meta.json] 元数据快照（标题、作者、年份、DOI/arXiv ID、来源等）。SQLite 是
     主存储，meta.json 是供脚本读取的镜像。
   \item[note.md] 这篇的笔记。完全由你写，LitFolio 不会改动除你在阅读器写入之外的内容。
-  \item[pdf-text.txt] PDF 全文提取（用 pdf-extract 离线生成），用于 FTS5 索引与
-    RAG 召回。
+  \item[text.txt] PDF 全文缓存。通常由阅读器中的 PDF.js 写入；如果尚无缓存，速读/
+    深读也会通过后端 \cmd{lopdf} 兜底提取并写入。
 \end{description}
 
 \section{性能优化}
@@ -767,7 +771,7 @@ LitFolio 有两类自动备份：
 \textbf{现象}：修改了论文的标签或状态，但智能收藏夹的论文列表没有变化。
 
 \textbf{原因}：智能收藏夹是实时查询的——你需要重新选中该收藏夹才能看到更新。
-这不是 bug，而是设计选择：避免每次论文变更都触发规则查询影响性能。
+这样设计是为了避免每次论文变更都触发规则查询影响性能。
 
 \section{Linux AppImage 无法启动}
 

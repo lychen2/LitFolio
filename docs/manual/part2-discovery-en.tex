@@ -21,8 +21,7 @@ arXiv API request to fetch the 50 most recent papers.
 
 Scrolling to the bottom and clicking "Load More" fetches the next page (50 items per page). When a
 category has low publication volume and two consecutive requests return no new entries, LitFolio
-displays "Exhausted" and stops requesting---this is intentional behavior to avoid unnecessary API
-calls, not a bug.
+displays "Exhausted" and stops requesting---this avoids unnecessary API calls.
 
 \section{Importing}
 
@@ -57,9 +56,9 @@ commonly used sources.
 
 \section{Conditional GET Refresh}
 
-LitFolio uses conditional GET (\cmd{If-Modified-Sometimes} / \cmd{ETag}) to fetch feeds. When the
+LitFolio uses conditional GET (\cmd{If-Modified-Since} / \cmd{ETag}) to fetch feeds. When the
 remote has not been updated, the server returns 304 Not Modified---this is why clicking "Refresh"
-sometimes instantly responds with "Already up to date." The practical implications are:
+sometimes instantly responds with "Already up to date." In practice:
 
 \begin{itemize}
   \item Refreshing frequently is \textbf{cheap}---it will not trigger rate limiting on the server.
@@ -95,7 +94,7 @@ entry remains in the feed list but is marked as "Imported."
 The \cmd{/topic} route is one of LitFolio's advanced capabilities, split into two tabs:
 \textbf{Search Recall} and \textbf{Survey Generation}. They solve different problems.
 
-\section{Two-Tab Mental Model}
+\section{The Two Tabs}
 
 \begin{description}
   \item[Search Recall] You already have a rough research direction and want to find all relevant
@@ -158,10 +157,10 @@ real time via IPC events.
 
 \subsubsection{Why Not Let the LLM List Papers Directly}
 
-If you ask an LLM to output a paper list directly, it will fabricate DOIs, authors, and
-years---hallucination rates are extremely high. LitFolio's approach strictly separates "planning"
-from "retrieval": the LLM is only responsible for planning (decomposing sub-fields + providing
-search terms). The actual paper retrieval from Semantic Scholar is done by program code, and the
+Asking an LLM to list papers directly leads to fabricated DOIs, authors, and
+years---hallucination rates are extremely high. LitFolio separates "planning"
+from "retrieval": the LLM only handles decomposing sub-fields and providing
+search terms. Actual paper retrieval from Semantic Scholar is done by program code, and the
 LLM then annotates the real papers.
 
 \begin{enumerate}
@@ -355,10 +354,24 @@ The entire process has four steps:
     $\to$ Comparison $\to$ Limitations $\to$ Key Findings $\to$ User highlights (up to 3, each 240
     characters). All snippets combined do not exceed 14,000 characters; excess is truncated.
   \item \textbf{LLM Answer}---The system prompt enforces: answer only based on the provided
-    evidence, annotate each fact with a \cmd{[N]} citation reference; when retrieved papers are
-    not directly relevant, the LLM honestly states "these papers do not directly address your
-    question." Answers are rendered in rich Markdown format (bold, italic, lists, headings).
+    evidence, annotate each fact with a \cmd{[N]} citation reference; when the sources are
+    insufficient, the LLM says so explicitly and describes what kind of paper would be needed
+    rather than guessing. Answers are rendered in rich Markdown format (bold, italic, lists,
+    headings).
 \end{enumerate}
+
+\subsection{@-Mention Pinning}
+
+You can type \cmd{@} in the question box to \textbf{pin specific papers} to a question.
+A popover appears showing recently imported papers (or matching results when you keep
+typing after \cmd{@}). Selecting a paper adds it as a chip above the textarea; multiple
+papers can be pinned to the same question.
+
+When at least one paper is pinned, the retrieval pipeline is \textbf{bypassed entirely}:
+only the pinned papers are sent to the LLM (along with any highlights you have on them).
+This is useful when you already know which paper(s) to ask about and want the answer
+to be strictly grounded in those sources rather than spread across a search-ranked set.
+If no paper is pinned, the normal RAG retrieval flow applies as before.
 
 \section{Multi-Turn Chat Interface}
 
@@ -455,7 +468,7 @@ terms, answer, and evidence sources}. This note is synced along with the library
 sync.
 
 \begin{tipbox}
-LitFolio uses a \textbf{degraded search} strategy——first rewrites the question to precise English
+LitFolio uses a \textbf{degraded search} strategy---first rewrites the question to precise English
 terms for AND matching, then falls back to raw question search, OR fuzzy matching, CJK keyword
 splitting, and finally recent library papers. This means the answer \textbf{always has some papers
 to work with}. If the retrieved papers are not directly relevant, the LLM honestly states they

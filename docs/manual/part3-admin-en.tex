@@ -411,20 +411,27 @@ Understanding how each task calls the LLM helps you decide what tier of model to
 
 \subsubsection{Quick Read TL;DR}
 
-Input: title + authors (first 6) + abstract. The prompt requests JSON: \cmd{\detokenize{{"tldr": "one
+Input: title + authors (first 6) + abstract + full PDF body text. The body is truncated
+to a 60\,000-character budget (head 70\% + tail 30\%) for very long papers. If no cached
+body text exists (\fpath{papers/<id>/text.txt}), LitFolio extracts it on the fly via
+\cmd{lopdf} and caches the result. The prompt requests JSON: \cmd{\detokenize{{"tldr": "one
 sentence, no more than 40 words", "key\_findings": ["3--5 items, each no more than 20
-words"]}}}. Output language follows user settings. JSON parsing has three-level fault
-tolerance (direct parse $\rightarrow$ extract \cmd{\{...\}} substring $\rightarrow$ empty
-object fallback). Results are written to the \cmd{papers} table cache; clicking again
-will not re-invoke the LLM.
+words"]}}}. Output language follows user settings. The system prompt instructs the LLM to
+ground every claim in the body text when provided, acknowledging it may be truncated.
+JSON parsing has three-level fault tolerance (direct parse $\rightarrow$ extract
+\cmd{\{...\}} substring $\rightarrow$ empty object fallback). Results are written to the
+\cmd{papers} table cache; clicking again will not re-invoke the LLM.
 
 \subsubsection{Deep Read Quick Read}
 
-Input is the same as TL;DR (title + authors + abstract), but the prompt is more detailed:
-it requests four-section structured JSON (problem / method / comparison / limitations),
-each section 2--4 sentences in prose style, no bullet points allowed. The system prompt
-positions the LLM as ``a senior reviewer helping a colleague decide whether to read the
-full paper,'' guiding it to provide judgmental assessments rather than generic summaries.
+Input is the same as TL;DR (title + authors + abstract + full PDF body, truncated to
+60\,000 characters). The prompt requests four-section structured JSON (problem / method
+/ comparison / limitations), each section 2--4 sentences in prose style, no bullet points
+allowed. The system prompt tells the LLM to act like a senior reviewer helping a colleague
+decide whether to read the full paper---and to prefer evidence from the body text over
+speculation, while acknowledging it may not have seen the entire document. This means
+the four sections are now grounded in actual methodology, experiments, and conclusions,
+not just the abstract.
 
 \subsubsection{Translation}
 
@@ -456,9 +463,9 @@ pull in the wrong direction---but please take this operation seriously, especial
 both machines have unpushed changes.
 \end{warnbox}
 
-The design choice of ``full library overwrite'' rather than incremental merging is because
-most modifications to a paper library involve PDFs and notes, and the semantics of which
-side wins during a conflict are difficult to explain to users; exposing only ``push all /
+Full-library overwrite rather than incremental merging was chosen because
+most paper library changes involve PDFs and notes, and the semantics of which
+side wins during a conflict are hard to explain clearly. Exposing only ``push all /
 pull all'' with ``automatic backup'' is more predictable.
 
 \section{Export Settings}
@@ -515,9 +522,9 @@ The ``Settings $\rightarrow$ Topic Alerts'' panel manages automated paper monito
 \chapter{Data and File Layout}
 \label{ch:data}
 
-LitFolio believes ``your data belongs to you.'' All information is stored in readable
-formats under \fpath{\textasciitilde/Litera-Library/}, so you can access it with scripts
-even without LitFolio.
+LitFolio's design principle is that your data belongs to you. All information is stored in
+readable formats under \fpath{\textasciitilde/Litera-Library/}, so you can access it with
+scripts even without LitFolio.
 
 \section{Top-Level Structure}
 
@@ -531,7 +538,7 @@ even without LitFolio.
 \ \ \ \ \ \ paper.pdf\\
 \ \ \ \ \ \ meta.json\\
 \ \ \ \ \ \ note.md\\
-\ \ \ \ \ \ pdf-text.txt\\
+\ \ \ \ \ \ text.txt\\
 \ \ notes/\\
 \ \ \ \ ask/\hfill\textnormal{\small Ask results saved as notes}\\
 \ \ backups/\\
@@ -608,8 +615,9 @@ Each paper has its own directory, named with a ULID (a 26-character string like
     SQLite is the primary storage; meta.json is a mirror for script access.
   \item[note.md] Notes for this paper. Entirely user-written; LitFolio does not modify
     content beyond what you write in the reader.
-  \item[pdf-text.txt] Full-text extraction from the PDF (generated offline with
-    pdf-extract), used for FTS5 indexing and RAG retrieval.
+  \item[text.txt] Cached full-text extraction from the PDF. Usually written by PDF.js
+    when the reader opens the paper; TL;DR / Deep Read may also create it through
+    the backend \cmd{lopdf} fallback when no cache exists yet.
 \end{description}
 
 \section{Performance Optimization}
@@ -870,8 +878,8 @@ data available.''
 paper list does not change.
 
 \textbf{Cause}: Smart collections are queried in real time---you need to re-select the
-collection to see the update. This is not a bug but a design choice: avoiding rule
-queries triggered by every paper change to prevent performance impacts.
+collection to see the update. This avoids rule queries triggered by every paper change,
+which would hurt performance.
 
 % =====================================================================
 \appendix

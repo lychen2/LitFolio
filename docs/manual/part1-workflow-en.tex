@@ -9,7 +9,7 @@
 LitFolio is a desktop research paper workbench:
 all data---metadata, PDFs, notes, highlights, terms, surveys---lives directly under
 \fpath{\textasciitilde/Litera-Library/} on your own machine. Network access is only
-needed to fetch arXiv metadata, parse RSS feeds, and call LLMs. In other words, you
+needed to fetch arXiv metadata, parse RSS feeds, and call LLMs. You
 can read, write, and search even when offline; moving to another computer is as simple
 as syncing that directory.
 
@@ -100,7 +100,7 @@ The physical layout of the library directory (detailed in Chapter 12) is roughly
 \ \ \ \ paper.pdf\\
 \ \ \ \ meta.json\\
 \ \ \ \ note.md\\
-\ \ \ \ pdf-text.txt\\
+\ \ \ \ text.txt\\
 \ \ backups/\hfill\textnormal{\small // automatic backups}\\
 \ \ sync/\hfill\textnormal{\small // sync snapshots}
 \end{quote}
@@ -119,7 +119,7 @@ features that do not require an LLM.
 \label{ch:library}
 
 The library page (\cmd{/library} route) is the screen you will spend the most time on.
-Its design goal is simple: one glance at the list should tell you what these papers are
+The idea is that one glance at the list should tell you what these papers are
 about, which ones deserve a deep read, and which are just RSS items you have not
 touched yet.
 
@@ -183,17 +183,21 @@ Each paper has a \textbf{reading state}, initially \cmd{unread}:
     priority when generating topic surveys.
 \end{description}
 
-Clicking the status badge cycles through the states in order. This four-state mechanism
-is a deliberate design choice: LitFolio does not assume that reading a paper once means
-you are done with it---it preserves the semantics of ``important papers deserve to be
-revisited.''
+Clicking the status badge cycles through the states in order. The four-state design
+reflects the idea that reading a paper once does not mean you are done with it---sometimes
+you want to keep important papers close at hand.
 
 \section{Quick Read (TL;DR)}
 
 The main list has a ``Quick Read'' button on the right. Clicking it invokes the
 ``TL;DR generation'' task (bound by default to your configured \cmd{tldr} model).
-The returned paragraph is saved directly to the database as a compact summary and
-appears instantly the next time you open the paper.
+The input is the paper's \textbf{title + authors + abstract + full PDF body} (truncated
+to a 60\,000-character budget if the paper is long). The returned paragraph is saved
+directly to the database as a compact summary and appears instantly the next time you
+open the paper.
+
+If you have not opened the PDF in the reader yet, LitFolio falls back to a built-in
+text extractor and caches the result so subsequent runs are instant.
 
 \begin{tipbox}
 Once generated, the TL;DR is cached in SQLite. Clicking the same paper again will not
@@ -210,6 +214,12 @@ presents content in four structured sections:
 does it solve}, \textbf{What method is proposed}, \textbf{How does it differ from
 others}, \textbf{Limitations and open issues}---each section is extracted from the
 full text and has a \cmd{Regenerate} button beside it.}
+
+Deep Read now reads the same \textbf{full PDF body} as TL;DR (title + authors +
+abstract + full text, truncated to 60\,000 characters). This means the four sections
+are grounded in the paper's methodology, experiments, and conclusions rather than just
+the abstract---grounded enough to surface details that rarely appear in a typical
+abstract, such as specific ablation studies, dataset limitations, or comparison baselines.
 
 The four-section design lets you judge whether a paper deserves a detailed read
 without going through the entire text. The \textbf{Differences} and \textbf{Limitations}
@@ -243,7 +253,7 @@ membership: drag and drop, or click ``Move to\ldots'' in the drawer.
 \section{Tags}
 
 Tags are flat, string-based labels created through the input box in the drawer. A paper
-can have any number of tags. The distinction from folders:
+can have any number of tags. How they differ from folders:
 
 \begin{itemize}
   \item Folders = \textbf{research domain taxonomy}, relatively stable, 2--3 levels deep.
@@ -500,13 +510,12 @@ At query time, the rule tree is recursively translated into a SQL WHERE clause:
 
 Smart collections are not snapshots---they query live every time you select them. So
 when a paper's tags or status change, the next time you click the collection the results
-immediately reflect the update. This is fundamentally different from ordinary folders:
-folders require manual drag-in/drag-out; smart collections only care whether the rules
-match.
+immediately reflect the update. Unlike ordinary folders, smart collections do not need
+manual drag-in/drag-out; they only care whether the rules match.
 
 \subsection{Performance}
 
-The translated SQL leverages SQLite indexes. For tag and folder conditions, the
+The translated SQL uses SQLite indexes. For tag and folder conditions, the
 \cmd{paper\_tags} and \cmd{paper\_folders} tables have \cmd{paper\_id} indexes, so
 EXISTS subqueries are fast. Ten smart collections add no perceptible delay to sidebar
 loading---only the currently selected one executes its query; the rest display only
@@ -805,7 +814,7 @@ You can preprocess scanned PDFs with \cmd{ocrmypdf} and then re-bind them.
 
 The arXiv browse and RSS feed features described in Chapters 5 and 6 each include an
 ``Import'' button in their detail drawers, which is equivalent to pasting the arXiv ID
-on the Import page. In other words: you do not need to visit the Import page
+on the Import page. You do not need to visit the Import page
 separately---when browsing RSS, just import directly from what catches your eye.
 
 % =====================================================================
@@ -822,10 +831,9 @@ When the reader loads a PDF, PDF.js performs full-text extraction on the fronten
 (it handles CMap encoding, embedded font subsets, and ToUnicode tables in modern
 academic PDFs more reliably than the backend \cmd{lopdf}). The extracted text is
 sent to the backend via IPC and cached in \fpath{papers/<id>/text.txt}. Subsequent
-term extraction and FTS5 indexing read from this cache file directly---as long as
-\fpath{text.txt}'s modification time is newer than \fpath{paper.pdf}'s, the cache
-is reused; otherwise \cmd{lopdf} re-extracts. This means term generation never
-needs to re-parse the PDF and is available instantly.
+term extraction, TL;DR, Deep Read, and full-text indexing read from this cache file
+directly; if it is missing, \cmd{lopdf} re-extracts the PDF and writes the cache.
+This means AI features do not need to re-parse the PDF once body text is available.
 
 \litfigure{14-reader-en.png}{Reader three-pane layout. Left: highlight list; center:
 PDF.js-rendered document; right: notes / selection translation / terms tab switcher.
@@ -872,7 +880,7 @@ The dialog automatically checks whether the DOI already exists in the library:
 
 \begin{itemize}
   \item \textbf{Already exists}---shows the paper's title, authors, and year. Click
-    ``Create link'' to establish a \cmd{builds_on} citation relationship between the
+    ``Create link'' to establish a \cmd{builds\_on} citation relationship between the
     current paper and the target (automatically deduplicated).
   \item \textbf{Not found}---shows metadata preview parsed from the DOI. You need to
     select or drop the corresponding PDF file, then click ``Import and link'' to
@@ -1026,8 +1034,8 @@ independently), but the full name is saved as context for the LLM definition.
 
 \subsubsection{Author Name Filtering}
 
-A frequently overlooked noise source is author surnames---common surnames like ``Chen,''
-``Yang,'' and ``Li'' appear at high frequency in paper author lists, satisfy Title Case
+Author surnames are a common source of noise---surnames like ``Chen,''
+``Yang,'' and ``Li'' appear frequently in paper author lists, satisfy Title Case
 proper-noun criteria, and can rank highly among term candidates. Before extraction,
 LitFolio collects all author surnames of the current paper into a HashSet (splitting
 on spaces, hyphens, and periods, then lowercasing). Candidates that match after
