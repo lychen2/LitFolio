@@ -21,8 +21,8 @@ function detectInitial(): Lang {
   return "zh";
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(detectInitial);
+export function I18nProvider({ children, lang: forced }: { children: ReactNode; lang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(() => forced ?? detectInitial());
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* ignore */ }
     if (typeof document !== "undefined") {
