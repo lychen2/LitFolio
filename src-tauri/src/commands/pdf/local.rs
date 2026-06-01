@@ -168,9 +168,8 @@ mod tests {
             .expect("stored paper");
         let canon_library_root = std::fs::canonicalize(&library_root).unwrap();
         assert_eq!(stored.title, "Integration PDF");
-        assert!(
-            std::path::Path::new(stored.pdf_path.as_deref().unwrap()).starts_with(&library_root)
-        );
+        assert!(std::path::Path::new(stored.pdf_path.as_deref().unwrap())
+            .starts_with(&canon_library_root));
         let asset_path = paper_pdf_asset_path_inner(&state, &paper.id).await.unwrap();
         assert!(std::path::Path::new(&asset_path).starts_with(&canon_library_root));
 
