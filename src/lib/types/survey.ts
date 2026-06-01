@@ -38,6 +38,10 @@ export interface TopicSurvey {
   annotate_tokens: number;
 }
 
+export interface SaveTopicSurveyResult {
+  path: string;
+}
+
 export type TopicSurveyPhase = "planning" | "grounding" | "annotating" | "done";
 
 export interface TopicSurveyProgress {

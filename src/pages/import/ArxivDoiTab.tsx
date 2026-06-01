@@ -8,6 +8,7 @@ import {
   useAutoDownloadMutation,
   useFetchMetaMutation,
   useLinkBackToFeed,
+  useMarkCandidateImported,
   usePrefillDraft,
   usePrepareFeedDraftMutation,
   useSaveWithPdfMutation,
@@ -30,8 +31,9 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const prepareFeedDraft = usePrepareFeedDraftMutation({ source, fetchMeta, setValue, setDraft, setSourceKind, setError, setSuccess });
   usePrefillDraft(source, prepareFeedDraft.mutate, fetchMeta.mutate, setValue);
   const linkBackToFeed = useLinkBackToFeed(source);
-  const saveWithPdf = useSaveWithPdfMutation({ draft, selectedPdf, linkBackToFeed, reset, setError, setSuccess });
-  const autoDownload = useAutoDownloadMutation({ draft, trimmed, linkBackToFeed, reset, setError, setSuccess });
+  const markCandidateImported = useMarkCandidateImported(source);
+  const saveWithPdf = useSaveWithPdfMutation({ draft, selectedPdf, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
+  const autoDownload = useAutoDownloadMutation({ draft, trimmed, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
 
   function reset() {
     setValue("");

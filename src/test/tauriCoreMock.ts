@@ -76,9 +76,14 @@ export async function invoke<T>(command: string, _args?: unknown): Promise<T> {
       return paper as T;
     case "papers_count":
       return 1 as T;
+    case "library_root":
+      return "/tmp/litfolio-test" as T;
+    case "sync_get_config":
+      return { webdav: { base_url: "", remote_path: "", username: "", password: "" } } as T;
     case "folders_list":
     case "smart_collections_list":
     case "reading_queue_list":
+    case "projects_list":
       return [] as T;
     case "papers_batch_tags":
       return {} as T;

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss, Network, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Archive, LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss, Network, PanelLeftClose, PanelLeftOpen, FolderKanban } from "lucide-react";
 import { clsx } from "clsx";
 import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,8 @@ const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
   { to: "/import",  labelKey: "nav.import",  icon: Inbox },
   { to: "/browse",  labelKey: "nav.browse",  icon: Atom },
   { to: "/feeds",   labelKey: "nav.feeds",   icon: Rss },
+  { to: "/candidates", labelKey: "nav.candidates", icon: Archive },
+  { to: "/projects", labelKey: "nav.projects", icon: FolderKanban },
   { to: "/topic",   labelKey: "nav.topic",   icon: Compass },
   { to: "/ask",     labelKey: "nav.ask",     icon: MessagesSquare },
   { to: "/graph",   labelKey: "nav.graph",   icon: Network },

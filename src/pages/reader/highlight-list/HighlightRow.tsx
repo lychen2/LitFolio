@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { api, type Highlight } from "@/lib/api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api, type Highlight, type ResearchProject } from "@/lib/api";
 import { errorMessage } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
+import type { TKey } from "@/i18n/dict";
 import { MIN_SUMMARY_CHARS } from "../HighlightList";
 import { ActionRow } from "./HighlightRowActions";
 import {
@@ -15,6 +16,18 @@ import {
   TranslationIcon,
 } from "./HighlightRowBlocks";
 import { countChars, hasCondensedAction, hasCondensedContent } from "./highlightRowUtils";
+
+const HIGHLIGHT_TYPES = [
+  "background",
+  "motivation",
+  "method",
+  "dataset",
+  "result",
+  "limitation",
+  "comparison",
+  "quote",
+  "question",
+] as const;
 
 export function HighlightRow({
   highlight,
@@ -30,6 +43,12 @@ export function HighlightRow({
   const [showOriginal, setShowOriginal] = useState(!hasCondensedContent(highlight));
   const [draftNote, setDraftNote] = useState(highlight.note ?? "");
   const [confirming, setConfirming] = useState(false);
+  const [projectId, setProjectId] = useState<number | "">("");
+  const [evidenceAdded, setEvidenceAdded] = useState(false);
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: api.projectsList,
+  });
   const saveNote = useMutation({
     mutationFn: (note: string) => api.highlightUpdateNote(highlight.id, note || null),
     onSuccess: async () => {
@@ -61,6 +80,17 @@ export function HighlightRow({
   const remove = useMutation({
     mutationFn: () => api.highlightDelete(highlight.id),
     onSuccess: onRefresh,
+  });
+  const updateType = useMutation({
+    mutationFn: (label: string | null) => api.highlightUpdateLabel(highlight.id, label),
+    onSuccess: onRefresh,
+  });
+  const addEvidence = useMutation({
+    mutationFn: () => {
+      if (projectId === "") throw new Error("Project is required");
+      return api.evidenceAddFromHighlight(projectId, highlight.id);
+    },
+    onSuccess: () => setEvidenceAdded(true),
   });
   const canSummarize = countChars(highlight.text) >= MIN_SUMMARY_CHARS;
 
@@ -151,6 +181,19 @@ export function HighlightRow({
         </div>
       )}
       {highlight.note && !editing && <NoteBlock note={highlight.note} />}
+      <HighlightTypeRow
+        highlight={highlight}
+        isSaving={updateType.isPending}
+        onChange={(label) => updateType.mutate(label)}
+      />
+      <EvidenceTargetRow
+        projects={projects.data ?? []}
+        projectId={projectId}
+        isSaving={addEvidence.isPending}
+        added={evidenceAdded}
+        onProjectChange={setProjectId}
+        onAdd={() => addEvidence.mutate()}
+      />
       {editing && (
         <NoteEditor
           draftNote={draftNote}
@@ -172,6 +215,84 @@ export function HighlightRow({
       {explain.error && (
         <ErrorText message={errorMessage(explain.error)} />
       )}
+      {updateType.error && (
+        <ErrorText message={errorMessage(updateType.error)} />
+      )}
+      {addEvidence.error && (
+        <ErrorText message={errorMessage(addEvidence.error)} />
+      )}
     </li>
+  );
+}
+
+function HighlightTypeRow({
+  highlight,
+  isSaving,
+  onChange,
+}: {
+  highlight: Highlight;
+  isSaving: boolean;
+  onChange: (label: string | null) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-2 flex items-center gap-2 text-[11px] text-litera-mute">
+      <span>{t("reader.highlightType")}</span>
+      <select
+        value={highlight.label ?? ""}
+        onChange={(event) => onChange(event.target.value || null)}
+        disabled={isSaving}
+        className="litera-input py-0.5 text-[11px]"
+      >
+        <option value="">{t("reader.highlightType.none")}</option>
+        {HIGHLIGHT_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {t(`reader.highlightType.${type}` as TKey)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function EvidenceTargetRow({
+  projects,
+  projectId,
+  isSaving,
+  added,
+  onProjectChange,
+  onAdd,
+}: {
+  projects: ResearchProject[];
+  projectId: number | "";
+  isSaving: boolean;
+  added: boolean;
+  onProjectChange: (id: number | "") => void;
+  onAdd: () => void;
+}) {
+  const t = useT();
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-2 flex items-center gap-2 text-[11px] text-litera-mute">
+      <span>{t("reader.evidenceProject")}</span>
+      <select
+        value={projectId}
+        onChange={(event) => onProjectChange(event.target.value ? Number(event.target.value) : "")}
+        className="litera-input py-0.5 text-[11px] min-w-0 flex-1"
+      >
+        <option value="">{t("common.none")}</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>{project.name}</option>
+        ))}
+      </select>
+      <button
+        onClick={onAdd}
+        disabled={isSaving || projectId === ""}
+        className="litera-btn text-[11px] px-2 py-0.5 disabled:opacity-50"
+      >
+        {t("reader.addEvidence")}
+      </button>
+      {added && <span className="text-emerald-400">{t("reader.evidenceAdded")}</span>}
+    </div>
   );
 }

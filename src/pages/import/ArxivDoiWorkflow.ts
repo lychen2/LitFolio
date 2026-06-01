@@ -95,11 +95,21 @@ export function useLinkBackToFeed(source: ImportSource) {
   };
 }
 
+export function useMarkCandidateImported(source: ImportSource) {
+  const qc = useQueryClient();
+  return async () => {
+    if (source.candidateId == null) return;
+    await api.candidateSetStatus(source.candidateId, "imported");
+    qc.invalidateQueries({ queryKey: ["candidates"] });
+  };
+}
+
 type SaveMutationParams = {
   draft: ArxivDraft | null;
   selectedPdf?: string | null;
   trimmed?: string;
   linkBackToFeed: (paperId: string) => Promise<void>;
+  markCandidateImported: () => Promise<void>;
   reset: () => void;
   setError: (error: string | null) => void;
   setSuccess: (success: string | null) => void;
@@ -116,6 +126,7 @@ export function useSaveWithPdfMutation(params: SaveMutationParams) {
     onSuccess: async (p) => {
       params.setSuccess(t("import.saved", { title: p.title }));
       await params.linkBackToFeed(p.id);
+      await params.markCandidateImported();
       params.reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
     },
@@ -131,6 +142,7 @@ export function useAutoDownloadMutation(params: SaveMutationParams) {
     onSuccess: async (p) => {
       params.setSuccess(t("import.downloadedSaved", { title: p.title }));
       await params.linkBackToFeed(p.id);
+      await params.markCandidateImported();
       params.reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
     },

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   BookMarked, FileText, LibraryBig, Loader2, MessagesSquare, Search, User, Bot,
 } from "lucide-react";
-import { api, type AskLibraryResult, type AskSource } from "@/lib/api";
+import { api, type AskLibraryResult, type AskSource, type ResearchProject } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { MarkdownView } from "@/components/MarkdownView";
 import { WorkflowCard } from "./ask/WorkflowCard";
@@ -19,14 +20,38 @@ interface ConversationTurn {
 
 export function AskPage() {
   const t = useT();
+  const [params] = useSearchParams();
+  const projectIdParam = Number(params.get("projectId"));
+  const scopedProjectId = Number.isFinite(projectIdParam) && projectIdParam > 0 ? projectIdParam : null;
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [pinnedPapers, setPinnedPapers] = useState<PinnedPaper[]>([]);
+  const [evidenceProjectId, setEvidenceProjectId] = useState<number | "">("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: api.projectsList,
+  });
+  const projectPapers = useQuery({
+    queryKey: ["projects", scopedProjectId, "papers"],
+    queryFn: () => api.projectPapersList(scopedProjectId!),
+    enabled: scopedProjectId != null,
+  });
+  const scopedProject = projects.data?.find((project) => project.id === scopedProjectId) ?? null;
 
   // Auto-scroll to bottom when conversation updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
+
+  useEffect(() => {
+    if (scopedProjectId == null || !projectPapers.data) return;
+    setPinnedPapers(projectPapers.data.map((paper) => ({
+      id: paper.id,
+      title: paper.title,
+      year: paper.year,
+    })));
+    setEvidenceProjectId(scopedProjectId);
+  }, [projectPapers.data, scopedProjectId]);
 
   const ask = useMutation({
     mutationFn: ({ question, pinnedIds }: { question: string; pinnedIds: string[] }) => {
@@ -55,6 +80,21 @@ export function AskPage() {
         sources: params.result.sources,
         model: params.result.model,
       }),
+  });
+  const addEvidence = useMutation({
+    mutationFn: (params: { question: string; result: AskLibraryResult }) => {
+      if (evidenceProjectId === "") throw new Error("Project is required");
+      const firstSource = params.result.sources[0] ?? null;
+      return api.evidenceAdd(evidenceProjectId, {
+        source_type: "ask",
+        paper_id: firstSource?.paper_id ?? null,
+        highlight_id: null,
+        page: null,
+        label: "ask",
+        excerpt: params.result.answer,
+        note: params.question,
+      });
+    },
   });
 
   function handleSubmit(question: string, pinnedIds: string[]) {
@@ -90,6 +130,11 @@ export function AskPage() {
               {t("ask.title")}
             </h1>
             <p className="mt-1 text-sm text-litera-mute">{t("ask.subtitle")}</p>
+            {scopedProject && (
+              <div className="mt-2 inline-flex rounded border border-litera-line px-2 py-1 text-xs text-litera-mute">
+                {t("ask.projectScope", { name: scopedProject.name })}
+              </div>
+            )}
           </div>
           {hasConversation && (
             <button
@@ -142,15 +187,32 @@ export function AskPage() {
                           <div className="text-xs text-litera-mute">
                             {turn.result.model || "—"} · {turn.result.prompt_tokens + turn.result.completion_tokens} tk · {t("ask.citationCount", { count: turn.result.sources.length })}
                           </div>
-                          <button
-                            onClick={() => saveNote(turn)}
-                            disabled={save.isPending}
-                            className="litera-btn text-xs disabled:opacity-60"
-                          >
-                            {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                            {t("ask.save")}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => saveNote(turn)}
+                              disabled={save.isPending}
+                              className="litera-btn text-xs disabled:opacity-60"
+                            >
+                              {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                              {t("ask.save")}
+                            </button>
+                          </div>
                         </div>
+                        <AskEvidenceControls
+                          projects={projects.data ?? []}
+                          projectId={evidenceProjectId}
+                          isSaving={addEvidence.isPending}
+                          saved={addEvidence.isSuccess}
+                          onProjectChange={setEvidenceProjectId}
+                          onAdd={() => {
+                            const turnIndex = conversation.indexOf(turn);
+                            const question = turnIndex > 0 ? conversation[turnIndex - 1].content : "";
+                            addEvidence.mutate({ question, result: turn.result! });
+                          }}
+                        />
+                        {addEvidence.error && (
+                          <div className="mt-2 text-xs text-red-400/90">{(addEvidence.error as Error).message}</div>
+                        )}
                         {turn.result.sources.length > 0 && (
                           <div className="mt-3">
                             <SourcesInline sources={turn.result.sources} />
@@ -199,6 +261,49 @@ export function AskPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+function AskEvidenceControls({
+  projects,
+  projectId,
+  isSaving,
+  saved,
+  onProjectChange,
+  onAdd,
+}: {
+  projects: ResearchProject[];
+  projectId: number | "";
+  isSaving: boolean;
+  saved: boolean;
+  onProjectChange: (id: number | "") => void;
+  onAdd: () => void;
+}) {
+  const t = useT();
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-litera-mute">
+      <span>{t("ask.evidenceProject")}</span>
+      <select
+        value={projectId}
+        onChange={(event) => onProjectChange(event.target.value ? Number(event.target.value) : "")}
+        className="litera-input py-1 text-xs"
+      >
+        <option value="">{t("common.none")}</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>{project.name}</option>
+        ))}
+      </select>
+      <button
+        onClick={onAdd}
+        disabled={isSaving || projectId === ""}
+        className="litera-btn text-xs disabled:opacity-50"
+      >
+        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookMarked className="h-3.5 w-3.5" />}
+        {t("ask.addEvidence")}
+      </button>
+      {saved && <span className="text-emerald-400">{t("ask.evidenceAdded")}</span>}
+    </div>
   );
 }
 
