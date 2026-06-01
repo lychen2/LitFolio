@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Cpu, Download, FolderSync, Loader2, Save, Search, Workflow } from "lucide-react";
+import { Cpu, Download, FolderSync, Loader2, Save, Search, ShieldCheck, Workflow } from "lucide-react";
 import { api, type LlmConfig, type LlmProfile } from "@/lib/api";
 import { TabButton } from "@/components/TabButton";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import { CustomFieldsManager } from "./settings/CustomFieldsManager";
+import { DataPrivacyPanel } from "./settings/DataPrivacyPanel";
 import { DuplicatesPanel } from "./settings/DuplicatesPanel";
 import { ExportPanel } from "./settings/ExportPanel";
 import { ProfilesTab } from "./settings/ProfilesTab";
@@ -13,9 +14,10 @@ import { SyncPanel } from "./settings/SyncPanel";
 import { TaskAssignments } from "./settings/TaskAssignments";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
 
-type SettingsTab = "profiles" | "tasks" | "sync" | "export" | "tools";
+type SettingsTab = "privacy" | "profiles" | "tasks" | "sync" | "export" | "tools";
 
 const TAB_DEFS: { key: SettingsTab; labelKey: TKey; icon: typeof Cpu }[] = [
+  { key: "privacy", labelKey: "settings.tab.privacy", icon: ShieldCheck },
   { key: "profiles", labelKey: "settings.tab.profiles", icon: Cpu },
   { key: "tasks", labelKey: "settings.tab.tasks", icon: Workflow },
   { key: "sync", labelKey: "settings.tab.sync", icon: FolderSync },
@@ -25,7 +27,7 @@ const TAB_DEFS: { key: SettingsTab; labelKey: TKey; icon: typeof Cpu }[] = [
 
 export function SettingsPage() {
   const t = useT();
-  const [tab, setTab] = useState<SettingsTab>("profiles");
+  const [tab, setTab] = useState<SettingsTab>("privacy");
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["llm", "config"],
     queryFn: api.llmGetConfig,
@@ -107,6 +109,7 @@ export function SettingsPage() {
             ))}
           </div>
 
+          {tab === "privacy" && <DataPrivacyPanel />}
           {tab === "profiles" && (
             <ProfilesTab
               draft={draft}

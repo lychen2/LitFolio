@@ -3,13 +3,74 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, NotebookPen, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { api, type NoteSection } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import type { TKey } from "@/i18n/dict";
 
-const SECTION_ICONS: Record<string, string> = {
-  problem: "❓",
-  method: "⚙️",
-  numbers: "📊",
-  limits: "⚠️",
-  thoughts: "💡",
+const SECTION_META: Record<string, { icon: string; labelKey: TKey; placeholderKey: TKey }> = {
+  problem: {
+    icon: "❓",
+    labelKey: "reader.card.problem",
+    placeholderKey: "reader.card.problemPlaceholder",
+  },
+  method: {
+    icon: "⚙️",
+    labelKey: "reader.card.method",
+    placeholderKey: "reader.card.methodPlaceholder",
+  },
+  key_findings: {
+    icon: "✦",
+    labelKey: "reader.card.keyFindings",
+    placeholderKey: "reader.card.keyFindingsPlaceholder",
+  },
+  evidence: {
+    icon: "§",
+    labelKey: "reader.card.evidence",
+    placeholderKey: "reader.card.evidencePlaceholder",
+  },
+  limitations: {
+    icon: "⚠️",
+    labelKey: "reader.card.limitations",
+    placeholderKey: "reader.card.limitationsPlaceholder",
+  },
+  datasets: {
+    icon: "▦",
+    labelKey: "reader.card.datasets",
+    placeholderKey: "reader.card.datasetsPlaceholder",
+  },
+  metrics: {
+    icon: "#",
+    labelKey: "reader.card.metrics",
+    placeholderKey: "reader.card.metricsPlaceholder",
+  },
+  project_relation: {
+    icon: "↗",
+    labelKey: "reader.card.projectRelation",
+    placeholderKey: "reader.card.projectRelationPlaceholder",
+  },
+  quotes: {
+    icon: "“”",
+    labelKey: "reader.card.quotes",
+    placeholderKey: "reader.card.quotesPlaceholder",
+  },
+  open_questions: {
+    icon: "?",
+    labelKey: "reader.card.openQuestions",
+    placeholderKey: "reader.card.openQuestionsPlaceholder",
+  },
+  numbers: {
+    icon: "#",
+    labelKey: "reader.card.metrics",
+    placeholderKey: "reader.card.metricsPlaceholder",
+  },
+  limits: {
+    icon: "⚠️",
+    labelKey: "reader.card.limitations",
+    placeholderKey: "reader.card.limitationsPlaceholder",
+  },
+  thoughts: {
+    icon: "↗",
+    labelKey: "reader.card.projectRelation",
+    placeholderKey: "reader.card.projectRelationPlaceholder",
+  },
 };
 
 export function NoteSectionsPane({ paperId }: { paperId: string }) {
@@ -108,7 +169,11 @@ function SectionCard({
     };
   }, [draft, dirty, onSave]);
 
-  const icon = SECTION_ICONS[section.section_key] ?? "📝";
+  const t = useT();
+  const meta = SECTION_META[section.section_key];
+  const icon = meta?.icon ?? "📝";
+  const label = meta ? t(meta.labelKey) : section.section_key;
+  const placeholder = meta ? t(meta.placeholderKey) : t("reader.card.defaultPlaceholder");
   const sourceBadge =
     section.source === "user" ? null : (
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-litera-accent/10 text-litera-accent">
@@ -128,7 +193,7 @@ function SectionCard({
           <ChevronDown className="h-3.5 w-3.5 text-litera-mute" />
         )}
         <span className="text-sm">{icon}</span>
-        <span className="text-sm font-medium text-litera-text flex-1">{section.section_key}</span>
+        <span className="text-sm font-medium text-litera-text flex-1">{label}</span>
         {sourceBadge}
         {dirty && <span className="text-[10px] text-amber-400">●</span>}
         <button
@@ -143,7 +208,7 @@ function SectionCard({
           value={draft}
           onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
           spellCheck={false}
-          placeholder="Write here…"
+          placeholder={placeholder}
           className="w-full min-h-[80px] px-3 py-2 text-sm bg-transparent border-0 outline-none resize-y text-litera-text placeholder:text-litera-mute"
         />
       )}

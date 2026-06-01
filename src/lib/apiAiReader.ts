@@ -17,6 +17,7 @@ import type {
   ReadStatus,
   SaveAskNoteInput,
   SaveAskNoteResult,
+  SaveTopicSurveyResult,
   TldrResult,
   TopicSurvey,
   TranslationResult,
@@ -140,4 +141,6 @@ export const aiReaderApi = {
       annotate: params.annotate ?? null,
       perSubareaTopk: params.perSubareaTopk ?? null,
     }),
+  topicSurveySaveAsNote: (survey: TopicSurvey) =>
+    invoke<SaveTopicSurveyResult>("topic_survey_save_as_note", { survey }),
 };

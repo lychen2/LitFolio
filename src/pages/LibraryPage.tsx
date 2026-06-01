@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  LibraryBig, X, Search, Clock, PenLine,
+  Atom, Compass, Download, GitCompareArrows, Inbox, LibraryBig, ListPlus, Loader2,
+  Rss, X, Search, Clock, PenLine,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
 import { FolderSidebar } from "./library/FolderSidebar";
@@ -10,9 +12,12 @@ import { ReadingQueue } from "./library/ReadingQueue";
 import { QuickReadDrawer } from "./library/QuickReadDrawer";
 import { VirtualPaperList } from "./library/PaperList";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
+import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export function LibraryPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
   const [smartCollectionId, setSmartCollectionId] = useState<number | null>(null);
@@ -42,6 +47,34 @@ export function LibraryPage() {
   const [reading, setReading] = useState<Paper | null>(null);
   const [preview, setPreview] = useState<Paper | null>(null);
   const [showLitReview, setShowLitReview] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const selected = Array.from(selectedIds);
+  const compare = useMutation({
+    mutationFn: () => api.paperComparisonGenerate(selected),
+    onSuccess: (report) => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["comparisons"] });
+      navigate(`/compare?id=${report.id}`);
+    },
+  });
+  const queueSelected = useMutation({
+    mutationFn: async () => {
+      await Promise.all(selected.map((id) => api.queueAdd(id)));
+    },
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <section className="h-full flex flex-col">
@@ -114,6 +147,24 @@ export function LibraryPage() {
           onSelectSmart={setSmartCollectionId}
         />
         <div className="flex-1 overflow-hidden">
+          {selected.length > 0 && (
+            <SelectionToolbar
+              count={selected.length}
+              canCompare={selected.length >= 2}
+              comparing={compare.isPending}
+              queueing={queueSelected.isPending}
+              onClear={() => setSelectedIds(new Set())}
+              onQueue={() => queueSelected.mutate()}
+              onCompare={() => compare.mutate()}
+              onLitReview={() => setShowLitReview(true)}
+              onExport={() => setShowExport(true)}
+            />
+          )}
+          {compare.error && (
+            <div className="border-b border-red-400/20 bg-red-400/10 px-6 py-2 text-xs text-red-300">
+              {(compare.error as Error).message}
+            </div>
+          )}
           {isLoading ? (
             <div className="overflow-auto h-full"><LibrarySkeleton /></div>
           ) : !papers || papers.length === 0 ? (
@@ -122,6 +173,8 @@ export function LibraryPage() {
             <VirtualPaperList
               papers={papers}
               tagsByPaper={tagsByPaper}
+              selectedIds={selectedIds}
+              onToggleSelection={toggleSelection}
               onInspect={setPreview}
               onQuickRead={setReading}
             />
@@ -133,12 +186,62 @@ export function LibraryPage() {
       {preview && <PaperDetailDrawer paper={preview} onClose={() => setPreview(null)} />}
       {showLitReview && papers && (
         <LitReviewDialog
-          paperIds={papers.map((p) => p.id)}
-          paperCount={papers.length}
+          paperIds={selected.length > 0 ? selected : papers.map((p) => p.id)}
+          paperCount={selected.length > 0 ? selected.length : papers.length}
           onClose={() => setShowLitReview(false)}
         />
       )}
+      {showExport && (
+        <ExportCitationsDialog
+          paperIds={selected}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </section>
+  );
+}
+
+function SelectionToolbar({
+  count, canCompare, comparing, queueing, onClear, onQueue, onCompare, onLitReview, onExport,
+}: {
+  count: number;
+  canCompare: boolean;
+  comparing: boolean;
+  queueing: boolean;
+  onClear: () => void;
+  onQueue: () => void;
+  onCompare: () => void;
+  onLitReview: () => void;
+  onExport: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="border-b border-litera-line bg-litera-paper px-6 py-2.5 flex items-center gap-2 text-xs">
+      <span className="mr-auto text-litera-mute">{t("library.selectedCount", { count: String(count) })}</span>
+      <button onClick={onQueue} disabled={queueing} className="litera-btn text-xs disabled:opacity-50">
+        {queueing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListPlus className="h-3.5 w-3.5" />}
+        {t("queue.add")}
+      </button>
+      <button onClick={onLitReview} className="litera-btn text-xs">
+        <PenLine className="h-3.5 w-3.5" />
+        {t("litReview.title")}
+      </button>
+      <button onClick={onExport} className="litera-btn text-xs">
+        <Download className="h-3.5 w-3.5" />
+        {t("citations.title")}
+      </button>
+      <button
+        onClick={onCompare}
+        disabled={!canCompare || comparing}
+        className="litera-btn-primary text-xs disabled:opacity-50"
+      >
+        {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompareArrows className="h-3.5 w-3.5" />}
+        {t("compare.generate")}
+      </button>
+      <button onClick={onClear} className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel">
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -174,11 +277,30 @@ function LibrarySkeleton() {
 
 function Empty() {
   const t = useI18n().t;
+  const actions = [
+    { to: "/import?tab=pdf", icon: Inbox, label: t("library.emptyImportPdf") },
+    { to: "/import?tab=arxiv_doi", icon: Atom, label: t("library.emptyAddIdentifier") },
+    { to: "/topic", icon: Compass, label: t("library.emptyStartTopic") },
+    { to: "/feeds", icon: Rss, label: t("library.emptyTrackFeeds") },
+  ];
   return (
-    <div className="grid place-items-center h-full text-litera-mute litera-fade-in">
-      <div className="text-center">
-        <LibraryBig className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-sm">{t("library.empty")}</p>
+    <div className="h-full overflow-auto px-6 py-10 litera-fade-in">
+      <div className="mx-auto max-w-xl">
+        <LibraryBig className="h-10 w-10 mb-4 text-litera-mute" />
+        <h2 className="font-serif text-xl tracking-tight text-litera-text">{t("library.emptyTitle")}</h2>
+        <p className="mt-1 text-sm text-litera-mute">{t("library.empty")}</p>
+        <div className="mt-6 divide-y divide-litera-line border-y border-litera-line">
+          {actions.map(({ to, icon: Icon, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className="flex items-center gap-3 py-3 text-sm text-litera-text hover:text-litera-accent transition-colors"
+            >
+              <Icon className="h-4 w-4 text-litera-mute" />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

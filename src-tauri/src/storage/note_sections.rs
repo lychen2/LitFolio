@@ -1,5 +1,4 @@
-//! Structured note sections per paper — replaces single free-text note with
-//! categorized cards (Problem, Method, Key Numbers, Limitations, Thoughts).
+//! Structured reading-card sections per paper.
 
 use anyhow::Result;
 use chrono::Utc;
@@ -24,9 +23,14 @@ pub struct NoteSection {
 pub const DEFAULT_SECTIONS: &[(&str, &str)] = &[
     ("problem", "Problem"),
     ("method", "Method"),
-    ("numbers", "Key Numbers"),
-    ("limits", "Limitations"),
-    ("thoughts", "My Thoughts"),
+    ("key_findings", "Key Findings"),
+    ("evidence", "Evidence"),
+    ("limitations", "Limitations"),
+    ("datasets", "Datasets"),
+    ("metrics", "Metrics"),
+    ("project_relation", "Relation To My Project"),
+    ("quotes", "Cite-Worthy Quotes"),
+    ("open_questions", "Open Questions"),
 ];
 
 pub struct NoteSectionRepo<'a> {
@@ -41,7 +45,7 @@ impl<'a> NoteSectionRepo<'a> {
     /// Get all sections for a paper, ordered by sort_order.
     pub async fn list_by_paper(&self, paper_id: &str) -> Result<Vec<NoteSection>> {
         let rows = sqlx::query(
-            "SELECT * FROM paper_note_sections WHERE paper_id = ?1 ORDER BY sort_order",
+            "SELECT * FROM paper_note_sections WHERE paper_id = ?1 ORDER BY sort_order, id",
         )
         .bind(paper_id)
         .fetch_all(self.pool)

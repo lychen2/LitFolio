@@ -21,10 +21,12 @@ const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentT
 const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
 
 export function VirtualPaperList({
-  papers, tagsByPaper, onInspect, onQuickRead,
+  papers, tagsByPaper, selectedIds, onToggleSelection, onInspect, onQuickRead,
 }: {
   papers: Paper[];
   tagsByPaper: Record<string, Tag[]>;
+  selectedIds: Set<string>;
+  onToggleSelection: (id: string) => void;
   onInspect: (p: Paper) => void;
   onQuickRead: (p: Paper) => void;
 }) {
@@ -55,6 +57,8 @@ export function VirtualPaperList({
             <PaperRow
               p={papers[vi.index]}
               tags={tagsByPaper[papers[vi.index].id] ?? []}
+              selected={selectedIds.has(papers[vi.index].id)}
+              onToggleSelection={onToggleSelection}
               onInspect={onInspect}
               onQuickRead={onQuickRead}
             />
@@ -66,10 +70,12 @@ export function VirtualPaperList({
 }
 
 const PaperRow = memo(function PaperRow({
-  p, tags, onInspect, onQuickRead,
+  p, tags, selected, onToggleSelection, onInspect, onQuickRead,
 }: {
   p: Paper;
   tags: Tag[];
+  selected: boolean;
+  onToggleSelection: (id: string) => void;
   onInspect: (p: Paper) => void;
   onQuickRead: (p: Paper) => void;
 }) {
@@ -80,6 +86,13 @@ const PaperRow = memo(function PaperRow({
   return (
     <li ref={rowRef} className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
       <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelection(p.id)}
+          className="mt-1 h-4 w-4 rounded border-litera-line bg-litera-paper text-litera-accent focus:ring-litera-accent/40"
+          aria-label={t("library.selectPaper", { title: p.title })}
+        />
         <StatusToggle paper={p} />
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
         <div className="min-w-0 flex-1">

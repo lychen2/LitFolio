@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, FolderOpen, Loader2, Rocket, Search } from "lucide-react";
+import { Archive, CheckCircle2, FolderOpen, Loader2, Rocket, Search } from "lucide-react";
 import { api, pickSinglePdf, type SearchHit } from "@/lib/api";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 import { useT } from "@/i18n/I18nProvider";
+import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
+import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState";
 
 export function SearchTab() {
   const t = useT();
@@ -49,6 +51,9 @@ function SearchHitRow({ h }: { h: SearchHit }) {
   const qc = useQueryClient();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const { data: importedIds } = useImportedArxivIds();
+  const { findCandidate } = useCandidateLookup();
+  const candidateDraft = searchHitToCandidate(h);
+  const syncedCandidate = findCandidate(candidateDraft);
   const alreadyImported = useMemo(
     () => importedIds?.includes(h.draft.arxiv_id ?? "") ?? false,
     [importedIds, h.draft.arxiv_id],
@@ -77,12 +82,24 @@ function SearchHitRow({ h }: { h: SearchHit }) {
     },
     onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
   });
+  const candidate = useMutation({
+    mutationFn: () => api.candidateUpsert(candidateDraft),
+    onSuccess: () => {
+      setMsg({ kind: "ok", text: t("candidate.added") });
+      qc.invalidateQueries({ queryKey: ["candidates"] });
+    },
+    onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
+  });
+  if (candidateIsHidden(syncedCandidate)) return null;
 
   return (
     <li className="p-3.5 hover:bg-litera-panel/60 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-litera-text">{h.draft.title}</div>
+          <div className="font-medium text-litera-text">
+            {h.draft.title}
+            {syncedCandidate && <span className="ml-2 align-middle"><CandidateStatusPill status={syncedCandidate.status} /></span>}
+          </div>
           <div className="text-xs text-litera-mute mt-1">
             {h.draft.authors.slice(0, 4).join(", ")}{h.draft.authors.length > 4 ? " et al." : ""}
             {h.draft.year ? ` · ${h.draft.year}` : ""}
@@ -97,23 +114,35 @@ function SearchHitRow({ h }: { h: SearchHit }) {
           hasArxiv={!!h.draft.arxiv_id}
           savePending={savePdf.isPending}
           autoPending={arxivAuto.isPending}
+          candidatePending={candidate.isPending}
           onSave={() => savePdf.mutate()}
           onAuto={() => arxivAuto.mutate()}
+          onCandidate={() => candidate.mutate()}
         />
       </div>
     </li>
   );
 }
 
+function searchHitToCandidate(h: SearchHit) {
+  return {
+    ...h.draft,
+    source_type: "semantic_scholar",
+    source_url: h.paper_id ? `https://www.semanticscholar.org/paper/${h.paper_id}` : null,
+  };
+}
+
 function SearchHitActions({
-  alreadyImported, hasArxiv, savePending, autoPending, onSave, onAuto,
+  alreadyImported, hasArxiv, savePending, autoPending, candidatePending, onSave, onAuto, onCandidate,
 }: {
   alreadyImported: boolean;
   hasArxiv: boolean;
   savePending: boolean;
   autoPending: boolean;
+  candidatePending: boolean;
   onSave: () => void;
   onAuto: () => void;
+  onCandidate: () => void;
 }) {
   const t = useT();
   if (alreadyImported) {
@@ -125,6 +154,10 @@ function SearchHitActions({
   }
   return (
     <div className="shrink-0 flex flex-col items-end gap-1.5">
+      <button onClick={onCandidate} disabled={candidatePending} className="litera-btn text-xs whitespace-nowrap disabled:opacity-50" title={t("candidate.add")}>
+        {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+        {t("candidate.addShort")}
+      </button>
       <button onClick={onSave} disabled={savePending} className="litera-btn text-xs whitespace-nowrap disabled:opacity-50" title={t("import.search.pickSaveTitle")}>
         {savePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
         {t("import.search.pickSave")}

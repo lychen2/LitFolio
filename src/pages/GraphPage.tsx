@@ -9,6 +9,7 @@ import { MindmapView } from "./graph/MindmapView";
 import { GraphSidebar } from "./graph/GraphSidebar";
 import { GraphLegend } from "./graph/GraphLegend";
 import { LinkCreateDialog } from "./graph/LinkCreateDialog";
+import { GraphDecisionPanel } from "./graph/GraphDecisionPanel";
 
 const ALL_RELATIONS = ["extends", "contradicts", "compares", "builds_on", "uses_method", "related"];
 
@@ -190,6 +191,7 @@ export function GraphPage() {
           onClose={() => setSelectedNodeId(null)}
           onCenterConcept={handleCenterConcept}
         />
+        <GraphDecisionPanel graphData={gd} onSelectNode={setSelectedNodeId} />
       </div>
 
       {/* Link dialog */}

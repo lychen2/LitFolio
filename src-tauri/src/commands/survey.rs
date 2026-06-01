@@ -9,7 +9,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::Serialize;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, State};
 
@@ -19,9 +20,10 @@ use crate::ai::{
     LlmConfig, PiHint, SurveyAnnotation, SurveySkeleton, TaskKind,
 };
 use crate::ingest::{ground_survey, GroundedSubarea};
+use crate::storage::knowledge;
 use crate::AppState;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TopicSurvey {
     pub topic: String,
     pub subareas: Vec<SurveySubareaResult>,
@@ -34,7 +36,7 @@ pub struct TopicSurvey {
     pub annotate_tokens: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SurveySubareaResult {
     pub name: String,
     pub year_range: Option<(i32, i32)>,
@@ -43,7 +45,7 @@ pub struct SurveySubareaResult {
     pub papers: Vec<SurveyPaper>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SurveyPaper {
     pub id: String,
     pub title: String,
@@ -57,6 +59,11 @@ pub struct SurveyPaper {
     pub influential_citation_count: Option<u32>,
     pub why_important: Option<String>,
     pub must_read: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SaveTopicSurveyResult {
+    pub path: String,
 }
 
 const DEFAULT_TOPK: usize = 6;
@@ -111,6 +118,22 @@ pub async fn topic_survey(
 
     emit_or_warn(&app, "topic-survey-progress", &json!({ "phase": "done" }));
     Ok(assemble(&topic, skeleton, grounded, annotation))
+}
+
+#[tauri::command]
+pub async fn topic_survey_save_as_note(
+    state: State<'_, Arc<AppState>>,
+    survey: TopicSurvey,
+) -> Result<SaveTopicSurveyResult, String> {
+    let topic = survey.topic.trim();
+    if topic.is_empty() {
+        return Err("empty topic".into());
+    }
+    let slug = note_slug(topic);
+    let content = render_survey_note(&survey, Utc::now().format("%Y-%m-%d %H:%M UTC").to_string());
+    let path =
+        knowledge::save_markdown(&state.paths, &slug, &content).map_err(|e| e.to_string())?;
+    Ok(SaveTopicSurveyResult { path })
 }
 
 fn survey_error(stage: &str, profile_label: &str, err: anyhow::Error) -> String {
@@ -257,4 +280,126 @@ fn paper_identity(h: &crate::ingest::SearchResult) -> Option<String> {
         }
     }
     None
+}
+
+fn note_slug(topic: &str) -> String {
+    let mut slug = String::new();
+    let mut last_dash = false;
+    for ch in topic.chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+            last_dash = false;
+            continue;
+        }
+        if (ch.is_ascii_whitespace() || ch == '-' || ch == '_') && !slug.is_empty() && !last_dash {
+            slug.push('-');
+            last_dash = true;
+        }
+        if slug.len() >= 48 {
+            break;
+        }
+    }
+    let base = slug.trim_matches('-');
+    let suffix = if base.is_empty() {
+        "topic-survey"
+    } else {
+        base
+    };
+    format!("{}-{}", Utc::now().format("%Y%m%d-%H%M%S"), suffix)
+}
+
+fn render_survey_note(survey: &TopicSurvey, generated_at: String) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("# Topic Survey: {}\n\n", survey.topic.trim()));
+    out.push_str(&format!("- Saved at: {generated_at}\n"));
+    out.push_str(&format!("- Plan model: {}\n", survey.plan_model));
+    write_annotation_meta(&mut out, survey);
+    write_key_pis(&mut out, survey);
+    write_subareas(&mut out, survey);
+    out
+}
+
+fn write_annotation_meta(out: &mut String, survey: &TopicSurvey) {
+    if let Some(model) = &survey.annotate_model {
+        out.push_str(&format!("- Annotation model: {model}\n"));
+    }
+    out.push_str(&format!("- Annotated: {}\n\n", survey.annotated));
+}
+
+fn write_key_pis(out: &mut String, survey: &TopicSurvey) {
+    if survey.key_pis.is_empty() {
+        return;
+    }
+    out.push_str("## Key researchers\n\n");
+    for pi in &survey.key_pis {
+        out.push_str(&format!(
+            "- **{}**: {}\n",
+            pi.name.trim(),
+            pi.why_central.trim()
+        ));
+    }
+    out.push('\n');
+}
+
+fn write_subareas(out: &mut String, survey: &TopicSurvey) {
+    for subarea in &survey.subareas {
+        out.push_str(&format!("## {}\n\n", subarea.name.trim()));
+        if let Some((start, end)) = subarea.year_range {
+            out.push_str(&format!("- Year range: {start}-{end}\n"));
+        }
+        if !subarea.search_terms.is_empty() {
+            out.push_str(&format!(
+                "- Search terms: {}\n",
+                subarea.search_terms.join(", ")
+            ));
+        }
+        out.push_str(&format!("\n{}\n\n", subarea.summary.trim()));
+        for paper in &subarea.papers {
+            write_survey_paper(out, paper);
+        }
+    }
+}
+
+fn write_survey_paper(out: &mut String, paper: &SurveyPaper) {
+    let marker = if paper.must_read {
+        "must read"
+    } else {
+        "candidate"
+    };
+    out.push_str(&format!("### {} ({marker})\n\n", paper.title.trim()));
+    if !paper.authors.is_empty() || paper.year.is_some() {
+        out.push_str(&format!("- Authors: {}\n", paper.authors.join(", ")));
+        if let Some(year) = paper.year {
+            out.push_str(&format!("- Year: {year}\n"));
+        }
+    }
+    if let Some(why) = paper
+        .why_important
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        out.push_str(&format!("- Why important: {}\n", why.trim()));
+    }
+    write_paper_ids(out, paper);
+    if let Some(abstract_text) = paper.abstract_text.as_deref() {
+        out.push_str(&format!("\n{}\n", abstract_text.trim()));
+    }
+    out.push('\n');
+}
+
+fn write_paper_ids(out: &mut String, paper: &SurveyPaper) {
+    if let Some(doi) = paper
+        .doi
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        out.push_str(&format!("- DOI: {}\n", doi.trim()));
+    }
+    if let Some(arxiv_id) = paper
+        .arxiv_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        out.push_str(&format!("- arXiv: {}\n", arxiv_id.trim()));
+    }
 }

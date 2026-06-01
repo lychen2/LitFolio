@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { ImportPage } from "./ImportPage";
 import { LibraryPage } from "./LibraryPage";
+import { ProjectsPage } from "./ProjectsPage";
 import { ReaderPage } from "./ReaderPage";
 import { SettingsPage } from "./SettingsPage";
 
@@ -20,19 +21,23 @@ vi.mock("./reader/PdfPane", () => ({
 
 describe("page smoke render", () => {
   it("renders the library shell", () => {
-    expect(renderPage(<LibraryPage />, "/library")).toContain("Library");
+    expect(renderPage(<LibraryPage />, "/library")).toContain("文献库");
   });
 
   it("renders the import shell", () => {
-    expect(renderPage(<ImportPage />, "/import")).toContain("Import");
+    expect(renderPage(<ImportPage />, "/import")).toContain("导入");
   });
 
   it("renders the settings shell", () => {
-    expect(renderPage(<SettingsPage />, "/settings")).toContain("Settings");
+    expect(renderPage(<SettingsPage />, "/settings")).toContain("设置");
+  });
+
+  it("renders the projects shell", () => {
+    expect(renderPage(<ProjectsPage />, "/projects")).toContain("研究项目");
   });
 
   it("renders the reader route while paper data is loading", () => {
-    expect(renderPage(<ReaderPage />, "/reader/paper-1", "/reader/:paperId")).toContain("Loading");
+    expect(renderPage(<ReaderPage />, "/reader/paper-1", "/reader/:paperId")).toContain("加载中");
   });
 });
 
@@ -62,9 +67,14 @@ function mockInvoke(command: string): unknown {
     case "folders_list":
     case "smart_collections_list":
     case "reading_queue_list":
+    case "projects_list":
       return [];
     case "papers_count":
       return 0;
+    case "library_root":
+      return "/tmp/litfolio-test";
+    case "sync_get_config":
+      return { webdav: { base_url: "", remote_path: "", username: "", password: "" } };
     case "llm_get_config":
       return {
         profiles: [],

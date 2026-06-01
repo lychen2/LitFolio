@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2, ExternalLink, Languages, Loader2, Rocket,
+  Archive, CheckCircle2, ExternalLink, Languages, Loader2, Rocket,
 } from "lucide-react";
 import { api, type ArxivDraft, type Paper, type TranslationResult } from "@/lib/api";
-import { useI18n } from "@/i18n/I18nProvider";
+import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
+import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
+import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState";
 
 export function DraftRow({
   draft, rank, onOpen,
@@ -20,6 +22,8 @@ export function DraftRow({
   const [saved, setSaved] = useState<Paper | null>(null);
   const [translation, setTranslation] = useState<TranslationResult | null>(null);
   const { data: importedIds } = useImportedArxivIds();
+  const { findCandidate } = useCandidateLookup();
+  const syncedCandidate = findCandidate(draftToCandidate(draft));
   const alreadyImported = useMemo(
     () => importedIds?.includes(draft.arxiv_id ?? "") ?? false,
     [importedIds, draft.arxiv_id],
@@ -38,6 +42,11 @@ export function DraftRow({
     mutationFn: () => api.draftTranslate(draft, llmLanguageNameFor(lang)),
     onSuccess: (result) => setTranslation(result),
   });
+  const candidate = useMutation({
+    mutationFn: () => api.candidateUpsert(draftToCandidate(draft)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["candidates"] }),
+  });
+  if (candidateIsHidden(syncedCandidate)) return null;
 
   return (
     <li className="px-6 py-3.5 hover:bg-litera-panel/40 transition-colors group">
@@ -49,7 +58,9 @@ export function DraftRow({
           draft={draft}
           translation={translation}
           addError={add.error}
+          candidateError={candidate.error}
           translateError={translate.error}
+          candidateStatus={syncedCandidate?.status ?? null}
           onOpen={onOpen}
         />
         <DraftActions
@@ -57,8 +68,10 @@ export function DraftRow({
           saved={saved}
           alreadyImported={alreadyImported}
           addPending={add.isPending}
+          candidatePending={candidate.isPending}
           translatePending={translate.isPending}
           onAdd={() => add.mutate()}
+          onCandidate={() => candidate.mutate()}
           onTranslate={() => translate.mutate()}
         />
       </div>
@@ -67,12 +80,14 @@ export function DraftRow({
 }
 
 function DraftText({
-  draft, translation, addError, translateError, onOpen,
+  draft, translation, addError, candidateError, translateError, candidateStatus, onOpen,
 }: {
   draft: ArxivDraft;
   translation: TranslationResult | null;
   addError: Error | null;
+  candidateError: Error | null;
   translateError: Error | null;
+  candidateStatus: import("@/lib/api").CandidateStatus | null;
   onOpen: () => void;
 }) {
   return (
@@ -83,6 +98,7 @@ function DraftText({
       >
         {draft.title}
       </button>
+      {candidateStatus && <span className="ml-2 align-middle"><CandidateStatusPill status={candidateStatus} /></span>}
       {translation?.title && (
         <div className="text-sm text-litera-accent2 leading-snug mt-1">{translation.title}</div>
       )}
@@ -99,6 +115,7 @@ function DraftText({
       )}
       {translateError && <RowError error={translateError} />}
       {addError && <RowError error={addError} />}
+      {candidateError && <RowError error={candidateError} />}
     </div>
   );
 }
@@ -126,16 +143,19 @@ function DraftMeta({ draft }: { draft: ArxivDraft }) {
 }
 
 function DraftActions({
-  draft, saved, alreadyImported, addPending, translatePending, onAdd, onTranslate,
+  draft, saved, alreadyImported, addPending, candidatePending, translatePending, onAdd, onCandidate, onTranslate,
 }: {
   draft: ArxivDraft;
   saved: Paper | null;
   alreadyImported: boolean;
   addPending: boolean;
+  candidatePending: boolean;
   translatePending: boolean;
   onAdd: () => void;
+  onCandidate: () => void;
   onTranslate: () => void;
 }) {
+  const t = useT();
   return (
     <div className="shrink-0 flex items-center gap-2">
       <button
@@ -147,9 +167,28 @@ function DraftActions({
         {translatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
         翻译
       </button>
+      {!saved && !alreadyImported && (
+        <button
+          onClick={onCandidate}
+          disabled={candidatePending}
+          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          title={t("candidate.add")}
+        >
+          {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+          {t("candidate.addShort")}
+        </button>
+      )}
       {saved || alreadyImported ? <Saved /> : <AddButton draft={draft} pending={addPending} onClick={onAdd} />}
     </div>
   );
+}
+
+function draftToCandidate(draft: ArxivDraft) {
+  return {
+    ...draft,
+    source_type: "arxiv",
+    source_url: draft.arxiv_id ? `https://arxiv.org/abs/${draft.arxiv_id}` : null,
+  };
 }
 
 function Saved() {

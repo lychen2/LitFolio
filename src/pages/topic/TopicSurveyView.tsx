@@ -30,6 +30,7 @@ export function TopicSurveyView() {
   const [survey, setSurvey] = useState<TopicSurvey | null>(null);
   const [saved, setSaved] = useState<SavedSurvey[]>(() => loadSavedSurveys());
   const [progress, setProgress] = useState<TopicSurveyProgress | null>(null);
+  const [savedPath, setSavedPath] = useState<string | null>(null);
 
   useEffect(() => {
     const current = loadCurrentSurvey();
@@ -67,11 +68,16 @@ export function TopicSurveyView() {
     : [];
 
   const submit = () => { if (topic.trim()) run.mutate(topic.trim()); };
+  const saveNote = useMutation({
+    mutationFn: (value: TopicSurvey) => api.topicSurveySaveAsNote(value),
+    onSuccess: (result) => setSavedPath(result.path),
+  });
   const saveSurvey = () => {
     if (!survey) return;
     const next = upsertSavedSurvey(saved, survey);
     setSaved(next);
     persistSavedSurveys(next);
+    saveNote.mutate(survey);
   };
   const deleteSaved = (id: string) => {
     const next = saved.filter((item) => item.id !== id);
@@ -135,10 +141,19 @@ export function TopicSurveyView() {
           <SavedSurveyBar
             saved={saved}
             canSave={!!survey}
+            isSaving={saveNote.isPending}
             onSave={saveSurvey}
             onRestore={restoreSaved}
             onDelete={deleteSaved}
           />
+          {saveNote.error && (
+            <div className="mt-2 text-xs text-red-400/90">{errorMessage(saveNote.error)}</div>
+          )}
+          {savedPath && (
+            <div className="mt-2 text-xs text-litera-accent">
+              {t("topic.survey.savedTo", { path: savedPath })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -165,10 +180,11 @@ export function TopicSurveyView() {
 }
 
 function SavedSurveyBar({
-  saved, canSave, onSave, onRestore, onDelete,
+  saved, canSave, isSaving, onSave, onRestore, onDelete,
 }: {
   saved: SavedSurvey[];
   canSave: boolean;
+  isSaving: boolean;
   onSave: () => void;
   onRestore: (item: SavedSurvey) => void;
   onDelete: (id: string) => void;
@@ -177,8 +193,9 @@ function SavedSurveyBar({
   const t = useT();
   return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
-      <button onClick={onSave} disabled={!canSave} className="litera-btn text-xs disabled:opacity-50">
-        <Save className="h-3.5 w-3.5" /> {t("topic.survey.save")}
+      <button onClick={onSave} disabled={!canSave || isSaving} className="litera-btn text-xs disabled:opacity-50">
+        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+        {t("topic.survey.save")}
       </button>
       {saved.length > 0 && (
         <select

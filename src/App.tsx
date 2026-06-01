@@ -19,6 +19,8 @@ const BrowsePage = lazy(() => import("@/pages/BrowsePage").then((m) => ({ defaul
 const FeedsPage = lazy(() => import("@/pages/FeedsPage").then((m) => ({ default: m.FeedsPage })));
 const GraphPage = lazy(() => import("@/pages/GraphPage").then((m) => ({ default: m.GraphPage })));
 const ComparePage = lazy(() => import("@/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
+const CandidateInboxPage = lazy(() => import("@/pages/CandidateInboxPage").then((m) => ({ default: m.CandidateInboxPage })));
+const ProjectsPage = lazy(() => import("@/pages/ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
 
 export function App() {
   return (
@@ -31,6 +33,8 @@ export function App() {
         <Route path="/topic" element={<RouteShell><TopicPage /></RouteShell>} />
         <Route path="/browse" element={<RouteShell><BrowsePage /></RouteShell>} />
         <Route path="/feeds" element={<RouteShell><FeedsPage /></RouteShell>} />
+        <Route path="/candidates" element={<RouteShell><CandidateInboxPage /></RouteShell>} />
+        <Route path="/projects" element={<RouteShell><ProjectsPage /></RouteShell>} />
         <Route path="/ask" element={<RouteShell><AskPage /></RouteShell>} />
         <Route path="/graph" element={<RouteShell><GraphPage /></RouteShell>} />
         <Route path="/compare" element={<RouteShell><ComparePage /></RouteShell>} />

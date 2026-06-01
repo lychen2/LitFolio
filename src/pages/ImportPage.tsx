@@ -18,11 +18,12 @@ export function ImportPage() {
   const [params] = useSearchParams();
   const source: ImportSource = {
     fromFeedItem: params.get("fromFeedItem"),
+    candidateId: candidateIdFrom(params),
     link: params.get("link"),
     title: params.get("title"),
     prefill: params.get("link") ? extractIdentifier(params.get("link")!) : null,
   };
-  const [tab, setTab] = useState<Tab>(source.prefill ? "arxiv_doi" : "pdf");
+  const [tab, setTab] = useState<Tab>(() => initialTab(params, source.prefill));
 
   return (
     <section className="h-full flex flex-col">
@@ -53,4 +54,19 @@ export function ImportPage() {
       </div>
     </section>
   );
+}
+
+function candidateIdFrom(params: URLSearchParams): number | null {
+  const raw = params.get("candidateId");
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function initialTab(params: URLSearchParams, prefill: string | null): Tab {
+  const requested = params.get("tab");
+  if (requested === "pdf" || requested === "arxiv_doi" || requested === "search") {
+    return requested;
+  }
+  return prefill ? "arxiv_doi" : "pdf";
 }

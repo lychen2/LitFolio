@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Eye, EyeOff, Languages, Loader2 } from "lucide-react";
+import { Archive, ExternalLink, Eye, EyeOff, Languages, Loader2 } from "lucide-react";
 import { open as openInBrowser } from "@tauri-apps/plugin-shell";
 import { api, type FeedItem, type TranslationResult } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
+import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState";
 import { feedItemToDraft } from "./feedDraft";
 
 export function FeedItemRow({
@@ -20,6 +22,8 @@ export function FeedItemRow({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { lang } = useI18n();
+  const { findCandidate } = useCandidateLookup();
+  const syncedCandidate = findCandidate(feedItemToCandidate(item));
   const seen = useMutation({
     mutationFn: (s: boolean) => api.feedItemSetSeen(item.id, s),
     onSuccess: () => invalidateFeeds(qc),
@@ -27,6 +31,13 @@ export function FeedItemRow({
   const translate = useMutation({
     mutationFn: () => api.draftTranslate(feedItemToDraft(item), llmLanguageNameFor(lang)),
     onSuccess: onTranslated,
+  });
+  const candidate = useMutation({
+    mutationFn: () => api.candidateUpsert(feedItemToCandidate(item)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["candidates"] });
+      seen.mutate(true);
+    },
   });
 
   function openExternal() {
@@ -36,6 +47,7 @@ export function FeedItemRow({
   }
 
   const meta = itemRowMeta(item);
+  if (candidateIsHidden(syncedCandidate)) return null;
   return (
     <li className={"px-5 py-4 hover:bg-litera-panel/30 group " + (item.seen ? "opacity-70" : "")}>
       <div className="flex items-start gap-3">
@@ -48,6 +60,7 @@ export function FeedItemRow({
             {!item.seen && <span className="inline-block h-1.5 w-1.5 rounded-full bg-litera-accent mr-2 align-middle" />}
             {meta.title}
             {item.imported_paper_id && <span className="ml-2 text-[10px] text-emerald-400/90 align-middle">{t("feeds.imported")}</span>}
+            {syncedCandidate && <span className="ml-2 align-middle"><CandidateStatusPill status={syncedCandidate.status} /></span>}
           </button>
           {translation?.title && <div className="text-xs text-litera-accent2 leading-snug mt-1">{translation.title}</div>}
           <ItemMetaLine feedTitle={feedTitle} published={meta.published} authors={meta.authors} />
@@ -63,12 +76,17 @@ export function FeedItemRow({
           item={item}
           seenPending={seen.isPending}
           translatePending={translate.isPending}
+          candidatePending={candidate.isPending}
           onTranslate={() => translate.mutate()}
+          onCandidate={() => candidate.mutate()}
           onOpenExternal={openExternal}
-          onImport={() => navigate(importUrl(item))}
+          onImport={() => navigate(importUrl(item, syncedCandidate?.id ?? null))}
           onToggleSeen={() => seen.mutate(!item.seen)}
         />
       </div>
+      {candidate.error && (
+        <div className="ml-0 mt-1 text-[11px] text-red-400/90">✕ {(candidate.error as Error).message}</div>
+      )}
     </li>
   );
 }
@@ -102,12 +120,14 @@ function ItemMetaLine({ feedTitle, published, authors }: { feedTitle: string; pu
 }
 
 function ItemActions({
-  item, seenPending, translatePending, onTranslate, onOpenExternal, onImport, onToggleSeen,
+  item, seenPending, translatePending, candidatePending, onTranslate, onCandidate, onOpenExternal, onImport, onToggleSeen,
 }: {
   item: FeedItem;
   seenPending: boolean;
   translatePending: boolean;
+  candidatePending: boolean;
   onTranslate: () => void;
+  onCandidate: () => void;
   onOpenExternal: () => void;
   onImport: () => void;
   onToggleSeen: () => void;
@@ -129,6 +149,17 @@ function ItemActions({
           <ExternalLink className="h-3.5 w-3.5" /> {t("common.open")}
         </button>
       )}
+      {!item.imported_paper_id && (
+        <button
+          onClick={onCandidate}
+          disabled={candidatePending}
+          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          title={t("candidate.add")}
+        >
+          {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+          {t("candidate.addShort")}
+        </button>
+      )}
       {!item.imported_paper_id && <button onClick={onImport} className="litera-btn-primary text-xs whitespace-nowrap" title={t("feeds.importGo")}>{t("feeds.importBtn")}</button>}
       <button
         onClick={onToggleSeen}
@@ -142,8 +173,18 @@ function ItemActions({
   );
 }
 
-function importUrl(item: FeedItem) {
+function feedItemToCandidate(item: FeedItem) {
+  const draft = feedItemToDraft(item);
+  return {
+    ...draft,
+    source_type: "rss",
+    source_url: item.link,
+  };
+}
+
+function importUrl(item: FeedItem, candidateId: number | null) {
   const params = new URLSearchParams({ fromFeedItem: item.id, title: item.title });
+  if (candidateId != null) params.set("candidateId", String(candidateId));
   if (item.link) params.set("link", item.link);
   return `/import?${params.toString()}`;
 }

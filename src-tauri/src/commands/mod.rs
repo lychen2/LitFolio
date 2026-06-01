@@ -2,12 +2,14 @@
 
 pub mod ask;
 pub mod batch;
+pub mod candidates;
 pub mod comparisons;
 pub mod concepts;
 pub mod custom_fields;
 pub mod discovery;
 pub mod duplicates;
 pub(crate) mod events;
+pub mod evidence;
 pub mod export;
 pub mod feed_metadata;
 pub mod feeds;
@@ -20,6 +22,10 @@ pub mod llm;
 pub mod notes;
 pub mod papers;
 pub mod pdf;
+pub mod project_manifest;
+pub mod project_writing;
+pub mod project_writing_render;
+pub mod projects;
 pub mod queue;
 pub mod reader_terms;
 pub mod reader_translate;
