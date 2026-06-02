@@ -58,6 +58,18 @@ export class Channel<T = unknown> {
   }
 }
 
+export class Resource {
+  readonly rid: number;
+
+  constructor(rid: number) {
+    this.rid = rid;
+  }
+
+  async close(): Promise<void> {
+    return undefined;
+  }
+}
+
 export function transformCallback(): number {
   return 0;
 }
@@ -66,7 +78,9 @@ export function convertFileSrc(path: string): string {
   return path;
 }
 
-export const isTauri = false;
+export function isTauri(): boolean {
+  return false;
+}
 
 export async function invoke<T>(command: string, _args?: unknown): Promise<T> {
   switch (command) {
