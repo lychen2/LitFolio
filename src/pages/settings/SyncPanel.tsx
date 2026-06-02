@@ -228,6 +228,7 @@ function reportMessage(
   return t(key, {
     count: report.file_count,
     size: formatBytes(report.total_bytes),
+    skippedCount: report.skipped_count,
     remote: report.remote_root,
   });
 }

@@ -103,6 +103,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "LitFolio ${{ github.ref_name }}"
@@ -110,24 +112,16 @@ jobs:
             ## What's new in ${{ github.ref_name }}
 
             ### Added
-            - Candidate Inbox for triaging papers from RSS, arXiv browse, search, and topic surveys before importing them into the library.
-            - Research Projects for grouping papers around a research question, with project-scoped Ask, weekly review signals, source manifests, and AI writing outlines.
-            - Evidence Board for collecting excerpts from highlights, Ask answers, comparisons, notes, and manual entries, with Markdown export.
-            - AI-generated paper comparison reports from selected library papers.
-            - Knowledge Graph decision panel with unread-paper, concept-coverage, cluster, and evidence-chain signals.
-            - Data & Privacy settings panel showing storage, sync, model bindings, and network-using features.
+            - GitHub Releases based auto-update support with signed Tauri updater artifacts.
 
             ### Changed
-            - Library rows now support multi-select batch actions for queueing, AI comparison, literature review, and citation export.
-            - Reader notes are now a 10-section Reading Card with structured prompts for findings, evidence, datasets, metrics, project relevance, quotes, and open questions.
-            - Highlights can be categorized by type, including method, dataset, result, limitation, comparison, quote, and question.
-            - Topic surveys can be saved as Markdown knowledge notes.
-            - Import flows can mark candidate papers as imported, and ignored candidates are hidden from discovery surfaces.
-            - Bundled Chinese and English manuals are updated for the v0.3.4 workflows.
+            - WebDAV library sync now uses the sync manifest as a sha256 file list and skips unchanged files.
+            - Sync uploads verify remote file existence and size before skipping, so manually deleted remote files are restored.
+            - Pull sync reuses unchanged local files and still verifies downloaded files against manifest sha256 checksums.
 
             ### Fixed
-            - Windows release tests now compare canonicalized PDF and manual-note paths instead of platform-specific path strings.
-            - Rust library tests cover the release-critical path roundtrips used by local PDF import and knowledge notes.
+            - Paper deletion now surfaces filesystem removal failures instead of silently leaving orphan paper folders.
+            - Sync snapshots ignore orphan paper folders that no longer exist in the database.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true

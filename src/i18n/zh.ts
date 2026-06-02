@@ -496,8 +496,8 @@ export const zh = {
   "settings.sync.pullConfirm": "这会用远端文献库完整替换本地内容，并在完成后自动重启应用。继续吗？",
   "settings.sync.saved": "✓ 同步配置已保存。",
   "settings.sync.testOk": "✓ 已连通 {remote}",
-  "settings.sync.pushOk": "✓ 已上传 {count} 个文件，共 {size} → {remote}",
-  "settings.sync.pullOk": "✓ 已拉取 {count} 个文件，共 {size} ← {remote}，应用将自动重启",
+  "settings.sync.pushOk": "✓ 已上传 {count} 个文件，共 {size}；跳过 {skippedCount} 个已同步文件 → {remote}",
+  "settings.sync.pullOk": "✓ 已拉取 {count} 个文件，共 {size}；跳过 {skippedCount} 个已同步文件 ← {remote}，应用将自动重启",
 
   "reader.back": "返回",
   "reader.backToLibrary": "返回文献库",

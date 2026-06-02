@@ -15,6 +15,36 @@ fn snapshot_skips_sqlite_sidecars() {
 }
 
 #[test]
+fn snapshot_skips_local_derived_dirs() {
+    let root = temp_root();
+    std::fs::write(root.join("library.db"), b"db").unwrap();
+    std::fs::create_dir_all(root.join("backups")).unwrap();
+    std::fs::write(root.join("backups/old.db"), b"backup").unwrap();
+    std::fs::create_dir_all(root.join("vectors")).unwrap();
+    std::fs::write(root.join("vectors/cache.bin"), b"cache").unwrap();
+
+    let snapshot = create_snapshot(&root).unwrap();
+
+    assert_eq!(manifest_paths(&snapshot), vec!["library.db"]);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn snapshot_skips_paper_dirs_missing_from_database_filter() {
+    let root = temp_root();
+    std::fs::create_dir_all(root.join("papers/keep")).unwrap();
+    std::fs::write(root.join("papers/keep/original.pdf"), b"%PDF-keep").unwrap();
+    std::fs::create_dir_all(root.join("papers/orphan")).unwrap();
+    std::fs::write(root.join("papers/orphan/original.pdf"), b"%PDF-orphan").unwrap();
+    let valid_papers = HashSet::from(["keep".to_string()]);
+
+    let snapshot = create_snapshot_for_papers(&root, &valid_papers).unwrap();
+
+    assert_eq!(manifest_paths(&snapshot), vec!["papers/keep/original.pdf"]);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn manifest_roundtrip() {
     let manifest = SyncManifest {
         version: SYNC_MANIFEST_VERSION,
@@ -137,4 +167,15 @@ fn manifest_file(path: &str, bytes: &[u8]) -> ManifestFile {
         size: bytes.len() as u64,
         sha256: hash_hex(bytes),
     }
+}
+
+fn manifest_paths(snapshot: &Snapshot) -> Vec<&str> {
+    let mut paths = snapshot
+        .manifest
+        .files
+        .iter()
+        .map(|file| file.path.as_str())
+        .collect::<Vec<_>>();
+    paths.sort_unstable();
+    paths
 }

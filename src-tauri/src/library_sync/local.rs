@@ -32,7 +32,17 @@ pub struct SyncReport {
     pub remote_root: String,
     pub file_count: usize,
     pub total_bytes: u64,
+    pub skipped_count: usize,
+    pub skipped_bytes: u64,
     pub restart_required: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SyncTransferStats {
+    pub file_count: usize,
+    pub total_bytes: u64,
+    pub skipped_count: usize,
+    pub skipped_bytes: u64,
 }
 
 pub struct SnapshotDir {
@@ -74,20 +84,42 @@ impl Snapshot {
         self.dir.path()
     }
 
-    pub fn report(&self, remote_root: String, restart_required: bool) -> SyncReport {
+    pub fn report_with_stats(
+        &self,
+        remote_root: String,
+        stats: SyncTransferStats,
+        restart_required: bool,
+    ) -> SyncReport {
         SyncReport {
             remote_root,
-            file_count: self.manifest.files.len(),
-            total_bytes: self.manifest.files.iter().map(|file| file.size).sum(),
+            file_count: stats.file_count,
+            total_bytes: stats.total_bytes,
+            skipped_count: stats.skipped_count,
+            skipped_bytes: stats.skipped_bytes,
             restart_required,
         }
     }
 }
 
+#[cfg(test)]
 pub fn create_snapshot(root: &Path) -> Result<Snapshot> {
+    create_snapshot_with_filter(root, None)
+}
+
+pub fn create_snapshot_for_papers(
+    root: &Path,
+    valid_paper_ids: &HashSet<String>,
+) -> Result<Snapshot> {
+    create_snapshot_with_filter(root, Some(valid_paper_ids))
+}
+
+fn create_snapshot_with_filter(
+    root: &Path,
+    valid_paper_ids: Option<&HashSet<String>>,
+) -> Result<Snapshot> {
     let mut files = Vec::new();
     let snapshot = Snapshot::new_empty("litera-sync-snapshot", empty_manifest())?;
-    copy_tree(root, root, snapshot.root(), &mut files)?;
+    copy_tree(root, root, snapshot.root(), &mut files, valid_paper_ids)?;
     Ok(Snapshot {
         dir: snapshot.dir,
         manifest: SyncManifest {
@@ -106,6 +138,22 @@ pub fn manifest_from_bytes(bytes: &[u8]) -> Result<SyncManifest> {
     let manifest: SyncManifest = serde_json::from_slice(bytes).context("parse sync manifest")?;
     validate_manifest(&manifest)?;
     Ok(manifest)
+}
+
+pub fn copy_snapshot_file(
+    src_snapshot: &Snapshot,
+    dst_snapshot: &Snapshot,
+    file: &ManifestFile,
+) -> Result<()> {
+    validate_manifest_file(file)?;
+    let source = src_snapshot.root().join(&file.path);
+    let target = dst_snapshot.root().join(&file.path);
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    std::fs::copy(&source, &target)
+        .with_context(|| format!("copy {} -> {}", source.display(), target.display()))?;
+    Ok(())
 }
 
 pub fn stage_downloaded_file(snapshot: &Snapshot, file: &ManifestFile, bytes: &[u8]) -> Result<()> {
@@ -217,6 +265,7 @@ fn copy_tree(
     current: &Path,
     dst_root: &Path,
     files: &mut Vec<ManifestFile>,
+    valid_paper_ids: Option<&HashSet<String>>,
 ) -> Result<()> {
     for entry in
         std::fs::read_dir(current).with_context(|| format!("read {}", current.display()))?
@@ -226,12 +275,24 @@ fn copy_tree(
         let rel = path
             .strip_prefix(src_root)
             .context("strip snapshot prefix")?;
-        if should_skip(rel) {
+        if should_skip(rel, valid_paper_ids) {
             continue;
         }
-        if path.is_dir() {
-            copy_tree(src_root, &path, dst_root, files)?;
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("read file type {}", path.display()))?;
+        if file_type.is_symlink() {
+            return Err(anyhow!(
+                "sync does not support symlinks: {}",
+                path.display()
+            ));
+        }
+        if file_type.is_dir() {
+            copy_tree(src_root, &path, dst_root, files, valid_paper_ids)?;
             continue;
+        }
+        if !file_type.is_file() {
+            return Err(anyhow!("sync only supports files: {}", path.display()));
         }
         copy_file(src_root, &path, dst_root, files)?;
     }
@@ -283,11 +344,43 @@ fn copy_file(
     Ok(())
 }
 
-fn should_skip(rel: &Path) -> bool {
+fn should_skip(rel: &Path, valid_paper_ids: Option<&HashSet<String>>) -> bool {
+    let first_component = rel
+        .components()
+        .next()
+        .and_then(|component| match component {
+            Component::Normal(value) => value.to_str(),
+            _ => None,
+        });
+    if matches!(first_component, Some("backups" | "vectors")) {
+        return true;
+    }
+    if is_orphan_paper_path(rel, valid_paper_ids) {
+        return true;
+    }
     matches!(
         rel.file_name().and_then(|name| name.to_str()),
         Some("library.db-wal" | "library.db-shm" | MANIFEST_FILE_NAME)
     )
+}
+
+fn is_orphan_paper_path(rel: &Path, valid_paper_ids: Option<&HashSet<String>>) -> bool {
+    let Some(valid_paper_ids) = valid_paper_ids else {
+        return false;
+    };
+    let mut components = rel.components();
+    if !matches!(
+        components.next(),
+        Some(Component::Normal(component)) if component == "papers"
+    ) {
+        return false;
+    }
+    let Some(Component::Normal(paper_id)) = components.next() else {
+        return false;
+    };
+    paper_id
+        .to_str()
+        .is_some_and(|paper_id| !valid_paper_ids.contains(paper_id))
 }
 
 fn hash_hex(bytes: &[u8]) -> String {

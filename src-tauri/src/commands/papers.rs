@@ -100,11 +100,9 @@ pub async fn paper_delete(state: State<'_, Arc<AppState>>, id: String) -> Result
         .delete(&id)
         .await
         .map_err(|e| e.to_string())?;
-    // Best-effort: remove sidecar files after the DB row is already gone.
-    // A leftover folder is recoverable; surfacing that error would confuse users.
     let dir = state.paths.paper_dir(&id);
     if dir.exists() {
-        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::remove_dir_all(&dir).map_err(|e| format!("remove {}: {e}", dir.display()))?;
     }
     Ok(())
 }
