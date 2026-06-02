@@ -19,6 +19,8 @@ export interface SyncReport {
   remote_root: string;
   file_count: number;
   total_bytes: number;
+  skipped_count: number;
+  skipped_bytes: number;
   restart_required: boolean;
 }
 

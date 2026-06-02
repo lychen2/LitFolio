@@ -501,8 +501,8 @@ export const en: Record<TKey, string> = {
   "settings.sync.pullConfirm": "This will replace the local library with the full remote snapshot and restart the app afterwards. Continue?",
   "settings.sync.saved": "✓ Sync config saved.",
   "settings.sync.testOk": "✓ Connected to {remote}",
-  "settings.sync.pushOk": "✓ Uploaded {count} files, {size} total → {remote}",
-  "settings.sync.pullOk": "✓ Downloaded {count} files, {size} total ← {remote}; the app will restart",
+  "settings.sync.pushOk": "✓ Uploaded {count} files, {size} total; skipped {skippedCount} already-synced files → {remote}",
+  "settings.sync.pullOk": "✓ Downloaded {count} files, {size} total; skipped {skippedCount} already-synced files ← {remote}; the app will restart",
 
   "reader.back": "Back",
   "reader.backToLibrary": "Back to library",

@@ -4,6 +4,7 @@ mod webdav;
 
 use anyhow::{Context, Result};
 use reqwest::Client;
+use std::collections::HashSet;
 
 use crate::storage::{LibraryPaths, Pool};
 
@@ -21,10 +22,11 @@ pub async fn push_library(
     cfg: &WebDavConfig,
 ) -> Result<SyncReport> {
     checkpoint_db(pool).await?;
-    let snapshot = local::create_snapshot(&paths.root)?;
+    let paper_ids = synced_paper_ids(pool).await?;
+    let snapshot = local::create_snapshot_for_papers(&paths.root, &paper_ids)?;
     let remote = webdav::WebDavRemote::new(client, cfg);
-    remote.upload_snapshot(&snapshot).await?;
-    Ok(snapshot.report(remote.remote_root(), false))
+    let stats = remote.upload_snapshot(&snapshot).await?;
+    Ok(snapshot.report_with_stats(remote.remote_root(), stats, false))
 }
 
 pub async fn pull_library(
@@ -34,11 +36,23 @@ pub async fn pull_library(
     cfg: &WebDavConfig,
 ) -> Result<SyncReport> {
     let remote = webdav::WebDavRemote::new(client, cfg);
-    let snapshot = remote.download_snapshot().await?;
     checkpoint_db(pool).await?;
+    let paper_ids = synced_paper_ids(pool).await?;
+    let local_snapshot = local::create_snapshot_for_papers(&paths.root, &paper_ids)?;
+    let (snapshot, stats) = remote
+        .download_snapshot_reusing(Some(&local_snapshot))
+        .await?;
     pool.close().await;
     local::replace_library_root(&paths.root, snapshot.root())?;
-    Ok(snapshot.report(remote.remote_root(), true))
+    Ok(snapshot.report_with_stats(remote.remote_root(), stats, true))
+}
+
+async fn synced_paper_ids(pool: &Pool) -> Result<HashSet<String>> {
+    let ids = sqlx::query_scalar::<_, String>("SELECT id FROM papers")
+        .fetch_all(pool)
+        .await
+        .context("list paper ids for sync snapshot")?;
+    Ok(ids.into_iter().collect())
 }
 
 async fn checkpoint_db(pool: &Pool) -> Result<()> {
