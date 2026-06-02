@@ -1,6 +1,4 @@
-import { confirm, message } from "@tauri-apps/plugin-dialog";
-import { relaunch } from "@tauri-apps/plugin-process";
-import { check } from "@tauri-apps/plugin-updater";
+import { isTauri } from "@tauri-apps/api/core";
 
 let started = false;
 
@@ -9,6 +7,13 @@ export async function startAutoUpdateCheck(): Promise<void> {
   started = true;
 
   try {
+    if (!isTauri()) return;
+
+    const [{ confirm, message }, { relaunch }, { check }] = await Promise.all([
+      import("@tauri-apps/plugin-dialog"),
+      import("@tauri-apps/plugin-process"),
+      import("@tauri-apps/plugin-updater"),
+    ]);
     const update = await check();
     if (!update) return;
 
