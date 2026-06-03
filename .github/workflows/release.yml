@@ -111,17 +111,12 @@ jobs:
           releaseBody: |
             ## What's new in ${{ github.ref_name }}
 
-            ### Added
-            - GitHub Releases based auto-update support with signed Tauri updater artifacts.
+            ### Fixed
+            - RSS feed imports now show the auto-download PDF action for DOI-backed papers.
+            - DOI imports from RSS use the existing DOI PDF download flow and still link the imported paper back to the feed item.
 
             ### Changed
-            - WebDAV library sync now uses the sync manifest as a sha256 file list and skips unchanged files.
-            - Sync uploads verify remote file existence and size before skipping, so manually deleted remote files are restored.
-            - Pull sync reuses unchanged local files and still verifies downloaded files against manifest sha256 checksums.
-
-            ### Fixed
-            - Paper deletion now surfaces filesystem removal failures instead of silently leaving orphan paper folders.
-            - Sync snapshots ignore orphan paper folders that no longer exist in the database.
+            - Import guidance now reflects DOI auto-download support.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true
