@@ -33,7 +33,7 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const linkBackToFeed = useLinkBackToFeed(source);
   const markCandidateImported = useMarkCandidateImported(source);
   const saveWithPdf = useSaveWithPdfMutation({ draft, selectedPdf, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
-  const autoDownload = useAutoDownloadMutation({ draft, trimmed, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
+  const autoDownload = useAutoDownloadMutation({ draft, sourceKind, trimmed, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
 
   function reset() {
     setValue("");

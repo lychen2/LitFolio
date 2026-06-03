@@ -7,9 +7,10 @@ import { type ImportSource } from "./types";
 export type SourceKind = "arxiv" | "doi" | null;
 
 export function detectSourceKind(value: string): SourceKind {
-  const isArxiv = /^\d{4}\.\d{4,5}/.test(value) || value.toLowerCase().includes("arxiv");
+  const lower = value.toLowerCase();
+  const isArxiv = /^\d{4}\.\d{4,5}/.test(value) || lower.includes("arxiv");
   if (isArxiv) return "arxiv";
-  return /^10\./.test(value) || value.includes("doi.org") ? "doi" : null;
+  return /^10\./i.test(value) || lower.includes("doi.org") || lower.startsWith("doi:") ? "doi" : null;
 }
 
 type DraftSetters = {
@@ -54,7 +55,19 @@ export function usePrepareFeedDraftMutation({
 }) {
   return useMutation({
     mutationFn: (itemId: string) => api.feedItemPrepareDraft(itemId),
-    onSuccess: (draft) => applyDraft({ draft, value: "", setValue, setDraft, setSourceKind, setError, setSuccess }),
+    onSuccess: (draft) => {
+      const fallbackKind = source.prefill ? detectSourceKind(source.prefill) : null;
+      applyDraft({
+        draft,
+        kind: draft.arxiv_id || draft.doi ? undefined : fallbackKind,
+        value: source.prefill ?? "",
+        setValue,
+        setDraft,
+        setSourceKind,
+        setError,
+        setSuccess,
+      });
+    },
     onError: () => {
       if (!source.prefill) return;
       setValue(source.prefill);
@@ -106,6 +119,7 @@ export function useMarkCandidateImported(source: ImportSource) {
 
 type SaveMutationParams = {
   draft: ArxivDraft | null;
+  sourceKind?: SourceKind;
   selectedPdf?: string | null;
   trimmed?: string;
   linkBackToFeed: (paperId: string) => Promise<void>;
@@ -138,7 +152,12 @@ export function useAutoDownloadMutation(params: SaveMutationParams) {
   const t = useT();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.arxivAddWithPdf(params.draft?.arxiv_id ?? params.trimmed?.replace(/^arxiv:/i, "").trim() ?? ""),
+    mutationFn: () => {
+      if (params.sourceKind === "doi") {
+        return api.doiAddWithPdf(params.draft?.doi ?? params.trimmed ?? "");
+      }
+      return api.arxivAddWithPdf(params.draft?.arxiv_id ?? params.trimmed?.replace(/^arxiv:/i, "").trim() ?? "");
+    },
     onSuccess: async (p) => {
       params.setSuccess(t("import.downloadedSaved", { title: p.title }));
       await params.linkBackToFeed(p.id);

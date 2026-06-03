@@ -65,8 +65,13 @@ export function DraftSavePanel({
           <button onClick={onPickPdf} disabled={saving} className="litera-btn text-sm disabled:opacity-50">
             <FolderOpen className="h-4 w-4" /> {t("import.step3.pickPdf")}
           </button>
-          {sourceKind === "arxiv" && (
-            <button onClick={onAutoDownload} disabled={saving} className="litera-btn text-sm disabled:opacity-50" title={t("import.step3.autoDownloadTitle")}>
+          {sourceKind && (
+            <button
+              onClick={onAutoDownload}
+              disabled={saving}
+              className="litera-btn text-sm disabled:opacity-50"
+              title={sourceKind === "doi" ? t("import.step3.doiAutoDownloadTitle") : t("import.step3.autoDownloadTitle")}
+            >
               {autoPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
               {t("import.step3.autoDownload")}
             </button>
