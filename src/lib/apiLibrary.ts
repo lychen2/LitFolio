@@ -106,6 +106,8 @@ export const libraryApi = {
     invokeParsed("arxiv_add_draft", { draft }, parsePaper),
   arxivAddWithPdf: (arxivId: string) =>
     invokeParsed("arxiv_add_with_pdf", { arxivId }, parsePaper),
+  doiAddWithPdf: (doi: string) =>
+    invokeParsed("doi_add_with_pdf", { doi }, parsePaper),
   prepareDoiDraft: (doi: string) =>
     invokeParsed("prepare_doi_draft", { doi }, parseArxivDraft),
   paperFindByDoi: (doi: string) =>
