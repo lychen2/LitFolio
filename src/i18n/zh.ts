@@ -503,7 +503,7 @@ export const zh = {
   "settings.sync.saved": "✓ 同步配置已保存。",
   "settings.sync.testOk": "✓ 已连通 {remote}",
   "settings.sync.pushOk": "✓ 已上传 {count} 个文件，共 {size}；跳过 {skippedCount} 个已同步文件 → {remote}",
-  "settings.sync.pullOk": "✓ 已拉取 {count} 个文件，共 {size}；跳过 {skippedCount} 个已同步文件 ← {remote}，应用将自动重启",
+  "settings.sync.pullOk": "✓ 已拉取 {count} 个文件，共 {size}；跳过 {skippedCount} 个已同步文件 ← {remote}，备份：{backupPath}，应用将自动重启",
 
   "reader.back": "返回",
   "reader.backToLibrary": "返回文献库",
