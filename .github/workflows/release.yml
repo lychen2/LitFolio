@@ -111,12 +111,16 @@ jobs:
           releaseBody: |
             ## What's new in ${{ github.ref_name }}
 
+            ### Added
+            - PDF imports can now generate and index Markdown through the local parser, MinerU Agent API, or MinerU Precise API.
+            - Reader PDF failures now show stage, message, and asset URL details directly in the app so Windows users can report errors without DevTools.
+
             ### Fixed
-            - RSS feed imports now show the auto-download PDF action for DOI-backed papers.
-            - DOI imports from RSS use the existing DOI PDF download flow and still link the imported paper back to the feed item.
+            - Windows PDF rendering can fetch Tauri asset URLs through the app content security policy.
+            - Full Rust validation no longer fails on the Sci-Hub example target.
 
             ### Changed
-            - Import guidance now reflects DOI auto-download support.
+            - DOI PDF auto-download tries Sci-Hub before CrossRef public PDF links and reports clearer failure reasons.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true
