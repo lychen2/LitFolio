@@ -1,5 +1,5 @@
 import { Copy, Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
 type PdfToolbarProps = {
@@ -110,6 +110,12 @@ type VisiblePdfError = {
 export function PdfLoadError({ error, onRetry }: { error?: VisiblePdfError; onRetry?: () => void }) {
   const t = useT();
   const fields = pdfErrorFields(error, t("reader.unknownError"));
+  const [copied, setCopied] = useState(false);
+  async function copyDetails() {
+    await navigator.clipboard.writeText(formatPdfError(fields));
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
   return (
     <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
       <div className="max-w-2xl w-full">
@@ -128,6 +134,10 @@ export function PdfLoadError({ error, onRetry }: { error?: VisiblePdfError; onRe
             {t("common.retry")}
           </button>
         )}
+        <button onClick={copyDetails} className="litera-btn text-xs px-3 py-1 mt-3 ml-2">
+          <Copy className="h-3 w-3" />
+          {copied ? t("reader.errorDetailsCopied") : t("reader.copyErrorDetails")}
+        </button>
       </div>
     </div>
   );
@@ -143,6 +153,10 @@ function pdfErrorFields(error: VisiblePdfError | undefined, fallback: string): A
     ["assetUrl", error.assetUrl],
     ["detail", error.detail],
   ].filter((field): field is [string, string] => typeof field[1] === "string" && field[1].trim().length > 0);
+}
+
+function formatPdfError(fields: Array<[string, string]>): string {
+  return fields.map(([label, value]) => `${label}: ${value}`).join("\n");
 }
 
 export function PdfMutationError({

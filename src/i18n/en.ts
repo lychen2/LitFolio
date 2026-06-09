@@ -520,6 +520,8 @@ export const en: Record<TKey, string> = {
   "reader.pdfLoadFailed": "Failed to load PDF",
   "reader.pdfRenderFailed": "PDF render failed",
   "reader.pdfErrorHint": "Send these error details to the developer. DevTools is not required.",
+  "reader.copyErrorDetails": "Copy error details",
+  "reader.errorDetailsCopied": "Error details copied",
   "reader.unknownError": "Unknown error",
   "reader.openConsole": "Error details are shown on the page. Open DevTools only if more diagnostics are needed.",
   "reader.darkMode": "Dark",
