@@ -387,7 +387,12 @@ pub async fn scihub_download_pdf(pdf_url: &str, doi: &str, dest: &std::path::Pat
 async fn fetch_html_via_curl(url: &str) -> Result<Option<String>> {
     use tokio::process::Command;
     // Quick check: is curl on PATH?
-    if !Command::new("curl").arg("--version").output().await.is_ok() {
+    if Command::new("curl")
+        .arg("--version")
+        .output()
+        .await
+        .is_err()
+    {
         return Ok(None);
     }
     let output = Command::new("curl")

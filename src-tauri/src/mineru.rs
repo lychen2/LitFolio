@@ -9,18 +9,13 @@ use serde::{Deserialize, Serialize};
 const DEFAULT_BASE_URL: &str = "https://mineru.net";
 const DEFAULT_MAX_POLLS: usize = 120;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PdfMarkdownEngine {
+    #[default]
     Local,
     MineruAgent,
     MineruPrecise,
-}
-
-impl Default for PdfMarkdownEngine {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,7 +127,9 @@ impl MineruClient {
                     return data
                         .markdown_url
                         .filter(|url| !url.trim().is_empty())
-                        .ok_or_else(|| anyhow!("MinerU Agent result did not include markdown_url"));
+                        .ok_or_else(|| {
+                            anyhow!("MinerU Agent result did not include markdown_url")
+                        });
                 }
                 "failed" => {
                     return Err(anyhow!(
@@ -159,17 +156,18 @@ impl MineruClient {
                 .await
                 .context("parse MinerU precise poll response")?;
             let data = response.into_data("precise poll task")?;
-            let result = data
-                .extract_result
-                .first()
-                .ok_or_else(|| anyhow!("MinerU precise poll response did not include extract_result"))?;
+            let result = data.extract_result.first().ok_or_else(|| {
+                anyhow!("MinerU precise poll response did not include extract_result")
+            })?;
             match result.state.as_str() {
                 "done" => {
                     return result
                         .full_zip_url
                         .clone()
                         .filter(|url| !url.trim().is_empty())
-                        .ok_or_else(|| anyhow!("MinerU precise result did not include full_zip_url"));
+                        .ok_or_else(|| {
+                            anyhow!("MinerU precise result did not include full_zip_url")
+                        });
                 }
                 "failed" => {
                     return Err(anyhow!(
@@ -180,7 +178,9 @@ impl MineruClient {
                 _ => tokio::time::sleep(self.poll_interval).await,
             }
         }
-        Err(anyhow!("MinerU precise polling timed out for batch {batch_id}"))
+        Err(anyhow!(
+            "MinerU precise polling timed out for batch {batch_id}"
+        ))
     }
 
     fn endpoint(&self, path: &str) -> String {
@@ -312,7 +312,10 @@ async fn download_text(http: &Client, url: &str, label: &str) -> Result<String> 
         .await
         .map_err(|e| anyhow!("download {label} failed: {}", e.without_url()))?;
     if !response.status().is_success() {
-        return Err(anyhow!("download {label} returned HTTP {}", response.status()));
+        return Err(anyhow!(
+            "download {label} returned HTTP {}",
+            response.status()
+        ));
     }
     response
         .text()
@@ -327,7 +330,10 @@ async fn download_bytes(http: &Client, url: &str, label: &str) -> Result<Vec<u8>
         .await
         .map_err(|e| anyhow!("download {label} failed: {}", e.without_url()))?;
     if !response.status().is_success() {
-        return Err(anyhow!("download {label} returned HTTP {}", response.status()));
+        return Err(anyhow!(
+            "download {label} returned HTTP {}",
+            response.status()
+        ));
     }
     let bytes = response
         .bytes()
@@ -372,7 +378,9 @@ fn display_code(code: &serde_json::Value) -> String {
 }
 
 fn error_suffix(message: Option<&str>, code: Option<i64>) -> String {
-    let code = code.map(|value| format!(" code={value}")).unwrap_or_default();
+    let code = code
+        .map(|value| format!(" code={value}"))
+        .unwrap_or_default();
     let message = message
         .filter(|value| !value.trim().is_empty())
         .map(|value| format!(": {value}"))
@@ -403,10 +411,22 @@ mod tests {
 
         assert_eq!(markdown, "# Agent\n\nParsed markdown");
         let requests = server.requests();
-        assert!(requests.iter().any(|r| r.method == "POST" && r.path == "/api/v1/agent/parse/file"));
-        assert!(requests.iter().any(|r| r.method == "PUT" && r.path == "/agent-upload" && r.body.starts_with(b"%PDF-")));
-        assert!(requests.iter().filter(|r| r.method == "GET" && r.path == "/api/v1/agent/parse/task-agent").count() >= 2);
-        assert!(requests.iter().any(|r| r.method == "GET" && r.path == "/agent/full.md"));
+        assert!(requests
+            .iter()
+            .any(|r| r.method == "POST" && r.path == "/api/v1/agent/parse/file"));
+        assert!(requests.iter().any(|r| r.method == "PUT"
+            && r.path == "/agent-upload"
+            && r.body.starts_with(b"%PDF-")));
+        assert!(
+            requests
+                .iter()
+                .filter(|r| r.method == "GET" && r.path == "/api/v1/agent/parse/task-agent")
+                .count()
+                >= 2
+        );
+        assert!(requests
+            .iter()
+            .any(|r| r.method == "GET" && r.path == "/agent/full.md"));
         std::fs::remove_file(pdf).ok();
     }
 
@@ -417,7 +437,10 @@ mod tests {
         let client = MineruClient::with_base_url(reqwest::Client::new(), server.base_url())
             .with_polling(Duration::from_millis(1), 4);
 
-        let markdown = client.parse_precise_file(&pdf, "mineru-token").await.unwrap();
+        let markdown = client
+            .parse_precise_file(&pdf, "mineru-token")
+            .await
+            .unwrap();
 
         assert_eq!(markdown, "# Precise\n\nParsed markdown");
         let requests = server.requests();
@@ -425,11 +448,20 @@ mod tests {
             .iter()
             .find(|r| r.method == "POST" && r.path == "/api/v4/file-urls/batch")
             .expect("precise batch creation request");
-        assert!(create.headers.iter().any(|h| h.eq_ignore_ascii_case("authorization: Bearer mineru-token")));
+        assert!(create
+            .headers
+            .iter()
+            .any(|h| h.eq_ignore_ascii_case("authorization: Bearer mineru-token")));
         assert!(String::from_utf8_lossy(&create.body).contains("\"model_version\":\"vlm\""));
-        assert!(requests.iter().any(|r| r.method == "PUT" && r.path == "/precise-upload" && r.body.starts_with(b"%PDF-")));
-        assert!(requests.iter().any(|r| r.method == "GET" && r.path == "/api/v4/extract-results/batch/batch-1"));
-        assert!(requests.iter().any(|r| r.method == "GET" && r.path == "/precise/result.zip"));
+        assert!(requests.iter().any(|r| r.method == "PUT"
+            && r.path == "/precise-upload"
+            && r.body.starts_with(b"%PDF-")));
+        assert!(requests
+            .iter()
+            .any(|r| r.method == "GET" && r.path == "/api/v4/extract-results/batch/batch-1"));
+        assert!(requests
+            .iter()
+            .any(|r| r.method == "GET" && r.path == "/precise/result.zip"));
         std::fs::remove_file(pdf).ok();
     }
 
@@ -529,10 +561,15 @@ mod tests {
         let mut first_parts = first.split_whitespace();
         let method = first_parts.next()?.to_string();
         let path = first_parts.next()?.to_string();
-        let headers = lines.map(|line| line.trim().to_string()).collect::<Vec<_>>();
+        let headers = lines
+            .map(|line| line.trim().to_string())
+            .collect::<Vec<_>>();
         let content_length = headers
             .iter()
-            .find_map(|line| line.strip_prefix("Content-Length:").or_else(|| line.strip_prefix("content-length:")))
+            .find_map(|line| {
+                line.strip_prefix("Content-Length:")
+                    .or_else(|| line.strip_prefix("content-length:"))
+            })
             .and_then(|value| value.trim().parse::<usize>().ok())
             .unwrap_or(0);
         let body_start = header_end + 4;
@@ -544,8 +581,15 @@ mod tests {
             }
             buf.extend_from_slice(&chunk[..read]);
         }
-        let body = buf[body_start..body_start + content_length.min(buf.len().saturating_sub(body_start))].to_vec();
-        Some(RecordedRequest { method, path, headers, body })
+        let body = buf
+            [body_start..body_start + content_length.min(buf.len().saturating_sub(body_start))]
+            .to_vec();
+        Some(RecordedRequest {
+            method,
+            path,
+            headers,
+            body,
+        })
     }
 
     fn find_header_end(buf: &[u8]) -> Option<usize> {
@@ -566,14 +610,18 @@ mod tests {
                 let mut state = state.lock().unwrap();
                 state.polls += 1;
                 if state.polls == 1 {
-                    json_response(r#"{"code":0,"msg":"ok","data":{"task_id":"task-agent","state":"running"}}"#)
+                    json_response(
+                        r#"{"code":0,"msg":"ok","data":{"task_id":"task-agent","state":"running"}}"#,
+                    )
                 } else {
                     json_response(&format!(
                         r#"{{"code":0,"msg":"ok","data":{{"task_id":"task-agent","state":"done","markdown_url":"{base_url}/agent/full.md"}}}}"#
                     ))
                 }
             }
-            ("GET", "/agent/full.md") => text_response("# Agent\n\nParsed markdown", "text/markdown"),
+            ("GET", "/agent/full.md") => {
+                text_response("# Agent\n\nParsed markdown", "text/markdown")
+            }
             _ => empty_response(404),
         }
     }
@@ -587,7 +635,10 @@ mod tests {
             ("GET", "/api/v4/extract-results/batch/batch-1") => json_response(&format!(
                 r#"{{"code":0,"msg":"ok","data":{{"batch_id":"batch-1","extract_result":[{{"file_name":"paper.pdf","state":"done","err_msg":"","full_zip_url":"{base_url}/precise/result.zip"}}]}}}}"#
             )),
-            ("GET", "/precise/result.zip") => binary_response(zip_with_full_md("# Precise\n\nParsed markdown"), "application/zip"),
+            ("GET", "/precise/result.zip") => binary_response(
+                zip_with_full_md("# Precise\n\nParsed markdown"),
+                "application/zip",
+            ),
             _ => empty_response(404),
         }
     }
@@ -624,7 +675,8 @@ mod tests {
     }
 
     fn fixture_pdf(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("litera-mineru-{name}-{}.pdf", ulid::Ulid::new()));
+        let path =
+            std::env::temp_dir().join(format!("litera-mineru-{name}-{}.pdf", ulid::Ulid::new()));
         std::fs::write(&path, b"%PDF-1.4\n%fixture\n%%EOF\n").unwrap();
         path
     }

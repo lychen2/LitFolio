@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::ai::{
     active_profile_for_task, answer_library_question, empty_result, AskLibraryResult, ChatMessage,
-    LlmProfile, TaskKind,
+    LibraryQuestionRequest, LlmProfile, TaskKind,
 };
 use crate::commands::pdf::common::generate_and_index_pdf_markdown_or_warn;
 use crate::storage::{Highlight, HighlightRepo, Paper, PaperDocumentRepo, PaperRepo};
@@ -133,16 +133,16 @@ struct PinnedAnswerRequest<'a> {
 }
 
 async fn answer(state: &AppState, request: AnswerRequest<'_>) -> Result<AskLibraryResult, String> {
-    answer_library_question(
-        &state.http,
-        request.profile,
-        request.question,
-        request.papers,
-        request.highlights,
-        request.document_snippets,
-        request.terms,
-        request.history,
-    )
+    answer_library_question(LibraryQuestionRequest {
+        client: &state.http,
+        profile: request.profile,
+        question: request.question,
+        papers: request.papers,
+        highlights: request.highlights,
+        document_snippets: request.document_snippets,
+        terms: request.terms,
+        conversation_history: request.history,
+    })
     .await
     .map_err(|e| e.to_string())
 }

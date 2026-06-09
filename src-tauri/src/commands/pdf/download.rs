@@ -227,16 +227,28 @@ fn is_private_or_special_ip(ip: IpAddr) -> bool {
     }
 }
 
-async fn finalize_paper(
-    repo: &PaperRepo<'_>,
-    pdf_path: &std::path::Path,
+struct FinalizePaperRequest<'a> {
+    repo: &'a PaperRepo<'a>,
+    pdf_path: &'a std::path::Path,
     draft: crate::ingest::PaperDraft,
     paper_id: String,
     existing: Option<Paper>,
-    pool: &sqlx::SqlitePool,
-    paths: &crate::storage::LibraryPaths,
-    http: &reqwest::Client,
-) -> Result<Paper, String> {
+    pool: &'a sqlx::SqlitePool,
+    paths: &'a crate::storage::LibraryPaths,
+    http: &'a reqwest::Client,
+}
+
+async fn finalize_paper(request: FinalizePaperRequest<'_>) -> Result<Paper, String> {
+    let FinalizePaperRequest {
+        repo,
+        pdf_path,
+        draft,
+        paper_id,
+        existing,
+        pool,
+        paths,
+        http,
+    } = request;
     if let Some(existing) = existing {
         let dest_str = pdf_path.display().to_string();
         repo.update_pdf_path(&existing.id, &dest_str)
@@ -295,7 +307,14 @@ pub async fn arxiv_add_with_pdf(
         .insert(&paper)
         .await
         .map_err(|e| e.to_string())?;
-    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &paper.id, &pdf_path).await;
+    generate_and_index_pdf_markdown_or_warn(
+        &state.pool,
+        &state.paths,
+        &state.http,
+        &paper.id,
+        &pdf_path,
+    )
+    .await;
     Ok(paper)
 }
 
@@ -344,16 +363,16 @@ pub async fn doi_add_with_pdf(
                         std::fs::remove_file(&tmp_pdf_path).ok();
                         failures.push(format!("Sci-Hub finalize: {e}"));
                     } else {
-                        return finalize_paper(
-                            &repo,
-                            &pdf_path,
+                        return finalize_paper(FinalizePaperRequest {
+                            repo: &repo,
+                            pdf_path: &pdf_path,
                             draft,
                             paper_id,
                             existing,
-                            &state.pool,
-                            &state.paths,
-                            &state.http,
-                        )
+                            pool: &state.pool,
+                            paths: &state.paths,
+                            http: &state.http,
+                        })
                         .await;
                     }
                 }
@@ -388,16 +407,16 @@ pub async fn doi_add_with_pdf(
             for link in &links {
                 match download_pdf(&state.http_external, link, &pdf_path).await {
                     Ok(_) => {
-                        return finalize_paper(
-                            &repo,
-                            &pdf_path,
+                        return finalize_paper(FinalizePaperRequest {
+                            repo: &repo,
+                            pdf_path: &pdf_path,
                             draft,
                             paper_id,
                             existing,
-                            &state.pool,
-                            &state.paths,
-                            &state.http,
-                        )
+                            pool: &state.pool,
+                            paths: &state.paths,
+                            http: &state.http,
+                        })
                         .await;
                     }
                     Err(e) => failures.push(format!(

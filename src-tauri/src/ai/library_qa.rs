@@ -83,16 +83,30 @@ pub fn empty_result(terms: Vec<String>) -> AskLibraryResult {
     }
 }
 
+pub struct LibraryQuestionRequest<'a> {
+    pub client: &'a reqwest::Client,
+    pub profile: &'a LlmProfile,
+    pub question: &'a str,
+    pub papers: &'a [Paper],
+    pub highlights: &'a HashMap<String, Vec<Highlight>>,
+    pub document_snippets: &'a HashMap<String, String>,
+    pub terms: &'a [String],
+    pub conversation_history: &'a [ChatMessage],
+}
+
 pub async fn answer_library_question(
-    client: &reqwest::Client,
-    profile: &LlmProfile,
-    question: &str,
-    papers: &[Paper],
-    highlights: &HashMap<String, Vec<Highlight>>,
-    document_snippets: &HashMap<String, String>,
-    terms: &[String],
-    conversation_history: &[ChatMessage],
+    request: LibraryQuestionRequest<'_>,
 ) -> Result<AskLibraryResult> {
+    let LibraryQuestionRequest {
+        client,
+        profile,
+        question,
+        papers,
+        highlights,
+        document_snippets,
+        terms,
+        conversation_history,
+    } = request;
     let trimmed = question.trim();
     if trimmed.is_empty() {
         return Err(anyhow!("empty question"));

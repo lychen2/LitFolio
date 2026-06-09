@@ -190,8 +190,14 @@ async fn import_one_folder_pdf(
         repo.insert(&paper)
             .await
             .map_err(|e| pdf_failure(&path, e.to_string()))?;
-        generate_and_index_pdf_markdown_or_warn(&pool, &library, &http, &paper.id, &imported.stored_path)
-            .await;
+        generate_and_index_pdf_markdown_or_warn(
+            &pool,
+            &library,
+            &http,
+            &paper.id,
+            &imported.stored_path,
+        )
+        .await;
         Ok(paper)
     }
 }

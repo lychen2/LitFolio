@@ -42,7 +42,14 @@ async fn paper_save_with_pdf_inner(
         .insert(&paper)
         .await
         .map_err(|e| e.to_string())?;
-    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &paper.id, &dest).await;
+    generate_and_index_pdf_markdown_or_warn(
+        &state.pool,
+        &state.paths,
+        &state.http,
+        &paper.id,
+        &dest,
+    )
+    .await;
     Ok(paper)
 }
 
@@ -69,7 +76,8 @@ pub async fn paper_attach_pdf(
     repo.update_pdf_path(&id, &dest_str)
         .await
         .map_err(|e| e.to_string())?;
-    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &id, &dest).await;
+    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &id, &dest)
+        .await;
     repo.get(&id)
         .await
         .map_err(|e| e.to_string())?
