@@ -23,7 +23,10 @@ export function MetaTextBlock({
         {label}
         {model ? <span className="normal-case tracking-normal text-litera-mute/80">{model}</span> : null}
       </div>
-      <p className="leading-5 whitespace-pre-wrap">{text}</p>
+      <MarkdownView
+        content={text}
+        className="markdown-body text-[11px] leading-5 text-litera-accent2/90 [&_p]:my-0.5 [&_p]:text-[11px] [&_p]:leading-5 [&_li]:text-[11px] [&_li]:leading-5 [&_.katex]:text-[1em]"
+      />
     </div>
   );
 }

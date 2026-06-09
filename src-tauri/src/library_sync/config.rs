@@ -27,6 +27,18 @@ pub struct WebDavConfig {
 }
 
 impl WebDavConfig {
+    pub fn validate_if_configured(&self) -> Result<()> {
+        if self.base_url.trim().is_empty()
+            && self.remote_path.trim().is_empty()
+            && self.username.trim().is_empty()
+            && self.password.is_empty()
+        {
+            return Ok(());
+        }
+
+        self.validate()
+    }
+
     pub fn validate(&self) -> Result<()> {
         let base_url = self.base_url.trim();
         let remote_path = self.remote_path.trim();
@@ -36,17 +48,26 @@ impl WebDavConfig {
         if remote_path.is_empty() {
             return Err(anyhow!("WebDAV remote path is required"));
         }
-        let url = Url::parse(base_url).context("parse WebDAV base URL")?;
-        let scheme = url.scheme();
-        if scheme != "http" && scheme != "https" {
-            return Err(anyhow!(
-                "WebDAV base URL must start with http:// or https://"
-            ));
-        }
         if remote_path.contains('\\') {
             return Err(anyhow!("WebDAV remote path must use forward slashes"));
         }
-        Ok(())
+
+        let url = Url::parse(base_url).context("parse WebDAV base URL")?;
+        match url.scheme() {
+            "https" => Ok(()),
+            "http"
+                if matches!(
+                    url.host_str(),
+                    Some("localhost" | "127.0.0.1" | "::1" | "[::1]")
+                ) =>
+            {
+                Ok(())
+            }
+            "http" => Err(anyhow!(
+                "WebDAV base URL must use HTTPS unless the host is local"
+            )),
+            _ => Err(anyhow!("WebDAV base URL must use https://")),
+        }
     }
 }
 
@@ -87,6 +108,8 @@ pub fn load_config() -> Result<SyncConfig> {
 }
 
 pub fn save_config(cfg: &SyncConfig) -> Result<()> {
+    cfg.webdav.validate_if_configured()?;
+
     let path = config_file()?;
     let mut to_persist = cfg.clone();
     if !to_persist.webdav.password.is_empty() {
@@ -168,6 +191,48 @@ mod tests {
         let loaded = load_config_at(&path).unwrap();
         assert_eq!(loaded.webdav.base_url, cfg.webdav.base_url);
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    fn webdav_config(base_url: &str) -> WebDavConfig {
+        WebDavConfig {
+            base_url: base_url.into(),
+            remote_path: "litfolio/main".into(),
+            username: "alice".into(),
+            password: String::new(),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_https() {
+        webdav_config("https://dav.example.com").validate().unwrap();
+    }
+
+    #[test]
+    fn validate_accepts_local_http() {
+        for base_url in [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://[::1]:8080",
+        ] {
+            webdav_config(base_url)
+                .validate()
+                .unwrap_or_else(|err| panic!("{base_url}: {err}"));
+        }
+    }
+
+    #[test]
+    fn validate_rejects_remote_http_with_https_error() {
+        let err = webdav_config("http://dav.example.com")
+            .validate()
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("HTTPS"), "{err}");
+    }
+
+    #[test]
+    fn validate_if_configured_accepts_empty_default_config() {
+        WebDavConfig::default().validate_if_configured().unwrap();
     }
 
     #[test]

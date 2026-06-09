@@ -326,7 +326,7 @@ function SourcesInline({ sources }: { sources: AskSource[] }) {
     <div className="space-y-2">
       <div className="text-xs font-medium text-litera-mute">{t("ask.sources")}</div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {sources.slice(0, 4).map((source, index) => (
+        {sources.slice(0, SOURCE_LIMIT).map((source, index) => (
           <div key={`${source.paper_id}-${index}`} className="rounded-md bg-litera-panel/60 px-2.5 py-2">
             <div className="text-xs font-medium text-litera-text truncate">
               [{index + 1}] {source.title}
@@ -337,9 +337,9 @@ function SourcesInline({ sources }: { sources: AskSource[] }) {
           </div>
         ))}
       </div>
-      {sources.length > 4 && (
+      {sources.length > SOURCE_LIMIT && (
         <div className="text-[11px] text-litera-mute">
-          +{sources.length - 4} {t("ask.moreSources")}
+          +{sources.length - SOURCE_LIMIT} {t("ask.moreSources")}
         </div>
       )}
     </div>

@@ -43,6 +43,7 @@ const llmConfig: LlmConfig = {
     ask: null,
   },
   output_language: "Chinese",
+  pdf_markdown: { engine: "local", mineru_token: "" },
 };
 
 export class Channel<T = unknown> {

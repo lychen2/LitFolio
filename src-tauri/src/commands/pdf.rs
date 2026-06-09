@@ -1,6 +1,6 @@
 //! PDF import and reader IPC commands.
 
-mod common;
+pub(crate) mod common;
 pub mod download;
 pub mod folder;
 pub mod import_files;

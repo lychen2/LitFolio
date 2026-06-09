@@ -1,9 +1,9 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, AlertTriangle, ClipboardCopy, Columns2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { ArrowLeft, AlertTriangle, ClipboardCopy, Columns2, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
 import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
-import { api } from "@/lib/api";
+import { api, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { HighlightList } from "./reader/HighlightList";
 import { PdfPane } from "./reader/PdfPane";
@@ -216,17 +216,7 @@ function ReaderSinglePane({
             {rightCollapsed ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
           </button>
           {onOpenSplit && (
-            <button
-              onClick={() => {
-                const id = prompt(t("reader.splitPrompt"));
-                if (id) onOpenSplit(id);
-              }}
-              className="litera-btn text-xs shrink-0"
-              title={t("reader.splitView")}
-              aria-label={t("reader.splitView")}
-            >
-              <Columns2 className="h-3.5 w-3.5" />
-            </button>
+            <SplitPaperPicker currentPaperId={paperId} onOpenSplit={onOpenSplit} />
           )}
         </header>
       )}
@@ -293,6 +283,153 @@ function ReaderSinglePane({
           </Panel>
         </PanelGroup>
       </div>
+    </div>
+  );
+}
+
+function SplitPaperPicker({
+  currentPaperId,
+  onOpenSplit,
+}: {
+  currentPaperId: string;
+  onOpenSplit: (id: string) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const papersQ = useQuery({
+    queryKey: ["readerSplitPaperSearch", query],
+    queryFn: async () => {
+      const trimmed = query.trim();
+      return trimmed ? api.papersSearch(trimmed, 8) : api.papersRecent(8);
+    },
+    enabled: open,
+    staleTime: 5_000,
+  });
+
+  const papers: Paper[] = (papersQ.data ?? []).filter((paper) => paper.id !== currentPaperId);
+  const focusedPaper = papers[focusedIndex];
+
+  useEffect(() => {
+    if (!open) return;
+    setFocusedIndex(0);
+  }, [open, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  function pickPaper(paper: Paper) {
+    onOpenSplit(paper.id);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setFocusedIndex((index) => Math.min(index + 1, Math.max(papers.length - 1, 0)));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setFocusedIndex((index) => Math.max(index - 1, 0));
+      return;
+    }
+    if (event.key === "Enter" && focusedPaper) {
+      event.preventDefault();
+      pickPaper(focusedPaper);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((value) => !value)}
+        className={`litera-btn text-xs ${open ? "bg-litera-accent/15 text-litera-accent border-litera-accent/30" : ""}`}
+        title={t("reader.splitView")}
+        aria-label={t("reader.splitView")}
+        aria-expanded={open}
+      >
+        <Columns2 className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-2 w-[360px] max-w-[calc(100vw-2rem)] litera-panel shadow-xl">
+          <div className="border-b border-litera-line px-3 py-2">
+            <div className="mb-1 text-[11px] font-medium uppercase tracking-normal text-litera-mute">
+              {t("reader.splitPickerTitle")}
+            </div>
+            <label className="flex items-center gap-2 rounded-md border border-litera-line bg-litera-bg/70 px-2 py-1.5">
+              <Search className="h-3.5 w-3.5 text-litera-mute" />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t("reader.splitSearchPlaceholder")}
+                className="min-w-0 flex-1 bg-transparent text-sm text-litera-text outline-none placeholder:text-litera-mute"
+              />
+            </label>
+          </div>
+          {papersQ.isLoading ? (
+            <div className="flex items-center gap-2 px-3 py-3 text-xs text-litera-mute">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {t("reader.splitSearching")}
+            </div>
+          ) : papersQ.isError ? (
+            <div className="px-3 py-3 text-xs text-red-400">
+              {t("reader.splitSearchFailed")}
+            </div>
+          ) : papers.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-litera-mute">
+              {t(query.trim() ? "reader.splitNoResults" : "reader.splitNoOtherPapers")}
+            </div>
+          ) : (
+            <ul className="max-h-72 overflow-auto py-1">
+              {papers.map((paper, index) => (
+                <li key={paper.id}>
+                  <button
+                    onMouseEnter={() => setFocusedIndex(index)}
+                    onClick={() => pickPaper(paper)}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-litera-panel/80 ${
+                      index === focusedIndex ? "bg-litera-panel/80" : ""
+                    }`}
+                  >
+                    <div className="truncate font-medium text-litera-text">{paper.title}</div>
+                    <div className="mt-0.5 truncate text-[11px] text-litera-mute">
+                      {paper.authors.slice(0, 2).join(", ")}
+                      {paper.authors.length > 2 ? " et al." : ""}
+                      {paper.year ? ` · ${paper.year}` : ""}
+                      {paper.venue ? ` · ${paper.venue}` : ""}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

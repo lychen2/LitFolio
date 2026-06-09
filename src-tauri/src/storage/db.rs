@@ -67,6 +67,8 @@ mod tests {
         let pool = mem_pool().await;
         run_migrations(&pool).await.expect("migrations run");
         assert_table(&pool, "papers_fts").await;
+        assert_table(&pool, "paper_documents").await;
+        assert_table(&pool, "paper_documents_fts").await;
         assert_table(&pool, "feed_items").await;
         assert_table(&pool, "paper_embeddings").await;
         assert_column(&pool, "feed_items", "metadata_json").await;
@@ -75,6 +77,8 @@ mod tests {
         assert_column(&pool, "highlights", "explanation_model").await;
         assert_trigger(&pool, "papers_ai").await;
         assert_trigger(&pool, "papers_au").await;
+        assert_trigger(&pool, "paper_documents_ai").await;
+        assert_trigger(&pool, "paper_documents_au").await;
         assert_index(&pool, "idx_paper_embeddings_model").await;
     }
 
@@ -173,6 +177,7 @@ mod tests {
         assert_column(pool, "highlights", "explanation_text").await;
         assert_table(pool, "smart_collections").await;
         assert_table(pool, "paper_embeddings").await;
+        assert_table(pool, "paper_documents").await;
         assert_table(pool, "concepts").await;
         assert_trigger(pool, "papers_au").await;
 

@@ -9,6 +9,7 @@ use serde::Deserialize;
 use super::paper_draft::PaperDraft;
 
 const CROSSREF_BASE: &str = "https://api.crossref.org/works";
+const SCIHUB_PDF_DOWNLOAD_MAX_BYTES: usize = 200 * 1024 * 1024;
 // CrossRef's polite-pool guideline: include a contact URL so they can throttle
 // per-app rather than per-IP. Pointing at the project repository lets their
 // admins reach us; the previous `litfolio@example.com` placeholder risked
@@ -49,6 +50,8 @@ struct CrossRefMessage {
     doi: Option<String>,
     #[serde(default, rename = "abstract")]
     abstract_text: Option<String>,
+    #[serde(default)]
+    link: Vec<CrossRefLink>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +68,16 @@ struct CrossRefAuthor {
 struct CrossRefDate {
     #[serde(rename = "date-parts", default)]
     date_parts: Vec<Vec<i32>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CrossRefLink {
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default, rename = "content-type")]
+    content_type: Option<String>,
+    #[serde(default, rename = "intended-application")]
+    intended_application: Option<String>,
 }
 
 impl CrossRefAuthor {
@@ -198,6 +211,253 @@ fn urlencode(s: &str) -> String {
         .collect()
 }
 
+/// Fetch publisher-declared public PDF links from CrossRef metadata for a DOI.
+pub async fn fetch_doi_pdf_links(
+    client: &reqwest::Client,
+    doi_or_url: &str,
+) -> Result<Vec<String>> {
+    let doi = normalize_doi(doi_or_url)?;
+    let url = format!("{CROSSREF_BASE}/{}", urlencode(&doi));
+    let resp = client
+        .get(&url)
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("CrossRef returned {status}: {body}"));
+    }
+    let body: CrossRefResponse = resp.json().await.context("decode CrossRef JSON")?;
+    let mut links = Vec::new();
+    for link in body.message.link {
+        let Some(link_url) = link.url else {
+            continue;
+        };
+        if crossref_link_is_pdf(&link_url, link.content_type.as_deref()) {
+            links.push(link_url);
+        }
+    }
+    dedup_preserving_order(&mut links);
+    Ok(links)
+}
+
+fn crossref_link_is_pdf(url: &str, content_type: Option<&str>) -> bool {
+    content_type
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .starts_with("application/pdf")
+        || url_looks_like_pdf(url)
+}
+
+fn url_looks_like_pdf(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    let path = parsed.path().to_ascii_lowercase();
+    path.ends_with(".pdf")
+        || path.contains(".pdf/")
+        || path.contains("/pdf/")
+        || path.ends_with("/pdf")
+}
+
+fn dedup_preserving_order(values: &mut Vec<String>) {
+    let mut seen = std::collections::HashSet::new();
+    values.retain(|value| seen.insert(value.clone()));
+}
+
+// ── Sci-Hub PDF link resolution ──────────────────────────────────────────
+//
+// Sci-Hub is fronted by DDOS-Guard which TLS-fingerprints clients; reqwest
+// with rustls-tls consistently gets 403.  We use the system `curl` binary
+// (which uses OpenSSL / native TLS) to fetch page HTML and download PDFs,
+// with reqwest as a best-effort fallback when curl is not available.
+
+const SCIHUB_MIRRORS: &[&str] = &[
+    "https://sci-hub.ru",
+    "https://sci-hub.st",
+    "https://sci-hub.su",
+];
+
+/// Try each Sci-Hub mirror to resolve a DOI into a direct PDF URL.
+/// Returns the first working PDF URL found, or `None` if all mirrors fail.
+pub async fn fetch_scihub_pdf_url(client: &reqwest::Client, doi: &str) -> Result<Option<String>> {
+    for mirror in SCIHUB_MIRRORS {
+        let page_url = format!("{mirror}/{doi}");
+        match try_scihub_mirror(client, &page_url).await {
+            Ok(Some(pdf_url)) => return Ok(Some(pdf_url)),
+            Ok(None) => continue,
+            Err(_) => continue,
+        }
+    }
+    Ok(None)
+}
+
+async fn try_scihub_mirror(client: &reqwest::Client, page_url: &str) -> Result<Option<String>> {
+    // Prefer system curl (bypasses DDOS-Guard TLS fingerprinting).
+    let html = if let Some(h) = fetch_html_via_curl(page_url).await? {
+        h
+    } else {
+        // Fallback: reqwest (may hit 403 from DDOS-Guard).
+        let resp = client.get(page_url).send().await?;
+        if !resp.status().is_success() {
+            return Ok(None);
+        }
+        resp.text().await?
+    };
+
+    if let Some(pdf_url) = parse_scihub_html(page_url, &html)? {
+        return Ok(Some(pdf_url));
+    }
+    Ok(None)
+}
+
+/// Download a PDF from a Sci-Hub storage URL via system curl (with cookies).
+/// Returns the number of bytes written to `dest`.
+pub async fn scihub_download_pdf(pdf_url: &str, doi: &str, dest: &std::path::Path) -> Result<u64> {
+    use tokio::process::Command;
+
+    // curl -o won't create parent directories.
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+
+    let cookie_jar =
+        std::env::temp_dir().join(format!("litfolio-scihub-{}.cookies", doi.replace('/', "_")));
+
+    // Prime cookies: visit the mirror homepage so DDOS-Guard sets session
+    // cookies (the PDF storage URL itself does not issue cookies).
+    let mirror = if let Some(idx) = pdf_url[8..].find('/') {
+        &pdf_url[..8 + idx]
+    } else {
+        pdf_url
+    };
+    let _ = Command::new("curl")
+        .args(["-sL", "--max-time", "15", "-c"])
+        .arg(&cookie_jar)
+        .arg(mirror)
+        .output()
+        .await;
+
+    // Download PDF with cookies.
+    let max_filesize = SCIHUB_PDF_DOWNLOAD_MAX_BYTES.to_string();
+    let output = Command::new("curl")
+        .args(["-sL", "--max-time", "120", "--max-filesize"])
+        .arg(&max_filesize)
+        .arg("-b")
+        .arg(&cookie_jar)
+        .arg("-o")
+        .arg(dest)
+        .arg(pdf_url)
+        .output()
+        .await
+        .context("failed to spawn curl for Sci-Hub PDF download")?;
+
+    let _ = std::fs::remove_file(&cookie_jar);
+
+    if !output.status.success() {
+        anyhow::bail!("curl exited with {} for {pdf_url}", output.status);
+    }
+
+    let size = std::fs::metadata(dest)
+        .with_context(|| format!("curl reported success but no file at {}", dest.display()))?
+        .len();
+
+    if size < 1024 {
+        anyhow::bail!(
+            "Sci-Hub PDF too small ({} bytes), likely not a valid PDF",
+            size
+        );
+    }
+
+    // Validate PDF header.
+    let header =
+        std::fs::read(dest).with_context(|| format!("failed to read {}", dest.display()))?;
+    if header.len() < 5 || &header[..5] != b"%PDF-" {
+        anyhow::bail!("Sci-Hub response is not a valid PDF (missing %PDF- header)");
+    }
+
+    Ok(size)
+}
+
+/// Fetch Sci-Hub page HTML via system curl.
+/// Returns `Some(html)` on success, `None` if curl is not available.
+async fn fetch_html_via_curl(url: &str) -> Result<Option<String>> {
+    use tokio::process::Command;
+    // Quick check: is curl on PATH?
+    if !Command::new("curl").arg("--version").output().await.is_ok() {
+        return Ok(None);
+    }
+    let output = Command::new("curl")
+        .args(["-sL", "--max-time", "15"])
+        .arg(url)
+        .output()
+        .await
+        .context("failed to spawn curl")?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let html = String::from_utf8_lossy(&output.stdout).into_owned();
+    if html.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(html))
+}
+
+/// Parse Sci-Hub HTML to extract the PDF URL.
+fn parse_scihub_html(page_url: &str, html: &str) -> Result<Option<String>> {
+    use regex::Regex;
+
+    // Pattern 1 (primary): Sci-Hub <meta name="citation_pdf_url" content="...">
+    let re_meta = Regex::new(
+        r#"<meta\s+name\s*=\s*["']citation_pdf_url["']\s+content\s*=\s*["']([^"']+\.pdf)["']"#,
+    )?;
+    if let Some(cap) = re_meta.captures(html) {
+        let raw = cap[1].to_string();
+        return Ok(Some(resolve_pdf_url(page_url, &raw)));
+    }
+
+    // Pattern 2: <object>/<iframe>/<embed> with .pdf src/data
+    let re_object = Regex::new(
+        r#"(?i)<(?:object|iframe|embed)\b[^>]*?\b(?:src|data)\s*=\s*["']([^"']*?\.pdf[^"']*?)["']"#,
+    )?;
+    if let Some(cap) = re_object.captures(html) {
+        let raw = cap[1].to_string();
+        return Ok(Some(resolve_pdf_url(page_url, &raw)));
+    }
+
+    // Pattern 3: <a> href pointing to a .pdf
+    let re_href = Regex::new(r#"(?i)\bhref\s*=\s*["']([^"']*?\.pdf[^"']*?)["']"#)?;
+    if let Some(cap) = re_href.captures(html) {
+        let raw = cap[1].to_string();
+        return Ok(Some(resolve_pdf_url(page_url, &raw)));
+    }
+
+    Ok(None)
+}
+
+/// Resolve a possibly-relative PDF URL against the page URL.
+fn resolve_pdf_url(page_url: &str, raw: &str) -> String {
+    if raw.starts_with("http://") || raw.starts_with("https://") {
+        return raw.to_string();
+    }
+    if raw.starts_with("//") {
+        return format!("https:{raw}");
+    }
+    if let Some(slash) = page_url[8..].find('/') {
+        let base = &page_url[..8 + slash];
+        if raw.starts_with('/') {
+            format!("{base}{raw}")
+        } else {
+            format!("{base}/{raw}")
+        }
+    } else {
+        format!("{page_url}/{raw}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +480,28 @@ mod tests {
     fn url_encode_handles_special() {
         assert_eq!(urlencode("10.1038/foo bar"), "10.1038/foo%20bar");
         assert_eq!(urlencode("10.1038/x;y"), "10.1038/x%3By");
+    }
+
+    #[test]
+    fn crossref_pdf_link_accepts_science_pdf_path_without_extension() {
+        assert!(crossref_link_is_pdf(
+            "https://www.science.org/doi/pdf/10.1126/science.abb9318",
+            Some("unspecified"),
+        ));
+    }
+
+    #[test]
+    fn crossref_pdf_link_rejects_non_pdf_text_mining_url() {
+        assert!(!crossref_link_is_pdf(
+            "https://example.org/tdm/10.1000/example.xml",
+            Some("application/xml"),
+        ));
+    }
+
+    #[test]
+    fn dedup_preserves_crossref_order() {
+        let mut links = vec!["b".to_string(), "a".to_string(), "b".to_string()];
+        dedup_preserving_order(&mut links);
+        assert_eq!(links, vec!["b".to_string(), "a".to_string()]);
     }
 }

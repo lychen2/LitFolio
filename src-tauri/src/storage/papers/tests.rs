@@ -1,6 +1,7 @@
 use super::*;
 use crate::storage::db::{open_pool, run_migrations};
 use crate::storage::models::ReadStatus;
+use crate::storage::PaperDocumentRepo;
 use chrono::Utc;
 use std::path::PathBuf;
 
@@ -94,6 +95,28 @@ async fn search_finds_inserted_paper() {
     assert_eq!(hits.len(), 1);
     let hits = repo.search("zzz_no_match", 10).await.unwrap();
     assert!(hits.is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
+async fn search_finds_imported_document_markdown() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    let mut p = sample("D");
+    p.title = "Unrelated Metadata".into();
+    p.abstract_text = Some("generic abstract".into());
+    repo.insert(&p).await.unwrap();
+    PaperDocumentRepo::new(&pool)
+        .upsert_markdown(
+            &p.id,
+            "## Experiments\nThe paper studies retrieval augmented generation with reranking.",
+        )
+        .await
+        .unwrap();
+
+    let hits = repo.search("reranking", 10).await.unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].id, p.id);
     std::fs::remove_dir_all(&dir).ok();
 }
 

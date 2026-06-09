@@ -140,13 +140,14 @@ fn feed_item_corpus(item: &FeedItem) -> String {
 }
 
 fn feed_item_fallback_draft(item: FeedItem) -> PaperDraft {
+    let corpus = feed_item_corpus(&item);
     PaperDraft {
         title: item.title,
         authors: item.authors,
         year: item.published_at.and_then(timestamp_year),
         venue: None,
-        doi: None,
-        arxiv_id: None,
+        doi: extract_doi(&corpus),
+        arxiv_id: extract_arxiv_id(&corpus),
         abstract_text: item.summary,
     }
 }
@@ -254,4 +255,50 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 fn timestamp_year(timestamp: i64) -> Option<i32> {
     Utc.timestamp_opt(timestamp, 0).single().map(|dt| dt.year())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fallback_draft_preserves_doi_from_feed_fields() {
+        let draft = feed_item_fallback_draft(feed_item(
+            Some("https://publisher.example/paper"),
+            Some("Published version: https://doi.org/10.1038/s41566-026-01234-5."),
+        ));
+
+        assert_eq!(draft.doi.as_deref(), Some("10.1038/s41566-026-01234-5"));
+        assert_eq!(draft.arxiv_id, None);
+    }
+
+    #[test]
+    fn fallback_draft_preserves_arxiv_id_from_feed_fields() {
+        let draft = feed_item_fallback_draft(feed_item(
+            Some("https://arxiv.org/abs/2401.12345v2"),
+            Some("Preprint"),
+        ));
+
+        assert_eq!(draft.arxiv_id.as_deref(), Some("2401.12345"));
+        assert_eq!(draft.doi, None);
+    }
+
+    fn feed_item(link: Option<&str>, summary: Option<&str>) -> FeedItem {
+        FeedItem {
+            id: "feed-item-1".into(),
+            feed_id: 1,
+            entry_id: "entry-1".into(),
+            title: "A Feed Paper".into(),
+            link: link.map(str::to_string),
+            summary: summary.map(str::to_string),
+            authors: vec!["Ada Lovelace".into()],
+            published_at: Some(1_704_067_200),
+            fetched_at: 1_704_067_200,
+            seen: false,
+            imported_paper_id: None,
+            metadata: None,
+            metadata_source: None,
+            metadata_checked_at: None,
+        }
+    }
 }

@@ -22,6 +22,10 @@ impl<'a> PaperRepo<'a> {
         Self { pool }
     }
 
+    pub(crate) fn pool(&self) -> &'a Pool {
+        self.pool
+    }
+
     pub async fn insert(&self, p: &Paper) -> Result<()> {
         let authors_json = serde_json::to_string(&p.authors)?;
         let findings_json = serde_json::to_string(&p.key_findings)?;

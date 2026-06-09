@@ -12,6 +12,7 @@ import { ExportPanel } from "./settings/ExportPanel";
 import { ProfilesTab } from "./settings/ProfilesTab";
 import { SyncPanel } from "./settings/SyncPanel";
 import { TaskAssignments } from "./settings/TaskAssignments";
+import { PdfMarkdownSettings } from "./settings/PdfMarkdownSettings";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
 
 type SettingsTab = "privacy" | "profiles" | "tasks" | "sync" | "export" | "tools";
@@ -36,6 +37,7 @@ export function SettingsPage() {
     profiles: [],
     active: null,
     output_language: "Chinese",
+    pdf_markdown: { engine: "local", mineru_token: "" },
     task_assignments: {
       tldr: null,
       quick_read: null,
@@ -125,6 +127,7 @@ export function SettingsPage() {
           {tab === "export" && <ExportPanel />}
           {tab === "tools" && (
             <div className="space-y-8">
+              <PdfMarkdownSettings draft={draft} onChange={setDraft} />
               <TopicAlertsPanel />
               <DuplicatesPanel />
               <CustomFieldsManager />
