@@ -4,6 +4,7 @@ mod ai;
 mod bibtex;
 mod cluster;
 mod commands;
+mod diagnostics;
 mod discovery;
 mod export;
 mod http;
@@ -55,9 +56,8 @@ fn backend_log_filter() -> EnvFilter {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(backend_log_filter())
-        .init();
+    diagnostics::init(backend_log_filter());
+    diagnostics::install_panic_hook();
 
     if let Err(e) = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -258,7 +258,7 @@ pub fn run() {
         .setup(|app| {
             let state =
                 tauri::async_runtime::block_on(startup::bootstrap_state()).map_err(|e| {
-                    tracing::error!(error = %e, "bootstrap failed");
+                    diagnostics::write_fatal(&format!("bootstrap failed: {e}"));
                     Box::<dyn std::error::Error>::from(e)
                 })?;
             app.manage(state);
@@ -267,7 +267,7 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
     {
-        tracing::error!(error = %e, "error while running litfolio");
+        diagnostics::write_fatal(&format!("error while running litfolio: {e}"));
         std::process::exit(1);
     }
 }

@@ -934,4 +934,16 @@ export const en: Record<TKey, string> = {
   "relation.competes_with": "Competes with",
 
   "graph.concepts": "Concepts",
+
+  "update.section": "App updates",
+  "update.sectionHint": "Fetch and install the latest version from GitHub Releases.",
+  "update.check": "Check for updates",
+  "update.checking": "Checking…",
+  "update.title": "LitFolio Update",
+  "update.available": "LitFolio {version} is available. Install it now?",
+  "update.installed": "LitFolio has been updated and will restart now.",
+  "update.upToDate": "You're on the latest version.",
+  "update.declined": "Update cancelled.",
+  "update.unsupported": "Updates are only available in the desktop app.",
+  "update.failed": "Update check failed: {message}",
 };
