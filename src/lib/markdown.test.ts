@@ -26,6 +26,14 @@ describe("renderMarkdown", () => {
     expect(html).not.toContain("< y");
   });
 
+  it("renders bracketed latex delimiters commonly returned by translators", () => {
+    const html = renderMarkdown("inline \\(x_i^2\\)\n\n\\[\\sum_i x_i\\]");
+
+    expect(html.match(/katex/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).not.toContain("\\(");
+    expect(html).not.toContain("\\[");
+  });
+
   it("keeps fenced code escaped when the fence is not closed", () => {
     const html = renderMarkdown("```ts\nconst x = \"<script>\";");
 

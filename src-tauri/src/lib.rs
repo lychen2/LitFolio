@@ -10,6 +10,7 @@ mod http;
 mod index;
 mod ingest;
 mod library_sync;
+mod mineru;
 mod secret;
 mod startup;
 mod storage;
@@ -20,6 +21,9 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 use storage::{LibraryPaths, Pool};
+
+// Re-export for integration testing (examples, external crates).
+pub use ingest::{fetch_scihub_pdf_url, scihub_download_pdf};
 
 pub struct AppState {
     pub pool: Pool,
@@ -39,12 +43,20 @@ pub struct AppState {
     pub sync_lock: AsyncMutex<()>,
 }
 
+fn backend_log_filter() -> EnvFilter {
+    EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"))
+        .add_directive(
+            "lopdf::object=error"
+                .parse()
+                .expect("valid lopdf warning suppression filter"),
+        )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+        .with_env_filter(backend_log_filter())
         .init();
 
     if let Err(e) = tauri::Builder::default()
@@ -93,6 +105,7 @@ pub fn run() {
             commands::imports::arxiv_list_category,
             commands::imports::arxiv_add_draft,
             commands::pdf::download::arxiv_add_with_pdf,
+            commands::pdf::download::doi_add_with_pdf,
             commands::imports::prepare_doi_draft,
             commands::imports::paper_find_by_doi,
             commands::imports::prepare_arxiv_draft,
@@ -243,16 +256,13 @@ pub fn run() {
             commands::concepts::concept_extract_and_store,
         ])
         .setup(|app| {
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                match startup::bootstrap_state().await {
-                    Ok(state) => {
-                        handle.manage(state);
-                        tracing::info!("LitFolio backend booted");
-                    }
-                    Err(e) => tracing::error!(error = %e, "bootstrap failed"),
-                }
-            });
+            let state =
+                tauri::async_runtime::block_on(startup::bootstrap_state()).map_err(|e| {
+                    tracing::error!(error = %e, "bootstrap failed");
+                    Box::<dyn std::error::Error>::from(e)
+                })?;
+            app.manage(state);
+            tracing::info!("LitFolio backend booted");
             Ok(())
         })
         .run(tauri::generate_context!())

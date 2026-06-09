@@ -1,4 +1,4 @@
-import { Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
+import { Copy, Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -14,6 +14,7 @@ type PdfToolbarProps = {
 
 type SelectionActionsProps = {
   onHighlight: () => void;
+  onCopy: () => void;
   onTranslate: () => void;
   onAddTerm: () => void;
   pending: boolean;
@@ -63,6 +64,7 @@ export function PdfToolbar({
 
 export function SelectionActions({
   onHighlight,
+  onCopy,
   onTranslate,
   onAddTerm,
   pending,
@@ -72,6 +74,10 @@ export function SelectionActions({
     <div className="litera-overlay p-1.5 flex items-center gap-1.5 litera-slide-up">
       <button onClick={onHighlight} className="litera-btn-primary text-xs px-2 py-1">
         {t("reader.addHighlight")}
+      </button>
+      <button onClick={onCopy} className="litera-btn text-xs px-2 py-1">
+        <Copy className="h-3 w-3" />
+        {t("reader.copySelection")}
       </button>
       <button onClick={onTranslate} className="litera-btn text-xs px-2 py-1">
         {t("reader.translateSelection")}
@@ -92,24 +98,51 @@ export function Center({ children }: { children: ReactNode }) {
   );
 }
 
-export function PdfLoadError({ error, onRetry }: { error?: Error; onRetry?: () => void }) {
+type VisiblePdfError = {
+  stage?: string;
+  name?: string;
+  message?: string;
+  detail?: string;
+  assetPath?: string;
+  assetUrl?: string;
+};
+
+export function PdfLoadError({ error, onRetry }: { error?: VisiblePdfError; onRetry?: () => void }) {
   const t = useT();
+  const fields = pdfErrorFields(error, t("reader.unknownError"));
   return (
     <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
-      <div>
+      <div className="max-w-2xl w-full">
         <div className="font-medium mb-1">✕ {t("reader.pdfRenderFailed")}</div>
-        <div className="text-xs text-litera-mute font-mono break-all">
-          {error?.message || String(error) || t("reader.unknownError")}
+        <div className="text-xs text-litera-mute mb-3">{t("reader.pdfErrorHint")}</div>
+        <div className="text-left rounded border border-red-400/30 bg-litera-paper px-3 py-2 space-y-1">
+          {fields.map(([label, value]) => (
+            <div key={label} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-xs">
+              <span className="text-litera-mute">{label}</span>
+              <span className="font-mono text-red-200/90 break-all whitespace-pre-wrap">{value}</span>
+            </div>
+          ))}
         </div>
         {onRetry && (
           <button onClick={onRetry} className="litera-btn text-xs px-3 py-1 mt-3">
             {t("common.retry")}
           </button>
         )}
-        <div className="text-[11px] text-litera-mute mt-2">{t("reader.openConsole")}</div>
       </div>
     </div>
   );
+}
+
+function pdfErrorFields(error: VisiblePdfError | undefined, fallback: string): Array<[string, string]> {
+  if (!error) return [["message", fallback]];
+  return [
+    ["stage", error.stage],
+    ["name", error.name],
+    ["message", error.message || fallback],
+    ["assetPath", error.assetPath],
+    ["assetUrl", error.assetUrl],
+    ["detail", error.detail],
+  ].filter((field): field is [string, string] => typeof field[1] === "string" && field[1].trim().length > 0);
 }
 
 export function PdfMutationError({

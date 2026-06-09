@@ -22,6 +22,7 @@ export interface SyncReport {
   skipped_count: number;
   skipped_bytes: number;
   restart_required: boolean;
+  backup_path?: string | null;
 }
 
 export const EMPTY_SYNC_CONFIG: SyncConfig = {

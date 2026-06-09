@@ -68,5 +68,5 @@ function initialTab(params: URLSearchParams, prefill: string | null): Tab {
   if (requested === "pdf" || requested === "arxiv_doi" || requested === "search") {
     return requested;
   }
-  return prefill ? "arxiv_doi" : "pdf";
+  return params.get("fromFeedItem") || prefill ? "arxiv_doi" : "pdf";
 }

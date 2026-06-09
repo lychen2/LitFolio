@@ -52,6 +52,8 @@ export type {
   LlmTestResult,
   NoteSection,
   Paper,
+  PdfMarkdownConfig,
+  PdfMarkdownEngine,
   PaperComparison,
   PaperConcept,
   PaperCustomField,

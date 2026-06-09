@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Archive, DownloadCloud, ExternalLink, ListPlus, Loader2, SearchX, Star, Trash2 } from "lucide-react";
-import { api, type CandidatePaper, type CandidateStatus } from "@/lib/api";
+import { api, type ArxivDraft, type CandidatePaper, type CandidateStatus, type Paper } from "@/lib/api";
+import { extractSourceIdentifier } from "@/lib/identifier";
 import { useT } from "@/i18n/I18nProvider";
 import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
 
@@ -240,14 +241,52 @@ async function runBatchAction(action: BatchAction, candidates: CandidatePaper[])
     await Promise.all(candidates.map((candidate) => api.candidateSetStatus(candidate.id, action)));
     return;
   }
-  const missingArxiv = candidates.filter((candidate) => !candidate.arxiv_id);
-  if (missingArxiv.length > 0) {
-    throw new Error(`Cannot batch import ${missingArxiv.length} candidate(s) without an arXiv ID.`);
-  }
   for (const candidate of candidates) {
-    await api.arxivAddWithPdf(candidate.arxiv_id!);
-    await api.candidateSetStatus(candidate.id, "imported");
+    await importCandidate(candidate, api);
   }
+}
+
+export type CandidateImportApi = {
+  arxivAddWithPdf: (arxivId: string) => Promise<Paper>;
+  importDoi: (doi: string) => Promise<Paper>;
+  arxivAddDraft: (draft: ArxivDraft) => Promise<Paper>;
+  candidateSetStatus: (id: number, status: CandidateStatus) => Promise<void>;
+};
+
+export async function importCandidate(candidate: CandidatePaper, candidateApi: CandidateImportApi) {
+  const sourceIds = candidate.source_url ? extractSourceIdentifier(candidate.source_url) : null;
+  const arxivId = candidate.arxiv_id ?? sourceIds?.arxivId ?? null;
+  if (arxivId) {
+    await candidateApi.arxivAddWithPdf(arxivId);
+    await candidateApi.candidateSetStatus(candidate.id, "imported");
+    return;
+  }
+
+  const doi = candidate.doi ?? sourceIds?.doi ?? null;
+  if (doi) {
+    await candidateApi.importDoi(doi);
+    await candidateApi.candidateSetStatus(candidate.id, "imported");
+    return;
+  }
+
+  const draft = candidateToDraft(candidate);
+  if (!draft.title.trim()) {
+    throw new Error(`Cannot import candidate ${candidate.id}: missing title, arXiv ID, and DOI.`);
+  }
+  await candidateApi.arxivAddDraft(draft);
+  await candidateApi.candidateSetStatus(candidate.id, "imported");
+}
+
+function candidateToDraft(candidate: CandidatePaper): ArxivDraft {
+  return {
+    title: candidate.title,
+    authors: candidate.authors,
+    year: candidate.year,
+    venue: candidate.venue,
+    doi: candidate.doi,
+    arxiv_id: candidate.arxiv_id,
+    abstract_text: candidate.abstract_text,
+  };
 }
 
 function importUrl(candidate: CandidatePaper) {

@@ -4,7 +4,7 @@ use crate::storage::{Highlight, Paper};
 
 use super::AskSource;
 
-const MAX_CONTEXT_TOKENS: usize = 6_000;
+const MAX_CONTEXT_TOKENS: usize = 10_000;
 const MAX_SNIPPET_TOKENS: usize = 800;
 const MAX_HIGHLIGHTS_PER_PAPER: usize = 3;
 const MAX_HIGHLIGHT_TEXT_CHARS: usize = 240;
@@ -12,13 +12,15 @@ const MAX_HIGHLIGHT_TEXT_CHARS: usize = 240;
 pub(super) fn build_sources(
     papers: &[Paper],
     highlights: &HashMap<String, Vec<Highlight>>,
+    document_snippets: &HashMap<String, String>,
     terms: &[String],
 ) -> Vec<AskSource> {
     papers
         .iter()
         .filter_map(|p| {
             let hl = highlights.get(&p.id).map(Vec::as_slice).unwrap_or(&[]);
-            let snippet = paper_snippet(p, hl, terms);
+            let document = document_snippets.get(&p.id).map(String::as_str);
+            let snippet = paper_snippet(p, hl, document, terms);
             if snippet.is_empty() {
                 return None;
             }
@@ -33,10 +35,16 @@ pub(super) fn build_sources(
         .collect()
 }
 
-fn paper_snippet(p: &Paper, highlights: &[Highlight], terms: &[String]) -> String {
+fn paper_snippet(
+    p: &Paper,
+    highlights: &[Highlight],
+    document_snippet: Option<&str>,
+    terms: &[String],
+) -> String {
     let mut parts = Vec::new();
     push_part(&mut parts, "TL;DR", p.tldr.as_deref());
     push_part(&mut parts, "Abstract", p.abstract_text.as_deref());
+    push_part(&mut parts, "Document excerpts (Markdown)", document_snippet);
 
     let terms_lower: Vec<String> = terms.iter().map(|t| t.to_lowercase()).collect();
     push_if_relevant(
@@ -176,7 +184,8 @@ mod tests {
     #[test]
     fn builds_source_snippet_with_no_highlights() {
         let highlights = HashMap::new();
-        let sources = build_sources(&[paper()], &highlights, &[]);
+        let documents = HashMap::new();
+        let sources = build_sources(&[paper()], &highlights, &documents, &[]);
         assert_eq!(sources.len(), 1);
         assert!(sources[0].snippet.contains("TL;DR"));
         assert!(sources[0].snippet.contains("Key findings"));
@@ -187,15 +196,30 @@ mod tests {
     fn includes_highlights_in_snippet() {
         let mut highlights = HashMap::new();
         highlights.insert("p1".into(), vec![highlight("important quoted passage")]);
-        let sources = build_sources(&[paper()], &highlights, &[]);
+        let documents = HashMap::new();
+        let sources = build_sources(&[paper()], &highlights, &documents, &[]);
         assert!(sources[0].snippet.contains("User highlights"));
         assert!(sources[0].snippet.contains("important quoted passage"));
     }
 
     #[test]
+    fn includes_document_markdown_snippet() {
+        let highlights = HashMap::new();
+        let mut documents = HashMap::new();
+        documents.insert(
+            "p1".into(),
+            "## Method\nUses a sparse attention block.".into(),
+        );
+        let sources = build_sources(&[paper()], &highlights, &documents, &[]);
+        assert!(sources[0].snippet.contains("Document excerpts"));
+        assert!(sources[0].snippet.contains("sparse attention"));
+    }
+
+    #[test]
     fn relevance_filter_skips_unrelated_sections() {
         let highlights = HashMap::new();
-        let sources = build_sources(&[paper()], &highlights, &["methods".into()]);
+        let documents = HashMap::new();
+        let sources = build_sources(&[paper()], &highlights, &documents, &["methods".into()]);
         assert_eq!(sources.len(), 1);
         assert!(!sources[0].snippet.contains("Comparison"));
     }

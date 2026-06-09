@@ -6,6 +6,10 @@ import { type ImportSource } from "./types";
 
 export type SourceKind = "arxiv" | "doi" | null;
 
+const DOI_NO_PUBLIC_PDF = "DOI_AUTO_DOWNLOAD_NO_PUBLIC_PDF";
+const DOI_PUBLIC_PDF_FAILED = "DOI_AUTO_DOWNLOAD_PUBLIC_PDF_FAILED";
+const DOI_ALL_METHODS_FAILED = "DOI_AUTO_DOWNLOAD_ALL_FAILED";
+
 export function detectSourceKind(value: string): SourceKind {
   const lower = value.toLowerCase();
   const isArxiv = /^\d{4}\.\d{4,5}/.test(value) || lower.includes("arxiv");
@@ -152,6 +156,10 @@ export function useAutoDownloadMutation(params: SaveMutationParams) {
   const t = useT();
   const qc = useQueryClient();
   return useMutation({
+    onMutate: () => {
+      params.setError(null);
+      params.setSuccess(null);
+    },
     mutationFn: () => {
       if (params.sourceKind === "doi") {
         return api.doiAddWithPdf(params.draft?.doi ?? params.trimmed ?? "");
@@ -165,6 +173,28 @@ export function useAutoDownloadMutation(params: SaveMutationParams) {
       params.reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
     },
-    onError: (e: Error) => params.setError(e.message),
+    onError: (e: Error) => params.setError(formatAutoDownloadError(e.message, params.sourceKind, t)),
   });
+}
+
+export function formatAutoDownloadError(
+  message: string,
+  sourceKind: SourceKind | undefined,
+  t: ReturnType<typeof useT>,
+): string {
+  if (sourceKind !== "doi") return message;
+  const match = /^([A-Z0-9_]+):\s*(.*)$/.exec(message);
+  if (!match) return message;
+
+  const [, code, detail] = match;
+  switch (code) {
+    case DOI_NO_PUBLIC_PDF:
+      return t("import.error.doiNoPublicPdf");
+    case DOI_PUBLIC_PDF_FAILED:
+      return t("import.error.doiPublicPdfFailed", { detail });
+    case DOI_ALL_METHODS_FAILED:
+      return t("import.error.doiAllMethodsFailed", { detail });
+    default:
+      return message;
+  }
 }

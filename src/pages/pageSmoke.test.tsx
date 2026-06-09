@@ -28,6 +28,10 @@ describe("page smoke render", () => {
     expect(renderPage(<ImportPage />, "/import")).toContain("导入");
   });
 
+  it("opens the arXiv / DOI import tab for feed-item imports", () => {
+    expect(renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import")).toContain("第 1 步");
+  });
+
   it("renders the settings shell", () => {
     expect(renderPage(<SettingsPage />, "/settings")).toContain("设置");
   });

@@ -32,6 +32,7 @@ import {
 } from "./apiSchemaCore";
 
 const READ_STATUSES = new Set<ReadStatus>(["unread", "reading", "read", "must"]);
+const PDF_MARKDOWN_ENGINES = new Set(["local", "mineru-agent", "mineru-precise"]);
 const NODE_TYPES = new Set(["paper", "concept"]);
 const EDGE_SOURCE_TYPES = new Set(["user", "ai", "derived"]);
 
@@ -81,6 +82,7 @@ export function parseLlmConfig(value: unknown, path = "LlmConfig"): LlmConfig {
     active: nullableStringField(obj, "active", path),
     task_assignments: parseTaskAssignments(field(obj, "task_assignments", path), `${path}.task_assignments`),
     output_language: stringField(obj, "output_language", path),
+    pdf_markdown: parsePdfMarkdownConfig(obj.pdf_markdown ?? {}, `${path}.pdf_markdown`),
   };
 }
 
@@ -177,6 +179,16 @@ function parseLlmProfile(value: unknown, path: string): LlmProfile {
     embed_model: nullableStringField(obj, "embed_model", path),
     max_tokens: numberField(obj, "max_tokens", path),
     temperature: numberField(obj, "temperature", path),
+  };
+}
+
+function parsePdfMarkdownConfig(value: unknown, path: string): LlmConfig["pdf_markdown"] {
+  const obj = object(value, path);
+  const engine = "engine" in obj ? enumStringField(obj, "engine", path, PDF_MARKDOWN_ENGINES) : "local";
+  const mineruToken = "mineru_token" in obj ? stringField(obj, "mineru_token", path) : "";
+  return {
+    engine: engine as LlmConfig["pdf_markdown"]["engine"],
+    mineru_token: mineruToken,
   };
 }
 

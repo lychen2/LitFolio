@@ -8,11 +8,19 @@ export interface LlmProfile {
   temperature: number;
 }
 
+export type PdfMarkdownEngine = "local" | "mineru-agent" | "mineru-precise";
+
+export interface PdfMarkdownConfig {
+  engine: PdfMarkdownEngine;
+  mineru_token: string;
+}
+
 export interface LlmConfig {
   profiles: LlmProfile[];
   active: string | null;
   task_assignments: TaskAssignments;
   output_language: string;
+  pdf_markdown: PdfMarkdownConfig;
 }
 
 export interface TaskBinding {
