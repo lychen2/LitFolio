@@ -68,7 +68,10 @@ async fn markdown_for_configured_engine(
     match config.engine {
         PdfMarkdownEngine::Local => extract_local_markdown(pdf_path).await,
         PdfMarkdownEngine::MineruAgent => {
-            match MineruClient::new(http.clone()).parse_agent_file(pdf_path).await {
+            match MineruClient::new(http.clone())
+                .parse_agent_file(pdf_path)
+                .await
+            {
                 Ok(markdown) => Ok(markdown),
                 Err(error) => {
                     tracing::warn!(paper_id, error = %error, "MinerU Agent PDF Markdown conversion failed; falling back to local engine");
@@ -104,7 +107,8 @@ pub async fn generate_and_index_pdf_markdown_or_warn(
     paper_id: &str,
     pdf_path: &Path,
 ) {
-    if let Err(error) = generate_and_index_pdf_markdown(pool, paths, http, paper_id, pdf_path).await {
+    if let Err(error) = generate_and_index_pdf_markdown(pool, paths, http, paper_id, pdf_path).await
+    {
         tracing::warn!(
             paper_id,
             pdf_path = %pdf_path.display(),
