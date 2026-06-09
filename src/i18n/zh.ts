@@ -929,6 +929,18 @@ export const zh = {
   "relation.competes_with": "竞争",
 
   "graph.concepts": "概念",
+
+  "update.section": "应用更新",
+  "update.sectionHint": "从 GitHub Releases 获取并安装最新版本。",
+  "update.check": "检查更新",
+  "update.checking": "正在检查…",
+  "update.title": "LitFolio 更新",
+  "update.available": "LitFolio {version} 可用，现在安装吗？",
+  "update.installed": "LitFolio 已更新，将立即重启。",
+  "update.upToDate": "已是最新版本。",
+  "update.declined": "已取消本次更新。",
+  "update.unsupported": "仅桌面应用支持检查更新。",
+  "update.failed": "检查更新失败：{message}",
 } as const;
 
 export type TKey = keyof typeof zh;

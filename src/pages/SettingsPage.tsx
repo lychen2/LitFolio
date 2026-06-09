@@ -6,6 +6,7 @@ import { TabButton } from "@/components/TabButton";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import { CustomFieldsManager } from "./settings/CustomFieldsManager";
+import { AppUpdateCard } from "./settings/AppUpdateCard";
 import { DataPrivacyPanel } from "./settings/DataPrivacyPanel";
 import { DuplicatesPanel } from "./settings/DuplicatesPanel";
 import { ExportPanel } from "./settings/ExportPanel";
@@ -111,7 +112,12 @@ export function SettingsPage() {
             ))}
           </div>
 
-          {tab === "privacy" && <DataPrivacyPanel />}
+          {tab === "privacy" && (
+            <div className="space-y-5">
+              <DataPrivacyPanel />
+              <AppUpdateCard />
+            </div>
+          )}
           {tab === "profiles" && (
             <ProfilesTab
               draft={draft}

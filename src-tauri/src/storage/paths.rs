@@ -38,6 +38,12 @@ impl LibraryPaths {
     pub fn backups_dir(&self) -> PathBuf {
         self.root.join("backups")
     }
+    pub fn logs_dir(&self) -> PathBuf {
+        self.root.join("logs")
+    }
+    pub fn app_log_file(&self) -> PathBuf {
+        self.logs_dir().join("litfolio.log")
+    }
     pub fn config_file(&self) -> PathBuf {
         self.root.join("litera.config.json")
     }
@@ -98,6 +104,7 @@ impl LibraryPaths {
         ensure_dir(&self.vectors_dir())?;
         ensure_dir(&self.attachments_dir())?;
         ensure_dir(&self.backups_dir())?;
+        ensure_dir(&self.logs_dir())?;
         Ok(())
     }
 
@@ -260,6 +267,14 @@ pub fn default_library_root() -> Result<PathBuf> {
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn app_log_file_lives_under_library_logs() {
+        let root = PathBuf::from("/tmp/litfolio-test-root");
+        let paths = LibraryPaths::new(&root);
+
+        assert_eq!(paths.app_log_file(), root.join("logs").join("litfolio.log"));
+    }
 
     #[test]
     fn ensure_creates_layout() {
