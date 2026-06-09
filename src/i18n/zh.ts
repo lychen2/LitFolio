@@ -515,6 +515,8 @@ export const zh = {
   "reader.pdfLoadFailed": "加载 PDF 失败",
   "reader.pdfRenderFailed": "PDF 渲染失败",
   "reader.pdfErrorHint": "请把下面的错误详情发给开发者；无需打开 F12。",
+  "reader.copyErrorDetails": "复制错误详情",
+  "reader.errorDetailsCopied": "已复制错误详情",
   "reader.unknownError": "未知错误",
   "reader.openConsole": "错误详情已显示在页面上；如需更多信息再打开开发者工具。",
   "reader.darkMode": "深色",
