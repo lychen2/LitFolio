@@ -1,6 +1,6 @@
 [package]
 name = "litera"
-version = "0.3.8"
+version = "0.3.9"
 description = "LitFolio — local-first literature management"
 authors = ["litfolio"]
 license = "GPL-3.0-or-later"
