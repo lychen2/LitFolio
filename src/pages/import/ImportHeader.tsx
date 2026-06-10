@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Rss } from "lucide-react";
-import { open as openInBrowser } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { type ImportSource } from "./types";
@@ -9,7 +9,7 @@ export function ImportSourceBanner({ source }: { source: ImportSource }) {
   const t = useT();
   if (!source.link && !source.fromFeedItem) return null;
   function open() {
-    if (source.link) openInBrowser(source.link).catch(() => undefined);
+    if (source.link) openUrl(source.link).catch(() => undefined);
   }
   return (
     <div className="border-b border-litera-line px-6 py-3 bg-litera-accent/5 flex items-center gap-3">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { open as openPath } from "@tauri-apps/plugin-shell";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Cloud, Database, ExternalLink, Globe2, HardDrive, KeyRound, Loader2, ShieldCheck,
   type LucideIcon,
@@ -32,7 +32,7 @@ export function DataPrivacyPanel() {
     if (!root.data) return;
     setOpenError(null);
     try {
-      await openPath(root.data);
+      await revealItemInDir(root.data);
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
     }

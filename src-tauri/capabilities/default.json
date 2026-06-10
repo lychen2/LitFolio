@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability for the LitFolio main window. fs:default is intentionally absent — every filesystem touch happens through the Rust command layer where we canonicalize against the library root. shell:allow-open is kept (tauri-plugin-shell already restricts open() to http(s) URLs in its bundled scope), used by FeedsPage / ImportPage to launch external links in the system browser.",
+  "description": "Default capability for the LitFolio main window. fs:default is intentionally absent — every filesystem touch happens through the Rust command layer where we canonicalize against the library root. opener:default grants open-url (http(s)/mailto/tel scope) for launching external links in the system browser (FeedsPage / ImportPage) and reveal-item-in-dir for showing the library root in the OS file manager (DataPrivacyPanel). open-path is intentionally NOT granted so no broad filesystem path scope is exposed.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -9,7 +9,7 @@
     "dialog:default",
     "dialog:allow-open",
     "process:allow-restart",
-    "shell:allow-open",
+    "opener:default",
     "updater:default"
   ]
 }
