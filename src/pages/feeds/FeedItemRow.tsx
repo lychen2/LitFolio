@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, ExternalLink, Eye, EyeOff, Languages, Loader2 } from "lucide-react";
-import { open as openInBrowser } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type FeedItem, type TranslationResult } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
@@ -43,7 +43,7 @@ export function FeedItemRow({
   function openExternal() {
     if (!item.link) return;
     seen.mutate(true);
-    openInBrowser(item.link).catch(() => undefined);
+    openUrl(item.link).catch(() => undefined);
   }
 
   const meta = itemRowMeta(item);
