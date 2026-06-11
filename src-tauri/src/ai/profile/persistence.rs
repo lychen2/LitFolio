@@ -18,7 +18,8 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
     let mut cfg: LlmConfig =
         serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     let migrated_names = hydrate_profile_keys(&mut cfg);
-    rewrite_sanitized_config(&path, &cfg, &migrated_names);
+    let migrated_mineru = hydrate_mineru_token(&mut cfg);
+    rewrite_sanitized_config(&path, &cfg, &migrated_names, migrated_mineru);
     Ok(cfg)
 }
 
@@ -53,8 +54,37 @@ fn read_keychain_key(profile: &mut super::LlmProfile) {
     }
 }
 
-fn rewrite_sanitized_config(path: &std::path::Path, cfg: &LlmConfig, migrated_names: &[String]) {
-    if migrated_names.is_empty() {
+fn hydrate_mineru_token(cfg: &mut LlmConfig) -> bool {
+    if cfg.pdf_markdown.mineru_token.is_empty() {
+        match secret::get(secret::MINERU_ACCOUNT) {
+            Ok(Some(token)) => cfg.pdf_markdown.mineru_token = token,
+            Ok(None) => {}
+            Err(e) => tracing::warn!(
+                error = %e,
+                "keychain read failed; MinerU token will use whatever value is in JSON"
+            ),
+        }
+        return false;
+    }
+    match migrate_secret(secret::MINERU_ACCOUNT, &cfg.pdf_markdown.mineru_token) {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "keychain put/verify failed; MinerU token will remain in JSON"
+            );
+            false
+        }
+    }
+}
+
+fn rewrite_sanitized_config(
+    path: &std::path::Path,
+    cfg: &LlmConfig,
+    migrated_names: &[String],
+    migrated_mineru: bool,
+) {
+    if migrated_names.is_empty() && !migrated_mineru {
         return;
     }
     let mut sanitized = cfg.clone();
@@ -62,6 +92,9 @@ fn rewrite_sanitized_config(path: &std::path::Path, cfg: &LlmConfig, migrated_na
         if migrated_names.contains(&p.name) {
             p.api_key.clear();
         }
+    }
+    if migrated_mineru {
+        sanitized.pdf_markdown.mineru_token.clear();
     }
     let Ok(body) = serde_json::to_vec_pretty(&sanitized) else {
         return;
@@ -72,7 +105,8 @@ fn rewrite_sanitized_config(path: &std::path::Path, cfg: &LlmConfig, migrated_na
     }
     tracing::info!(
         profiles = migrated_names.len(),
-        "migrated LLM api_keys from JSON to OS keychain"
+        mineru = migrated_mineru,
+        "migrated secrets from JSON to OS keychain"
     );
 }
 
@@ -92,6 +126,18 @@ pub fn save_config(paths: &LibraryPaths, cfg: &LlmConfig) -> Result<()> {
                 error = %e,
                 profile = %profile.name,
                 "keychain put/verify failed; api_key will be written to JSON as a fallback"
+            ),
+        }
+    }
+    if !to_persist.pdf_markdown.mineru_token.is_empty() {
+        match migrate_secret(
+            secret::MINERU_ACCOUNT,
+            &to_persist.pdf_markdown.mineru_token,
+        ) {
+            Ok(()) => to_persist.pdf_markdown.mineru_token.clear(),
+            Err(e) => tracing::warn!(
+                error = %e,
+                "keychain put/verify failed; MinerU token will be written to JSON as a fallback"
             ),
         }
     }

@@ -1,5 +1,8 @@
 import type {
   ArxivDraft,
+  CandidatePaper,
+  CandidateStatus,
+  EvidenceItem,
   FeedItem,
   FeedWithCounts,
   GraphData,
@@ -10,9 +13,12 @@ import type {
   LlmProfile,
   Paper,
   PdfImportSummary,
+  ProjectStatus,
   ReadStatus,
+  ResearchProject,
   TaskAssignments,
   TaskBinding,
+  TopicAlertResult,
 } from "./types/api";
 import {
   booleanField,
@@ -30,8 +36,31 @@ import {
   stringField,
   type Shape,
 } from "./apiSchemaCore";
+import type { SyncReport } from "./syncApi";
 
-const READ_STATUSES = new Set<ReadStatus>(["unread", "reading", "read", "must"]);
+const READ_STATUSES = new Set<ReadStatus>([
+  "unread",
+  "reading",
+  "read",
+  "must",
+]);
+const CANDIDATE_STATUSES = new Set<CandidateStatus>([
+  "new",
+  "shortlisted",
+  "queued",
+  "ignored",
+  "imported",
+]);
+const PROJECT_STATUSES = new Set<ProjectStatus>([
+  "active",
+  "paused",
+  "archived",
+]);
+const PDF_MARKDOWN_ENGINES = new Set([
+  "local",
+  "mineru-agent",
+  "mineru-precise",
+]);
 const NODE_TYPES = new Set(["paper", "concept"]);
 const EDGE_SOURCE_TYPES = new Set(["user", "ai", "derived"]);
 
@@ -60,27 +89,53 @@ export function parsePaper(value: unknown, path = "Paper"): Paper {
     comparison: nullableStringField(obj, "comparison", path),
     title_translated: nullableStringField(obj, "title_translated", path),
     abstract_translated: nullableStringField(obj, "abstract_translated", path),
-    translate_target_lang: nullableStringField(obj, "translate_target_lang", path),
+    translate_target_lang: nullableStringField(
+      obj,
+      "translate_target_lang",
+      path
+    ),
     translated_at: nullableNumberField(obj, "translated_at", path),
     bibtex: nullableStringField(obj, "bibtex", path),
   };
 }
 
-export function parsePdfImportSummary(value: unknown, path = "PdfImportSummary"): PdfImportSummary {
+export function parsePdfImportSummary(
+  value: unknown,
+  path = "PdfImportSummary"
+): PdfImportSummary {
   const obj = object(value, path);
   return {
-    imported: parseArray(field(obj, "imported", path), `${path}.imported`, parsePaper),
-    failed: parseArray(field(obj, "failed", path), `${path}.failed`, parsePdfFailure),
+    imported: parseArray(
+      field(obj, "imported", path),
+      `${path}.imported`,
+      parsePaper
+    ),
+    failed: parseArray(
+      field(obj, "failed", path),
+      `${path}.failed`,
+      parsePdfFailure
+    ),
   };
 }
 
 export function parseLlmConfig(value: unknown, path = "LlmConfig"): LlmConfig {
   const obj = object(value, path);
   return {
-    profiles: parseArray(field(obj, "profiles", path), `${path}.profiles`, parseLlmProfile),
+    profiles: parseArray(
+      field(obj, "profiles", path),
+      `${path}.profiles`,
+      parseLlmProfile
+    ),
     active: nullableStringField(obj, "active", path),
-    task_assignments: parseTaskAssignments(field(obj, "task_assignments", path), `${path}.task_assignments`),
+    task_assignments: parseTaskAssignments(
+      field(obj, "task_assignments", path),
+      `${path}.task_assignments`
+    ),
     output_language: stringField(obj, "output_language", path),
+    pdf_markdown: parsePdfMarkdownConfig(
+      obj.pdf_markdown ?? {},
+      `${path}.pdf_markdown`
+    ),
   };
 }
 
@@ -99,7 +154,11 @@ export function parseHighlight(value: unknown, path = "Highlight"): Highlight {
     summary_model: nullableStringField(obj, "summary_model", path),
     summarized_at: nullableNumberField(obj, "summarized_at", path),
     translation_text: nullableStringField(obj, "translation_text", path),
-    translation_target_lang: nullableStringField(obj, "translation_target_lang", path),
+    translation_target_lang: nullableStringField(
+      obj,
+      "translation_target_lang",
+      path
+    ),
     translation_model: nullableStringField(obj, "translation_model", path),
     translated_at: nullableNumberField(obj, "translated_at", path),
     explanation_text: nullableStringField(obj, "explanation_text", path),
@@ -112,12 +171,23 @@ export function parseHighlight(value: unknown, path = "Highlight"): Highlight {
 export function parseGraphData(value: unknown, path = "GraphData"): GraphData {
   const obj = object(value, path);
   return {
-    nodes: parseArray(field(obj, "nodes", path), `${path}.nodes`, parseGraphNode),
-    edges: parseArray(field(obj, "edges", path), `${path}.edges`, parseGraphEdge),
+    nodes: parseArray(
+      field(obj, "nodes", path),
+      `${path}.nodes`,
+      parseGraphNode
+    ),
+    edges: parseArray(
+      field(obj, "edges", path),
+      `${path}.edges`,
+      parseGraphEdge
+    ),
   };
 }
 
-export function parseFeedWithCounts(value: unknown, path = "FeedWithCounts"): FeedWithCounts {
+export function parseFeedWithCounts(
+  value: unknown,
+  path = "FeedWithCounts"
+): FeedWithCounts {
   const obj = object(value, path);
   return {
     id: numberField(obj, "id", path),
@@ -148,13 +218,20 @@ export function parseFeedItem(value: unknown, path = "FeedItem"): FeedItem {
     fetched_at: numberField(obj, "fetched_at", path),
     seen: booleanField(obj, "seen", path),
     imported_paper_id: nullableStringField(obj, "imported_paper_id", path),
-    metadata: parseNullable(field(obj, "metadata", path), `${path}.metadata`, parseArxivDraft),
+    metadata: parseNullable(
+      field(obj, "metadata", path),
+      `${path}.metadata`,
+      parseArxivDraft
+    ),
     metadata_source: nullableStringField(obj, "metadata_source", path),
     metadata_checked_at: nullableNumberField(obj, "metadata_checked_at", path),
   };
 }
 
-export function parseArxivDraft(value: unknown, path = "ArxivDraft"): ArxivDraft {
+export function parseArxivDraft(
+  value: unknown,
+  path = "ArxivDraft"
+): ArxivDraft {
   const obj = object(value, path);
   return {
     title: stringField(obj, "title", path),
@@ -164,6 +241,107 @@ export function parseArxivDraft(value: unknown, path = "ArxivDraft"): ArxivDraft
     doi: nullableStringField(obj, "doi", path),
     arxiv_id: nullableStringField(obj, "arxiv_id", path),
     abstract_text: nullableStringField(obj, "abstract_text", path),
+  };
+}
+
+export function parseCandidatePaper(
+  value: unknown,
+  path = "CandidatePaper"
+): CandidatePaper {
+  const obj = object(value, path);
+  return {
+    id: numberField(obj, "id", path),
+    title: stringField(obj, "title", path),
+    authors: stringArrayField(obj, "authors", path),
+    year: nullableNumberField(obj, "year", path),
+    venue: nullableStringField(obj, "venue", path),
+    doi: nullableStringField(obj, "doi", path),
+    arxiv_id: nullableStringField(obj, "arxiv_id", path),
+    abstract_text: nullableStringField(obj, "abstract_text", path),
+    source_type: stringField(obj, "source_type", path),
+    source_url: nullableStringField(obj, "source_url", path),
+    status: candidateStatusField(obj, "status", path),
+    related_project: nullableStringField(obj, "related_project", path),
+    created_at: numberField(obj, "created_at", path),
+    last_seen_at: numberField(obj, "last_seen_at", path),
+  };
+}
+
+export function parseResearchProject(
+  value: unknown,
+  path = "ResearchProject"
+): ResearchProject {
+  const obj = object(value, path);
+  return {
+    id: numberField(obj, "id", path),
+    name: stringField(obj, "name", path),
+    description: nullableStringField(obj, "description", path),
+    research_question: nullableStringField(obj, "research_question", path),
+    target_output: nullableStringField(obj, "target_output", path),
+    status: projectStatusField(obj, "status", path),
+    due_date: nullableNumberField(obj, "due_date", path),
+    paper_count: numberField(obj, "paper_count", path),
+    created_at: numberField(obj, "created_at", path),
+    updated_at: numberField(obj, "updated_at", path),
+  };
+}
+
+export function parseEvidenceItem(
+  value: unknown,
+  path = "EvidenceItem"
+): EvidenceItem {
+  const obj = object(value, path);
+  return {
+    id: numberField(obj, "id", path),
+    project_id: numberField(obj, "project_id", path),
+    source_type: stringField(obj, "source_type", path),
+    paper_id: nullableStringField(obj, "paper_id", path),
+    paper_title: nullableStringField(obj, "paper_title", path),
+    highlight_id: nullableStringField(obj, "highlight_id", path),
+    page: nullableNumberField(obj, "page", path),
+    label: nullableStringField(obj, "label", path),
+    excerpt: stringField(obj, "excerpt", path),
+    note: nullableStringField(obj, "note", path),
+    created_at: numberField(obj, "created_at", path),
+    updated_at: numberField(obj, "updated_at", path),
+  };
+}
+
+export function parseTopicAlertResult(
+  value: unknown,
+  path = "TopicAlertResult"
+): TopicAlertResult {
+  const obj = object(value, path);
+  return {
+    id: numberField(obj, "id", path),
+    alert_id: numberField(obj, "alert_id", path),
+    paper_doi: nullableStringField(obj, "paper_doi", path),
+    paper_arxiv_id: nullableStringField(obj, "paper_arxiv_id", path),
+    title: stringField(obj, "title", path),
+    authors: nullableStringField(obj, "authors", path),
+    year: nullableNumberField(obj, "year", path),
+    abstract_text: nullableStringField(obj, "abstract_text", path),
+    seen: booleanField(obj, "seen", path),
+    added_at: numberField(obj, "added_at", path),
+  };
+}
+
+export function parseSyncReport(
+  value: unknown,
+  path = "SyncReport"
+): SyncReport {
+  const obj = object(value, path);
+  return {
+    remote_root: stringField(obj, "remote_root", path),
+    file_count: numberField(obj, "file_count", path),
+    total_bytes: numberField(obj, "total_bytes", path),
+    skipped_count: numberField(obj, "skipped_count", path),
+    skipped_bytes: numberField(obj, "skipped_bytes", path),
+    restart_required: booleanField(obj, "restart_required", path),
+    backup_path:
+      "backup_path" in obj
+        ? nullableStringField(obj, "backup_path", path)
+        : null,
   };
 }
 
@@ -180,6 +358,23 @@ function parseLlmProfile(value: unknown, path: string): LlmProfile {
   };
 }
 
+function parsePdfMarkdownConfig(
+  value: unknown,
+  path: string
+): LlmConfig["pdf_markdown"] {
+  const obj = object(value, path);
+  const engine =
+    "engine" in obj
+      ? enumStringField(obj, "engine", path, PDF_MARKDOWN_ENGINES)
+      : "local";
+  const mineruToken =
+    "mineru_token" in obj ? stringField(obj, "mineru_token", path) : "";
+  return {
+    engine: engine as LlmConfig["pdf_markdown"]["engine"],
+    mineru_token: mineruToken,
+  };
+}
+
 function parseTaskAssignments(value: unknown, path: string): TaskAssignments {
   const obj = object(value, path);
   return {
@@ -193,8 +388,16 @@ function parseTaskAssignments(value: unknown, path: string): TaskAssignments {
   };
 }
 
-function parseTaskBindingField(obj: Shape, key: string, path: string): TaskBinding | null {
-  return parseNullable(field(obj, key, path), `${path}.${key}`, parseTaskBinding);
+function parseTaskBindingField(
+  obj: Shape,
+  key: string,
+  path: string
+): TaskBinding | null {
+  return parseNullable(
+    field(obj, key, path),
+    `${path}.${key}`,
+    parseTaskBinding
+  );
 }
 
 function parseTaskBinding(value: unknown, path: string): TaskBinding {
@@ -221,7 +424,12 @@ function parseGraphNode(value: unknown, path: string): GraphNode {
 
 function parseGraphEdge(value: unknown, path: string): GraphEdge {
   const obj = object(value, path);
-  const sourceType = enumStringField(obj, "source_type", path, EDGE_SOURCE_TYPES);
+  const sourceType = enumStringField(
+    obj,
+    "source_type",
+    path,
+    EDGE_SOURCE_TYPES
+  );
   return {
     id: stringField(obj, "id", path),
     source: stringField(obj, "source", path),
@@ -233,7 +441,10 @@ function parseGraphEdge(value: unknown, path: string): GraphEdge {
   };
 }
 
-function parsePdfFailure(value: unknown, path: string): { path: string; error: string } {
+function parsePdfFailure(
+  value: unknown,
+  path: string
+): { path: string; error: string } {
   const obj = object(value, path);
   return {
     path: stringField(obj, "path", path),
@@ -244,4 +455,22 @@ function parsePdfFailure(value: unknown, path: string): { path: string; error: s
 function readStatusField(obj: Shape, key: string, path: string): ReadStatus {
   const value = enumStringField(obj, key, path, READ_STATUSES);
   return value as ReadStatus;
+}
+
+function candidateStatusField(
+  obj: Shape,
+  key: string,
+  path: string
+): CandidateStatus {
+  const value = enumStringField(obj, key, path, CANDIDATE_STATUSES);
+  return value as CandidateStatus;
+}
+
+function projectStatusField(
+  obj: Shape,
+  key: string,
+  path: string
+): ProjectStatus {
+  const value = enumStringField(obj, key, path, PROJECT_STATUSES);
+  return value as ProjectStatus;
 }

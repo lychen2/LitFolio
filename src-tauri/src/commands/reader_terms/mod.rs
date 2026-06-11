@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::commands::term_filter::{self, is_term_candidate};
-use crate::storage::{NewPaperTerm, PaperRepo, PaperTerm, PaperTermRepo};
+use crate::storage::{NewPaperTerm, PaperDocumentRepo, PaperRepo, PaperTerm, PaperTermRepo};
 use crate::AppState;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -235,12 +235,10 @@ pub async fn paper_term_delete(
         .map_err(|e| e.to_string())
 }
 
-/// Frontend hands us the text it pulled out of the PDF via pdfjs. We just
-/// persist it next to the PDF so the term extractor can read it. PDF.js's
-/// extractor is dramatically more reliable than lopdf on modern academic
-/// PDFs (CMap-encoded fonts, embedded font subsets, content streams with
-/// ToUnicode tables), so going through the renderer that's already loaded
-/// in the reader gives us body text basically for free.
+/// Frontend hands us Markdown converted from the PDF via pdfjs. The command
+/// name is kept for API compatibility with older clients, but the payload is
+/// Markdown-first so RAG sees sections, lists, and page markers instead of a
+/// flattened text blob.
 #[tauri::command]
 pub async fn paper_set_pdf_text(
     state: State<'_, Arc<AppState>>,
@@ -249,12 +247,16 @@ pub async fn paper_set_pdf_text(
 ) -> Result<(), String> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
-        return Err("empty pdf text".into());
+        return Err("empty pdf markdown".into());
     }
-    let dir = state.paths.paper_dir(&paper_id);
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let cache_path = dir.join("text.txt");
-    std::fs::write(&cache_path, trimmed).map_err(|e| e.to_string())?;
+    state
+        .paths
+        .write_paper_markdown(&paper_id, trimmed)
+        .map_err(|e| e.to_string())?;
+    PaperDocumentRepo::new(&state.pool)
+        .upsert_markdown(&paper_id, trimmed)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

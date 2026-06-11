@@ -43,7 +43,9 @@ pub(super) async fn retrieve_papers(
         limit: request.limit,
         expanded_terms: &expanded_terms,
     };
-    let mut papers = initial_search(state, repo, search).await;
+    let explicit_papers = explicit_title_search(repo, request.question, request.limit).await;
+    let semantic_papers = initial_search(state, repo, search).await;
+    let mut papers = merge_paper_lists(explicit_papers, semantic_papers, request.limit);
     let mut used_terms = terms_for_search(request.question, &expanded_terms);
 
     if papers.is_empty() && !expanded_terms.is_empty() {
@@ -70,6 +72,98 @@ pub(super) async fn retrieve_papers(
         },
     )
     .await
+}
+
+async fn explicit_title_search(repo: &PaperRepo<'_>, question: &str, limit: i64) -> Vec<Paper> {
+    let titles = extract_quoted_titles(question);
+    if titles.is_empty() {
+        return Vec::new();
+    }
+    let mut papers = Vec::new();
+    for title in titles {
+        let strict_hits = repo.search(&title, 3).await.unwrap_or_default();
+        let mut matched = matching_title_hits(strict_hits, &title);
+        if matched.is_empty() {
+            let broad_hits = repo.search_or(&title, 3).await.unwrap_or_default();
+            matched = matching_title_hits(broad_hits, &title);
+        }
+        papers = merge_paper_lists(papers, matched, limit);
+        if papers.len() >= limit as usize {
+            break;
+        }
+    }
+    papers
+}
+
+fn matching_title_hits(hits: Vec<Paper>, query_title: &str) -> Vec<Paper> {
+    let query = normalize_title_for_match(query_title);
+    hits.into_iter()
+        .filter(|paper| {
+            let title = normalize_title_for_match(&paper.title);
+            title == query || title.contains(&query) || query.contains(&title)
+        })
+        .collect()
+}
+
+fn merge_paper_lists(mut primary: Vec<Paper>, secondary: Vec<Paper>, limit: i64) -> Vec<Paper> {
+    for paper in secondary {
+        if primary.iter().any(|existing| existing.id == paper.id) {
+            continue;
+        }
+        primary.push(paper);
+        if primary.len() >= limit as usize {
+            break;
+        }
+    }
+    primary
+}
+
+fn extract_quoted_titles(question: &str) -> Vec<String> {
+    let mut titles = Vec::new();
+    let mut current = String::new();
+    let mut in_quote = false;
+    for ch in question.chars() {
+        if matches!(ch, '"' | '“' | '”') {
+            if in_quote {
+                push_title(&mut titles, &current);
+                current.clear();
+                in_quote = false;
+            } else {
+                in_quote = true;
+                current.clear();
+            }
+            continue;
+        }
+        if in_quote {
+            current.push(ch);
+        }
+    }
+    titles.sort();
+    titles.dedup();
+    titles
+}
+
+fn push_title(titles: &mut Vec<String>, raw: &str) {
+    let title = raw.trim();
+    if title.chars().count() >= 8 && title.chars().any(|ch| ch.is_alphabetic()) {
+        titles.push(title.to_string());
+    }
+}
+
+fn normalize_title_for_match(title: &str) -> String {
+    title
+        .chars()
+        .map(|ch| {
+            if ch.is_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 async fn finish_search(repo: &PaperRepo<'_>, request: FinishRequest<'_>) -> RetrievalResult {
@@ -175,4 +269,38 @@ fn push_phrase(phrases: &mut Vec<String>, current: &mut String) {
         phrases.push(trimmed.to_string());
     }
     current.clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extracts_numbered_reference_titles() {
+        let question = r#"1. D. Strickland and G. Mourou, "Compression of amplified chirped optical pulses,"
+2. P. M. Paul et al., "Observation of a train of attosecond pulses from high harmonic generation,""#;
+        let titles = extract_quoted_titles(question);
+        assert_eq!(
+            titles,
+            vec![
+                "Compression of amplified chirped optical pulses,".to_string(),
+                "Observation of a train of attosecond pulses from high harmonic generation,"
+                    .to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn normalizes_titles_for_punctuation_insensitive_match() {
+        assert_eq!(
+            normalize_title_for_match("Compression of amplified chirped optical pulses,"),
+            "compression of amplified chirped optical pulses"
+        );
+        assert_eq!(
+            normalize_title_for_match(
+                "Towards zeptosecond-scale pulses from x-ray free-electron lasers"
+            ),
+            "towards zeptosecond scale pulses from x ray free electron lasers"
+        );
+    }
 }

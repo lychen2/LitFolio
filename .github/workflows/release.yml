@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# Quality gates (typecheck, lint, frontend/Rust tests, fmt, clippy) run in ci.yml
+# on every push to main and on PRs. This workflow only builds and publishes, so
+# tagging a green main commit always ships — a lint warning or a flaky test can no
+# longer abort the release before artifacts are published. tsc (via the bundle's
+# beforeBuildCommand) and cargo build still block a release that does not compile.
 jobs:
   release:
     strategy:
@@ -39,8 +44,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-24.04'
@@ -61,44 +64,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Lint
-        run: pnpm run lint:strict
-
-      - name: Frontend tests
-        run: pnpm test
-
-      - name: Install Playwright browsers (Linux)
-        if: matrix.platform == 'ubuntu-24.04'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install Playwright browsers (Windows)
-        if: matrix.platform == 'windows-2025'
-        run: pnpm exec playwright install chromium
-
-      - name: Browser smoke test
-        run: pnpm run test:e2e
-
-      - name: Build frontend
-        run: pnpm run build
-
-      - name: Bundle report
-        run: pnpm run bundle:report
-
-      - name: Rust format
-        working-directory: src-tauri
-        run: cargo fmt --check
-
-      - name: Rust clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Rust tests
-        working-directory: src-tauri
-        run: cargo test
-
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -108,15 +73,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "LitFolio ${{ github.ref_name }}"
-          releaseBody: |
-            ## What's new in ${{ github.ref_name }}
-
-            ### Fixed
-            - RSS feed imports now show the auto-download PDF action for DOI-backed papers.
-            - DOI imports from RSS use the existing DOI PDF download flow and still link the imported paper back to the feed item.
-
-            ### Changed
-            - Import guidance now reflects DOI auto-download support.
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true

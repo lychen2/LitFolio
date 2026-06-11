@@ -8,8 +8,9 @@
 //! at 80 to leave headroom.
 
 use anyhow::{anyhow, Context, Result};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::paper_draft::PaperDraft;
@@ -20,8 +21,54 @@ const FIELDS: &str = "paperId,title,abstract,year,authors.name,venue,externalIds
 const BUCKET_CAP: u64 = 80;
 const BUCKET_WINDOW_SECS: u64 = 300;
 
-static LAST_BUCKET_RESET: AtomicU64 = AtomicU64::new(0);
-static REQUESTS_IN_WINDOW: AtomicU64 = AtomicU64::new(0);
+static RATE_LIMITER: Lazy<RateLimiter> =
+    Lazy::new(|| RateLimiter::new(BUCKET_CAP, BUCKET_WINDOW_SECS));
+
+#[derive(Debug)]
+struct RateLimiter {
+    cap: u64,
+    window_secs: u64,
+    state: Mutex<RateLimitState>,
+}
+
+#[derive(Debug, Default)]
+struct RateLimitState {
+    last_reset: u64,
+    used: u64,
+}
+
+impl RateLimiter {
+    fn new(cap: u64, window_secs: u64) -> Self {
+        Self {
+            cap,
+            window_secs,
+            state: Mutex::new(RateLimitState::default()),
+        }
+    }
+
+    fn try_acquire(&self) -> Result<()> {
+        self.try_acquire_at(now_secs())
+    }
+
+    fn try_acquire_at(&self, now: u64) -> Result<()> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| anyhow!("Semantic Scholar rate limiter lock poisoned"))?;
+        if now.saturating_sub(state.last_reset) >= self.window_secs {
+            state.last_reset = now;
+            state.used = 0;
+        }
+        if state.used >= self.cap {
+            return Err(anyhow!(
+                "Semantic Scholar rate limit reached ({} per 5 min); try again later",
+                self.cap
+            ));
+        }
+        state.used += 1;
+        Ok(())
+    }
+}
 
 fn now_secs() -> u64 {
     SystemTime::now()
@@ -31,20 +78,7 @@ fn now_secs() -> u64 {
 }
 
 fn check_rate_limit() -> Result<()> {
-    let now = now_secs();
-    let last = LAST_BUCKET_RESET.load(Ordering::Relaxed);
-    if now.saturating_sub(last) >= BUCKET_WINDOW_SECS {
-        LAST_BUCKET_RESET.store(now, Ordering::Relaxed);
-        REQUESTS_IN_WINDOW.store(0, Ordering::Relaxed);
-    }
-    let used = REQUESTS_IN_WINDOW.fetch_add(1, Ordering::Relaxed);
-    if used >= BUCKET_CAP {
-        REQUESTS_IN_WINDOW.fetch_sub(1, Ordering::Relaxed);
-        return Err(anyhow!(
-            "Semantic Scholar rate limit reached ({BUCKET_CAP} per 5 min); try again later"
-        ));
-    }
-    Ok(())
+    RATE_LIMITER.try_acquire()
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,11 +221,13 @@ pub async fn bulk_by_citations(
 }
 
 fn urlencode(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-            ' ' => "+".to_string(),
-            _ => format!("%{:02X}", c as u32),
+    s.bytes()
+        .map(|b| match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                char::from(b).to_string()
+            }
+            b' ' => "+".to_string(),
+            _ => format!("%{b:02X}"),
         })
         .collect()
 }
@@ -200,6 +236,11 @@ fn urlencode(s: &str) -> String {
 mod tests {
     use super::*;
 
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Barrier,
+    };
+
     #[test]
     fn urlencode_basic() {
         assert_eq!(urlencode("attention is all"), "attention+is+all");
@@ -207,12 +248,44 @@ mod tests {
     }
 
     #[test]
+    fn urlencode_encodes_utf8_bytes() {
+        assert_eq!(urlencode("中文"), "%E4%B8%AD%E6%96%87");
+        assert_eq!(urlencode("β phase"), "%CE%B2+phase");
+    }
+
+    #[test]
     fn rate_limit_caps_at_bucket() {
-        LAST_BUCKET_RESET.store(now_secs(), Ordering::Relaxed);
-        REQUESTS_IN_WINDOW.store(0, Ordering::Relaxed);
+        let limiter = RateLimiter::new(BUCKET_CAP, BUCKET_WINDOW_SECS);
+        let now = 1_000;
         for _ in 0..BUCKET_CAP {
-            check_rate_limit().unwrap();
+            limiter.try_acquire_at(now).unwrap();
         }
-        assert!(check_rate_limit().is_err());
+        assert!(limiter.try_acquire_at(now).is_err());
+    }
+
+    #[test]
+    fn rate_limiter_preserves_bucket_cap_across_parallel_callers() {
+        let limiter = Arc::new(RateLimiter::new(BUCKET_CAP, BUCKET_WINDOW_SECS));
+        let callers = BUCKET_CAP + 20;
+        let barrier = Arc::new(Barrier::new(callers as usize));
+        let accepted = Arc::new(AtomicU64::new(0));
+        let now = 1_000;
+
+        std::thread::scope(|scope| {
+            for _ in 0..callers {
+                let limiter = Arc::clone(&limiter);
+                let barrier = Arc::clone(&barrier);
+                let accepted = Arc::clone(&accepted);
+                scope.spawn(move || {
+                    barrier.wait();
+                    if limiter.try_acquire_at(now).is_ok() {
+                        accepted.fetch_add(1, Ordering::SeqCst);
+                    }
+                });
+            }
+        });
+
+        assert_eq!(accepted.load(Ordering::SeqCst), BUCKET_CAP);
+        assert!(limiter.try_acquire_at(now).is_err());
     }
 }

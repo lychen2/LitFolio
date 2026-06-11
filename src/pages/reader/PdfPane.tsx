@@ -28,6 +28,15 @@ import {
 import { DEFAULT_ZOOM, nextZoom, wheelZoom, ZOOM_STEP, type PdfZoom } from "./PdfPaneZoom";
 import { extractPdfText } from "./pdfTextExtraction";
 
+type PdfPaneError = {
+  stage: "asset-path" | "asset-url" | "pdfjs-load" | "text-cache";
+  message: string;
+  name?: string;
+  detail?: string;
+  assetPath?: string;
+  assetUrl?: string;
+};
+
 /**
  * The middle pane: renders the bound PDF and lets the user highlight, search,
  * translate, and mark terms inside the document.
@@ -52,7 +61,7 @@ export const PdfPane = memo(function PdfPane({
   const t = useT();
   const qc = useQueryClient();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<PdfPaneError | null>(null);
   const [dark, setDark] = useState<boolean>(() => {
     try { return localStorage.getItem("litera.pdf.dark") === "1"; }
     catch { return false; }
@@ -77,9 +86,14 @@ export const PdfPane = memo(function PdfPane({
       try {
         const path = await api.paperPdfAssetPath(paperId);
         if (cancelled) return;
-        setPdfUrl(convertFileSrc(path));
+        try {
+          const assetUrl = convertFileSrc(path);
+          setPdfUrl(assetUrl);
+        } catch (error) {
+          if (!cancelled) setLoadErr(toPdfPaneError("asset-url", error, { assetPath: path }));
+        }
       } catch (e) {
-        if (!cancelled) setLoadErr((e as Error).message);
+        if (!cancelled) setLoadErr(toPdfPaneError("asset-path", e));
       }
     })();
     return () => { cancelled = true; };
@@ -184,7 +198,7 @@ export const PdfPane = memo(function PdfPane({
     });
   }, [scrollRefCb, highlights]);
 
-  if (loadErr) return <Center><PdfLoadError error={new Error(loadErr)} onRetry={() => { setLoadErr(null); setPdfUrl(null); }} /></Center>;
+  if (loadErr) return <Center><PdfLoadError error={loadErr} onRetry={() => { setLoadErr(null); setPdfUrl(null); }} /></Center>;
   if (!pdfUrl) {
     return <Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.loadingPdf")}</Center>;
   }
@@ -209,8 +223,12 @@ export const PdfPane = memo(function PdfPane({
         url={pdfUrl}
         workerSrc={workerUrl}
         beforeLoad={<Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.renderingPdf")}</Center>}
-        errorMessage={<PdfLoadError />}
-        onError={(e) => { console.error("[PdfLoader] getDocument failed", e); }}
+        errorMessage={<PdfLoadError error={loadErr ?? undefined} />}
+        onError={(error) => {
+          const visibleError = toPdfPaneError("pdfjs-load", error, { assetUrl: pdfUrl });
+          console.error("[PdfLoader] getDocument failed", visibleError, error);
+          setLoadErr(visibleError);
+        }}
       >
         {(pdfDocument) => {
           // pdfjs gives us reliable body text. lopdf in the backend chokes on
@@ -225,7 +243,11 @@ export const PdfPane = memo(function PdfPane({
                 if (!text) return;
                 return api.paperSetPdfText(paperId, text);
               })
-              .catch((err) => console.warn("[PdfPane] push pdf text failed", err));
+              .catch((err) => console.warn(
+                "[PdfPane] push pdf text failed",
+                toPdfPaneError("text-cache", err, { assetUrl: pdfUrl }),
+                err,
+              ));
           }
           return (
             <>
@@ -243,8 +265,13 @@ export const PdfPane = memo(function PdfPane({
                       create.mutate({ position, content, comment: { text: "", emoji: "" } });
                       hideTipAndSelection();
                     }}
+                    onCopy={() => {
+                      const text = selectedText(content);
+                      if (text) void navigator.clipboard.writeText(text);
+                      hideTipAndSelection();
+                    }}
                     onTranslate={() => {
-                      const text = content.text?.trim();
+                      const text = selectedText(content);
                       if (text) onTranslateSelection?.(text);
                       hideTipAndSelection();
                     }}
@@ -291,3 +318,52 @@ export const PdfPane = memo(function PdfPane({
     </div>
   );
 });
+
+function selectedText(content: { text?: string | null }): string {
+  const fromHighlighter = content.text?.trim();
+  if (fromHighlighter) return fromHighlighter;
+  return window.getSelection()?.toString().trim() ?? "";
+}
+
+function toPdfPaneError(
+  stage: PdfPaneError["stage"],
+  error: unknown,
+  context: Pick<PdfPaneError, "assetPath" | "assetUrl"> = {},
+): PdfPaneError {
+  if (error instanceof Error) {
+    return {
+      stage,
+      name: error.name,
+      message: error.message || String(error),
+      detail: error.stack,
+      ...context,
+    };
+  }
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    return {
+      stage,
+      name: stringValue(record.name),
+      message: stringValue(record.message) || stringifyError(error),
+      detail: stringifyError(error),
+      ...context,
+    };
+  }
+  return {
+    stage,
+    message: String(error || "Unknown PDF error"),
+    ...context,
+  };
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function stringifyError(error: unknown): string {
+  try {
+    return JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
+  } catch {
+    return String(error);
+  }
+}

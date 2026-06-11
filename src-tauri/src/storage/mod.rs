@@ -18,6 +18,7 @@ pub mod knowledge;
 mod models;
 mod note_sections;
 pub mod notes;
+mod paper_documents;
 mod paper_links;
 mod paper_terms;
 mod papers;
@@ -44,6 +45,7 @@ pub use highlights::{
 };
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
+pub use paper_documents::{PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;

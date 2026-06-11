@@ -14,9 +14,9 @@ use crate::storage::{LibraryPaths, PaperRepo};
 use crate::AppState;
 
 /// Resolve body text to send to the LLM for TLDR / QuickRead. Three tiers:
-/// 1. `text.txt` cache populated by pdfjs in the reader (highest quality);
+/// 1. `document.md` cache populated by pdfjs in the reader (highest quality);
 /// 2. on-the-fly lopdf extraction from the original PDF (cached back to
-///    text.txt so the next call hits tier 1) — needed because users
+///    document.md so the next call hits tier 1) — needed because users
 ///    summarize papers they have not yet opened;
 /// 3. None — caller falls back to abstract-only behaviour.
 ///
@@ -34,7 +34,7 @@ pub(crate) async fn load_or_extract_pdf_body(
     let raw_path = pdf_path?;
     let canonical = paths.ensure_inside_root(Path::new(raw_path)).ok()?;
     let extracted =
-        tokio::task::spawn_blocking(move || crate::ingest::extract_full_text_from_path(&canonical))
+        tokio::task::spawn_blocking(move || crate::ingest::extract_markdown_from_path(&canonical))
             .await
             .ok()?
             .ok()?;

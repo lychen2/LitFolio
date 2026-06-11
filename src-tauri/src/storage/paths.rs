@@ -1,11 +1,18 @@
 //! Resolve the user's library root and the canonical paths inside it.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct LibraryPaths {
     pub root: PathBuf,
+}
+
+#[derive(Debug, Default)]
+pub struct LegacyPdfTextMigration {
+    pub converted: usize,
+    pub removed_legacy: usize,
+    pub markdown_documents: Vec<(String, String)>,
 }
 
 impl LibraryPaths {
@@ -31,6 +38,12 @@ impl LibraryPaths {
     pub fn backups_dir(&self) -> PathBuf {
         self.root.join("backups")
     }
+    pub fn logs_dir(&self) -> PathBuf {
+        self.root.join("logs")
+    }
+    pub fn app_log_file(&self) -> PathBuf {
+        self.logs_dir().join("litfolio.log")
+    }
     pub fn config_file(&self) -> PathBuf {
         self.root.join("litera.config.json")
     }
@@ -41,35 +54,47 @@ impl LibraryPaths {
     pub fn note_file(&self, paper_id: &str) -> PathBuf {
         self.notes_dir().join(format!("{paper_id}.md"))
     }
-    /// Where the body text extracted from the paper's PDF lives. Written by
-    /// `paper_set_pdf_text` after pdfjs renders in the reader, also used as
-    /// a cache when we have to fall back to lopdf extraction for papers
-    /// that have never been opened in the reader.
+    /// Where the Markdown extracted from the paper's PDF lives. Written by
+    /// `paper_set_pdf_text` after pdfjs renders in the reader. The command
+    /// name is kept for API compatibility, but new writes are Markdown-first.
+    pub fn paper_markdown_file(&self, paper_id: &str) -> PathBuf {
+        self.paper_dir(paper_id).join("document.md")
+    }
+    /// Legacy plain-text cache path. Read for compatibility with existing
+    /// libraries; new extraction writes `document.md`.
     pub fn pdf_text_file(&self, paper_id: &str) -> PathBuf {
         self.paper_dir(paper_id).join("text.txt")
     }
-    /// Read cached body text for a paper. Returns None when the file is
+    /// Read cached body content for a paper. Returns None when the file is
     /// missing, unreadable, or only whitespace — i.e. anything the
     /// summarizer should treat as "no body available".
     pub fn read_pdf_text(&self, paper_id: &str) -> Option<String> {
-        let path = self.pdf_text_file(paper_id);
-        let raw = std::fs::read_to_string(&path).ok()?;
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
+        self.read_paper_markdown(paper_id)
+            .or_else(|| self.read_legacy_pdf_text(paper_id))
     }
-    /// Persist body text next to the paper. Used by the lopdf fallback so
-    /// the next TLDR/QuickRead skips re-extraction. Best-effort: a write
-    /// failure is logged by the caller but not fatal.
-    pub fn write_pdf_text(&self, paper_id: &str, body: &str) -> Result<()> {
+    pub fn read_paper_markdown(&self, paper_id: &str) -> Option<String> {
+        read_non_empty_file(self.paper_markdown_file(paper_id))
+    }
+    fn read_legacy_pdf_text(&self, paper_id: &str) -> Option<String> {
+        read_non_empty_file(self.pdf_text_file(paper_id))
+    }
+    /// Persist extracted Markdown next to the paper.
+    pub fn write_paper_markdown(&self, paper_id: &str, markdown: &str) -> Result<()> {
         let dir = self.paper_dir(paper_id);
         std::fs::create_dir_all(&dir).map_err(|e| anyhow!("create {}: {e}", dir.display()))?;
-        let path = self.pdf_text_file(paper_id);
-        std::fs::write(&path, body).map_err(|e| anyhow!("write {}: {e}", path.display()))?;
+        let path = self.paper_markdown_file(paper_id);
+        std::fs::write(&path, markdown).map_err(|e| anyhow!("write {}: {e}", path.display()))?;
+        let legacy = self.pdf_text_file(paper_id);
+        if legacy.exists() {
+            std::fs::remove_file(&legacy)
+                .map_err(|e| anyhow!("remove legacy PDF text cache {}: {e}", legacy.display()))?;
+        }
         Ok(())
+    }
+    /// Persist body text next to the paper. Used by the lopdf fallback so
+    /// the next TLDR/QuickRead skips re-extraction.
+    pub fn write_pdf_text(&self, paper_id: &str, body: &str) -> Result<()> {
+        self.write_paper_markdown(paper_id, body)
     }
 
     pub fn ensure(&self) -> Result<()> {
@@ -79,6 +104,7 @@ impl LibraryPaths {
         ensure_dir(&self.vectors_dir())?;
         ensure_dir(&self.attachments_dir())?;
         ensure_dir(&self.backups_dir())?;
+        ensure_dir(&self.logs_dir())?;
         Ok(())
     }
 
@@ -166,6 +192,53 @@ impl LibraryPaths {
         }
         Ok(canon)
     }
+
+    pub fn migrate_legacy_pdf_text_cache(&self) -> Result<LegacyPdfTextMigration> {
+        let mut summary = LegacyPdfTextMigration::default();
+        if !self.papers_dir().exists() {
+            return Ok(summary);
+        }
+        for entry in std::fs::read_dir(self.papers_dir())
+            .with_context(|| format!("read {}", self.papers_dir().display()))?
+        {
+            let entry = entry?;
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+            let paper_id = entry.file_name().to_string_lossy().to_string();
+            let markdown_path = self.paper_markdown_file(&paper_id);
+            let legacy_path = self.pdf_text_file(&paper_id);
+            if !legacy_path.exists() {
+                if let Some(markdown) = read_non_empty_file(markdown_path) {
+                    summary.markdown_documents.push((paper_id, markdown));
+                }
+                continue;
+            }
+            if !markdown_path.exists() {
+                let legacy = std::fs::read_to_string(&legacy_path)
+                    .with_context(|| format!("read {}", legacy_path.display()))?;
+                let trimmed = legacy.trim();
+                if !trimmed.is_empty() {
+                    self.write_paper_markdown(&paper_id, trimmed)?;
+                    summary.converted += 1;
+                    summary
+                        .markdown_documents
+                        .push((paper_id, trimmed.to_string()));
+                    summary.removed_legacy += 1;
+                    continue;
+                }
+            } else if let Some(markdown) = read_non_empty_file(markdown_path) {
+                summary
+                    .markdown_documents
+                    .push((paper_id.clone(), markdown));
+            }
+            std::fs::remove_file(&legacy_path).with_context(|| {
+                format!("remove legacy PDF text cache {}", legacy_path.display())
+            })?;
+            summary.removed_legacy += 1;
+        }
+        Ok(summary)
+    }
 }
 
 fn ensure_dir(p: &Path) -> Result<()> {
@@ -173,6 +246,16 @@ fn ensure_dir(p: &Path) -> Result<()> {
         std::fs::create_dir_all(p)?;
     }
     Ok(())
+}
+
+fn read_non_empty_file(path: PathBuf) -> Option<String> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 pub fn default_library_root() -> Result<PathBuf> {
@@ -186,6 +269,14 @@ mod tests {
     use std::fs;
 
     #[test]
+    fn app_log_file_lives_under_library_logs() {
+        let root = PathBuf::from("/tmp/litfolio-test-root");
+        let paths = LibraryPaths::new(&root);
+
+        assert_eq!(paths.app_log_file(), root.join("logs").join("litfolio.log"));
+    }
+
+    #[test]
     fn ensure_creates_layout() {
         let tmp = std::env::temp_dir().join(format!("litera-test-{}", ulid::Ulid::new()));
         let paths = LibraryPaths::new(&tmp);
@@ -193,6 +284,50 @@ mod tests {
         assert!(paths.papers_dir().is_dir());
         assert!(paths.notes_dir().is_dir());
         assert!(paths.vectors_dir().is_dir());
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn write_paper_markdown_removes_legacy_text_cache() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdwrite-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+        let legacy = paths.pdf_text_file("abc");
+        fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        fs::write(&legacy, "old plain text").unwrap();
+
+        paths.write_paper_markdown("abc", "# Markdown").unwrap();
+
+        assert_eq!(
+            fs::read_to_string(paths.paper_markdown_file("abc")).unwrap(),
+            "# Markdown"
+        );
+        assert!(!legacy.exists());
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn migrate_legacy_pdf_text_cache_writes_document_markdown() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdmigrate-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+        let legacy = paths.pdf_text_file("abc");
+        fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        fs::write(&legacy, "legacy body").unwrap();
+
+        let summary = paths.migrate_legacy_pdf_text_cache().unwrap();
+
+        assert_eq!(summary.converted, 1);
+        assert_eq!(summary.removed_legacy, 1);
+        assert_eq!(
+            summary.markdown_documents,
+            vec![("abc".to_string(), "legacy body".to_string())]
+        );
+        assert_eq!(
+            fs::read_to_string(paths.paper_markdown_file("abc")).unwrap(),
+            "legacy body"
+        );
+        assert!(!legacy.exists());
         fs::remove_dir_all(&tmp).ok();
     }
 

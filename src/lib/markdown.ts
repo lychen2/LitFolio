@@ -104,7 +104,21 @@ function extractMath(text: string): { stripped: string; math: Map<string, string
     return ph;
   });
 
-  // 2) $ inline math $  (single-line, no `$` inside)
+  // 2) \[ display math \]  (multi-line)
+  stripped = stripped.replace(/\\\[([\s\S]*?)\\\]/g, (_full, tex: string) => {
+    const ph = nextPlaceholder("block");
+    math.set(ph, tryRenderKatex(tex, true));
+    return ph;
+  });
+
+  // 3) \( inline math \)  (single-line)
+  stripped = stripped.replace(/\\\((.+?)\\\)/g, (_full, tex: string) => {
+    const ph = nextPlaceholder("inline");
+    math.set(ph, tryRenderKatex(tex, false));
+    return ph;
+  });
+
+  // 4) $ inline math $  (single-line, no `$` inside)
   stripped = stripped.replace(/\$(.+?)\$/g, (_full, tex: string) => {
     const ph = nextPlaceholder("inline");
     math.set(ph, tryRenderKatex(tex, false));

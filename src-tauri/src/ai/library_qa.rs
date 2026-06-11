@@ -60,10 +60,11 @@ Rules:\n\
 - Reply in 中文 regardless of question language.\n\
 - Use ONLY the provided sources. Do not invent papers, authors, years, or DOIs.\n\
 - Cite sources inline as [1], [2], etc., placed right after the claim each supports.\n\
-- Structure: lead with one direct conclusion sentence, then a short paragraph or 3-5 bullet points with the supporting citations.\n\
+- Structure: lead with one direct conclusion sentence, then a short paragraph or concise bullets with the supporting citations.\n\
 - If the sources are insufficient, say so explicitly and describe what kind of paper would be needed — never guess.\n\
 - Do not pad with generic background; stay tight to the question.\n\
-- Prefer citing 2-4 sources when relevant; do not just dump every source.";
+- For timeline, bibliography, or explicitly enumerated-paper questions, cover every provided source that is directly requested.\n\
+- For open-ended synthesis questions, cite only the most relevant sources instead of dumping every source.";
 
 const NO_SOURCES_ANSWER: &str = "未在你的文献库中检索到与此问题相关的论文。可以尝试:\n\
 1. 用更具体的关键词重新提问;\n\
@@ -82,20 +83,35 @@ pub fn empty_result(terms: Vec<String>) -> AskLibraryResult {
     }
 }
 
+pub struct LibraryQuestionRequest<'a> {
+    pub client: &'a reqwest::Client,
+    pub profile: &'a LlmProfile,
+    pub question: &'a str,
+    pub papers: &'a [Paper],
+    pub highlights: &'a HashMap<String, Vec<Highlight>>,
+    pub document_snippets: &'a HashMap<String, String>,
+    pub terms: &'a [String],
+    pub conversation_history: &'a [ChatMessage],
+}
+
 pub async fn answer_library_question(
-    client: &reqwest::Client,
-    profile: &LlmProfile,
-    question: &str,
-    papers: &[Paper],
-    highlights: &HashMap<String, Vec<Highlight>>,
-    terms: &[String],
-    conversation_history: &[ChatMessage],
+    request: LibraryQuestionRequest<'_>,
 ) -> Result<AskLibraryResult> {
+    let LibraryQuestionRequest {
+        client,
+        profile,
+        question,
+        papers,
+        highlights,
+        document_snippets,
+        terms,
+        conversation_history,
+    } = request;
     let trimmed = question.trim();
     if trimmed.is_empty() {
         return Err(anyhow!("empty question"));
     }
-    let sources = build_sources(papers, highlights, terms);
+    let sources = build_sources(papers, highlights, document_snippets, terms);
     if sources.is_empty() {
         return Ok(empty_result(terms.to_vec()));
     }

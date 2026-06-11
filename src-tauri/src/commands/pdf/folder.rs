@@ -6,7 +6,8 @@ use tokio::task::JoinSet;
 use ulid::Ulid;
 
 use super::common::{
-    attach_imported_pdf_to_existing, existing_paper_for_draft, PdfFailure, PdfImportSummary,
+    attach_imported_pdf_to_existing, existing_paper_for_draft,
+    generate_and_index_pdf_markdown_or_warn, PdfFailure, PdfImportSummary,
 };
 use crate::bibtex::generate_bibtex;
 use crate::commands::events::emit_or_warn;
@@ -170,13 +171,33 @@ async fn import_one_folder_pdf(
     paper.bibtex = Some(generate_bibtex(&paper));
 
     if let Some(existing) = existing {
-        attach_imported_pdf_to_existing(&repo, &library, &existing, &imported.stored_path)
-            .await
-            .map_err(|e| pdf_failure(&path, e.to_string()))
+        let paper =
+            attach_imported_pdf_to_existing(&repo, &library, &existing, &imported.stored_path)
+                .await
+                .map_err(|e| pdf_failure(&path, e.to_string()))?;
+        if let Some(pdf_path) = paper.pdf_path.as_deref() {
+            generate_and_index_pdf_markdown_or_warn(
+                &pool,
+                &library,
+                &http,
+                &paper.id,
+                Path::new(pdf_path),
+            )
+            .await;
+        }
+        Ok(paper)
     } else {
         repo.insert(&paper)
             .await
             .map_err(|e| pdf_failure(&path, e.to_string()))?;
+        generate_and_index_pdf_markdown_or_warn(
+            &pool,
+            &library,
+            &http,
+            &paper.id,
+            &imported.stored_path,
+        )
+        .await;
         Ok(paper)
     }
 }

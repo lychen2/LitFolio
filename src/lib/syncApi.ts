@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { parseSyncReport } from "./apiSchema";
+import { invokeParsed } from "./apiInvoke";
+
 export interface WebDavConfig {
   base_url: string;
   remote_path: string;
@@ -22,6 +25,7 @@ export interface SyncReport {
   skipped_count: number;
   skipped_bytes: number;
   restart_required: boolean;
+  backup_path?: string | null;
 }
 
 export const EMPTY_SYNC_CONFIG: SyncConfig = {
@@ -35,8 +39,11 @@ export const EMPTY_SYNC_CONFIG: SyncConfig = {
 
 export const syncApi = {
   getConfig: () => invoke<SyncConfig>("sync_get_config"),
-  saveConfig: (config: SyncConfig) => invoke<void>("sync_save_config", { config }),
+  saveConfig: (config: SyncConfig) =>
+    invoke<void>("sync_save_config", { config }),
   test: () => invoke<SyncConnectionResult>("sync_test"),
-  pushLibrary: () => invoke<SyncReport>("sync_push_library"),
-  pullLibrary: () => invoke<SyncReport>("sync_pull_library"),
+  pushLibrary: () =>
+    invokeParsed("sync_push_library", undefined, parseSyncReport),
+  pullLibrary: () =>
+    invokeParsed("sync_pull_library", undefined, parseSyncReport),
 };

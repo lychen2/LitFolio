@@ -64,10 +64,11 @@ function ProjectSidebar({
   projects: ResearchProject[];
   loading: boolean;
   selectedId: number | null;
-  onSelect: (id: number) => void;
+  onSelect: (id: number | null) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const [copiedProjectId, setCopiedProjectId] = useState<number | null>(null);
   const create = useMutation({
     mutationFn: () => api.projectCreate({
       ...EMPTY_DRAFT,
@@ -76,6 +77,25 @@ function ProjectSidebar({
     onSuccess: (project) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
       onSelect(project.id);
+    },
+  });
+  const exportProject = useMutation({
+    mutationFn: (project: ResearchProject) => api.projectExportMarkdown(project.id),
+    onSuccess: async (markdown, project) => {
+      await navigator.clipboard.writeText(markdown);
+      setCopiedProjectId(project.id);
+    },
+  });
+  const removeProject = useMutation({
+    mutationFn: (project: ResearchProject) => api.projectDelete(project.id),
+    onSuccess: (_, deletedProject) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      if (deletedProject.id !== selectedId) {
+        return;
+      }
+      const deletedIndex = projects.findIndex((project) => project.id === deletedProject.id);
+      const nextProject = projects[deletedIndex + 1] ?? projects[deletedIndex - 1] ?? null;
+      onSelect(nextProject?.id ?? null);
     },
   });
 
@@ -91,6 +111,8 @@ function ProjectSidebar({
           {t("projects.create")}
         </button>
         {create.error && <div className="mt-2 text-xs text-red-400/90">{(create.error as Error).message}</div>}
+        {exportProject.error && <div className="mt-2 text-xs text-red-400/90">{(exportProject.error as Error).message}</div>}
+        {removeProject.error && <div className="mt-2 text-xs text-red-400/90">{(removeProject.error as Error).message}</div>}
       </div>
       <div className="flex-1 overflow-auto">
         {loading ? (
@@ -102,23 +124,56 @@ function ProjectSidebar({
           <div className="p-5 text-sm text-litera-mute leading-relaxed">{t("projects.empty")}</div>
         ) : (
           <ul className="divide-y divide-litera-line">
-            {projects.map((project) => (
-              <li key={project.id}>
-                <button
-                  onClick={() => onSelect(project.id)}
+            {projects.map((project) => {
+              const isSelected = project.id === selectedId;
+              const isExporting = exportProject.isPending && exportProject.variables?.id === project.id;
+              const isDeleting = removeProject.isPending && removeProject.variables?.id === project.id;
+              return (
+                <li
+                  key={project.id}
                   className={
-                    "w-full px-4 py-3 text-left transition-colors " +
-                    (project.id === selectedId ? "bg-litera-panel text-litera-text" : "hover:bg-litera-panel/50")
+                    "group flex items-stretch transition-colors " +
+                    (isSelected ? "bg-litera-panel text-litera-text" : "hover:bg-litera-panel/50")
                   }
                 >
-                  <div className="font-medium leading-snug">{project.name}</div>
-                  <div className="mt-1 text-[11px] text-litera-mute flex items-center gap-2">
-                    <span>{t(`projects.status.${project.status}` as TKey)}</span>
-                    <span>{t("projects.paperCount", { count: project.paper_count })}</span>
+                  <button
+                    onClick={() => onSelect(project.id)}
+                    className="min-w-0 flex-1 px-4 py-3 text-left"
+                  >
+                    <div className="font-medium leading-snug truncate">{project.name}</div>
+                    <div className="mt-1 text-[11px] text-litera-mute flex items-center gap-2">
+                      <span>{t(`projects.status.${project.status}` as TKey)}</span>
+                      <span>{t("projects.paperCount", { count: project.paper_count })}</span>
+                      {copiedProjectId === project.id && <span className="text-emerald-400">{t("projects.packageCopied")}</span>}
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-1 pr-3 opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => exportProject.mutate(project)}
+                      disabled={isExporting}
+                      className="rounded-md p-1.5 text-litera-mute hover:bg-litera-line/70 hover:text-litera-text disabled:opacity-50"
+                      title={t("projects.packageExport")}
+                      aria-label={t("projects.packageExport")}
+                    >
+                      {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(t("projects.deleteConfirm"))) removeProject.mutate(project);
+                      }}
+                      disabled={isDeleting}
+                      className="rounded-md p-1.5 text-litera-mute hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                      title={t("projects.delete")}
+                      aria-label={t("projects.delete")}
+                    >
+                      {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </button>
                   </div>
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

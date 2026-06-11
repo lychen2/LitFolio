@@ -33,6 +33,9 @@ async fn run_optional_startup_tasks(pool: &Pool, paths: &LibraryPaths) {
     repair_default_feeds(pool).await;
     seed_default_feeds(pool).await;
     seed_manual_pdfs_if_empty(pool, paths).await;
+    migrate_legacy_pdf_text_cache(pool, paths).await;
+    // PDF markdown rebuild stays lazy: imports, Ask backfill, and the PDF.js
+    // reader generate document.md without making startup parse the whole library.
 }
 
 async fn repair_default_feeds(pool: &Pool) {
@@ -52,6 +55,34 @@ async fn seed_default_feeds(pool: &Pool) {
         Ok(seeded) if seeded > 0 => tracing::info!(seeded, "seeded default RSS feeds"),
         Ok(_) => {}
         Err(error) => tracing::warn!(%error, "optional startup task failed: seed default feeds"),
+    }
+}
+
+async fn migrate_legacy_pdf_text_cache(pool: &Pool, paths: &LibraryPaths) {
+    let summary = match paths.migrate_legacy_pdf_text_cache() {
+        Ok(summary) => summary,
+        Err(error) => {
+            tracing::warn!(%error, "optional startup task failed: migrate legacy PDF text cache");
+            return;
+        }
+    };
+    let repo = storage::PaperDocumentRepo::new(pool);
+    for (paper_id, markdown) in &summary.markdown_documents {
+        if let Err(error) = repo.upsert_markdown(paper_id, markdown).await {
+            tracing::warn!(
+                %error,
+                paper_id,
+                "optional startup task failed: index migrated PDF markdown"
+            );
+        }
+    }
+    if summary.converted > 0 || summary.removed_legacy > 0 {
+        tracing::info!(
+            converted = summary.converted,
+            removed_legacy = summary.removed_legacy,
+            indexed = summary.markdown_documents.len(),
+            "migrated legacy PDF text cache to Markdown"
+        );
     }
 }
 

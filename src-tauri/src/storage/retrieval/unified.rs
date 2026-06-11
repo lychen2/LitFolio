@@ -36,6 +36,7 @@ pub async fn unified_search(
 
     let mut results = Vec::new();
     append_paper_results(pool, &escaped, limit, &mut results).await;
+    append_document_results(pool, &escaped, limit, &mut results).await;
     append_highlight_results(pool, &escaped, limit, &mut results).await;
     append_term_results(pool, &escaped, limit, &mut results).await;
 
@@ -46,6 +47,34 @@ pub async fn unified_search(
     });
     results.truncate(limit as usize);
     Ok(results)
+}
+
+async fn append_document_results(
+    pool: &Pool,
+    escaped: &str,
+    limit: i64,
+    results: &mut Vec<UnifiedSearchResult>,
+) {
+    let rows = sqlx::query(
+        "SELECT d.paper_id, p.title as paper_title, bm25(paper_documents_fts) as score,
+                snippet(paper_documents_fts, 1, '>>>', '<<<', '…', 80) as snip_markdown
+         FROM paper_documents_fts f
+         JOIN paper_documents d ON f.rowid = d.rowid
+         JOIN papers p ON d.paper_id = p.id
+         WHERE paper_documents_fts MATCH ?1
+         ORDER BY bm25(paper_documents_fts)
+         LIMIT ?2",
+    )
+    .bind(escaped)
+    .bind(limit)
+    .fetch_all(pool)
+    .await;
+
+    if let Ok(rows) = rows {
+        for row in rows {
+            results.push(document_result(row));
+        }
+    }
 }
 
 async fn append_paper_results(
@@ -132,6 +161,16 @@ async fn append_term_results(
         for row in rows {
             results.push(term_result(row));
         }
+    }
+}
+
+fn document_result(row: sqlx::sqlite::SqliteRow) -> UnifiedSearchResult {
+    UnifiedSearchResult {
+        source: "document".into(),
+        paper_id: row.try_get("paper_id").unwrap_or_default(),
+        paper_title: row.try_get("paper_title").unwrap_or_default(),
+        snippet: row.try_get("snip_markdown").unwrap_or_default(),
+        score: row.try_get("score").unwrap_or(0.0),
     }
 }
 

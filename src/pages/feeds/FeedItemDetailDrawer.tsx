@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { ExternalLink, Languages, Loader2, X } from "lucide-react";
-import { open as openInBrowser } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type ArxivDraft, type FeedItem, type TranslationResult } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
@@ -91,7 +91,7 @@ function DetailActions({
         {t("feeds.translateTitleAbstract")}
       </button>
       {item.link && (
-        <button onClick={() => openInBrowser(item.link!).catch(() => undefined)} className="litera-btn text-xs">
+        <button onClick={() => openUrl(item.link!).catch(() => undefined)} className="litera-btn text-xs">
           <ExternalLink className="h-3.5 w-3.5" /> {t("feeds.openExternal")}
         </button>
       )}
@@ -133,7 +133,7 @@ function ExternalLinkValue({ link, emptyLabel }: { link: string | null; emptyLab
       href={link}
       onClick={(e) => {
         e.preventDefault();
-        openInBrowser(link).catch(() => undefined);
+        openUrl(link).catch(() => undefined);
       }}
       className="text-litera-accent2 hover:underline inline-flex items-center gap-1"
     >

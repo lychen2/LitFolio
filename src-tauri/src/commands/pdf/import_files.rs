@@ -5,7 +5,8 @@ use tauri::State;
 use ulid::Ulid;
 
 use super::common::{
-    attach_imported_pdf_to_existing, existing_paper_for_draft, PdfFailure, PdfImportSummary,
+    attach_imported_pdf_to_existing, existing_paper_for_draft,
+    generate_and_index_pdf_markdown_or_warn, PdfFailure, PdfImportSummary,
 };
 use crate::bibtex::generate_bibtex;
 use crate::ingest::{fetch_doi, import_pdf_file};
@@ -90,16 +91,35 @@ impl ImportContext<'_> {
         paper.pdf_path = Some(result.stored_path.display().to_string());
         paper.bibtex = Some(generate_bibtex(&paper));
         if let Some(existing) = existing {
-            return attach_imported_pdf_to_existing(
+            let paper = attach_imported_pdf_to_existing(
                 self.repo,
                 self.library,
                 &existing,
                 &result.stored_path,
             )
             .await
-            .map_err(|e| e.to_string());
+            .map_err(|e| e.to_string())?;
+            if let Some(pdf_path) = paper.pdf_path.as_deref() {
+                generate_and_index_pdf_markdown_or_warn(
+                    self.repo.pool(),
+                    self.library,
+                    self.http,
+                    &paper.id,
+                    std::path::Path::new(pdf_path),
+                )
+                .await;
+            }
+            return Ok(paper);
         }
         self.repo.insert(&paper).await.map_err(|e| e.to_string())?;
+        generate_and_index_pdf_markdown_or_warn(
+            self.repo.pool(),
+            self.library,
+            self.http,
+            &paper.id,
+            &result.stored_path,
+        )
+        .await;
         Ok(paper)
     }
 }

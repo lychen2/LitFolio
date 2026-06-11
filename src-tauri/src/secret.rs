@@ -19,6 +19,7 @@ pub fn llm_account(profile_name: &str) -> String {
 }
 
 pub const WEBDAV_ACCOUNT: &str = "webdav/default";
+pub const MINERU_ACCOUNT: &str = "mineru/default";
 
 #[cfg(not(test))]
 mod real {

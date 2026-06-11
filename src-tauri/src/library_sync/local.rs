@@ -185,8 +185,24 @@ pub fn stage_downloaded_file(snapshot: &Snapshot, file: &ManifestFile, bytes: &[
 
 pub fn replace_library_root(target_root: &Path, snapshot_root: &Path) -> Result<()> {
     ensure_root(target_root)?;
-    clear_directory(target_root)?;
-    copy_tree_plain(snapshot_root, snapshot_root, target_root)
+    let staging_root = unique_sibling_path(target_root, "incoming")?;
+    let backup_staging_root = unique_sibling_path(target_root, "pre-pull-backup")?;
+    let rollback_root = unique_sibling_path(target_root, "rollback")?;
+
+    let result = prepare_replacement(
+        target_root,
+        snapshot_root,
+        &staging_root,
+        &backup_staging_root,
+    )
+    .and_then(|()| activate_replacement(target_root, &staging_root, &rollback_root));
+
+    if result.is_err() {
+        std::fs::remove_dir_all(&staging_root).ok();
+        std::fs::remove_dir_all(&backup_staging_root).ok();
+    }
+
+    result
 }
 
 fn empty_manifest() -> SyncManifest {
@@ -247,16 +263,100 @@ fn ensure_root(root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn clear_directory(root: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(root).with_context(|| format!("read {}", root.display()))? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            std::fs::remove_dir_all(&path).with_context(|| format!("remove {}", path.display()))?;
-        } else {
-            std::fs::remove_file(&path).with_context(|| format!("remove {}", path.display()))?;
+fn unique_sibling_path(target_root: &Path, label: &str) -> Result<PathBuf> {
+    let parent = target_root
+        .parent()
+        .ok_or_else(|| anyhow!("library root has no parent: {}", target_root.display()))?;
+    let name = target_root.file_name().ok_or_else(|| {
+        anyhow!(
+            "library root has no directory name: {}",
+            target_root.display()
+        )
+    })?;
+    Ok(parent.join(format!(
+        ".{}-{label}-{}",
+        name.to_string_lossy(),
+        ulid::Ulid::new()
+    )))
+}
+
+fn prepare_replacement(
+    target_root: &Path,
+    snapshot_root: &Path,
+    staging_root: &Path,
+    backup_staging_root: &Path,
+) -> Result<()> {
+    std::fs::create_dir_all(staging_root)
+        .with_context(|| format!("create {}", staging_root.display()))?;
+    copy_tree_plain(target_root, target_root, backup_staging_root)?;
+    copy_tree_plain(snapshot_root, snapshot_root, staging_root)?;
+    move_backup_into_staging(backup_staging_root, staging_root)
+}
+
+fn move_backup_into_staging(backup_staging_root: &Path, staging_root: &Path) -> Result<()> {
+    let backup_root = staging_root
+        .join("backups")
+        .join(pre_pull_backup_dir_name());
+    if let Some(parent) = backup_root.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    std::fs::rename(backup_staging_root, &backup_root).with_context(|| {
+        format!(
+            "move pre-pull backup {} -> {}",
+            backup_staging_root.display(),
+            backup_root.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn pre_pull_backup_dir_name() -> String {
+    format!(
+        "pre-pull-{}-{}",
+        Utc::now().format("%Y%m%dT%H%M%SZ"),
+        ulid::Ulid::new()
+    )
+}
+
+fn activate_replacement(
+    target_root: &Path,
+    staging_root: &Path,
+    rollback_root: &Path,
+) -> Result<()> {
+    std::fs::rename(target_root, rollback_root).with_context(|| {
+        format!(
+            "move current library {} -> {}",
+            target_root.display(),
+            rollback_root.display()
+        )
+    })?;
+
+    match std::fs::rename(staging_root, target_root) {
+        Ok(()) => {
+            std::fs::remove_dir_all(rollback_root).ok();
+            Ok(())
+        }
+        Err(error) => {
+            restore_rollback(target_root, rollback_root)?;
+            Err(error).with_context(|| {
+                format!(
+                    "activate synced library {} -> {}",
+                    staging_root.display(),
+                    target_root.display()
+                )
+            })
         }
     }
+}
+
+fn restore_rollback(target_root: &Path, rollback_root: &Path) -> Result<()> {
+    std::fs::rename(rollback_root, target_root).with_context(|| {
+        format!(
+            "restore library rollback {} -> {}",
+            rollback_root.display(),
+            target_root.display()
+        )
+    })?;
     Ok(())
 }
 

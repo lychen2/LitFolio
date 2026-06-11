@@ -31,19 +31,14 @@ const NOISE_TERMS: &[&str] = &[
 ];
 const NOISE_ACRONYMS: &[&str] = &["PS", "PDF", "HTML", "HTTP", "HTTPS", "WWW", "DOI"];
 
-/// Read the PDF body text cached by the frontend PDF.js renderer.
+/// Read the PDF body Markdown cached by the frontend PDF.js renderer.
 ///
 /// This intentionally does not fall back to backend `lopdf` extraction. Term
 /// candidate generation must stay fast and visible; a slow full-PDF backend
 /// parse would make the non-LLM phase look stuck. If the cache is not ready,
 /// term generation still runs on title/abstract/deep-read metadata.
 pub(super) async fn extract_pdf_body(paper: &Paper, paths: &LibraryPaths) -> Option<String> {
-    let cache_path = paths.paper_dir(&paper.id).join("text.txt");
-    let cached = std::fs::read_to_string(cache_path).ok()?;
-    if cached.trim().is_empty() {
-        return None;
-    }
-    Some(cached)
+    paths.read_pdf_text(&paper.id)
 }
 
 pub(super) fn first_evidence(paper: &Paper, body: Option<&str>, term: &str) -> String {

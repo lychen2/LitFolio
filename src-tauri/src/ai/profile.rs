@@ -16,6 +16,8 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::mineru::PdfMarkdownConfig;
+
 mod persistence;
 #[cfg(test)]
 mod tests;
@@ -90,6 +92,8 @@ pub struct LlmConfig {
     pub output_language: String,
     #[serde(default)]
     pub export_dir: Option<String>,
+    #[serde(default)]
+    pub pdf_markdown: PdfMarkdownConfig,
 }
 
 fn default_output_language() -> String {

@@ -88,8 +88,8 @@ pub async fn discover_topic_multi(
     let classic_futs = terms
         .iter()
         .map(|t| bulk_by_citations(client, t, None, per_term));
-    let recent_results = futures_join_all(recent_futs).await?;
-    let classic_results = futures_join_all(classic_futs).await?;
+    let recent_results = await_all_sequentially(recent_futs).await?;
+    let classic_results = await_all_sequentially(classic_futs).await?;
 
     let recent = merge_dedupe_top(recent_results, req.recent_limit as usize);
     let classic = merge_dedupe_top(classic_results, req.classic_limit as usize);
@@ -103,9 +103,8 @@ pub async fn discover_topic_multi(
     })
 }
 
-/// Tiny inline futures::join_all to avoid pulling the whole `futures` crate in.
-/// Runs all futures concurrently, fails fast on the first error.
-async fn futures_join_all<F, T>(iter: impl IntoIterator<Item = F>) -> Result<Vec<T>>
+/// Await each future in order and fail on the first error.
+async fn await_all_sequentially<F, T>(iter: impl IntoIterator<Item = F>) -> Result<Vec<T>>
 where
     F: std::future::Future<Output = Result<T>>,
 {
@@ -114,9 +113,8 @@ where
         handles.push(fut);
     }
     let mut out = Vec::with_capacity(handles.len());
-    // Sequential await is fine here — bulk_by_citations is I/O bound; tokio
-    // would run them in parallel via tokio::spawn but we'd need 'static
-    // bounds. For 3-6 terms the latency cost is small.
+    // Sequential await keeps Semantic Scholar fan-out conservative while the
+    // shared rate limiter is still a simple process-local bucket.
     for h in handles {
         out.push(h.await?);
     }
