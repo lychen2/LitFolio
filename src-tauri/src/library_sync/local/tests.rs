@@ -1,5 +1,5 @@
 use super::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn snapshot_skips_sqlite_sidecars() {
@@ -155,6 +155,56 @@ fn stage_downloaded_file_rejects_checksum_mismatch() {
     assert!(err.to_string().contains("checksum mismatch"));
 }
 
+#[test]
+fn replace_library_root_preserves_existing_library_when_snapshot_copy_fails() {
+    let root = temp_root();
+    std::fs::create_dir_all(root.join("papers/local")).unwrap();
+    std::fs::write(root.join("library.db"), b"local-db").unwrap();
+    std::fs::write(root.join("papers/local/original.pdf"), b"local-pdf").unwrap();
+    let missing_snapshot =
+        std::env::temp_dir().join(format!("litera-missing-{}", ulid::Ulid::new()));
+
+    let err = replace_library_root(&root, &missing_snapshot).unwrap_err();
+
+    assert!(err.to_string().contains("read"));
+    assert_eq!(std::fs::read(root.join("library.db")).unwrap(), b"local-db");
+    assert_eq!(
+        std::fs::read(root.join("papers/local/original.pdf")).unwrap(),
+        b"local-pdf"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn replace_library_root_stores_pre_pull_backup_on_success() {
+    let root = temp_root();
+    std::fs::create_dir_all(root.join("papers/local")).unwrap();
+    std::fs::write(root.join("library.db"), b"local-db").unwrap();
+    std::fs::write(root.join("papers/local/original.pdf"), b"local-pdf").unwrap();
+    let snapshot = temp_root();
+    std::fs::write(snapshot.join("library.db"), b"remote-db").unwrap();
+
+    replace_library_root(&root, &snapshot).unwrap();
+
+    assert_eq!(
+        std::fs::read(root.join("library.db")).unwrap(),
+        b"remote-db"
+    );
+    let backups = pre_pull_backups(&root);
+    assert_eq!(backups.len(), 1);
+    let backup = &backups[0];
+    assert_eq!(
+        std::fs::read(backup.join("library.db")).unwrap(),
+        b"local-db"
+    );
+    assert_eq!(
+        std::fs::read(backup.join("papers/local/original.pdf")).unwrap(),
+        b"local-pdf"
+    );
+    std::fs::remove_dir_all(&root).ok();
+    std::fs::remove_dir_all(&snapshot).ok();
+}
+
 fn temp_root() -> PathBuf {
     let root = std::env::temp_dir().join(format!("litera-sync-local-{}", ulid::Ulid::new()));
     std::fs::create_dir_all(&root).unwrap();
@@ -177,5 +227,19 @@ fn manifest_paths(snapshot: &Snapshot) -> Vec<&str> {
         .map(|file| file.path.as_str())
         .collect::<Vec<_>>();
     paths.sort_unstable();
+    paths
+}
+
+fn pre_pull_backups(root: &Path) -> Vec<PathBuf> {
+    let mut paths = std::fs::read_dir(root.join("backups"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("pre-pull-"))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
     paths
 }

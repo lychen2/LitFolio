@@ -15,7 +15,7 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:strict": "eslint src --ext .ts,.tsx --max-warnings=0",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/check-playwright-browsers.mjs && playwright test",
     "bundle:report": "node scripts/bundle-report.mjs"
   },
   "dependencies": {

@@ -45,7 +45,7 @@ pub use highlights::{
 };
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
-pub use paper_documents::PaperDocumentRepo;
+pub use paper_documents::{PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
