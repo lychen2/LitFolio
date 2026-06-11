@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { parseGraphData, parseLlmConfig, parsePaper } from "./apiSchema";
+import {
+  parseCandidatePaper,
+  parseEvidenceItem,
+  parseGraphData,
+  parseLlmConfig,
+  parsePaper,
+  parseResearchProject,
+  parseSyncReport,
+  parseTopicAlertResult,
+} from "./apiSchema";
 
 describe("api schema parsers", () => {
   it("accepts a valid paper DTO", () => {
@@ -47,6 +56,32 @@ describe("api schema parsers", () => {
 
     expect(() => parseGraphData(graph, "graph_data")).toThrow("graph_data.nodes[0].node_type");
   });
+
+  it("validates priority cross-boundary DTOs", () => {
+    expect(parseCandidatePaper(validCandidate()).status).toBe("new");
+    expect(parseResearchProject(validProject()).status).toBe("active");
+    expect(parseEvidenceItem(validEvidence()).source_type).toBe("highlight");
+    expect(parseTopicAlertResult(validTopicAlertResult()).seen).toBe(false);
+    expect(parseSyncReport(validSyncReport()).backup_path).toBeNull();
+  });
+
+  it("rejects invalid priority cross-boundary DTOs with precise paths", () => {
+    expect(() => parseCandidatePaper({ ...validCandidate(), status: "bad" })).toThrow(
+      "CandidatePaper.status",
+    );
+    expect(() => parseResearchProject({ ...validProject(), paper_count: "1" })).toThrow(
+      "ResearchProject.paper_count",
+    );
+    expect(() => parseEvidenceItem({ ...validEvidence(), excerpt: null })).toThrow(
+      "EvidenceItem.excerpt",
+    );
+    expect(() => parseTopicAlertResult({ ...validTopicAlertResult(), seen: 0 })).toThrow(
+      "TopicAlertResult.seen",
+    );
+    expect(() => parseSyncReport({ ...validSyncReport(), total_bytes: "1024" })).toThrow(
+      "SyncReport.total_bytes",
+    );
+  });
 });
 
 function validPaper() {
@@ -88,5 +123,82 @@ function validProfile() {
     embed_model: null,
     max_tokens: 1024,
     temperature: 0.2,
+  };
+}
+
+function validCandidate() {
+  return {
+    id: 1,
+    title: "Candidate",
+    authors: ["A"],
+    year: 2026,
+    venue: null,
+    doi: null,
+    arxiv_id: null,
+    abstract_text: null,
+    source_type: "semantic_scholar",
+    source_url: null,
+    status: "new",
+    related_project: null,
+    created_at: 1,
+    last_seen_at: 2,
+  };
+}
+
+function validProject() {
+  return {
+    id: 1,
+    name: "Project",
+    description: null,
+    research_question: null,
+    target_output: null,
+    status: "active",
+    due_date: null,
+    paper_count: 0,
+    created_at: 1,
+    updated_at: 2,
+  };
+}
+
+function validEvidence() {
+  return {
+    id: 1,
+    project_id: 1,
+    source_type: "highlight",
+    paper_id: "p1",
+    paper_title: "Paper",
+    highlight_id: "h1",
+    page: 2,
+    label: null,
+    excerpt: "Evidence",
+    note: null,
+    created_at: 1,
+    updated_at: 2,
+  };
+}
+
+function validTopicAlertResult() {
+  return {
+    id: 1,
+    alert_id: 1,
+    paper_doi: null,
+    paper_arxiv_id: "2601.00001",
+    title: "Alert result",
+    authors: "A; B",
+    year: 2026,
+    abstract_text: null,
+    seen: false,
+    added_at: 1,
+  };
+}
+
+function validSyncReport() {
+  return {
+    remote_root: "https://example.test/lib",
+    file_count: 2,
+    total_bytes: 1024,
+    skipped_count: 0,
+    skipped_bytes: 0,
+    restart_required: false,
   };
 }

@@ -69,6 +69,9 @@ mod tests {
         assert_table(&pool, "papers_fts").await;
         assert_table(&pool, "paper_documents").await;
         assert_table(&pool, "paper_documents_fts").await;
+        assert_column(&pool, "paper_documents", "index_status").await;
+        assert_column(&pool, "paper_documents", "index_error").await;
+        assert_column(&pool, "paper_documents", "indexed_at").await;
         assert_table(&pool, "feed_items").await;
         assert_table(&pool, "paper_embeddings").await;
         assert_column(&pool, "feed_items", "metadata_json").await;

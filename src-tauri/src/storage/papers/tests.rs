@@ -121,6 +121,37 @@ async fn search_finds_imported_document_markdown() {
 }
 
 #[tokio::test]
+async fn paper_document_index_status_tracks_success_and_failure() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    let success = sample("INDEX_OK");
+    let failure = sample("INDEX_FAIL");
+    repo.insert(&success).await.unwrap();
+    repo.insert(&failure).await.unwrap();
+
+    let docs = PaperDocumentRepo::new(&pool);
+    docs.upsert_markdown(&success.id, "indexed body text")
+        .await
+        .unwrap();
+    docs.mark_index_failed(&failure.id, "pdf parse failed")
+        .await
+        .unwrap();
+
+    let ids = vec![success.id.clone(), failure.id.clone()];
+    let statuses = docs.index_status_for_papers(&ids).await.unwrap();
+    let ok = statuses.get(&success.id).unwrap();
+    assert_eq!(ok.status, "indexed");
+    assert!(ok.error.is_none());
+    assert!(ok.indexed_at.is_some());
+
+    let failed = statuses.get(&failure.id).unwrap();
+    assert_eq!(failed.status, "failed");
+    assert_eq!(failed.error.as_deref(), Some("pdf parse failed"));
+    assert!(failed.indexed_at.is_some());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
 async fn update_translation_roundtrip() {
     let (pool, dir) = temp_pool().await;
     let repo = PaperRepo::new(&pool);

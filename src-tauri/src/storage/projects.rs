@@ -43,7 +43,7 @@ impl<'a> ProjectRepo<'a> {
     }
 
     pub async fn list(&self) -> Result<Vec<ResearchProject>> {
-        let rows = sqlx::query(project_select_sql("ORDER BY p.updated_at DESC").as_str())
+        let rows = sqlx::query(project_select_sql("", "ORDER BY p.updated_at DESC").as_str())
             .fetch_all(self.pool)
             .await
             .context("list projects")?;
@@ -51,7 +51,7 @@ impl<'a> ProjectRepo<'a> {
     }
 
     pub async fn get(&self, id: i64) -> Result<Option<ResearchProject>> {
-        let sql = project_select_sql("WHERE p.id = ?1");
+        let sql = project_select_sql("WHERE p.id = ?1", "");
         let row = sqlx::query(sql.as_str())
             .bind(id)
             .fetch_optional(self.pool)
@@ -166,13 +166,14 @@ impl<'a> ProjectRepo<'a> {
     }
 }
 
-fn project_select_sql(tail: &str) -> String {
+fn project_select_sql(filter: &str, order: &str) -> String {
     format!(
         "SELECT p.*, COUNT(pp.paper_id) AS paper_count
          FROM research_projects p
          LEFT JOIN project_papers pp ON pp.project_id = p.id
-         {tail}
-         GROUP BY p.id"
+         {filter}
+         GROUP BY p.id
+         {order}"
     )
 }
 
@@ -213,4 +214,43 @@ fn trimmed_optional(value: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::{open_pool, run_migrations};
+
+    async fn temp_pool() -> (Pool, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("litera-project-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("library.db");
+        let pool = open_pool(&db).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        (pool, dir)
+    }
+
+    fn sample_draft(name: &str) -> ProjectDraft {
+        ProjectDraft {
+            name: name.into(),
+            description: None,
+            research_question: None,
+            target_output: None,
+            status: "active".into(),
+            due_date: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn create_then_list_roundtrip() {
+        let (pool, dir) = temp_pool().await;
+        let repo = ProjectRepo::new(&pool);
+
+        let created = repo.create(&sample_draft("New Project")).await.unwrap();
+        let listed = repo.list().await.unwrap();
+
+        assert_eq!(created.name, "New Project");
+        assert!(listed.iter().any(|project| project.id == created.id));
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

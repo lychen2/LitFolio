@@ -109,10 +109,21 @@ pub async fn generate_and_index_pdf_markdown_or_warn(
 ) {
     if let Err(error) = generate_and_index_pdf_markdown(pool, paths, http, paper_id, pdf_path).await
     {
+        let error_message = error.to_string();
+        if let Err(status_error) = PaperDocumentRepo::new(pool)
+            .mark_index_failed(paper_id, &error_message)
+            .await
+        {
+            tracing::warn!(
+                paper_id,
+                status_error = %status_error,
+                "failed to persist PDF markdown indexing failure status"
+            );
+        }
         tracing::warn!(
             paper_id,
             pdf_path = %pdf_path.display(),
-            error = %error,
+            error = %error_message,
             "failed to auto-generate markdown for imported PDF"
         );
     }

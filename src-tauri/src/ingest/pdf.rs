@@ -11,10 +11,14 @@
 use anyhow::{anyhow, Context, Result};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 use super::paper_draft::PaperDraft;
 use crate::storage::LibraryPaths;
+
+const LOCAL_PDF_IMPORT_MAX_BYTES: u64 = 200 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct PdfImportResult {
@@ -28,19 +32,81 @@ pub fn import_pdf_file(
     paper_id: &str,
     library: &LibraryPaths,
 ) -> Result<PdfImportResult> {
-    let bytes = std::fs::read(src).with_context(|| format!("read {}", src.display()))?;
-    let sha256 = hash_hex(&bytes);
-    let draft = extract_metadata(&bytes, src);
+    import_pdf_file_with_limit(src, paper_id, library, LOCAL_PDF_IMPORT_MAX_BYTES)
+}
+
+fn import_pdf_file_with_limit(
+    src: &Path,
+    paper_id: &str,
+    library: &LibraryPaths,
+    max_bytes: u64,
+) -> Result<PdfImportResult> {
+    reject_oversized_pdf(src, max_bytes)?;
+    let draft = extract_metadata(src);
     let paper_dir = library.paper_dir(paper_id);
     std::fs::create_dir_all(&paper_dir)?;
     let stored = paper_dir.join("original.pdf");
-    std::fs::write(&stored, &bytes)?;
+    let sha256 = copy_pdf_with_hash(src, &stored, max_bytes)?;
     write_sidecar(&paper_dir, &draft, &sha256)?;
     Ok(PdfImportResult {
         draft,
         stored_path: stored,
         sha256,
     })
+}
+
+fn reject_oversized_pdf(src: &Path, max_bytes: u64) -> Result<()> {
+    let len = std::fs::metadata(src)
+        .with_context(|| format!("stat {}", src.display()))?
+        .len();
+    if len > max_bytes {
+        return Err(anyhow!(
+            "PDF exceeds {} MB hard cap",
+            max_bytes / (1024 * 1024)
+        ));
+    }
+    Ok(())
+}
+
+fn copy_pdf_with_hash(src: &Path, dest: &Path, max_bytes: u64) -> Result<String> {
+    let mut reader =
+        BufReader::new(File::open(src).with_context(|| format!("open {}", src.display()))?);
+    let temp = dest.with_extension(format!("pdf.tmp-{}", ulid::Ulid::new()));
+    let mut writer =
+        BufWriter::new(File::create(&temp).with_context(|| format!("create {}", temp.display()))?);
+    let mut hasher = Sha256::new();
+    let mut copied = 0u64;
+    let mut buf = [0u8; 64 * 1024];
+
+    loop {
+        let read = reader
+            .read(&mut buf)
+            .with_context(|| format!("read {}", src.display()))?;
+        if read == 0 {
+            break;
+        }
+        copied = copied.saturating_add(read as u64);
+        if copied > max_bytes {
+            let _ = std::fs::remove_file(&temp);
+            return Err(anyhow!(
+                "PDF exceeds {} MB hard cap",
+                max_bytes / (1024 * 1024)
+            ));
+        }
+        hasher.update(&buf[..read]);
+        writer
+            .write_all(&buf[..read])
+            .with_context(|| format!("write {}", temp.display()))?;
+    }
+    writer
+        .flush()
+        .with_context(|| format!("flush {}", temp.display()))?;
+    drop(writer);
+    std::fs::rename(&temp, dest).with_context(|| {
+        let _ = std::fs::remove_file(&temp);
+        format!("move {} to {}", temp.display(), dest.display())
+    })?;
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn write_sidecar(dir: &Path, draft: &PaperDraft, sha256: &str) -> Result<()> {
@@ -59,9 +125,9 @@ fn hash_hex(bytes: &[u8]) -> String {
     hex::encode(h.finalize())
 }
 
-fn extract_metadata(bytes: &[u8], src: &Path) -> PaperDraft {
+fn extract_metadata(src: &Path) -> PaperDraft {
     let mut draft = PaperDraft::default();
-    if let Ok(doc) = lopdf::Document::load_mem(bytes) {
+    if let Ok(doc) = lopdf::Document::load(src) {
         if let Ok(info_id) = doc.trailer.get(b"Info") {
             if let Ok(info_ref) = info_id.as_reference() {
                 if let Ok(info_obj) = doc.get_object(info_ref) {
@@ -156,9 +222,7 @@ fn first_page_text(doc: &lopdf::Document) -> Option<String> {
 /// use CMap-encoded fonts or subset font tables. Scanned image PDFs return
 /// empty. Caller should treat an empty Ok as "no body extractable".
 pub fn extract_full_text_from_path(pdf_path: &Path) -> Result<String> {
-    let bytes = std::fs::read(pdf_path).with_context(|| format!("read {}", pdf_path.display()))?;
-    let doc = lopdf::Document::load_mem(&bytes)
-        .with_context(|| format!("parse pdf {}", pdf_path.display()))?;
+    let doc = load_local_pdf_document(pdf_path)?;
     let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
     if pages.is_empty() {
         return Err(anyhow!("pdf has no pages: {}", pdf_path.display()));
@@ -173,9 +237,7 @@ pub fn extract_full_text_from_path(pdf_path: &Path) -> Result<String> {
 /// backend import-time path; the reader later overwrites it with PDF.js output,
 /// which has better font/layout data for modern academic PDFs.
 pub fn extract_markdown_from_path(pdf_path: &Path) -> Result<String> {
-    let bytes = std::fs::read(pdf_path).with_context(|| format!("read {}", pdf_path.display()))?;
-    let doc = lopdf::Document::load_mem(&bytes)
-        .with_context(|| format!("parse pdf {}", pdf_path.display()))?;
+    let doc = load_local_pdf_document(pdf_path)?;
     let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
     if pages.is_empty() {
         return Err(anyhow!("pdf has no pages: {}", pdf_path.display()));
@@ -208,6 +270,14 @@ pub fn extract_markdown_from_path(pdf_path: &Path) -> Result<String> {
         ));
     }
     Ok(markdown)
+}
+fn load_local_pdf_document(pdf_path: &Path) -> Result<lopdf::Document> {
+    load_local_pdf_document_with_limit(pdf_path, LOCAL_PDF_IMPORT_MAX_BYTES)
+}
+
+fn load_local_pdf_document_with_limit(pdf_path: &Path, max_bytes: u64) -> Result<lopdf::Document> {
+    reject_oversized_pdf(pdf_path, max_bytes)?;
+    lopdf::Document::load(pdf_path).with_context(|| format!("parse pdf {}", pdf_path.display()))
 }
 
 fn page_text_to_markdown(page_number: usize, text: &str) -> String {
@@ -474,5 +544,37 @@ mod tests {
         assert_eq!(hash_hex(b"hello").len(), 64);
         assert_eq!(hash_hex(b"hello"), hash_hex(b"hello"));
         assert_ne!(hash_hex(b"hello"), hash_hex(b"world"));
+    }
+
+    #[test]
+    fn import_pdf_file_with_limit_rejects_oversized_local_pdf_before_writing() {
+        let root = temp_root("oversized-local-pdf");
+        let source = root.join("source.pdf");
+        let library = LibraryPaths::new(root.join("library"));
+        std::fs::write(&source, b"%PDF-1.4\n0123456789\n%%EOF\n").unwrap();
+
+        let err = import_pdf_file_with_limit(&source, "paper-1", &library, 8)
+            .expect_err("oversized local PDF should fail before import");
+
+        assert!(err.to_string().contains("PDF exceeds"));
+        assert!(!library.paper_dir("paper-1").exists());
+    }
+
+    #[test]
+    fn load_local_pdf_document_rejects_oversized_pdf_before_parsing() {
+        let root = temp_root("oversized-local-pdf-extract");
+        let source = root.join("source.pdf");
+        std::fs::write(&source, b"not a valid pdf but too large").unwrap();
+
+        let err = load_local_pdf_document_with_limit(&source, 8)
+            .expect_err("oversized PDF should be rejected before parsing");
+
+        assert!(err.to_string().contains("PDF exceeds"));
+    }
+
+    fn temp_root(label: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("litera-{label}-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&root).unwrap();
+        root
     }
 }

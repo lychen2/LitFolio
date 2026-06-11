@@ -5,6 +5,7 @@ import { StaticRouter } from "react-router-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
+import { invokeMockCommand } from "@/test/tauriMockCommands";
 import { ImportPage } from "./ImportPage";
 import { LibraryPage } from "./LibraryPage";
 import { ProjectsPage } from "./ProjectsPage";
@@ -29,7 +30,9 @@ describe("page smoke render", () => {
   });
 
   it("opens the arXiv / DOI import tab for feed-item imports", () => {
-    expect(renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import")).toContain("第 1 步");
+    expect(
+      renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import")
+    ).toContain("第 1 步");
   });
 
   it("renders the settings shell", () => {
@@ -41,7 +44,9 @@ describe("page smoke render", () => {
   });
 
   it("renders the reader route while paper data is loading", () => {
-    expect(renderPage(<ReaderPage />, "/reader/paper-1", "/reader/:paperId")).toContain("加载中");
+    expect(
+      renderPage(<ReaderPage />, "/reader/paper-1", "/reader/:paperId")
+    ).toContain("加载中");
   });
 });
 
@@ -61,32 +66,10 @@ function renderPage(element: React.ReactElement, path: string, route = path) {
           </Routes>
         </StaticRouter>
       </QueryClientProvider>
-    </I18nProvider>,
+    </I18nProvider>
   );
 }
 
 function mockInvoke(command: string): unknown {
-  switch (command) {
-    case "papers_recent":
-    case "folders_list":
-    case "smart_collections_list":
-    case "reading_queue_list":
-    case "projects_list":
-      return [];
-    case "papers_count":
-      return 0;
-    case "library_root":
-      return "/tmp/litfolio-test";
-    case "sync_get_config":
-      return { webdav: { base_url: "", remote_path: "", username: "", password: "" } };
-    case "llm_get_config":
-      return {
-        profiles: [],
-        active: null,
-        task_assignments: {},
-        output_language: "Chinese",
-      };
-    default:
-      return null;
-  }
+  return invokeMockCommand(command);
 }
