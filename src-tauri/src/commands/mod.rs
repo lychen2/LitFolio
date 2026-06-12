@@ -59,6 +59,7 @@ pub fn library_root(state: State<'_, Arc<AppState>>) -> String {
     state.paths.root.display().to_string()
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_core {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_papers!([
@@ -70,6 +71,7 @@ macro_rules! command_paths_core {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_papers {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_library_taxonomy!([
@@ -87,6 +89,7 @@ macro_rules! command_paths_papers {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_library_taxonomy {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_imports_pdf!([
@@ -111,6 +114,7 @@ macro_rules! command_paths_library_taxonomy {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_imports_pdf {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_config_sync_ai!([
@@ -139,6 +143,7 @@ macro_rules! command_paths_imports_pdf {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_config_sync_ai {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_projects_research!([
@@ -167,6 +172,7 @@ macro_rules! command_paths_config_sync_ai {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_projects_research {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_reader_notes!([
@@ -195,6 +201,7 @@ macro_rules! command_paths_projects_research {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_reader_notes {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_feeds_discovery_graph!([
@@ -230,6 +237,7 @@ macro_rules! command_paths_reader_notes {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_feeds_discovery_graph {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_collections_data!([
@@ -258,6 +266,7 @@ macro_rules! command_paths_feeds_discovery_graph {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_collections_data {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_alerts_concepts!([
@@ -299,6 +308,7 @@ macro_rules! command_paths_collections_data {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! command_paths_alerts_concepts {
     ([$($commands:tt)*]) => {
         tauri::generate_handler![
