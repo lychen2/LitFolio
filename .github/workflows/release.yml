@@ -2,6 +2,16 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without v prefix, for example 0.3.13"
+        required: true
+        type: string
+      release_notes:
+        description: "Release notes file"
+        required: false
+        default: ""
+        type: string
   push:
     tags:
       - "v*"
@@ -9,13 +19,100 @@ on:
 permissions:
   contents: write
 
-# Quality gates (typecheck, lint, frontend/Rust tests, fmt, clippy) run in ci.yml
-# on every push to main and on PRs. This workflow only builds and publishes, so
-# tagging a green main commit always ships — a lint warning or a flaky test can no
-# longer abort the release before artifacts are published. tsc (via the bundle's
-# beforeBuildCommand) and cargo build still block a release that does not compile.
+concurrency:
+  group: release-${{ github.ref_name || inputs.version }}
+  cancel-in-progress: false
+
 jobs:
+  preflight:
+    name: Validate release metadata
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      notes_file: ${{ steps.meta.outputs.notes_file }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            TAG="v${VERSION#v}"
+            NOTES_FILE="${{ inputs.release_notes }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+            NOTES_FILE=""
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must look like v0.3.13; got $TAG" >&2
+            exit 1
+          fi
+
+          if [[ -z "$NOTES_FILE" ]]; then
+            NOTES_FILE="RELEASE_NOTES_${TAG}.md"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version files match tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const version = process.env.VERSION;
+          const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          const tauriVersion = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version;
+          const cargoToml = readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const cargoLock = readFileSync('src-tauri/Cargo.lock', 'utf8');
+          const cargoVersion = cargoToml.match(/^version = "([^"]+)"/m)?.[1];
+          const lockLiteraVersion = cargoLock.match(/\nname = "litera"\nversion = "([^"]+)"/)?.[1];
+
+          const checks = {
+            'package.json': packageVersion,
+            'src-tauri/tauri.conf.json': tauriVersion,
+            'src-tauri/Cargo.toml': cargoVersion,
+            'src-tauri/Cargo.lock': lockLiteraVersion,
+          };
+
+          for (const [file, value] of Object.entries(checks)) {
+            if (value !== version) {
+              console.error(`${file} version mismatch: expected ${version}, got ${value ?? '<missing>'}`);
+              process.exitCode = 1;
+            }
+          }
+          NODE
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+
+      - name: Validate release notes exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES_FILE="${{ steps.meta.outputs.notes_file }}"
+          if [[ ! -s "$NOTES_FILE" ]]; then
+            echo "Release notes file is missing or empty: $NOTES_FILE" >&2
+            exit 1
+          fi
+
   release:
+    name: Build and publish (${{ matrix.platform }})
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +127,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -64,16 +163,28 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and publish release
+      - name: Load release notes
+        id: release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'body<<EOF'
+            cat "${{ needs.preflight.outputs.notes_file }}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build signed updater artifacts and publish release
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "LitFolio ${{ github.ref_name }}"
+          tagName: ${{ needs.preflight.outputs.tag }}
+          releaseName: "LitFolio ${{ needs.preflight.outputs.tag }}"
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
-          generateReleaseNotes: true
+          generateReleaseNotes: false
           args: ${{ matrix.bundles }}
