@@ -36,7 +36,7 @@ pub(super) fn build_sources(
             ))
         })
         .collect::<Vec<_>>();
-    sources.sort_by(|a, b| b.0.cmp(&a.0));
+    sources.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     sources.into_iter().map(|(_, source)| source).collect()
 }
 
