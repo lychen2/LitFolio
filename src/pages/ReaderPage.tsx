@@ -5,11 +5,13 @@ import { ArrowLeft, AlertTriangle, ClipboardCopy, Columns2, Loader2, PanelLeftCl
 import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
 import { api, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 import { HighlightList } from "./reader/HighlightList";
 import { PdfPane } from "./reader/PdfPane";
 import { ReaderWorkspacePane, type ReaderWorkspaceTab } from "./reader/ReaderWorkspacePane";
 import { ReaderOnboarding } from "./reader/ReaderOnboarding";
 import { MessageScreen } from "./reader/ReaderMessageScreen";
+import { HelpPanel } from "./reader/HelpPanel";
 
 /**
  * Three-pane PDF reader with optional split view.
@@ -83,6 +85,9 @@ function ReaderSinglePane({
 }) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<ReaderWorkspaceTab>("notes");
+  const [showHelp, setShowHelp] = useState(false);
+  const isNarrow = useNarrowLayout(1200);
+  const effectiveCompact = compact || isNarrow;
   const paperQ = useQuery({
     queryKey: ["paper", paperId],
     queryFn: () => api.paperGet(paperId),
@@ -137,6 +142,14 @@ function ReaderSinglePane({
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      
+      // Toggle help with ?
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowHelp((prev) => !prev);
+        return;
+      }
+      
       const highlights = highlightsRef.current;
       if (highlights.length === 0) return;
       if (e.key === "j" || e.key === "]") {
@@ -182,7 +195,7 @@ function ReaderSinglePane({
 
   return (
     <div className="h-full flex flex-col">
-      {!compact && (
+      {!effectiveCompact && (
         <header className="border-b border-litera-line px-4 py-2 flex items-center gap-3 shrink-0">
           <Link to="/library" className="litera-btn text-xs" title={t("reader.backToLibrary")}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t("reader.back")}
@@ -229,7 +242,7 @@ function ReaderSinglePane({
           )}
         </header>
       )}
-      {compact && (
+      {effectiveCompact && (
         <header className="border-b border-litera-line px-3 py-1.5 flex items-center gap-2 shrink-0">
           <div className="min-w-0 flex-1">
             <div className="text-xs font-medium text-litera-text truncate">{paper.title}</div>
@@ -247,8 +260,8 @@ function ReaderSinglePane({
         </header>
       )}
       <div className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal" autoSaveId={compact ? undefined : "litera-reader-layout"}>
-          {!compact && (
+        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
+          {!effectiveCompact && (
             <>
               <Panel
                 ref={leftPanelRef}
@@ -267,18 +280,18 @@ function ReaderSinglePane({
               </PanelResizeHandle>
             </>
           )}
-          <Panel defaultSize={compact ? 65 : 52} minSize={30}>
+          <Panel defaultSize={effectiveCompact ? 65 : 52} minSize={30}>
             <PdfPane paperId={paperId} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
           </Panel>
           <PanelResizeHandle className={`w-2 relative group/handle cursor-col-resize ${rightCollapsed ? "hidden" : ""}`}>
             <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-litera-line group-hover/handle:bg-litera-accent/40 transition-colors" />
           </PanelResizeHandle>
           <Panel
-            ref={compact ? undefined : rightPanelRef}
-            defaultSize={compact ? 35 : 28}
+            ref={effectiveCompact ? undefined : rightPanelRef}
+            defaultSize={effectiveCompact ? 35 : 28}
             minSize={15}
             maxSize={45}
-            collapsible={!compact}
+            collapsible={!effectiveCompact}
             collapsedSize={0}
             onCollapse={() => setRightCollapsed(true)}
             onExpand={() => setRightCollapsed(false)}
@@ -292,6 +305,7 @@ function ReaderSinglePane({
           </Panel>
         </PanelGroup>
       </div>
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

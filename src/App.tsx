@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Shell } from "@/components/Shell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GlobalOnboarding } from "@/components/GlobalOnboarding";
 import { useT } from "@/i18n/I18nProvider";
 
 // Route-level code splitting: each page is its own chunk. Loads the PDF
@@ -40,6 +41,7 @@ export function App() {
         <Route path="/compare" element={<RouteShell><ComparePage /></RouteShell>} />
         <Route path="/settings" element={<RouteShell><SettingsPage /></RouteShell>} />
       </Routes>
+      <GlobalOnboarding />
     </Shell>
   );
 }

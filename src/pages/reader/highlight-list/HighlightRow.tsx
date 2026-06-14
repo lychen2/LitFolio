@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, type Highlight, type ResearchProject } from "@/lib/api";
 import { errorMessage } from "@/lib/error";
@@ -41,6 +41,7 @@ export function HighlightRow({
     !hasCondensedContent(highlight)
   );
   const [draftNote, setDraftNote] = useState(highlight.note ?? "");
+  const [savedNoteSnapshot, setSavedNoteSnapshot] = useState(highlight.note ?? "");
   const [confirming, setConfirming] = useState(false);
   const [projectId, setProjectId] = useState<number | "">("");
   const [evidenceAdded, setEvidenceAdded] = useState(false);
@@ -51,8 +52,8 @@ export function HighlightRow({
   const saveNote = useMutation({
     mutationFn: (note: string) =>
       api.highlightUpdateNote(highlight.id, note || null),
-    onSuccess: async () => {
-      setEditing(false);
+    onSuccess: async (_, savedNote) => {
+      setSavedNoteSnapshot(savedNote);
       await onRefresh();
     },
   });
@@ -102,7 +103,26 @@ export function HighlightRow({
 
   useEffect(() => {
     setDraftNote(highlight.note ?? "");
+    setSavedNoteSnapshot(highlight.note ?? "");
   }, [highlight.note]);
+
+  // Debounced auto-save for note edits (1 second after user stops typing)
+  const saveTimerRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!editing) return;
+    if (draftNote === savedNoteSnapshot) return;
+    if (saveTimerRef.current !== undefined) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveNote.mutate(draftNote);
+    }, 1000);
+    return () => {
+      if (saveTimerRef.current !== undefined) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [editing, draftNote, savedNoteSnapshot, saveNote]);
 
   useEffect(() => {
     if (
@@ -117,6 +137,13 @@ export function HighlightRow({
     highlight.translation_text,
     highlight.explanation_text,
   ]);
+
+  const noteDirty = editing && draftNote !== savedNoteSnapshot;
+  const noteSaveStatus = saveNote.isPending
+    ? "saving"
+    : noteDirty
+      ? "dirty"
+      : "saved";
 
   return (
     <li
@@ -234,13 +261,13 @@ export function HighlightRow({
       {editing && (
         <NoteEditor
           draftNote={draftNote}
-          isSaving={saveNote.isPending}
+          saveStatus={noteSaveStatus}
+          saveError={saveNote.error as Error | null}
           onCancel={() => {
             setEditing(false);
-            setDraftNote(highlight.note ?? "");
+            setDraftNote(savedNoteSnapshot);
           }}
           onChange={setDraftNote}
-          onSave={() => saveNote.mutate(draftNote)}
         />
       )}
       {summarize.error && <ErrorText message={errorMessage(summarize.error)} />}
