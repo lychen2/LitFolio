@@ -28,10 +28,11 @@ export function ImportSidebar() {
     queryFn: api.projectsList,
     staleTime: 30_000,
   });
+  const refetchRecent = recent.refetch;
 
   useEffect(() => {
     function refreshRecentImports() {
-      void recent.refetch();
+      void refetchRecent();
     }
 
     window.addEventListener(RECENT_IMPORTS_CHANGED_EVENT, refreshRecentImports);
@@ -40,7 +41,7 @@ export function ImportSidebar() {
         RECENT_IMPORTS_CHANGED_EVENT,
         refreshRecentImports
       );
-  }, [recent.refetch]);
+  }, [refetchRecent]);
 
   return (
     <aside>

@@ -121,7 +121,7 @@ export function AskPage() {
     if (conversation.length === 0 && pinnedPapers.length === 0 && savedArtifacts.length === 0) return;
     const handle = window.setTimeout(() => saveSession.mutate(), 500);
     return () => window.clearTimeout(handle);
-  }, [conversation, evidenceProjectId, pinnedPapers, savedArtifacts, scopedProjectId, sessionHydrated]);
+  }, [conversation, evidenceProjectId, pinnedPapers, saveSession, savedArtifacts, scopedProjectId, sessionHydrated]);
 
   const ask = useMutation({
     mutationFn: ({ question, pinnedIds }: { question: string; pinnedIds: string[] }) => {

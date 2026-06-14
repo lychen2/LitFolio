@@ -295,6 +295,7 @@ export const PdfPane = memo(function PdfPane({
   }, [renderManualHighlightLayers]);
 
   useEffect(() => {
+    const highlighter = highlighterRef.current as PdfHighlighterApi | null;
     const cancel = scheduleManualHighlightLayers();
     const intervalId = window.setInterval(renderManualHighlightLayers, 250);
     const stopIntervalId = window.setTimeout(
@@ -305,7 +306,6 @@ export const PdfPane = memo(function PdfPane({
       cancel();
       window.clearInterval(intervalId);
       window.clearTimeout(stopIntervalId);
-      const highlighter = highlighterRef.current as PdfHighlighterApi | null;
       highlighter?.viewer?.container
         ?.querySelectorAll(".litera-manual-highlight-layer")
         .forEach((node) => node.remove());
