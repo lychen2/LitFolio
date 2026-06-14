@@ -2,6 +2,7 @@
 
 #![allow(dead_code, unused_imports)]
 
+mod ask_sessions;
 mod candidates;
 mod comparisons;
 pub mod concepts;
@@ -14,6 +15,7 @@ mod feed_defaults;
 pub mod feeds;
 mod folders;
 mod highlights;
+pub mod jobs;
 pub mod knowledge;
 mod models;
 mod note_sections;
@@ -30,6 +32,7 @@ pub mod smart_collections;
 mod tags;
 pub mod topic_alerts;
 
+pub use ask_sessions::{AskSession, AskSessionDraft, AskSessionRepo};
 pub use candidates::{CandidateDraft, CandidatePaper, CandidateRepo};
 pub use comparisons::{ComparisonRepo, PaperComparison};
 pub use concepts::{Concept, ConceptRelation, ConceptRepo, PaperConcept};
@@ -43,9 +46,10 @@ pub use folders::{FolderRepo, FolderWithCount};
 pub use highlights::{
     HighlightExplanationUpdate, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate,
 };
+pub use jobs::{JobDraft, JobProgress, JobRecord, JobRepo};
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
-pub use paper_documents::{PaperDocumentIndexStatus, PaperDocumentRepo};
+pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;

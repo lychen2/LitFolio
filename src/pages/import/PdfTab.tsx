@@ -3,26 +3,88 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileText, Folder, Loader2, Upload } from "lucide-react";
 import { api, pickPdfFiles } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import {
+  duplicateStatusFromFailures,
+  importJobId,
+  titleFromPath,
+  upsertImportJob,
+} from "./importJobs";
+import { notifyRecentImportsChanged } from "./recentImports";
 
 type ImportResult = { ok: number; failed: { path: string; error: string }[] };
-type FolderProgress = { phase: string; done: number; total: number; current: string; failed: number };
-type FolderProgressPayload = Omit<FolderProgress, "current"> & { current_file: string };
+type FolderProgress = {
+  phase: string;
+  done: number;
+  total: number;
+  current: string;
+  failed: number;
+};
+type FolderProgressPayload = Omit<FolderProgress, "current"> & {
+  current_file: string;
+};
 
 export function PdfTab() {
   const t = useT();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<string[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [folderProgress, setFolderProgress] = useState<FolderProgress | null>(null);
+  const [folderProgress, setFolderProgress] = useState<FolderProgress | null>(
+    null
+  );
 
   const m = useMutation({
-    mutationFn: (paths: string[]) => api.importPdfFiles(paths),
-    onSuccess: (s) => {
+    mutationFn: async (paths: string[]) => {
+      upsertImportJob({
+        id: importJobId("pdf", paths.join("|")),
+        source: "pdf",
+        title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
+        subtitle: paths.map(titleFromPath).join(" · "),
+        status: "running",
+        metadataStatus: "running",
+        pdfStatus: "running",
+        duplicateStatus: "checking",
+        progress: { done: 0, total: paths.length },
+      });
+      return api.importPdfFiles(paths);
+    },
+    onSuccess: (s, paths) => {
+      const id = importJobId("pdf", paths.join("|"));
       setResult({ ok: s.imported.length, failed: s.failed });
       setPicked([]);
+      upsertImportJob({
+        id,
+        source: "pdf",
+        title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
+        subtitle: paths.map(titleFromPath).join(" · "),
+        status: s.failed.length > 0 ? "failed" : "completed",
+        metadataStatus: s.imported.length > 0 ? "completed" : "failed",
+        pdfStatus: s.imported.length > 0 ? "completed" : "failed",
+        duplicateStatus: duplicateStatusFromFailures(s.failed),
+        error: s.failed[0]?.error,
+        progress: {
+          done: s.imported.length,
+          total: paths.length,
+          failed: s.failed.length,
+        },
+      });
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyRecentImportsChanged();
     },
-    onError: (e: Error) => setResult({ ok: 0, failed: [{ path: "(all)", error: e.message }] }),
+    onError: (e: Error, paths) => {
+      setResult({ ok: 0, failed: [{ path: "(all)", error: e.message }] });
+      upsertImportJob({
+        id: importJobId("pdf", paths.join("|")),
+        source: "pdf",
+        title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
+        subtitle: paths.map(titleFromPath).join(" · "),
+        status: "failed",
+        metadataStatus: "failed",
+        pdfStatus: "failed",
+        duplicateStatus: duplicateStatusFromFailures([{ error: e.message }]),
+        error: e.message,
+        progress: { done: 0, total: paths.length, failed: paths.length },
+      });
+    },
   });
   const folderMut = useFolderImportMutation(setFolderProgress, setResult);
 
@@ -42,7 +104,9 @@ export function PdfTab() {
       <div className="litera-panel p-8 text-center">
         <Upload className="h-10 w-10 mx-auto mb-3 text-litera-mute" />
         <p className="text-sm text-litera-text">{t("import.pdfTab.desc")}</p>
-        <p className="text-xs text-litera-mute mt-1">{t("import.pdfTab.hint", { path: "papers/<id>/original.pdf" })}</p>
+        <p className="text-xs text-litera-mute mt-1">
+          {t("import.pdfTab.hint", { path: "papers/<id>/original.pdf" })}
+        </p>
         <PdfPickActions
           pickedCount={picked.length}
           filePending={m.isPending}
@@ -53,7 +117,9 @@ export function PdfTab() {
         />
         {folderProgress && <FolderProgressView progress={folderProgress} />}
         {picked.length > 0 && <PickedFiles paths={picked} />}
-        <p className="mt-4 text-xs text-litera-mute">{t("import.pdfTab.dragHint")}</p>
+        <p className="mt-4 text-xs text-litera-mute">
+          {t("import.pdfTab.dragHint")}
+        </p>
       </div>
       {result && <ImportResultView result={result} />}
     </div>
@@ -62,36 +128,104 @@ export function PdfTab() {
 
 function useFolderImportMutation(
   setFolderProgress: (progress: FolderProgress | null) => void,
-  setResult: (result: ImportResult) => void,
+  setResult: (result: ImportResult) => void
 ) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (dirPath: string) => {
-      const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen<FolderProgressPayload>("folder-import-progress", (e) => {
-        const p = e.payload;
-        setFolderProgress({ phase: p.phase, done: p.done, total: p.total, current: p.current_file, failed: p.failed });
+      upsertImportJob({
+        id: importJobId("folder", dirPath),
+        source: "folder",
+        title: titleFromPath(dirPath),
+        subtitle: dirPath,
+        status: "running",
+        metadataStatus: "running",
+        pdfStatus: "running",
+        duplicateStatus: "checking",
       });
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<FolderProgressPayload>(
+        "folder-import-progress",
+        (e) => {
+          const p = e.payload;
+          setFolderProgress({
+            phase: p.phase,
+            done: p.done,
+            total: p.total,
+            current: p.current_file,
+            failed: p.failed,
+          });
+          upsertImportJob({
+            id: importJobId("folder", dirPath),
+            source: "folder",
+            title: titleFromPath(dirPath),
+            subtitle: p.current_file || dirPath,
+            status: p.phase === "done" ? "completed" : "running",
+            metadataStatus: p.phase === "done" ? "completed" : "running",
+            pdfStatus: p.phase === "done" ? "completed" : "running",
+            duplicateStatus: p.failed > 0 ? "unknown" : "checking",
+            progress: {
+              done: p.done,
+              total: p.total,
+              failed: p.failed,
+              label: p.phase,
+            },
+          });
+        }
+      );
       try {
         return await api.importFolder(dirPath);
       } finally {
         unlisten();
       }
     },
-    onSuccess: (s) => {
+    onSuccess: (s, dirPath) => {
       setResult({ ok: s.imported.length, failed: s.failed });
       setFolderProgress(null);
+      upsertImportJob({
+        id: importJobId("folder", dirPath),
+        source: "folder",
+        title: titleFromPath(dirPath),
+        subtitle: dirPath,
+        status: s.failed.length > 0 ? "failed" : "completed",
+        metadataStatus: s.imported.length > 0 ? "completed" : "failed",
+        pdfStatus: s.imported.length > 0 ? "completed" : "failed",
+        duplicateStatus: duplicateStatusFromFailures(s.failed),
+        error: s.failed[0]?.error,
+        progress: {
+          done: s.imported.length,
+          total: s.imported.length + s.failed.length,
+          failed: s.failed.length,
+        },
+      });
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyRecentImportsChanged();
     },
-    onError: (e: Error) => {
+    onError: (e: Error, dirPath) => {
       setResult({ ok: 0, failed: [{ path: "(folder)", error: e.message }] });
       setFolderProgress(null);
+      upsertImportJob({
+        id: importJobId("folder", dirPath),
+        source: "folder",
+        title: titleFromPath(dirPath),
+        subtitle: dirPath,
+        status: "failed",
+        metadataStatus: "failed",
+        pdfStatus: "failed",
+        duplicateStatus: duplicateStatusFromFailures([{ error: e.message }]),
+        error: e.message,
+      });
     },
   });
 }
 
 function PdfPickActions({
-  pickedCount, filePending, folderPending, onPick, onPickFolder, onImport,
+  pickedCount,
+  filePending,
+  folderPending,
+  onPick,
+  onPickFolder,
+  onImport,
 }: {
   pickedCount: number;
   filePending: boolean;
@@ -106,12 +240,24 @@ function PdfPickActions({
       <button onClick={onPick} className="litera-btn">
         <Upload className="h-4 w-4" /> {t("import.pdfTab.pick")}
       </button>
-      <button onClick={onPickFolder} disabled={folderPending} className="litera-btn disabled:opacity-50">
+      <button
+        onClick={onPickFolder}
+        disabled={folderPending}
+        className="litera-btn disabled:opacity-50"
+      >
         <Folder className="h-4 w-4" /> {t("import.pdfTab.pickFolder")}
       </button>
       {pickedCount > 0 && (
-        <button onClick={onImport} disabled={filePending} className="litera-btn-primary disabled:opacity-50">
-          {filePending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+        <button
+          onClick={onImport}
+          disabled={filePending}
+          className="litera-btn-primary disabled:opacity-50"
+        >
+          {filePending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileText className="h-4 w-4" />
+          )}
           {t("import.pdfTab.importBtn", { count: String(pickedCount) })}
         </button>
       )}
@@ -127,11 +273,19 @@ function FolderProgressView({ progress }: { progress: FolderProgress }) {
         ? t("import.pdfTab.folderScanning")
         : progress.phase === "done"
         ? t("import.pdfTab.done", { ok: String(progress.done) })
-        : t("import.pdfTab.folderProgress", { done: String(progress.done), total: String(progress.total) })}
-      {progress.current && <span className="ml-2 font-mono truncate">{progress.current}</span>}
+        : t("import.pdfTab.folderProgress", {
+            done: String(progress.done),
+            total: String(progress.total),
+          })}
+      {progress.current && (
+        <span className="ml-2 font-mono truncate">{progress.current}</span>
+      )}
       {progress.total > 0 && progress.phase !== "done" && (
         <div className="mt-1 h-1.5 bg-litera-line rounded-full overflow-hidden">
-          <div className="h-full bg-litera-accent rounded-full transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+          <div
+            className="h-full bg-litera-accent rounded-full transition-all"
+            style={{ width: `${(progress.done / progress.total) * 100}%` }}
+          />
         </div>
       )}
     </div>
@@ -141,7 +295,11 @@ function FolderProgressView({ progress }: { progress: FolderProgress }) {
 function PickedFiles({ paths }: { paths: string[] }) {
   return (
     <div className="mt-4 text-left text-xs text-litera-mute font-mono max-h-40 overflow-auto border border-litera-line rounded p-2">
-      {paths.map((p) => <div key={p} className="truncate">{p}</div>)}
+      {paths.map((p) => (
+        <div key={p} className="truncate">
+          {p}
+        </div>
+      ))}
     </div>
   );
 }
@@ -153,7 +311,10 @@ function ImportResultView({ result }: { result: ImportResult }) {
       <div className="text-litera-text">
         {result.failed.length === 0
           ? t("import.pdfTab.done", { ok: String(result.ok) })
-          : t("import.pdfTab.doneWithFail", { ok: String(result.ok), fail: String(result.failed.length) })}
+          : t("import.pdfTab.doneWithFail", {
+              ok: String(result.ok),
+              fail: String(result.failed.length),
+            })}
       </div>
       {result.failed.map((f, i) => (
         <div key={i} className="text-xs text-red-400/90 font-mono">

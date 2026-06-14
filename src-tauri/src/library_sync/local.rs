@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
 pub const MANIFEST_FILE_NAME: &str = ".litera-sync-manifest.json";
@@ -45,6 +45,72 @@ pub struct SyncTransferStats {
     pub skipped_bytes: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SyncPreviewChange {
+    pub path: String,
+    pub action: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SyncPreviewReport {
+    pub direction: String,
+    pub remote_root: String,
+    pub add_count: usize,
+    pub update_count: usize,
+    pub delete_count: usize,
+    pub unchanged_count: usize,
+    pub transfer_bytes: u64,
+    pub restart_required: bool,
+    pub backup_path: Option<String>,
+    pub changes: Vec<SyncPreviewChange>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncPreviewDirection {
+    Push,
+    Pull,
+}
+
+impl SyncPreviewDirection {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Push => "push",
+            Self::Pull => "pull",
+        }
+    }
+
+    fn add_action(self) -> &'static str {
+        match self {
+            Self::Push => "upload_new",
+            Self::Pull => "download_new",
+        }
+    }
+
+    fn update_action(self) -> &'static str {
+        match self {
+            Self::Push => "upload_replace",
+            Self::Pull => "download_replace",
+        }
+    }
+
+    fn delete_action(self) -> &'static str {
+        match self {
+            Self::Push => "delete_remote",
+            Self::Pull => "delete_local",
+        }
+    }
+
+    fn restart_required(self) -> bool {
+        matches!(self, Self::Pull)
+    }
+
+    fn backup_path(self) -> Option<String> {
+        self.restart_required()
+            .then(|| "backups/pre-pull-<timestamp>-<ulid>/".to_string())
+    }
+}
+
 pub struct SnapshotDir {
     path: PathBuf,
 }
@@ -64,6 +130,119 @@ impl SnapshotDir {
 impl Drop for SnapshotDir {
     fn drop(&mut self) {
         std::fs::remove_dir_all(&self.path).ok();
+    }
+}
+
+pub(crate) fn build_push_preview(
+    local_manifest: &SyncManifest,
+    remote_manifest: Option<&SyncManifest>,
+    remote_root: String,
+) -> SyncPreviewReport {
+    build_sync_preview(
+        SyncPreviewDirection::Push,
+        local_manifest,
+        remote_manifest,
+        remote_root,
+    )
+}
+
+pub(crate) fn build_pull_preview(
+    local_manifest: &SyncManifest,
+    remote_manifest: &SyncManifest,
+    remote_root: String,
+) -> SyncPreviewReport {
+    build_sync_preview(
+        SyncPreviewDirection::Pull,
+        remote_manifest,
+        Some(local_manifest),
+        remote_root,
+    )
+}
+
+fn build_sync_preview(
+    direction: SyncPreviewDirection,
+    source_manifest: &SyncManifest,
+    target_manifest: Option<&SyncManifest>,
+    remote_root: String,
+) -> SyncPreviewReport {
+    let source_files = manifest_by_path(source_manifest);
+    let target_files = target_manifest.map(manifest_by_path).unwrap_or_default();
+    let mut add_count = 0;
+    let mut update_count = 0;
+    let mut delete_count = 0;
+    let mut unchanged_count = 0;
+    let mut transfer_bytes = 0;
+    let mut changes = Vec::new();
+
+    for (path, source_file) in &source_files {
+        match target_files.get(path) {
+            None => {
+                add_count += 1;
+                transfer_bytes += source_file.size;
+                changes.push(preview_change(
+                    path,
+                    direction.add_action(),
+                    source_file.size,
+                ));
+            }
+            Some(target_file) if manifest_files_match(source_file, target_file) => {
+                unchanged_count += 1;
+            }
+            Some(_) => {
+                update_count += 1;
+                transfer_bytes += source_file.size;
+                changes.push(preview_change(
+                    path,
+                    direction.update_action(),
+                    source_file.size,
+                ));
+            }
+        }
+    }
+
+    for (path, target_file) in &target_files {
+        if source_files.contains_key(path) {
+            continue;
+        }
+        delete_count += 1;
+        changes.push(preview_change(
+            path,
+            direction.delete_action(),
+            target_file.size,
+        ));
+    }
+
+    SyncPreviewReport {
+        direction: direction.as_str().to_string(),
+        remote_root,
+        add_count,
+        update_count,
+        delete_count,
+        unchanged_count,
+        transfer_bytes,
+        restart_required: direction.restart_required(),
+        backup_path: direction.backup_path(),
+        changes,
+    }
+}
+
+fn manifest_by_path(manifest: &SyncManifest) -> BTreeMap<&str, &ManifestFile> {
+    manifest
+        .files
+        .iter()
+        .map(|file| (file.path.as_str(), file))
+        .collect()
+}
+
+fn manifest_files_match(left: &ManifestFile, right: &ManifestFile) -> bool {
+    left.size == right.size && left.sha256 == right.sha256
+}
+
+fn preview_change(path: &str, action: &str, size: u64) -> SyncPreviewChange {
+    SyncPreviewChange {
+        path: path.to_string(),
+        action: action.to_string(),
+        size,
     }
 }
 

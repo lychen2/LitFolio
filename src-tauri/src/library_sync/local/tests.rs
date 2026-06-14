@@ -205,6 +205,110 @@ fn replace_library_root_stores_pre_pull_backup_on_success() {
     std::fs::remove_dir_all(&snapshot).ok();
 }
 
+#[test]
+fn push_preview_reports_new_updated_deleted_and_unchanged_files() {
+    let local = SyncManifest {
+        version: SYNC_MANIFEST_VERSION,
+        generated_at: "local".into(),
+        files: vec![
+            manifest_file("papers/new/original.pdf", b"new"),
+            manifest_file("papers/shared/original.pdf", b"local-newer"),
+            manifest_file("library.db", b"same"),
+        ],
+    };
+    let remote = SyncManifest {
+        version: SYNC_MANIFEST_VERSION,
+        generated_at: "remote".into(),
+        files: vec![
+            manifest_file("papers/shared/original.pdf", b"remote-old"),
+            manifest_file("papers/remote-only/original.pdf", b"delete-me"),
+            manifest_file("library.db", b"same"),
+        ],
+    };
+
+    let preview = build_push_preview(&local, Some(&remote), "https://dav.test/lib".into());
+
+    assert_eq!(preview.direction, "push");
+    assert_eq!(preview.add_count, 1);
+    assert_eq!(preview.update_count, 1);
+    assert_eq!(preview.delete_count, 1);
+    assert_eq!(preview.unchanged_count, 1);
+    assert_eq!(
+        preview.transfer_bytes,
+        b"new".len() as u64 + b"local-newer".len() as u64
+    );
+    assert!(!preview.restart_required);
+    assert_eq!(preview.backup_path, None);
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/new/original.pdf" && change.action == "upload_new"));
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/shared/original.pdf"
+            && change.action == "upload_replace"));
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/remote-only/original.pdf"
+            && change.action == "delete_remote"));
+}
+
+#[test]
+fn pull_preview_reports_local_replacement_and_backup_requirement() {
+    let local = SyncManifest {
+        version: SYNC_MANIFEST_VERSION,
+        generated_at: "local".into(),
+        files: vec![
+            manifest_file("papers/local-only/original.pdf", b"delete-local"),
+            manifest_file("papers/shared/original.pdf", b"local-old"),
+            manifest_file("library.db", b"same"),
+        ],
+    };
+    let remote = SyncManifest {
+        version: SYNC_MANIFEST_VERSION,
+        generated_at: "remote".into(),
+        files: vec![
+            manifest_file("papers/remote-new/original.pdf", b"download"),
+            manifest_file("papers/shared/original.pdf", b"remote-newer"),
+            manifest_file("library.db", b"same"),
+        ],
+    };
+
+    let preview = build_pull_preview(&local, &remote, "https://dav.test/lib".into());
+
+    assert_eq!(preview.direction, "pull");
+    assert_eq!(preview.add_count, 1);
+    assert_eq!(preview.update_count, 1);
+    assert_eq!(preview.delete_count, 1);
+    assert_eq!(preview.unchanged_count, 1);
+    assert_eq!(
+        preview.transfer_bytes,
+        b"download".len() as u64 + b"remote-newer".len() as u64
+    );
+    assert!(preview.restart_required);
+    assert_eq!(
+        preview.backup_path.as_deref(),
+        Some("backups/pre-pull-<timestamp>-<ulid>/")
+    );
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/remote-new/original.pdf"
+            && change.action == "download_new"));
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/shared/original.pdf"
+            && change.action == "download_replace"));
+    assert!(preview
+        .changes
+        .iter()
+        .any(|change| change.path == "papers/local-only/original.pdf"
+            && change.action == "delete_local"));
+}
+
 fn temp_root() -> PathBuf {
     let root = std::env::temp_dir().join(format!("litera-sync-local-{}", ulid::Ulid::new()));
     std::fs::create_dir_all(&root).unwrap();

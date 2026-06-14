@@ -21,7 +21,11 @@ export function MetaTextBlock({
       <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-litera-mute mb-1">
         {icon}
         {label}
-        {model ? <span className="normal-case tracking-normal text-litera-mute/80">{model}</span> : null}
+        {model ? (
+          <span className="normal-case tracking-normal text-litera-mute/80">
+            {model}
+          </span>
+        ) : null}
       </div>
       <MarkdownView
         content={text}
@@ -35,29 +39,55 @@ export function TranslationIcon() {
   return <Languages className="h-3 w-3" />;
 }
 
-export function ExplanationBlock({ model, text }: { model: string | null; text: string }) {
+export function ExplanationBlock({
+  model,
+  text,
+}: {
+  model: string | null;
+  text: string;
+}) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-2 p-2.5 rounded-md bg-amber-400/5 border border-amber-400/15">
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-400/80">
-        <Lightbulb className="h-3 w-3" />
-        {t("reader.explainLabel")}
-        {model ? <span className="normal-case tracking-normal text-litera-mute/70 ml-1">{model}</span> : null}
+    <div className="mt-2 rounded-md border border-litera-line/80 bg-litera-panel/35 px-2 py-1.5">
+      <div className="flex items-center gap-1.5">
+        <Lightbulb className="h-3 w-3 shrink-0 text-amber-300/90" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1 text-[10px] uppercase tracking-wider text-litera-mute">
+            <span className="text-amber-300/90">
+              {t("reader.explainLabel")}
+            </span>
+            {model ? (
+              <span className="normal-case tracking-normal text-litera-mute/70">
+                {model}
+              </span>
+            ) : null}
+          </div>
+          {expanded ? (
+            <p className="mt-0.5 text-[10px] leading-4 text-litera-mute">
+              {t("reader.explainHint")}
+            </p>
+          ) : null}
+        </div>
         <button
-          onClick={() => setExpanded((v) => !v)}
-          className="ml-auto text-[10px] text-litera-accent hover:text-litera-accent2 transition-colors"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className="shrink-0 text-[10px] text-litera-accent transition-colors hover:text-litera-accent2"
         >
-          {expanded ? t("reader.collapseExplanation") : t("reader.expandExplanation")}
+          {expanded
+            ? t("reader.collapseExplanation")
+            : t("reader.expandExplanation")}
         </button>
       </div>
-      {expanded && (
+      {expanded ? (
         <MarkdownView
           content={text}
-          className="mt-1.5 text-xs leading-relaxed text-litera-text markdown-body"
+          className="markdown-body mt-2 text-[11px] leading-5 text-litera-text [&_li]:text-[11px] [&_li]:leading-5 [&_p]:my-1 [&_p]:text-[11px] [&_p]:leading-5"
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -110,11 +140,18 @@ export function NoteEditor({
         className="litera-input w-full text-xs h-16 resize-none"
       />
       <div className="flex gap-1.5">
-        <button onClick={onSave} disabled={isSaving} className="litera-btn-primary text-[11px] px-2 py-0.5">
+        <button
+          onClick={onSave}
+          disabled={isSaving}
+          className="litera-btn-primary text-[11px] px-2 py-0.5"
+        >
           {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           {t("common.save")}
         </button>
-        <button onClick={onCancel} className="litera-btn text-[11px] px-2 py-0.5">
+        <button
+          onClick={onCancel}
+          className="litera-btn text-[11px] px-2 py-0.5"
+        >
           {t("common.cancel")}
         </button>
       </div>

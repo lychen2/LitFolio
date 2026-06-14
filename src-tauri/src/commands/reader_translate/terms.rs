@@ -204,15 +204,57 @@ fn paper_snippet(paper: &Paper, term: &str) -> String {
 
 fn find_snippet(text: &str, needle: &str) -> Option<String> {
     let haystack = text.trim();
-    if haystack.is_empty() {
+    if haystack.is_empty() || needle.trim().is_empty() {
         return None;
     }
-    let lower_hay = haystack.to_lowercase();
-    let lower_needle = needle.to_lowercase();
-    let idx = lower_hay.find(&lower_needle)?;
-    let start = idx.saturating_sub(60);
-    let end = (idx + needle.len() + 80).min(haystack.len());
+
+    let (match_start, match_end) = find_case_insensitive_range(haystack, needle)?;
+    let start = floor_char_boundary(haystack, match_start.saturating_sub(60));
+    let end = ceil_char_boundary(haystack, match_end.saturating_add(80).min(haystack.len()));
     Some(truncate(haystack[start..end].trim(), MAX_SNIPPET_CHARS))
+}
+
+fn find_case_insensitive_range(haystack: &str, needle: &str) -> Option<(usize, usize)> {
+    let lower_needle = needle.to_lowercase();
+    if lower_needle.is_empty() {
+        return None;
+    }
+
+    let mut lower_haystack = String::new();
+    let mut lower_to_original = Vec::with_capacity(haystack.len() + 1);
+    lower_to_original.push(0);
+
+    for (byte_idx, ch) in haystack.char_indices() {
+        let original_end = byte_idx + ch.len_utf8();
+        for lower_ch in ch.to_lowercase() {
+            let mut buffer = [0; 4];
+            let encoded = lower_ch.encode_utf8(&mut buffer);
+            lower_haystack.push_str(encoded);
+            lower_to_original.extend(std::iter::repeat(original_end).take(encoded.len()));
+        }
+    }
+
+    let lower_start = lower_haystack.find(&lower_needle)?;
+    let lower_end = lower_start + lower_needle.len();
+    let start = *lower_to_original.get(lower_start)?;
+    let end = *lower_to_original.get(lower_end)?;
+    Some((start, end.max(start)))
+}
+
+fn floor_char_boundary(text: &str, index: usize) -> usize {
+    let mut boundary = index.min(text.len());
+    while boundary > 0 && !text.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    boundary
+}
+
+fn ceil_char_boundary(text: &str, index: usize) -> usize {
+    let mut boundary = index.min(text.len());
+    while boundary < text.len() && !text.is_char_boundary(boundary) {
+        boundary += 1;
+    }
+    boundary
 }
 
 fn derive_local_definition(term: &str, evidence: &str, linked: Option<&LinkedPaper>) -> String {
@@ -270,5 +312,14 @@ mod tests {
         )
         .unwrap();
         assert!(snippet.contains("retrieval augmented generation"));
+    }
+
+    #[test]
+    fn snippet_handles_multibyte_window_boundaries() {
+        let text = format!("具{}动态空间光束整形强调可重构性", "a".repeat(58));
+        let snippet = find_snippet(&text, "动态").unwrap();
+
+        assert!(snippet.contains("动态空间光束整形"));
+        assert!(snippet.starts_with('具'));
     }
 }

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runUpdateCheck, type UpdateDeps } from "./autoUpdate";
+import {
+  runUpdateCheck,
+  type UpdateDeps,
+  type UpdateDownloadEvent,
+  type UpdateProgress,
+} from "./autoUpdate";
 
 function makeDeps(over: Partial<UpdateDeps> = {}): UpdateDeps {
   return {
@@ -19,13 +24,19 @@ describe("runUpdateCheck", () => {
 
   it("reports unsupported outside Tauri without touching the updater", async () => {
     const check = vi.fn();
-    const outcome = await runUpdateCheck(makeDeps({ isTauri: () => false, check }), { prompt: true });
+    const outcome = await runUpdateCheck(
+      makeDeps({ isTauri: () => false, check }),
+      { prompt: true }
+    );
     expect(outcome).toEqual({ status: "unsupported" });
     expect(check).not.toHaveBeenCalled();
   });
 
   it("reports up-to-date when the backend offers no update", async () => {
-    const outcome = await runUpdateCheck(makeDeps({ check: async () => null }), { prompt: true });
+    const outcome = await runUpdateCheck(
+      makeDeps({ check: async () => null }),
+      { prompt: true }
+    );
     expect(outcome).toEqual({ status: "up-to-date" });
   });
 
@@ -38,7 +49,7 @@ describe("runUpdateCheck", () => {
         confirm: async () => true,
         relaunch,
       }),
-      { prompt: true },
+      { prompt: true }
     );
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(relaunch).toHaveBeenCalledOnce();
@@ -52,7 +63,7 @@ describe("runUpdateCheck", () => {
         check: async () => ({ version: "0.3.10", downloadAndInstall }),
         confirm: async () => false,
       }),
-      { prompt: true },
+      { prompt: true }
     );
     expect(downloadAndInstall).not.toHaveBeenCalled();
     expect(outcome).toEqual({ status: "declined", version: "0.3.10" });
@@ -67,10 +78,15 @@ describe("runUpdateCheck", () => {
         },
         log,
       }),
-      { prompt: true },
+      { prompt: true }
     );
-    expect(outcome).toEqual({ status: "error", message: "signature verification failed" });
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("signature verification failed"));
+    expect(outcome).toEqual({
+      status: "error",
+      message: "signature verification failed",
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("signature verification failed")
+    );
   });
 
   it("skips the confirm dialog when prompt is disabled", async () => {
@@ -81,11 +97,58 @@ describe("runUpdateCheck", () => {
         check: async () => ({ version: "0.3.10", downloadAndInstall }),
         confirm,
       }),
-      { prompt: false },
+      { prompt: false }
     );
     expect(confirm).not.toHaveBeenCalled();
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(outcome).toEqual({ status: "updated", version: "0.3.10" });
+  });
+
+  it("reports download progress before install and relaunch", async () => {
+    const progress: UpdateProgress[] = [];
+    const downloadAndInstall = vi.fn(
+      async (onEvent?: (event: UpdateDownloadEvent) => void) => {
+        onEvent?.({ event: "Started", data: { contentLength: 100 } });
+        onEvent?.({ event: "Progress", data: { chunkLength: 25 } });
+        onEvent?.({ event: "Progress", data: { chunkLength: 50 } });
+        onEvent?.({ event: "Finished" });
+      }
+    );
+
+    const outcome = await runUpdateCheck(
+      makeDeps({
+        check: async () => ({ version: "0.3.10", downloadAndInstall }),
+        confirm: async () => true,
+      }),
+      { prompt: true, onProgress: (next) => progress.push(next) }
+    );
+
+    expect(outcome).toEqual({ status: "updated", version: "0.3.10" });
+    expect(downloadAndInstall).toHaveBeenCalledWith(expect.any(Function));
+    expect(progress.map((item) => item.stage)).toEqual([
+      "checking",
+      "available",
+      "downloading",
+      "downloading",
+      "downloading",
+      "downloading",
+      "installing",
+      "relaunching",
+    ]);
+    expect(progress[4]).toMatchObject({
+      stage: "downloading",
+      version: "0.3.10",
+      downloadedBytes: 25,
+      totalBytes: 100,
+      percent: 25,
+    });
+    expect(progress[5]).toMatchObject({ downloadedBytes: 75, percent: 75 });
+    expect(progress[6]).toMatchObject({
+      stage: "installing",
+      downloadedBytes: 100,
+      totalBytes: 100,
+      percent: 100,
+    });
   });
 
   it("refuses to run a second check while one is in flight", async () => {

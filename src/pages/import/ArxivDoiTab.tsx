@@ -12,6 +12,7 @@ import {
   usePrefillDraft,
   usePrepareFeedDraftMutation,
   useSaveWithPdfMutation,
+  type AutoDownloadFailure,
 } from "./ArxivDoiWorkflow";
 import { type ImportSource } from "./types";
 
@@ -23,23 +24,64 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [autoDownloadFailure, setAutoDownloadFailure] =
+    useState<AutoDownloadFailure | null>(null);
   const pdfDropRef = useRef<HTMLDivElement>(null);
   const trimmed = value.trim();
   const kind = detectSourceKind(trimmed);
 
-  const fetchMeta = useFetchMetaMutation({ value, setValue, setDraft, setSourceKind, setError, setSuccess });
-  const prepareFeedDraft = usePrepareFeedDraftMutation({ source, fetchMeta, setValue, setDraft, setSourceKind, setError, setSuccess });
+  const fetchMeta = useFetchMetaMutation({
+    value,
+    source,
+    setValue,
+    setDraft,
+    setSourceKind,
+    setError,
+    setSuccess,
+  });
+  const prepareFeedDraft = usePrepareFeedDraftMutation({
+    source,
+    fetchMeta,
+    setValue,
+    setDraft,
+    setSourceKind,
+    setError,
+    setSuccess,
+  });
   usePrefillDraft(source, prepareFeedDraft.mutate, fetchMeta.mutate, setValue);
   const linkBackToFeed = useLinkBackToFeed(source);
   const markCandidateImported = useMarkCandidateImported(source);
-  const saveWithPdf = useSaveWithPdfMutation({ draft, selectedPdf, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
-  const autoDownload = useAutoDownloadMutation({ draft, sourceKind, trimmed, linkBackToFeed, markCandidateImported, reset, setError, setSuccess });
+  const saveWithPdf = useSaveWithPdfMutation({
+    draft,
+    source,
+    sourceKind,
+    selectedPdf,
+    trimmed,
+    linkBackToFeed,
+    markCandidateImported,
+    reset,
+    setError,
+    setSuccess,
+  });
+  const autoDownload = useAutoDownloadMutation({
+    draft,
+    source,
+    sourceKind,
+    trimmed,
+    linkBackToFeed,
+    markCandidateImported,
+    reset,
+    setError,
+    setSuccess,
+    setAutoDownloadFailure,
+  });
 
   function reset() {
     setValue("");
     setDraft(null);
     setSourceKind(null);
     setSelectedPdf(null);
+    setAutoDownloadFailure(null);
   }
 
   function submit() {
@@ -50,13 +92,17 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
     }
     setError(null);
     setSuccess(null);
+    setAutoDownloadFailure(null);
     fetchMeta.mutate(trimmed);
   }
 
   async function pickPdf() {
     try {
       const path = await pickSinglePdf();
-      if (path) setSelectedPdf(path);
+      if (path) {
+        setSelectedPdf(path);
+        setAutoDownloadFailure(null);
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -65,7 +111,9 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const fetching = fetchMeta.isPending || prepareFeedDraft.isPending;
   const saving = saveWithPdf.isPending || autoDownload.isPending;
   const handlePdfDrop = useCallback((paths: string[]) => {
-    if (paths.length > 0) setSelectedPdf(paths[0]);
+    if (paths.length === 0) return;
+    setSelectedPdf(paths[0]);
+    setAutoDownloadFailure(null);
   }, []);
   usePdfDropTarget(pdfDropRef, handlePdfDrop, !!draft && !saving);
 
@@ -84,6 +132,7 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
           draft={draft}
           sourceKind={sourceKind}
           selectedPdf={selectedPdf}
+          autoDownloadFailure={autoDownloadFailure}
           saving={saving}
           autoPending={autoDownload.isPending}
           savePending={saveWithPdf.isPending}

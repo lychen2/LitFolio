@@ -7,6 +7,7 @@ import {
   parseLlmConfig,
   parsePaper,
   parseResearchProject,
+  parseSyncPreviewReport,
   parseSyncReport,
   parseTopicAlertResult,
 } from "./apiSchema";
@@ -45,7 +46,9 @@ describe("api schema parsers", () => {
       output_language: "Chinese",
     };
 
-    expect(parseLlmConfig(config).task_assignments.tldr?.profile).toBe("default");
+    expect(parseLlmConfig(config).task_assignments.tldr?.profile).toBe(
+      "default"
+    );
   });
 
   it("rejects malformed graph nodes with precise paths", () => {
@@ -54,7 +57,9 @@ describe("api schema parsers", () => {
       edges: [],
     };
 
-    expect(() => parseGraphData(graph, "graph_data")).toThrow("graph_data.nodes[0].node_type");
+    expect(() => parseGraphData(graph, "graph_data")).toThrow(
+      "graph_data.nodes[0].node_type"
+    );
   });
 
   it("validates priority cross-boundary DTOs", () => {
@@ -63,24 +68,39 @@ describe("api schema parsers", () => {
     expect(parseEvidenceItem(validEvidence()).source_type).toBe("highlight");
     expect(parseTopicAlertResult(validTopicAlertResult()).seen).toBe(false);
     expect(parseSyncReport(validSyncReport()).backup_path).toBeNull();
+    expect(
+      parseSyncPreviewReport(validSyncPreviewReport()).changes[0].action
+    ).toBe("upload_new");
   });
 
   it("rejects invalid priority cross-boundary DTOs with precise paths", () => {
-    expect(() => parseCandidatePaper({ ...validCandidate(), status: "bad" })).toThrow(
-      "CandidatePaper.status",
-    );
-    expect(() => parseResearchProject({ ...validProject(), paper_count: "1" })).toThrow(
-      "ResearchProject.paper_count",
-    );
-    expect(() => parseEvidenceItem({ ...validEvidence(), excerpt: null })).toThrow(
-      "EvidenceItem.excerpt",
-    );
-    expect(() => parseTopicAlertResult({ ...validTopicAlertResult(), seen: 0 })).toThrow(
-      "TopicAlertResult.seen",
-    );
-    expect(() => parseSyncReport({ ...validSyncReport(), total_bytes: "1024" })).toThrow(
-      "SyncReport.total_bytes",
-    );
+    expect(() =>
+      parseCandidatePaper({ ...validCandidate(), status: "bad" })
+    ).toThrow("CandidatePaper.status");
+    expect(() =>
+      parseResearchProject({ ...validProject(), paper_count: "1" })
+    ).toThrow("ResearchProject.paper_count");
+    expect(() =>
+      parseEvidenceItem({ ...validEvidence(), excerpt: null })
+    ).toThrow("EvidenceItem.excerpt");
+    expect(() =>
+      parseTopicAlertResult({ ...validTopicAlertResult(), seen: 0 })
+    ).toThrow("TopicAlertResult.seen");
+    expect(() =>
+      parseSyncReport({ ...validSyncReport(), total_bytes: "1024" })
+    ).toThrow("SyncReport.total_bytes");
+    expect(() =>
+      parseSyncPreviewReport({
+        ...validSyncPreviewReport(),
+        direction: "sideways",
+      })
+    ).toThrow("SyncPreviewReport.direction");
+    expect(() =>
+      parseSyncPreviewReport({
+        ...validSyncPreviewReport(),
+        changes: [{ ...validSyncPreviewReport().changes[0], action: "bad" }],
+      })
+    ).toThrow("SyncPreviewReport.changes[0].action");
   });
 });
 
@@ -200,5 +220,26 @@ function validSyncReport() {
     skipped_count: 0,
     skipped_bytes: 0,
     restart_required: false,
+  };
+}
+
+function validSyncPreviewReport() {
+  return {
+    direction: "push",
+    remote_root: "https://example.test/lib",
+    add_count: 1,
+    update_count: 1,
+    delete_count: 0,
+    unchanged_count: 2,
+    transfer_bytes: 2048,
+    restart_required: false,
+    backup_path: null,
+    changes: [
+      {
+        path: "papers/new/original.pdf",
+        action: "upload_new",
+        size: 2048,
+      },
+    ],
   };
 }

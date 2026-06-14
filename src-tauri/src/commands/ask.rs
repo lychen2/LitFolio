@@ -18,8 +18,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::ai::{AskLibraryResult, AskSource};
-use crate::storage::knowledge;
+use crate::ai::{active_profile_for_task, load_config, AskLibraryResult, AskSource, TaskKind};
+use crate::storage::{knowledge, AskSession, AskSessionDraft, AskSessionRepo, PaperDocumentRepo};
 use crate::AppState;
 
 mod library;
@@ -46,6 +46,71 @@ pub struct SaveAskNoteResult {
 pub struct ConversationMessage {
     pub role: String,
     pub content: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AskCapabilityState {
+    pub state: String,
+    pub has_model: bool,
+    pub indexed_documents: i64,
+    pub failed_documents: i64,
+    pub total_documents: i64,
+    pub reason: Option<String>,
+}
+
+#[tauri::command]
+pub async fn ask_session_latest(
+    state: State<'_, Arc<AppState>>,
+    project_id: Option<i64>,
+) -> Result<Option<AskSession>, String> {
+    AskSessionRepo::new(&state.pool)
+        .latest(project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn ask_session_save(
+    state: State<'_, Arc<AppState>>,
+    draft: AskSessionDraft,
+) -> Result<AskSession, String> {
+    AskSessionRepo::new(&state.pool)
+        .save(draft)
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+pub async fn ask_capability_state(
+    state: State<'_, Arc<AppState>>,
+) -> Result<AskCapabilityState, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let model_result = active_profile_for_task(&cfg, TaskKind::Ask);
+    let counts = PaperDocumentRepo::new(&state.pool)
+        .index_counts()
+        .await
+        .map_err(|e| e.to_string())?;
+    let has_model = model_result.is_ok();
+    let reason = model_result.err().map(|e| e.to_string());
+    let state_name = if !has_model && counts.indexed > 0 {
+        "search_only"
+    } else if !has_model {
+        "needs_model"
+    } else if counts.failed > 0 {
+        "degraded"
+    } else if counts.total == 0 {
+        "indexing"
+    } else {
+        "answer_ready"
+    };
+
+    Ok(AskCapabilityState {
+        state: state_name.into(),
+        has_model,
+        indexed_documents: counts.indexed,
+        failed_documents: counts.failed,
+        total_documents: counts.total,
+        reason,
+    })
 }
 
 #[tauri::command]

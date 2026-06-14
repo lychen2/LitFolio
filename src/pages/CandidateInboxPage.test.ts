@@ -75,7 +75,10 @@ describe("importCandidate", () => {
   it("imports DOI candidates when only a DOI URL is available", async () => {
     const api = candidateApi();
 
-    await importCandidate(candidate({ source_url: "https://doi.org/10.1145/1234567?x=1" }), api);
+    await importCandidate(
+      candidate({ source_url: "https://doi.org/10.1145/1234567?x=1" }),
+      api
+    );
 
     expect(api.importDoi).toHaveBeenCalledWith("10.1145/1234567");
     expect(api.arxivAddWithPdf).not.toHaveBeenCalled();
@@ -105,9 +108,9 @@ describe("importCandidate", () => {
   it("throws when a candidate has no usable import identity or title", async () => {
     const api = candidateApi();
 
-    await expect(importCandidate(candidate({ title: " " }), api)).rejects.toThrow(
-      "missing title, arXiv ID, and DOI",
-    );
+    await expect(
+      importCandidate(candidate({ title: " " }), api)
+    ).rejects.toThrow("missing title, arXiv ID, and DOI");
     expect(api.candidateSetStatus).not.toHaveBeenCalled();
   });
 });

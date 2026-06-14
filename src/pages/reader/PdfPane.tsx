@@ -1,17 +1,21 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Loader2 } from "lucide-react";
-import {
-  PdfLoader, PdfHighlighter,
+import { PdfLoader, PdfHighlighter } from "react-pdf-highlighter";
+import type {
+  IHighlight,
+  NewHighlight,
+  ScaledPosition,
 } from "react-pdf-highlighter";
-import type { IHighlight, NewHighlight, ScaledPosition } from "react-pdf-highlighter";
+import type { T_ViewportHighlight } from "react-pdf-highlighter/dist/components/PdfHighlighter";
 import "react-pdf-highlighter/dist/style.css";
 import "pdfjs-dist/web/pdf_viewer.css";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api, type Highlight as BackendHighlight } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { PdfTextHighlight } from "./PdfTextHighlight";
+import { highlightPalette, highlightTypeKey, type HighlightTypeKey } from "./highlightTypes";
 import { PdfTermsOverlay, type PdfTermEntry } from "./PdfTermsOverlay";
 import { PdfSearchBar } from "./PdfSearchBar";
 import { FigureLinks } from "./FigureLinks";
@@ -25,7 +29,13 @@ import {
   PdfToolbar,
   SelectionActions,
 } from "./PdfPaneChrome";
-import { DEFAULT_ZOOM, nextZoom, wheelZoom, ZOOM_STEP, type PdfZoom } from "./PdfPaneZoom";
+import {
+  DEFAULT_ZOOM,
+  nextZoom,
+  wheelZoom,
+  ZOOM_STEP,
+  type PdfZoom,
+} from "./PdfPaneZoom";
 import { extractPdfText } from "./pdfTextExtraction";
 
 type PdfPaneError = {
@@ -35,6 +45,21 @@ type PdfPaneError = {
   detail?: string;
   assetPath?: string;
   assetUrl?: string;
+};
+
+type PdfHighlight = IHighlight & {
+  label: string | null;
+  typeKey: HighlightTypeKey;
+};
+
+type ViewportPdfHighlight = T_ViewportHighlight<PdfHighlight>;
+
+type PdfHighlighterApi = {
+  handleScaleValue?: () => void;
+  renderHighlightLayers?: () => void;
+  viewer?: {
+    container?: HTMLElement;
+  };
 };
 
 /**
@@ -52,7 +77,9 @@ type PdfPaneError = {
  * - Ctrl+F (or the search button) opens an in-document text find.
  */
 export const PdfPane = memo(function PdfPane({
-  paperId, scrollRefCb, onTranslateSelection,
+  paperId,
+  scrollRefCb,
+  onTranslateSelection,
 }: {
   paperId: string;
   scrollRefCb?: (fn: (id: string) => void) => void;
@@ -63,19 +90,27 @@ export const PdfPane = memo(function PdfPane({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<PdfPaneError | null>(null);
   const [dark, setDark] = useState<boolean>(() => {
-    try { return localStorage.getItem("litera.pdf.dark") === "1"; }
-    catch { return false; }
+    try {
+      return localStorage.getItem("litera.pdf.dark") === "1";
+    } catch {
+      return false;
+    }
   });
   const [searchSignal, setSearchSignal] = useState(0);
   const [zoom, setZoom] = useState<PdfZoom>("page-width");
   const [doiImport, setDoiImport] = useState<string | null>(null);
-  const scrollFnRef = useRef<((h: IHighlight) => void) | null>(null);
-  const highlighterRef = useRef<PdfHighlighter<IHighlight> | null>(null);
+  const scrollFnRef = useRef<((h: PdfHighlight) => void) | null>(null);
+  const highlighterRef = useRef<PdfHighlighter<PdfHighlight> | null>(null);
+  const pendingScrollIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textPushedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    try { localStorage.setItem("litera.pdf.dark", dark ? "1" : "0"); } catch { /* noop */ }
+    try {
+      localStorage.setItem("litera.pdf.dark", dark ? "1" : "0");
+    } catch {
+      /* noop */
+    }
   }, [dark]);
 
   useEffect(() => {
@@ -90,13 +125,16 @@ export const PdfPane = memo(function PdfPane({
           const assetUrl = convertFileSrc(path);
           setPdfUrl(assetUrl);
         } catch (error) {
-          if (!cancelled) setLoadErr(toPdfPaneError("asset-url", error, { assetPath: path }));
+          if (!cancelled)
+            setLoadErr(toPdfPaneError("asset-url", error, { assetPath: path }));
         }
       } catch (e) {
         if (!cancelled) setLoadErr(toPdfPaneError("asset-path", e));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [paperId]);
 
   // Ctrl+F → open the search bar. Only fires when the PDF pane has the
@@ -153,60 +191,259 @@ export const PdfPane = memo(function PdfPane({
 
   const termEntries: PdfTermEntry[] = useMemo(() => {
     return (termsQ.data ?? [])
-      .map((row) => ({ term: row.term.term, definition: row.term.local_definition }))
+      .map((row) => ({
+        term: row.term.term,
+        definition: row.term.local_definition,
+      }))
       .filter((t) => t.term.trim().length >= 2);
   }, [termsQ.data]);
 
   const create = useMutation({
     mutationFn: (h: NewHighlight) =>
-      api.highlightCreate(paperId, h.position.pageNumber, h.position, h.content.text ?? ""),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["highlights", paperId] }),
+      api.highlightCreate(
+        paperId,
+        h.position.pageNumber,
+        h.position,
+        h.content.text ?? ""
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["highlights", paperId] }),
   });
 
   const addTerm = useMutation({
     mutationFn: (input: { term: string }) =>
       api.paperTermAdd(paperId, input.term, null, null),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["paper-terms", paperId] }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["paper-terms", paperId] }),
   });
 
-  // Memoize the IHighlight[] derivation so PdfHighlighter's prop reference
-  // stays stable across renders that don't actually change the highlight set.
-  // Without this, every parent re-render forced PdfHighlighter to diff the
-  // array from scratch.
-  const highlights: IHighlight[] = useMemo(
+  // Memoize the highlight derivation so PdfHighlighter's prop reference stays
+  // stable across renders that don't actually change the highlight set.
+  const highlights: PdfHighlight[] = useMemo(
     () =>
-      (highlightsQ.data ?? []).map((h: BackendHighlight) => ({
-        id: h.id,
-        position: h.rect as ScaledPosition,
-        content: { text: h.text },
-        comment: { text: h.note ?? "", emoji: "" },
-      })),
-    [highlightsQ.data],
+      (highlightsQ.data ?? []).map((h: BackendHighlight) => {
+        const label = h.label ?? null;
+        return {
+          id: h.id,
+          position: h.rect as ScaledPosition,
+          content: { text: h.text },
+          comment: { text: h.note ?? "", emoji: "" },
+          label,
+          typeKey: highlightTypeKey(label),
+        };
+      }),
+    [highlightsQ.data]
   );
-  const pdfScaleValue = zoom === "page-width" ? "page-width" : String(zoom);
-  const zoomLabel = zoom === "page-width" ? t("reader.zoomFit") : `${Math.round(zoom * 100)}%`;
+
+  const renderManualHighlightLayers = useCallback(() => {
+    const highlighter = highlighterRef.current as PdfHighlighterApi | null;
+    const viewerContainer = highlighter?.viewer?.container;
+    if (!viewerContainer) return;
+
+    viewerContainer
+      .querySelectorAll(".litera-manual-highlight-layer")
+      .forEach((node) => node.remove());
+
+    for (const highlight of highlights) {
+      for (const rect of highlight.position.rects ?? []) {
+        const pageNumber = rect.pageNumber ?? highlight.position.pageNumber;
+        const page = viewerContainer.querySelector<HTMLElement>(
+          `.page[data-page-number="${pageNumber}"]`
+        );
+        if (!page) continue;
+
+        if (getComputedStyle(page).position === "static") {
+          page.style.position = "relative";
+        }
+
+        let layer = page.querySelector<HTMLElement>(
+          ":scope > .litera-manual-highlight-layer"
+        );
+        if (!layer) {
+          layer = document.createElement("div");
+          layer.className = "litera-manual-highlight-layer";
+          Object.assign(layer.style, {
+            position: "absolute",
+            inset: "0",
+            pointerEvents: "none",
+            zIndex: "4",
+          });
+          page.appendChild(layer);
+        }
+
+        const mark = document.createElement("div");
+        mark.dataset.highlightId = highlight.id;
+        Object.assign(
+          mark.style,
+          manualHighlightStyle(rect, page, highlight.label, dark)
+        );
+        layer.appendChild(mark);
+      }
+    }
+  }, [dark, highlights]);
+
+  const scheduleManualHighlightLayers = useCallback(() => {
+    renderManualHighlightLayers();
+    const frameId = window.requestAnimationFrame(renderManualHighlightLayers);
+    const shortId = window.setTimeout(renderManualHighlightLayers, 120);
+    const longId = window.setTimeout(renderManualHighlightLayers, 500);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(shortId);
+      window.clearTimeout(longId);
+    };
+  }, [renderManualHighlightLayers]);
 
   useEffect(() => {
-    highlighterRef.current?.handleScaleValue?.();
-  }, [pdfScaleValue]);
+    const cancel = scheduleManualHighlightLayers();
+    const intervalId = window.setInterval(renderManualHighlightLayers, 250);
+    const stopIntervalId = window.setTimeout(
+      () => window.clearInterval(intervalId),
+      2500
+    );
+    return () => {
+      cancel();
+      window.clearInterval(intervalId);
+      window.clearTimeout(stopIntervalId);
+      const highlighter = highlighterRef.current as PdfHighlighterApi | null;
+      highlighter?.viewer?.container
+        ?.querySelectorAll(".litera-manual-highlight-layer")
+        .forEach((node) => node.remove());
+    };
+  }, [renderManualHighlightLayers, scheduleManualHighlightLayers]);
+  const pdfScaleValue = zoom === "page-width" ? "page-width" : String(zoom);
+  const zoomLabel =
+    zoom === "page-width" ? t("reader.zoomFit") : `${Math.round(zoom * 100)}%`;
+
+  const refreshHighlighter = useCallback(() => {
+    const highlighter = highlighterRef.current as PdfHighlighterApi | null;
+    highlighter?.handleScaleValue?.();
+    highlighter?.renderHighlightLayers?.();
+  }, []);
+
+  const nudgeHighlightLayers = useCallback(() => {
+    refreshHighlighter();
+    renderManualHighlightLayers();
+    containerRef.current?.dispatchEvent(new Event("scroll", { bubbles: true }));
+    window.dispatchEvent(new Event("resize"));
+  }, [refreshHighlighter, renderManualHighlightLayers]);
+
+  const scheduleHighlightLayerRefresh = useCallback(() => {
+    let secondFrameId = 0;
+    const firstFrameId = window.requestAnimationFrame(() => {
+      nudgeHighlightLayers();
+      secondFrameId = window.requestAnimationFrame(nudgeHighlightLayers);
+    });
+    const shortTimeoutId = window.setTimeout(nudgeHighlightLayers, 80);
+    const layoutTimeoutId = window.setTimeout(nudgeHighlightLayers, 220);
+    const fontTimeoutId = window.setTimeout(nudgeHighlightLayers, 500);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      if (secondFrameId) window.cancelAnimationFrame(secondFrameId);
+      window.clearTimeout(shortTimeoutId);
+      window.clearTimeout(layoutTimeoutId);
+      window.clearTimeout(fontTimeoutId);
+    };
+  }, [nudgeHighlightLayers]);
+
+  const fallbackScrollToHighlight = useCallback(
+    (highlight: PdfHighlight) => {
+      const highlighter = highlighterRef.current as PdfHighlighterApi | null;
+      const viewerContainer = highlighter?.viewer?.container;
+      if (!viewerContainer) return false;
+
+      const page = viewerContainer.querySelector<HTMLElement>(
+        `.page[data-page-number="${highlight.position.pageNumber}"]`
+      );
+      if (!page) return false;
+
+      const rect = highlight.position.boundingRect;
+      const top =
+        page.offsetTop + (rect.y1 / rect.height) * page.clientHeight - 24;
+      viewerContainer.scrollTo({
+        top: Math.max(0, top),
+        behavior: "smooth",
+      });
+      renderManualHighlightLayers();
+      return true;
+    },
+    [renderManualHighlightLayers]
+  );
+
+  const jumpToHighlight = useCallback(
+    (id: string) => {
+      const target = highlights.find((h) => h.id === id);
+      if (!target || !scrollFnRef.current) {
+        pendingScrollIdRef.current = id;
+        nudgeHighlightLayers();
+        return;
+      }
+      pendingScrollIdRef.current = null;
+      scrollFnRef.current(target);
+      window.setTimeout(() => {
+        fallbackScrollToHighlight(target);
+        nudgeHighlightLayers();
+      }, 0);
+      window.setTimeout(() => fallbackScrollToHighlight(target), 120);
+    },
+    [fallbackScrollToHighlight, highlights, nudgeHighlightLayers]
+  );
+
+  const flushPendingScroll = useCallback(() => {
+    const pendingId = pendingScrollIdRef.current;
+    if (!pendingId) return;
+    jumpToHighlight(pendingId);
+  }, [jumpToHighlight]);
+
+  useEffect(() => {
+    const cancelRefresh = scheduleHighlightLayerRefresh();
+    const flushTimeoutId = window.setTimeout(flushPendingScroll, 240);
+    return () => {
+      cancelRefresh();
+      window.clearTimeout(flushTimeoutId);
+    };
+  }, [
+    flushPendingScroll,
+    highlights,
+    pdfScaleValue,
+    pdfUrl,
+    scheduleHighlightLayerRefresh,
+  ]);
 
   useEffect(() => {
     if (!scrollRefCb) return;
-    scrollRefCb((id: string) => {
-      const target = highlights.find((h) => h.id === id);
-      if (target && scrollFnRef.current) scrollFnRef.current(target);
-    });
-  }, [scrollRefCb, highlights]);
+    scrollRefCb(jumpToHighlight);
+  }, [scrollRefCb, jumpToHighlight]);
 
-  if (loadErr) return <Center><PdfLoadError error={loadErr} onRetry={() => { setLoadErr(null); setPdfUrl(null); }} /></Center>;
+  if (loadErr)
+    return (
+      <Center>
+        <PdfLoadError
+          error={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setPdfUrl(null);
+          }}
+        />
+      </Center>
+    );
   if (!pdfUrl) {
-    return <Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.loadingPdf")}</Center>;
+    return (
+      <Center>
+        <Loader2 className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
+        {t("reader.loadingPdf")}
+      </Center>
+    );
   }
 
   return (
     <div
       ref={containerRef}
-      className={"h-full w-full bg-litera-ink relative " + (dark ? "litera-pdf-dark" : "")}
+      className={
+        "h-full w-full bg-litera-ink relative " +
+        (dark ? "litera-pdf-dark" : "")
+      }
       tabIndex={-1}
     >
       <PdfToolbar
@@ -222,10 +459,17 @@ export const PdfPane = memo(function PdfPane({
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}
-        beforeLoad={<Center><Loader2 className="h-4 w-4 animate-spin inline mr-1.5" /> {t("reader.renderingPdf")}</Center>}
+        beforeLoad={
+          <Center>
+            <Loader2 className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
+            {t("reader.renderingPdf")}
+          </Center>
+        }
         errorMessage={<PdfLoadError error={loadErr ?? undefined} />}
         onError={(error) => {
-          const visibleError = toPdfPaneError("pdfjs-load", error, { assetUrl: pdfUrl });
+          const visibleError = toPdfPaneError("pdfjs-load", error, {
+            assetUrl: pdfUrl,
+          });
           console.error("[PdfLoader] getDocument failed", visibleError, error);
           setLoadErr(visibleError);
         }}
@@ -243,26 +487,43 @@ export const PdfPane = memo(function PdfPane({
                 if (!text) return;
                 return api.paperSetPdfText(paperId, text);
               })
-              .catch((err) => console.warn(
-                "[PdfPane] push pdf text failed",
-                toPdfPaneError("text-cache", err, { assetUrl: pdfUrl }),
-                err,
-              ));
+              .catch((err) =>
+                console.warn(
+                  "[PdfPane] push pdf text failed",
+                  toPdfPaneError("text-cache", err, { assetUrl: pdfUrl }),
+                  err
+                )
+              );
           }
           return (
             <>
-              <PdfHighlighter
+              <PdfHighlighter<PdfHighlight>
                 ref={highlighterRef}
                 pdfDocument={pdfDocument}
                 highlights={highlights}
                 enableAreaSelection={(e) => e.altKey}
                 pdfScaleValue={pdfScaleValue}
-                onScrollChange={() => { /* noop */ }}
-                scrollRef={(fn) => { scrollFnRef.current = fn; }}
-                onSelectionFinished={(position, content, hideTipAndSelection) => (
+                onScrollChange={() => {
+                  /* noop */
+                }}
+                scrollRef={(fn) => {
+                  scrollFnRef.current = fn;
+                  scheduleHighlightLayerRefresh();
+                  scheduleManualHighlightLayers();
+                  window.requestAnimationFrame(flushPendingScroll);
+                }}
+                onSelectionFinished={(
+                  position,
+                  content,
+                  hideTipAndSelection
+                ) => (
                   <SelectionActions
                     onHighlight={() => {
-                      create.mutate({ position, content, comment: { text: "", emoji: "" } });
+                      create.mutate({
+                        position,
+                        content,
+                        comment: { text: "", emoji: "" },
+                      });
                       hideTipAndSelection();
                     }}
                     onCopy={() => {
@@ -283,17 +544,29 @@ export const PdfPane = memo(function PdfPane({
                     pending={addTerm.isPending}
                   />
                 )}
-                highlightTransform={(highlight, _idx, _setTip, _hideTip, _vToScaled, _shot, isScrolledTo) => (
+                highlightTransform={(
+                  highlight: ViewportPdfHighlight,
+                  _idx,
+                  _setTip,
+                  _hideTip,
+                  _vToScaled,
+                  _shot,
+                  isScrolledTo
+                ) => (
                   <PdfTextHighlight
                     key={highlight.id}
                     rects={highlight.position.rects}
                     dark={dark}
                     isScrolledTo={isScrolledTo}
+                    label={highlight.label}
                   />
                 )}
               />
               <FigureLinks pdfDocument={pdfDocument} pdfUrl={pdfUrl} />
-              <PdfDoiLinkInterceptor containerRef={containerRef} onDoi={setDoiImport} />
+              <PdfDoiLinkInterceptor
+                containerRef={containerRef}
+                onDoi={setDoiImport}
+              />
             </>
           );
         }}
@@ -313,7 +586,10 @@ export const PdfPane = memo(function PdfPane({
         }}
       />
       {highlightsQ.data && (
-        <PdfStatusBadge highlights={highlightsQ.data.length} terms={termEntries.length} />
+        <PdfStatusBadge
+          highlights={highlightsQ.data.length}
+          terms={termEntries.length}
+        />
       )}
     </div>
   );
@@ -325,10 +601,50 @@ function selectedText(content: { text?: string | null }): string {
   return window.getSelection()?.toString().trim() ?? "";
 }
 
+type ManualScaledRect = {
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  left?: number;
+  top?: number;
+  width: number;
+  height: number;
+};
+
+function manualHighlightStyle(
+  rect: ManualScaledRect,
+  page: HTMLElement,
+  label: string | null,
+  dark: boolean
+): Partial<CSSStyleDeclaration> {
+  const palette = highlightPalette(label);
+  const pageWidth = page.clientWidth || rect.width;
+  const pageHeight = page.clientHeight || rect.height;
+  const rawLeft = rect.x1 ?? rect.left ?? 0;
+  const rawTop = rect.y1 ?? rect.top ?? 0;
+  const rawRight = rect.x2 ?? rawLeft + rect.width;
+  const rawBottom = rect.y2 ?? rawTop + rect.height;
+  const scaleX = pageWidth / rect.width;
+  const scaleY = pageHeight / rect.height;
+  const verticalInset = Math.min(2.5, Math.max(1, (rawBottom - rawTop) * scaleY * 0.16));
+
+  return {
+    position: "absolute",
+    left: `${rawLeft * scaleX}px`,
+    top: `${rawTop * scaleY + verticalInset}px`,
+    width: `${Math.max(2, (rawRight - rawLeft) * scaleX)}px`,
+    height: `${Math.max(2, (rawBottom - rawTop) * scaleY - verticalInset * 2)}px`,
+    borderRadius: "2px",
+    background: dark ? palette.pdfDark : palette.pdf,
+    pointerEvents: "none",
+  };
+}
+
 function toPdfPaneError(
   stage: PdfPaneError["stage"],
   error: unknown,
-  context: Pick<PdfPaneError, "assetPath" | "assetUrl"> = {},
+  context: Pick<PdfPaneError, "assetPath" | "assetUrl"> = {}
 ): PdfPaneError {
   if (error instanceof Error) {
     return {

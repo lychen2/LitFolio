@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { parseHighlight, parseLlmConfig } from "./apiSchema";
+import { parseAskCapabilityState, parseAskSession, parseAskSessionMaybe, parseHighlight, parseLlmConfig } from "./apiSchema";
 import { parseArray } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
   ArxivDraft,
+  AskSessionDraft,
   AskLibraryResult,
   BatchSummary,
   ExpandedQuery,
@@ -42,6 +43,16 @@ export const aiReaderApi = {
       draft,
       targetLang: targetLang ?? "Chinese",
     }),
+  askCapabilityState: () =>
+    invokeParsed("ask_capability_state", undefined, parseAskCapabilityState),
+  askSessionLatest: (projectId?: number | null) =>
+    invokeParsed(
+      "ask_session_latest",
+      { projectId: projectId ?? null },
+      parseAskSessionMaybe
+    ),
+  askSessionSave: (draft: AskSessionDraft) =>
+    invokeParsed("ask_session_save", { draft }, parseAskSession),
   libraryAsk: (
     question: string,
     limit?: number,

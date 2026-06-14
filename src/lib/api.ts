@@ -8,6 +8,10 @@ import type { TopicSurveyProgress } from "./types/api";
 
 export type {
   ArxivDraft,
+  AskCapabilityKind,
+  AskCapabilityState,
+  AskSession,
+  AskSessionDraft,
   AskLibraryResult,
   AskSource,
   BatchError,
@@ -48,6 +52,9 @@ export type {
   LinkedPaper,
   LitReviewResult,
   LlmConfig,
+  JobDraft,
+  JobRecord,
+  JobStatus,
   LlmProfile,
   LlmTestResult,
   NoteSection,

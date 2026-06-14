@@ -3,7 +3,7 @@ use crate::storage::{retrieval, Paper, PaperRepo};
 use crate::AppState;
 
 pub(super) struct RetrievalRequest<'a> {
-    pub profile: &'a LlmProfile,
+    pub profile: Option<&'a LlmProfile>,
     pub question: &'a str,
     pub limit: i64,
 }
@@ -37,15 +37,29 @@ pub(super) async fn retrieve_papers(
     repo: &PaperRepo<'_>,
     request: RetrievalRequest<'_>,
 ) -> RetrievalResult {
-    let expanded_terms = expand_terms(state, request.profile, request.question).await;
+    let expanded_terms = match request.profile {
+        Some(profile) => expand_terms(state, profile, request.question).await,
+        None => Vec::new(),
+    };
     let search = SearchRequest {
         question: request.question,
         limit: request.limit,
         expanded_terms: &expanded_terms,
     };
+    let mut local_used_terms = Vec::new();
     let explicit_papers = explicit_title_search(repo, request.question, request.limit).await;
+    let local_papers = raw_search(
+        repo,
+        RawSearchRequest {
+            question: request.question,
+            limit: request.limit,
+            used_terms: &mut local_used_terms,
+        },
+    )
+    .await;
     let semantic_papers = initial_search(state, repo, search).await;
-    let mut papers = merge_paper_lists(explicit_papers, semantic_papers, request.limit);
+    let mut papers = merge_paper_lists(explicit_papers, local_papers, request.limit);
+    papers = merge_paper_lists(papers, semantic_papers, request.limit);
     let mut used_terms = terms_for_search(request.question, &expanded_terms);
 
     if papers.is_empty() && !expanded_terms.is_empty() {

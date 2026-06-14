@@ -4,8 +4,9 @@ use std::collections::BTreeSet;
 
 use super::config::WebDavConfig;
 use super::local::{
-    copy_snapshot_file, manifest_bytes, manifest_from_bytes, stage_downloaded_file, ManifestFile,
-    Snapshot, SyncConnectionResult, SyncManifest, SyncTransferStats, MANIFEST_FILE_NAME,
+    build_pull_preview, build_push_preview, copy_snapshot_file, manifest_bytes,
+    manifest_from_bytes, stage_downloaded_file, ManifestFile, Snapshot, SyncConnectionResult,
+    SyncManifest, SyncPreviewReport, SyncTransferStats, MANIFEST_FILE_NAME,
 };
 
 pub struct WebDavRemote<'a> {
@@ -67,6 +68,25 @@ impl<'a> WebDavRemote<'a> {
             self.delete_file(&stale_path).await?;
         }
         Ok(stats)
+    }
+
+    pub async fn preview_upload(&self, snapshot: &Snapshot) -> Result<SyncPreviewReport> {
+        let remote_manifest = self.download_manifest_if_present().await?;
+        Ok(build_push_preview(
+            &snapshot.manifest,
+            remote_manifest.as_ref(),
+            self.remote_root(),
+        ))
+    }
+
+    pub async fn preview_download(&self, local_snapshot: &Snapshot) -> Result<SyncPreviewReport> {
+        let manifest_bytes = self.get_file(MANIFEST_FILE_NAME).await?;
+        let remote_manifest = manifest_from_bytes(&manifest_bytes)?;
+        Ok(build_pull_preview(
+            &local_snapshot.manifest,
+            &remote_manifest,
+            self.remote_root(),
+        ))
     }
 
     #[cfg(test)]

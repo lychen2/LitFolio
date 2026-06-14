@@ -37,8 +37,10 @@ export const en: Record<TKey, string> = {
   "common.untitled": "(untitled)",
 
   "candidate.title": "Candidate Inbox",
-  "candidate.subtitle": "Triage papers from RSS, arXiv, topic discovery, and search before importing.",
-  "candidate.empty": "No candidates yet. Add papers from RSS or discovery results.",
+  "candidate.subtitle":
+    "Triage papers from RSS, arXiv, topic discovery, and search before importing.",
+  "candidate.empty":
+    "No candidates yet. Add papers from RSS or discovery results.",
   "candidate.shortlist": "Shortlist",
   "candidate.queue": "Queue",
   "candidate.ignore": "Ignore",
@@ -58,8 +60,10 @@ export const en: Record<TKey, string> = {
   "candidate.status.imported": "imported",
 
   "projects.title": "Research Projects",
-  "projects.subtitle": "Organize papers around research questions, outputs, and reusable evidence.",
-  "projects.empty": "No projects yet. Create one for a topic, review, proposal, or technical decision.",
+  "projects.subtitle":
+    "Organize papers around research questions, outputs, and reusable evidence.",
+  "projects.empty":
+    "No projects yet. Create one for a topic, review, proposal, or technical decision.",
   "projects.create": "New project",
   "projects.name": "Name",
   "projects.namePlaceholder": "e.g. Neural evidence retrieval review",
@@ -72,7 +76,8 @@ export const en: Record<TKey, string> = {
   "projects.status.archived": "Archived",
   "projects.paperCount": "{count} papers",
   "projects.delete": "Delete project",
-  "projects.deleteConfirm": "Delete this project? Source papers stay in the library.",
+  "projects.deleteConfirm":
+    "Delete this project? Source papers stay in the library.",
   "projects.addPaper": "Add paper",
   "projects.removePaper": "Remove",
   "projects.papers": "Papers",
@@ -87,19 +92,25 @@ export const en: Record<TKey, string> = {
   "projects.packageExport": "Export package",
   "projects.packageCopied": "Project package copied.",
   "projects.weeklyReview": "Weekly review",
-  "projects.weeklyReviewHint": "Project-bound radar for fresh candidates and unread core papers.",
+  "projects.weeklyReviewHint":
+    "Project-bound radar for fresh candidates and unread core papers.",
   "projects.weeklyCandidates": "Topic radar candidates",
   "projects.weeklyUnread": "Unread core papers",
-  "projects.weeklyNoTopic": "Add a research question or description to make the project radar specific.",
-  "projects.weeklyNoCandidates": "No new candidate matched this project in the last 7 days.",
+  "projects.weeklyNoTopic":
+    "Add a research question or description to make the project radar specific.",
+  "projects.weeklyNoCandidates":
+    "No new candidate matched this project in the last 7 days.",
   "projects.weeklyNoUnread": "No unread linked papers need attention.",
   "projects.writing": "Writing",
-  "projects.writingHint": "Generate an editable outline from project papers, reading cards, evidence, and comparison reports.",
+  "projects.writingHint":
+    "Generate an editable outline from project papers, reading cards, evidence, and comparison reports.",
   "projects.writingGenerate": "Copy cited outline",
   "projects.writingEmpty": "No writing outline generated yet.",
-  "projects.writingCopied": "Outline copied: {papers} papers, {sources} sources, {sections} sections.",
+  "projects.writingCopied":
+    "Outline copied: {papers} papers, {sources} sources, {sections} sections.",
   "projects.sourceManifest": "Copy source manifest",
-  "projects.sourceManifestCopied": "Source manifest copied: {papers} papers, {pdfs} PDFs, {notes} note sections.",
+  "projects.sourceManifestCopied":
+    "Source manifest copied: {papers} papers, {pdfs} PDFs, {notes} note sections.",
   "compare.addEvidence": "Add evidence",
   "compare.evidenceProject": "Evidence project",
   "compare.evidenceAdded": "Comparison added to evidence.",
@@ -124,14 +135,17 @@ export const en: Record<TKey, string> = {
   "library.translateTitle": "Translate title + abstract to English",
   "library.retranslateTitle": "Retranslate title + abstract",
   "library.translateBtn": "Translate",
-  "library.readPdfTitle": "Open in built-in PDF reader with highlights and notes",
+  "library.readPdfTitle":
+    "Open in built-in PDF reader with highlights and notes",
   "library.readPdf": "Read",
   "library.tldrTitle": "Generate one-line summary + key findings",
   "library.quickRead": "TL;DR",
-  "library.deepReadTitle": "Deep read: problem / method / differences / limitations",
+  "library.deepReadTitle":
+    "Deep read: problem / method / differences / limitations",
   "library.deepRead": "Deep read",
   "library.deleteTitle": "Remove from library",
-  "library.confirmDelete": "Remove 「{title}」 from library?\n\nThis also deletes the papers/{id}/ directory and its PDF files.",
+  "library.confirmDelete":
+    "Remove 「{title}」 from library?\n\nThis also deletes the papers/{id}/ directory and its PDF files.",
   "library.statusToggle": "Status: {status} (click to cycle)",
   "library.cachedResult": "Showing cached deep read result.",
   "library.callingModel": "Calling model…",
@@ -150,7 +164,7 @@ export const en: Record<TKey, string> = {
   "library.noPdf": "No PDF",
   "library.mustRead": "Must-read",
   "library.translatedPrefix": "Trans:",
-  "library.searchResults": "\"{query}\" — {count} results",
+  "library.searchResults": '"{query}" — {count} results',
   "library.recentPapers": "{count} recent papers",
   "library.resultProblem": "1 · Problem addressed",
   "library.resultMethod": "2 · Proposed method",
@@ -218,14 +232,17 @@ export const en: Record<TKey, string> = {
   "feeds.openExternal": "Open in browser",
   "feeds.importGo": "Go to Import to bind a PDF",
   "feeds.viewMeta": "View metadata / abstract",
-  "feeds.refreshSummary": "{newItems} new · {unchanged} up to date · {failed} failed",
+  "feeds.refreshSummary":
+    "{newItems} new · {unchanged} up to date · {failed} failed",
   "feeds.newItemsCount": "+{count} new",
   "feeds.loadFailedColon": "Load failed: {message}",
   "feeds.itemsLoadFailed": "Failed to load items: {message}",
-  "feeds.emptyHintBody": "Paste an RSS / Atom link above and click +. For example:",
-  "feeds.removeConfirm": "Remove subscription \"{name}\"?",
+  "feeds.emptyHintBody":
+    "Paste an RSS / Atom link above and click +. For example:",
+  "feeds.removeConfirm": 'Remove subscription "{name}"?',
   "feeds.translateFailedPrefix": "Translation failed: {message}",
-  "feeds.translateTooltip": "Translate title and abstract using the bound translate model",
+  "feeds.translateTooltip":
+    "Translate title and abstract using the bound translate model",
   "feeds.importBtn": "📥 Add",
   "feeds.markUnread": "Mark as unread",
   "feeds.markRead": "Mark as read",
@@ -244,14 +261,23 @@ export const en: Record<TKey, string> = {
   "ask.title": "Ask",
   "ask.subtitle":
     "The model rewrites your question into precise search terms, fans out BM25 retrieval across your local library, and answers with cited snippets.",
+  "ask.capability.search_only": "Search-only mode",
+  "ask.capability.needs_model": "Model setup required",
+  "ask.capability.answer_ready": "Answer-ready",
+  "ask.capability.indexing": "Indexing library",
+  "ask.capability.degraded": "Degraded: some documents failed indexing",
+  "ask.capability.detail": "{indexed}/{total} indexed · {failed} failed",
   "ask.inputLabel": "Research question",
-  "ask.inputHint": "Press Ctrl+Enter or Cmd+Enter to submit. Useful answers can be saved as durable notes.",
-  "ask.atMentionHint": "Type @ to pin specific papers; pinned papers answer the question alone.",
+  "ask.inputHint":
+    "Press Ctrl+Enter or Cmd+Enter to submit. Useful answers can be saved as durable notes.",
+  "ask.atMentionHint":
+    "Type @ to pin specific papers; pinned papers answer the question alone.",
   "ask.atMentionEmpty": "No matching papers.",
   "ask.pinnedHeader": "References:",
   "ask.pinRemove": "Remove this paper",
   "ask.workflowTitle": "Workflow",
-  "ask.workflowBody": "Each run retrieves local papers, builds an evidence set, and produces a traceable answer you can keep as a long-term knowledge asset.",
+  "ask.workflowBody":
+    "Each run retrieves local papers, builds an evidence set, and produces a traceable answer you can keep as a long-term knowledge asset.",
   "ask.placeholder":
     "e.g. Which of these papers discuss limitations of chirped pulse amplification?",
   "ask.submit": "Ask",
@@ -265,13 +291,21 @@ export const en: Record<TKey, string> = {
   "ask.citationCount": "{count} cited papers",
   "ask.savedTo": "Saved to {path}",
   "ask.empty.card1Title": "Rewrite, then retrieve",
-  "ask.empty.card1Body": "Your question is first rewritten into tighter English search terms, then retrieved across the local library.",
+  "ask.empty.card1Body":
+    "Your question is first rewritten into tighter English search terms, then retrieved across the local library.",
   "ask.empty.card2Title": "Keep claims grounded",
-  "ask.empty.card2Body": "Answers are generated only from retrieved TL;DRs, abstracts, and highlights, with inline citations preserved.",
+  "ask.empty.card2Body":
+    "Answers are generated only from retrieved TL;DRs, abstracts, and highlights, with inline citations preserved.",
   "ask.empty.card3Title": "Turn output into assets",
-  "ask.empty.card3Body": "Useful answers can be saved as Markdown knowledge notes with the original question, search terms, and evidence sources.",
-  "ask.emptyHint1": "Your question is rewritten to English search terms, then matched in FTS5 with AND → raw question → OR → fuzzy CJK → fallback to recent papers,",
-  "ask.emptyHint2": "Matched papers are ranked by term hit count + year, top 8 sent to the model,",
+  "ask.empty.card3Body":
+    "Useful answers can be saved as Markdown knowledge notes with the original question, search terms, and evidence sources.",
+  "ask.emptyHint1":
+    "Your question is rewritten to English search terms, then matched in FTS5 with AND → raw question → OR → fuzzy CJK → fallback to recent papers,",
+  "ask.pinSelectorLabel": "Pin papers",
+  "ask.pinSelectorPlaceholder": "Search papers to pin before asking",
+  "ask.pinSelectorEmpty": "No matching papers",
+  "ask.emptyHint2":
+    "Matched papers are ranked by term hit count + year, top 8 sent to the model,",
   "ask.emptyHint3":
     "The model answers from TL;DR / abstract / highlights with inline [N] citations. If no exact match is found, it still attempts an honest answer using available library papers.",
   "ask.terms": "Search terms",
@@ -281,9 +315,13 @@ export const en: Record<TKey, string> = {
   "ask.followUpPlaceholder": "Ask a follow-up question… (Ctrl+Enter to send)",
   "ask.clearConversation": "Clear conversation",
   "ask.moreSources": "more sources",
+  "ask.sourceSave": "Save",
+  "ask.sourceSaveEvidence": "Save this source snippet as evidence",
+  "ask.sourcePickProject": "Choose an evidence project first",
 
   "import.title": "Import",
-  "import.subtitle": "Fetch metadata, then bind a PDF. Every paper needs a PDF.",
+  "import.subtitle":
+    "Fetch metadata, then bind a PDF. Every paper needs a PDF.",
   "import.tab.arxivDoi": "arXiv or DOI",
   "import.tab.pdf": "PDF file",
   "import.tab.search": "Search",
@@ -292,31 +330,49 @@ export const en: Record<TKey, string> = {
   "import.openOrigin": "Open source page",
   "import.step1.label": "Step 1 · Paste arXiv ID or DOI",
   "import.step1.fetch": "Fetch metadata",
-  "import.step1.hint": "arXiv papers can be auto-downloaded; DOI imports try public PDF links or a local file",
-  "import.step1.placeholder": "1706.03762  ·  arXiv:2310.06825  ·  10.1145/3530819",
+  "import.step1.hint":
+    "arXiv papers can be auto-downloaded; DOI imports try public PDF links or a local file",
+  "import.step1.placeholder":
+    "1706.03762  ·  arXiv:2310.06825  ·  10.1145/3530819",
   "import.step2.label": "Step 2 · Metadata preview",
   "import.step3.label": "Step 3 · Bind PDF",
   "import.step3.pickPdf": "Select local PDF file…",
   "import.step3.autoDownload": "Auto-download PDF",
   "import.step3.autoDownloadTitle": "Download directly from arxiv.org/pdf",
-  "import.step3.doiAutoDownloadTitle": "Try Sci-Hub, then CrossRef public PDF links",
+  "import.step3.doiAutoDownloadTitle":
+    "Try Sci-Hub, then CrossRef public PDF links",
   "import.step3.save": "Save to library",
   "import.step3.cancel": "Cancel",
   "import.step3.selected": "Selected: {path}",
   "import.step3.notSelected": "No PDF selected yet",
+  "import.step3.sourceDecision.title": "Source decision checklist",
+  "import.step3.sourceDecision.hint":
+    "Auto-download did not finish. Select a local PDF to save this paper.",
+  "import.step3.sourceDecision.source.arxiv": "arXiv",
+  "import.step3.sourceDecision.source.scihub": "Sci-Hub",
+  "import.step3.sourceDecision.source.crossref": "CrossRef",
+  "import.step3.sourceDecision.status.failed": "Failed",
+  "import.step3.sourceDecision.status.notFound": "Not found",
+  "import.step3.sourceDecision.evidenceUrl": "Evidence URL",
+  "import.step3.sourceDecision.noEvidenceUrl": "No URL reported",
+  "import.step3.sourceDecision.reason": "Reason",
+  "import.step3.sourceDecision.rawDetail": "Show raw error",
   "import.pdfTab.desc": "Select local PDF files to add to your library.",
-  "import.pdfTab.hint": "Title, authors, DOI and other metadata are extracted from the first page. Files are copied to {path}.",
+  "import.pdfTab.hint":
+    "Title, authors, DOI and other metadata are extracted from the first page. Files are copied to {path}.",
   "import.pdfTab.pick": "Select PDF files…",
   "import.pdfTab.importBtn": "Import {count} file(s)",
   "import.pdfTab.done": "✓ Imported {ok} paper(s)",
   "import.pdfTab.doneWithFail": "✓ Imported {ok}, {fail} failed",
-  "import.pdfTab.dragHint": "You can also drag and drop PDF files anywhere in the app to import",
+  "import.pdfTab.dragHint":
+    "You can also drag and drop PDF files anywhere in the app to import",
   "import.pdfTab.pickFolder": "Import Folder…",
   "import.pdfTab.folderProgress": "Importing {done}/{total}…",
   "import.pdfTab.folderScanning": "Scanning folder…",
   "import.search.label": "Search Semantic Scholar",
   "import.search.placeholder": "e.g. attention is all you need",
-  "import.search.hint": "Results show metadata only; import requires a local PDF. arXiv entries can be auto-downloaded.",
+  "import.search.hint":
+    "Results show metadata only; import requires a local PDF. arXiv entries can be auto-downloaded.",
   "import.search.searching": "Searching…",
   "import.search.empty": "No results found.",
   "import.search.pickSave": "Select PDF then save",
@@ -326,26 +382,81 @@ export const en: Record<TKey, string> = {
   "import.saved": "✓ Saved: {title}",
   "import.downloaded": "✓ Downloaded: {title}",
   "import.downloadedSaved": "✓ Downloaded and saved: {title}",
-  "import.error.invalidId": "Enter an arXiv ID (e.g. 1706.03762) or DOI (e.g. 10.1234/xyz).",
+  "import.error.invalidId":
+    "Enter an arXiv ID (e.g. 1706.03762) or DOI (e.g. 10.1234/xyz).",
   "import.error.missingMeta": "Missing metadata or PDF path",
-  "import.error.doiNoPublicPdf": "No public PDF link was found for this DOI. Select a local PDF and save it manually.",
-  "import.error.doiPublicPdfFailed": "A public PDF link was found for this DOI, but the download failed. Select a local PDF and save it manually. Details: {detail}",
-  "import.error.doiAllMethodsFailed": "Sci-Hub and CrossRef both failed to retrieve a PDF for this DOI. Select a local PDF and save it manually. Details: {detail}",
+  "import.error.doiNoPublicPdf":
+    "No public PDF link was found for this DOI. Select a local PDF and save it manually.",
+  "import.error.doiPublicPdfFailed":
+    "A public PDF link was found for this DOI, but the download failed. Select a local PDF and save it manually. Details: {detail}",
+  "import.error.doiAllMethodsFailed":
+    "Sci-Hub and CrossRef both failed to retrieve a PDF for this DOI. Select a local PDF and save it manually. Details: {detail}",
   "import.stats.count": "Library: {count} papers",
   "import.stats.root": "{path}",
   "import.sidebar.recent": "Recent imports",
   "import.sidebar.recentLoading": "Loading…",
   "import.sidebar.recentEmpty": "No papers yet. Import one to get started.",
+  "import.sidebar.openReader": "Open reader",
+  "import.sidebar.quickRead": "Quick Read",
+  "import.sidebar.quickReadDone": "Quick Read generated.",
+  "import.sidebar.queueDone": "Added to reading queue.",
+  "import.sidebar.projectSelect": "Select project",
+  "import.sidebar.addProject": "Add to project",
+  "import.sidebar.projectDone": "Added to project.",
+  "import.sidebar.projectRequired": "Select a project first.",
+  "import.sidebar.actionFailed": "Action failed",
+  "import.jobs.title": "Import inbox",
+  "import.jobs.subtitle":
+    "Track PDF, DOI, arXiv, RSS, candidate, and search imports in one queue.",
+  "import.jobs.clearResolved": "Clear resolved",
+  "import.jobs.empty":
+    "No import jobs yet. Start an import to see metadata, PDF, and duplicate status here.",
+  "import.jobs.summaryTotal": "{count} total jobs",
+  "import.jobs.summaryActive": "{count} active",
+  "import.jobs.progressFailed": "{count} failed",
+  "import.jobs.metadata": "Metadata",
+  "import.jobs.pdf": "PDF",
+  "import.jobs.duplicate": "Duplicate",
+  "import.jobs.source.pdf": "PDF",
+  "import.jobs.source.folder": "Folder",
+  "import.jobs.source.doi": "DOI",
+  "import.jobs.source.arxiv": "arXiv",
+  "import.jobs.source.rss": "RSS",
+  "import.jobs.source.candidate": "Candidate",
+  "import.jobs.source.search": "Search",
+  "import.jobs.status.queued": "Queued",
+  "import.jobs.status.waiting": "Waiting",
+  "import.jobs.status.running": "Running",
+  "import.jobs.status.completed": "Completed",
+  "import.jobs.status.failed": "Failed",
+  "import.jobs.status.cancelled": "Cancelled",
+  "import.jobs.cancel": "Cancel",
+  "import.jobs.retry": "Retry",
+  "import.jobs.step.unknown": "Unknown",
+  "import.jobs.step.pending": "Pending",
+  "import.jobs.step.checking": "Checking",
+  "import.jobs.step.ready": "Ready",
+  "import.jobs.step.missing": "Missing",
+  "import.jobs.step.running": "Running",
+  "import.jobs.step.completed": "Completed",
+  "import.jobs.step.failed": "Failed",
+  "import.jobs.step.clear": "Clear",
+  "import.jobs.step.duplicate": "Duplicate",
+  "import.jobs.step.candidate": "Candidate",
+  "import.jobs.step.skipped": "Skipped",
 
   "topic.title": "Discover",
   "topic.tab.search": "Search recall",
   "topic.tab.survey": "Survey generation",
   "topic.search.heading": "Search recall",
-  "topic.search.subtitle": "Scan the topic for recent important papers and canonical classics, ranked by citations.",
+  "topic.search.subtitle":
+    "Scan the topic for recent important papers and canonical classics, ranked by citations.",
   "topic.search.label": "Topic",
-  "topic.search.placeholder": "e.g. retrieval augmented generation, or paste Chinese and let ✨ rewrite it",
+  "topic.search.placeholder":
+    "e.g. retrieval augmented generation, or paste Chinese and let ✨ rewrite it",
   "topic.search.expand": "✨ Expand",
-  "topic.search.expandTitle": "Rewrite the current input into precise English search terms with the LLM",
+  "topic.search.expandTitle":
+    "Rewrite the current input into precise English search terms with the LLM",
   "topic.search.expandResult": "✨ Expanded terms:",
   "topic.search.expandHint": "You can edit the input above directly",
   "topic.search.expandFailed": "Expansion failed: {message}",
@@ -366,9 +477,11 @@ export const en: Record<TKey, string> = {
   "topic.search.empty": "No results yet. Run Discover above.",
   "topic.search.saved": "Added",
   "topic.search.downloadAndImport": "Download and add",
-  "topic.search.downloadAndImportTitle": "Download the PDF from arXiv and add it to the library",
+  "topic.search.downloadAndImportTitle":
+    "Download the PDF from arXiv and add it to the library",
   "topic.search.manualOnly": "Non-arXiv · manual",
-  "topic.search.manualOnlyTitle": "Automatic download is only available for arXiv. Use Import to bind the PDF manually.",
+  "topic.search.manualOnlyTitle":
+    "Automatic download is only available for arXiv. Use Import to bind the PDF manually.",
   "topic.search.cites": "cites",
   "topic.search.influential": "influential",
 
@@ -384,23 +497,31 @@ export const en: Record<TKey, string> = {
   "topic.survey.savedTo": "Saved to {path}",
   "topic.survey.restorePlaceholder": "Restore a saved survey...",
   "topic.survey.deleteSaved": "Delete {topic}",
-  "topic.survey.progress.planning": "Planning the topic structure with the LLM…",
-  "topic.survey.progress.grounding": "Fetching real papers from Semantic Scholar…",
-  "topic.survey.progress.groundingCount": "Fetching real papers from Semantic Scholar… ({count} subareas)",
-  "topic.survey.progress.annotating": "Annotating each paper and selecting must-reads…",
+  "topic.survey.progress.planning":
+    "Planning the topic structure with the LLM…",
+  "topic.survey.progress.grounding":
+    "Fetching real papers from Semantic Scholar…",
+  "topic.survey.progress.groundingCount":
+    "Fetching real papers from Semantic Scholar… ({count} subareas)",
+  "topic.survey.progress.annotating":
+    "Annotating each paper and selecting must-reads…",
   "topic.survey.progress.done": "Done",
-  "topic.survey.emptyTitle": "Enter a research topic to generate a structured survey.",
-  "topic.survey.emptyHint": "Chinese input works too. It is translated before retrieval. The full flow takes 30–60 seconds.",
+  "topic.survey.emptyTitle":
+    "Enter a research topic to generate a structured survey.",
+  "topic.survey.emptyHint":
+    "Chinese input works too. It is translated before retrieval. The full flow takes 30–60 seconds.",
   "topic.survey.planStats": "Plan: {model} · {tokens} tk",
   "topic.survey.annotateStats": "Annotate: {model} · {tokens} tk",
-  "topic.survey.annotateSkipped": "No annotation this run, the annotation LLM failed or was disabled",
+  "topic.survey.annotateSkipped":
+    "No annotation this run, the annotation LLM failed or was disabled",
   "topic.survey.mustRead": "Must-read {count}",
   "topic.survey.keyPis": "Key researchers ({count})",
   "topic.survey.noYearLimit": "No year filter",
   "topic.survey.paperCount": "{count} papers",
   "topic.survey.mustReadCount": "{count} must-read",
   "topic.survey.searchTerms": "Search terms:",
-  "topic.survey.noPapers": "No Semantic Scholar hits in this subarea. The search terms may be too narrow or too old.",
+  "topic.survey.noPapers":
+    "No Semantic Scholar hits in this subarea. The search terms may be too narrow or too old.",
   "topic.survey.mustReadAria": "Must-read",
   "topic.survey.importDisabled": "Add",
   "topic.survey.importDisabledTitle":
@@ -409,7 +530,8 @@ export const en: Record<TKey, string> = {
   "browse.title": "Browse arXiv",
   "browse.subtitle": "arXiv latest submissions · sorted by submission time",
   "browse.fetching": "Fetching {category}…",
-  "browse.noMatchFiltered": "No matches in current results. Clear the filter or load more.",
+  "browse.noMatchFiltered":
+    "No matches in current results. Clear the filter or load more.",
   "browse.noResults": "No results. Try a different category.",
   "browse.loaded": "Loaded {count}",
   "browse.exhausted": "(end)",
@@ -425,14 +547,16 @@ export const en: Record<TKey, string> = {
     "Any OpenAI-compatible endpoint works here. Fill in the API base URL and key first, then click 📥 Fetch to discover available models.",
   "settings.emptyTitle": "No LLM profiles yet.",
   "settings.emptyHint": "Click any preset above to get started.",
-  "settings.activeMissing": "The current profile “{profile}” no longer exists. Pick a valid profile above, set it active, then save.",
+  "settings.activeMissing":
+    "The current profile “{profile}” no longer exists. Pick a valid profile above, set it active, then save.",
   "settings.saved": "✓ Saved.",
   "settings.tab.privacy": "Data & Privacy",
   "settings.tab.profiles": "LLM Profiles",
   "settings.tab.tasks": "Task Routing",
   "settings.tab.sync": "Sync",
   "settings.privacy.title": "Data and Privacy",
-  "settings.privacy.subtitle": "Local storage, model endpoints, network access, and sync visibility.",
+  "settings.privacy.subtitle":
+    "Local storage, model endpoints, network access, and sync visibility.",
   "settings.privacy.openDataDir": "Open data directory",
   "settings.privacy.storageLocation": "Storage location",
   "settings.privacy.activeEndpoint": "Active endpoint",
@@ -442,14 +566,20 @@ export const en: Record<TKey, string> = {
   "settings.privacy.syncConfigured": "WebDAV configured",
   "settings.privacy.syncNotConfigured": "Local only",
   "settings.privacy.networkTitle": "Network-using features",
-  "settings.privacy.network.llm": "LLM calls use the configured OpenAI-compatible endpoint.",
-  "settings.privacy.network.semanticScholar": "Semantic Scholar search, similar papers, topic discovery, and alerts use network requests.",
-  "settings.privacy.network.arxiv": "arXiv import and browse fetch public arXiv metadata and PDFs.",
-  "settings.privacy.network.rss": "RSS refresh fetches configured feeds and linked landing pages.",
-  "settings.privacy.network.sync": "Sync uses the configured WebDAV server only when you run sync actions.",
+  "settings.privacy.network.llm":
+    "LLM calls use the configured OpenAI-compatible endpoint.",
+  "settings.privacy.network.semanticScholar":
+    "Semantic Scholar search, similar papers, topic discovery, and alerts use network requests.",
+  "settings.privacy.network.arxiv":
+    "arXiv import and browse fetch public arXiv metadata and PDFs.",
+  "settings.privacy.network.rss":
+    "RSS refresh fetches configured feeds and linked landing pages.",
+  "settings.privacy.network.sync":
+    "Sync uses the configured WebDAV server only when you run sync actions.",
   "settings.privacy.taskBindings": "Task model bindings",
   "settings.privacy.defaultBinding": "current profile",
-  "settings.privacy.lastSyncNotTracked": "Last sync time is not recorded by the current sync config.",
+  "settings.privacy.lastSyncNotTracked":
+    "Last sync time is not recorded by the current sync config.",
   "settings.profile.deleteConfirm": "Delete this profile?",
   "settings.profile.confirm": "Confirm",
   "settings.sync.pullConfirmInline": "Confirm pull and replace local?",
@@ -459,14 +589,17 @@ export const en: Record<TKey, string> = {
   "settings.profile.apiBaseUrl": "API base URL",
   "settings.profile.apiKey": "API key",
   "settings.profile.chatModel": "Chat model",
-  "settings.profile.chatModelPlaceholder": "Click 📥 Fetch to load available models",
+  "settings.profile.chatModelPlaceholder":
+    "Click 📥 Fetch to load available models",
   "settings.profile.fetchModels": "📥 Fetch",
-  "settings.profile.fetchModelsTitle": "GET /v1/models to ask the endpoint for available models",
-  "settings.profile.modelsEmpty": "The endpoint returned no models. This key may not have access to any.",
+  "settings.profile.fetchModelsTitle":
+    "GET /v1/models to ask the endpoint for available models",
+  "settings.profile.modelsEmpty":
+    "The endpoint returned no models. This key may not have access to any.",
   "settings.profile.modelsFound": "{count} available models discovered",
   "settings.profile.embedModel": "Embedding model (optional)",
   "settings.profile.temperature": "Sampling temperature",
-  "settings.profile.testReply": "{model} replied: \"{reply}\"",
+  "settings.profile.testReply": '{model} replied: "{reply}"',
   "settings.tasks.title": "Task routing",
   "settings.tasks.hint":
     "Each task can bind to a (profile, model) pair. One profile can route different tasks to different models, so you do not need a separate profile for every model. Empty falls back to the current profile default.",
@@ -486,10 +619,12 @@ export const en: Record<TKey, string> = {
   "settings.tasks.linkHint": "Reserved for future paper linking",
   "settings.tasks.useCurrent": "— Use current ({profile}) —",
   "settings.tasks.modelPlaceholder": "Default: {model}",
-  "settings.tasks.modelTitle": "Leave empty to use the profile's default chat model, or type any compatible model name",
+  "settings.tasks.modelTitle":
+    "Leave empty to use the profile's default chat model, or type any compatible model name",
   "settings.tasks.fetchModelsTitle": "GET /v1/models for this profile",
   "settings.sync.title": "Library sync",
-  "settings.sync.hint": "Configure WebDAV to push the entire library (database, PDFs, notes and reading records) to a remote folder, or pull the full remote snapshot back to this machine.",
+  "settings.sync.hint":
+    "Configure WebDAV to push the entire library (database, PDFs, notes and reading records) to a remote folder, or pull the full remote snapshot back to this machine.",
   "settings.sync.localRoot": "Current library root",
   "settings.sync.baseUrl": "WebDAV base URL",
   "settings.sync.remotePath": "Remote folder",
@@ -501,36 +636,67 @@ export const en: Record<TKey, string> = {
   "settings.sync.test": "Test connection",
   "settings.sync.push": "Push whole library",
   "settings.sync.pull": "Pull and replace local library",
-  "settings.sync.warning": "This is whole-library sync with no auto-merge. Push updates the remote manifest; pull replaces the local library with the remote snapshot and restarts the app afterwards.",
-  "settings.sync.localHttpWarning": "Local HTTP WebDAV is for development on this machine only. Use HTTPS for any remote server.",
-  "settings.sync.httpsRequired": "Use an HTTPS WebDAV URL. Plain HTTP is accepted only for localhost testing.",
-  "settings.sync.pullConfirm": "This will replace the local library with the full remote snapshot and restart the app afterwards. Continue?",
+  "settings.sync.warning":
+    "This is whole-library sync with no auto-merge. Push updates the remote manifest; pull replaces the local library with the remote snapshot and restarts the app afterwards.",
+  "settings.sync.localHttpWarning":
+    "Local HTTP WebDAV is for development on this machine only. Use HTTPS for any remote server.",
+  "settings.sync.httpsRequired":
+    "Use an HTTPS WebDAV URL. Plain HTTP is accepted only for localhost testing.",
+  "settings.sync.pullConfirm":
+    "This will replace the local library with the full remote snapshot and restart the app afterwards. Continue?",
   "settings.sync.saved": "✓ Sync config saved.",
   "settings.sync.testOk": "✓ Connected to {remote}",
-  "settings.sync.pushOk": "✓ Uploaded {count} files, {size} total; skipped {skippedCount} already-synced files → {remote}",
-  "settings.sync.pullOk": "✓ Downloaded {count} files, {size} total; skipped {skippedCount} already-synced files ← {remote}; backup: {backupPath}; the app will restart",
+  "settings.sync.pushOk":
+    "✓ Uploaded {count} files, {size} total; skipped {skippedCount} already-synced files → {remote}",
+  "settings.sync.pullOk":
+    "✓ Downloaded {count} files, {size} total; skipped {skippedCount} already-synced files ← {remote}; backup: {backupPath}; the app will restart",
+  "settings.sync.previewPush": "Preview push",
+  "settings.sync.previewPull": "Preview pull",
+  "settings.sync.previewPushTitle": "Push preview",
+  "settings.sync.previewPullTitle": "Pull preview",
+  "settings.sync.previewSummary":
+    "Add {add} / replace {update} / delete {delete} / unchanged {unchanged} / estimated transfer {size}",
+  "settings.sync.previewHint": "Preview does not modify local or remote files.",
+  "settings.sync.previewRemote": "Remote: {remote}",
+  "settings.sync.previewRestartRequired":
+    "The app needs to restart after pull completes.",
+  "settings.sync.previewBackup":
+    "A backup will be created before pull: {backupPath}",
+  "settings.sync.previewNoChanges": "No sync changes needed.",
+  "settings.sync.previewChanges": "Change list",
+  "settings.sync.previewMore": "{count} more items hidden.",
+  "settings.sync.previewAction.uploadNew": "Upload new",
+  "settings.sync.previewAction.uploadReplace": "Upload replace",
+  "settings.sync.previewAction.deleteRemote": "Delete remote",
+  "settings.sync.previewAction.downloadNew": "Download new",
+  "settings.sync.previewAction.downloadReplace": "Download replace",
+  "settings.sync.previewAction.deleteLocal": "Delete local",
 
   "reader.back": "Back",
   "reader.backToLibrary": "Back to library",
   "reader.noId": "Missing paperId",
   "reader.notFound": "Paper not found",
   "reader.noPdf": "This paper has no PDF bound yet",
-  "reader.noPdfHint": "Go to Library and click 📎 to add a PDF, then come back to read.",
+  "reader.noPdfHint":
+    "Go to Library and click 📎 to add a PDF, then come back to read.",
   "reader.loadingPdf": "Loading PDF…",
   "reader.pdfLoadFailed": "Failed to load PDF",
   "reader.pdfRenderFailed": "PDF render failed",
-  "reader.pdfErrorHint": "Send these error details to the developer. DevTools is not required.",
+  "reader.pdfErrorHint":
+    "Send these error details to the developer. DevTools is not required.",
   "reader.copyErrorDetails": "Copy error details",
   "reader.errorDetailsCopied": "Error details copied",
   "reader.unknownError": "Unknown error",
-  "reader.openConsole": "Error details are shown on the page. Open DevTools only if more diagnostics are needed.",
+  "reader.openConsole":
+    "Error details are shown on the page. Open DevTools only if more diagnostics are needed.",
   "reader.darkMode": "Dark",
   "reader.lightMode": "Light",
   "reader.darkModeTitle": "Switch to dark PDF (inverted)",
   "reader.lightModeTitle": "Switch to light PDF",
   "reader.highlights": "Highlights",
   "reader.terms": "Terms",
-  "reader.statusBar": "{highlights} highlights · {terms} terms · Ctrl+F search · Alt+drag area highlight",
+  "reader.statusBar":
+    "{highlights} highlights · {terms} terms · Ctrl+F search · Alt+drag area highlight",
   "reader.addHighlight": "Add highlight",
   "reader.translateSelection": "Translate selection",
   "reader.addTerm": "Add term",
@@ -542,27 +708,38 @@ export const en: Record<TKey, string> = {
   "reader.tabTranslate": "Translate",
   "reader.tabTerms": "Terms",
   "reader.card.problem": "Problem",
-  "reader.card.problemPlaceholder": "What problem does this paper address, and why does it matter?",
+  "reader.card.problemPlaceholder":
+    "What problem does this paper address, and why does it matter?",
   "reader.card.method": "Method",
-  "reader.card.methodPlaceholder": "What method, model, system, or theoretical move does it use?",
+  "reader.card.methodPlaceholder":
+    "What method, model, system, or theoretical move does it use?",
   "reader.card.keyFindings": "Key findings",
-  "reader.card.keyFindingsPlaceholder": "Record the main claims or results you may cite later.",
+  "reader.card.keyFindingsPlaceholder":
+    "Record the main claims or results you may cite later.",
   "reader.card.evidence": "Evidence",
-  "reader.card.evidencePlaceholder": "Add page numbers, highlighted excerpts, or source-backed observations.",
+  "reader.card.evidencePlaceholder":
+    "Add page numbers, highlighted excerpts, or source-backed observations.",
   "reader.card.limitations": "Limitations",
-  "reader.card.limitationsPlaceholder": "What assumptions, gaps, or weak evidence should be remembered?",
+  "reader.card.limitationsPlaceholder":
+    "What assumptions, gaps, or weak evidence should be remembered?",
   "reader.card.datasets": "Datasets",
-  "reader.card.datasetsPlaceholder": "Datasets, samples, corpora, instruments, or experimental conditions.",
+  "reader.card.datasetsPlaceholder":
+    "Datasets, samples, corpora, instruments, or experimental conditions.",
   "reader.card.metrics": "Metrics",
-  "reader.card.metricsPlaceholder": "Metrics, baselines, effect sizes, performance numbers, or evaluation criteria.",
+  "reader.card.metricsPlaceholder":
+    "Metrics, baselines, effect sizes, performance numbers, or evaluation criteria.",
   "reader.card.projectRelation": "Relation to my project",
-  "reader.card.projectRelationPlaceholder": "How does this paper support, challenge, or redirect your current work?",
+  "reader.card.projectRelationPlaceholder":
+    "How does this paper support, challenge, or redirect your current work?",
   "reader.card.quotes": "Cite-worthy quotes",
-  "reader.card.quotesPlaceholder": "Paste exact quotes with page numbers or locations.",
+  "reader.card.quotesPlaceholder":
+    "Paste exact quotes with page numbers or locations.",
   "reader.card.openQuestions": "Open questions",
-  "reader.card.openQuestionsPlaceholder": "Questions to verify, follow-up readings, or claims that need stronger evidence.",
+  "reader.card.openQuestionsPlaceholder":
+    "Questions to verify, follow-up readings, or claims that need stronger evidence.",
   "reader.card.defaultPlaceholder": "Write reading notes here.",
-  "reader.highlightType": "Highlight type",
+  "reader.highlightType": "Type",
+  "reader.highlightTypeHint": "PDF and list colors follow this type.",
   "reader.highlightType.none": "No type",
   "reader.highlightType.background": "Background",
   "reader.highlightType.motivation": "Motivation",
@@ -573,9 +750,11 @@ export const en: Record<TKey, string> = {
   "reader.highlightType.comparison": "Comparison",
   "reader.highlightType.quote": "Quote",
   "reader.highlightType.question": "Question",
-  "reader.addEvidence": "Add evidence",
-  "reader.evidenceProject": "Evidence project",
-  "reader.evidenceAdded": "Evidence added.",
+  "reader.addEvidence": "Save evidence",
+  "reader.evidenceProject": "Save to project",
+  "reader.evidenceProjectHint":
+    "Save this highlight as evidence for the selected project.",
+  "reader.evidenceAdded": "Saved as evidence.",
   "ask.addEvidence": "Add evidence",
   "ask.evidenceProject": "Evidence project",
   "ask.evidenceAdded": "Answer added to evidence.",
@@ -586,7 +765,10 @@ export const en: Record<TKey, string> = {
   "reader.explain": "Explain",
   "reader.reExplain": "Re-explain",
   "reader.explainLabel": "Explanation",
-  "reader.explaining": "Explaining the highlighted passage with full-text context…",
+  "reader.explainHint":
+    "Explains purpose, cause, and limits with paper context.",
+  "reader.explaining":
+    "Explaining the highlighted passage with full-text context…",
   "reader.expandExplanation": "Expand",
   "reader.collapseExplanation": "Collapse",
   "reader.collapseOriginal": "Hide original",
@@ -595,24 +777,30 @@ export const en: Record<TKey, string> = {
   "reader.commentPlaceholder": "Comment on this highlight…",
   "reader.translating": "Analyzing terms and translating…",
   "reader.translateFailed": "Translation failed",
-  "reader.translateEmpty": "Select text in the PDF, then click 'Translate' to see a bilingual comparison, term definitions, and cross-paper references.",
+  "reader.translateEmpty":
+    "Select text in the PDF, then click 'Translate' to see a bilingual comparison, term definitions, and cross-paper references.",
   "reader.original": "Original",
   "reader.translated": "Translation",
   "reader.termNetwork": "Term network",
   "reader.noTerms": "No cross-referenceable terms found in this selection.",
   "reader.paperEvidence": "Evidence in this paper",
   "reader.crossReference": "Cross-paper references",
-  "reader.notePlaceholder": "Write notes in Markdown… auto-saved to papers/<id>/note.md",
+  "reader.notePlaceholder":
+    "Write notes in Markdown… auto-saved to papers/<id>/note.md",
   "reader.loadingNote": "Loading note…",
   "reader.saveFailed": "Save failed",
   "reader.saving": "Saving…",
   "reader.unsaved": "Unsaved",
   "reader.saved": "Saved",
   "reader.onboard.title": "Reading workspace",
-  "reader.onboard.highlights": "The left pane shows your highlights. Click one to jump to its location in the PDF.",
-  "reader.onboard.pdf": "The center pane is the PDF reader. Select text to add highlights, translate, or mark terms.",
-  "reader.onboard.workspace": "The right pane is your workspace with notes, translation, and terms tabs.",
-  "reader.onboard.shortcuts": "Shortcuts: Ctrl+F search · Alt+drag area highlight · j/k navigate highlights",
+  "reader.onboard.highlights":
+    "The left pane shows your highlights. Click one to jump to its location in the PDF.",
+  "reader.onboard.pdf":
+    "The center pane is the PDF reader. Select text to add highlights, translate, or mark terms.",
+  "reader.onboard.workspace":
+    "The right pane is your workspace with notes, translation, and terms tabs.",
+  "reader.onboard.shortcuts":
+    "Shortcuts: Ctrl+F search · Alt+drag area highlight · j/k navigate highlights",
   "reader.onboard.gotIt": "Got it",
 
   "reader.renderingPdf": "Rendering…",
@@ -642,15 +830,18 @@ export const en: Record<TKey, string> = {
   "reader.doiSelfLink": "Cannot link the current paper to itself",
   "reader.termsLoading": "Loading terms…",
   "reader.termsTitle": "Paper terms",
-  "reader.termsSubtitle": "Used for selection translation reuse; can also be attached to hover tooltips later.",
+  "reader.termsSubtitle":
+    "Used for selection translation reuse; can also be attached to hover tooltips later.",
   "reader.termsGenerate": "Generate terms",
   "reader.termsRebuild": "Rebuild terms",
   "reader.termsGenerateFailed": "Term generation failed: {message}",
   "reader.termsExplainFailed": "Term explanation failed: {message}",
   "reader.termsExtracting": "Extracting candidate terms…",
-  "reader.termsExplaining": "Candidate terms are ready. Generating explanations…",
+  "reader.termsExplaining":
+    "Candidate terms are ready. Generating explanations…",
   "reader.termsPendingDefinition": "Waiting for model explanation",
-  "reader.termsEmpty": "This paper has no terms yet. Click \"Generate terms\" above to extract candidate terms and generate reusable definitions.",
+  "reader.termsEmpty":
+    'This paper has no terms yet. Click "Generate terms" above to extract candidate terms and generate reusable definitions.',
   "reader.termsRemove": "Remove term",
   "reader.termsEvidence": "Evidence in this paper",
   "reader.termsCrossRef": "Cross-paper references",
@@ -662,7 +853,8 @@ export const en: Record<TKey, string> = {
   "reader.toggleWorkspace": "Collapse / expand notes panel",
 
   "export.title": "Export",
-  "export.subtitle": "Export paper notes, highlights, and terms as Markdown files",
+  "export.subtitle":
+    "Export paper notes, highlights, and terms as Markdown files",
   "export.dirLabel": "Export directory",
   "export.dirPlaceholder": "Choose export directory…",
   "export.dirHint": "Exported .md files will be saved to this directory",
@@ -674,7 +866,8 @@ export const en: Record<TKey, string> = {
   "export.noDir": "Please set an export directory first",
 
   "drop.title": "Drop PDFs here",
-  "drop.hint": "Release to import — DOI and metadata are extracted automatically",
+  "drop.hint":
+    "Release to import — DOI and metadata are extracted automatically",
   "drop.importing": "Importing…",
   "drop.done": "✓ Imported {ok} paper(s)",
   "drop.doneWithFail": "✓ Imported {ok} · ✕ Failed {fail}",
@@ -700,7 +893,8 @@ export const en: Record<TKey, string> = {
   "graph.aiDiscovering": "Analyzing papers…",
   "graph.aiDiscoverDone": "Found {count} new relationships",
   "graph.noGraph": "No relationships yet",
-  "graph.noGraphHint": "Create links between papers manually, or use AI Discover to find implicit connections.",
+  "graph.noGraphHint":
+    "Create links between papers manually, or use AI Discover to find implicit connections.",
   "graph.addLink": "Add link",
   "graph.addLinkTitle": "Create a relationship between two papers",
   "graph.sourcePaper": "Source paper",
@@ -746,8 +940,10 @@ export const en: Record<TKey, string> = {
   "similar.title": "Similar Papers",
   "similar.find": "Find Similar Papers",
   "similar.searching": "Searching…",
-  "similar.hint": "Click the button above to get recommendations from Semantic Scholar based on DOI or arXiv ID",
-  "similar.empty": "No similar papers found, or all are already in your library",
+  "similar.hint":
+    "Click the button above to get recommendations from Semantic Scholar based on DOI or arXiv ID",
+  "similar.empty":
+    "No similar papers found, or all are already in your library",
   "similar.add": "Add to Library",
   "citations.title": "Export Citations",
   "citations.format": "Format",
@@ -796,7 +992,8 @@ export const en: Record<TKey, string> = {
   "litReview.groupDomain": "By Application Domain",
   "litReview.generate": "Generate",
   "litReview.generating": "Generating literature review, please wait…",
-  "litReview.hint": "Select a grouping strategy and click Generate — AI will draft a structured literature review",
+  "litReview.hint":
+    "Select a grouping strategy and click Generate — AI will draft a structured literature review",
   "litReview.saveAsNote": "Save as Note",
   "litReview.copy": "Copy",
   "litReview.copied": "Copied",
@@ -831,7 +1028,8 @@ export const en: Record<TKey, string> = {
   "smartCollections.opGte": "at least",
   "smartCollections.opLte": "at most",
   "dedup.title": "Find Duplicates",
-  "dedup.description": "Scan the library for records with the same DOI, same arXiv ID, or highly similar titles. When merging, the selected record keeps its metadata while highlights, notes, and tags move over.",
+  "dedup.description":
+    "Scan the library for records with the same DOI, same arXiv ID, or highly similar titles. When merging, the selected record keeps its metadata while highlights, notes, and tags move over.",
   "dedup.scan": "Scan",
   "dedup.scanning": "Scanning…",
   "dedup.noDuplicates": "No duplicates found",
@@ -843,18 +1041,23 @@ export const en: Record<TKey, string> = {
   "dedup.keepLeft": "Keep Left",
   "dedup.keepRight": "Keep Right",
   "dedup.dismiss": "Dismiss",
-  "dedup.mergeConfirm": "The merged paper keeps the selected record's metadata; highlights, notes, and tags from the other will be transferred. Proceed?",
+  "dedup.mergeConfirm":
+    "The merged paper keeps the selected record's metadata; highlights, notes, and tags from the other will be transferred. Proceed?",
   "settings.tab.tools": "Tools",
   "pdfMarkdown.title": "PDF to Markdown",
-  "pdfMarkdown.description": "After importing or binding a PDF, generate document.md automatically and index it for full-text retrieval. MinerU failures fall back to local conversion.",
+  "pdfMarkdown.description":
+    "After importing or binding a PDF, generate document.md automatically and index it for full-text retrieval. MinerU failures fall back to local conversion.",
   "pdfMarkdown.docsLink": "MinerU docs",
   "pdfMarkdown.engineLabel": "Conversion engine",
   "pdfMarkdown.engine.local": "Local lopdf",
-  "pdfMarkdown.engine.localHint": "Default option, no network required. Quality depends on the PDF font and text layer.",
+  "pdfMarkdown.engine.localHint":
+    "Default option, no network required. Quality depends on the PDF font and text layer.",
   "pdfMarkdown.engine.agent": "MinerU Agent API",
-  "pdfMarkdown.engine.agentHint": "No token required. Best for PDFs within 10MB / 20 pages. Uses network parsing.",
+  "pdfMarkdown.engine.agentHint":
+    "No token required. Best for PDFs within 10MB / 20 pages. Uses network parsing.",
   "pdfMarkdown.engine.precise": "MinerU Precise API",
-  "pdfMarkdown.engine.preciseHint": "Requires a token, uses the vlm model, and targets higher-quality parsing.",
+  "pdfMarkdown.engine.preciseHint":
+    "Requires a token, uses the vlm model, and targets higher-quality parsing.",
   "pdfMarkdown.tokenLabel": "MinerU Token",
   "pdfMarkdown.tokenPlaceholder": "Paste MinerU API token",
   "pdfMarkdown.tokenHint": "Get a token here:",
@@ -869,12 +1072,15 @@ export const en: Record<TKey, string> = {
   "customFields.options": "Options (comma-separated)",
   "customFields.delete": "Delete Field",
   "customFields.noFields": "No custom fields yet",
-  "customFields.description": "Add your own structured metadata to papers, such as platform, sample type, evidence level, or project.",
-  "customFields.empty": "No fields yet. Create one, then fill it from each paper detail view.",
+  "customFields.description":
+    "Add your own structured metadata to papers, such as platform, sample type, evidence level, or project.",
+  "customFields.empty":
+    "No fields yet. Create one, then fill it from each paper detail view.",
   "customFields.setValue": "Set Value",
 
   "alerts.title": "Topic Alerts",
-  "alerts.description": "Run a saved search against Semantic Scholar on a schedule and keep newly found papers as alert results.",
+  "alerts.description":
+    "Run a saved search against Semantic Scholar on a schedule and keep newly found papers as alert results.",
   "alerts.create": "New Alert",
   "alerts.query": "Search query",
   "alerts.frequency": "Frequency",
@@ -885,8 +1091,10 @@ export const en: Record<TKey, string> = {
   "alerts.run": "Check now",
   "alerts.running": "Checking…",
   "alerts.delete": "Delete alert",
-  "alerts.noAlerts": "No topic alerts yet. Create one to monitor research topics.",
-  "alerts.empty": "No alerts yet. Create one, then check manually or run it on launch, daily, or weekly.",
+  "alerts.noAlerts":
+    "No topic alerts yet. Create one to monitor research topics.",
+  "alerts.empty":
+    "No alerts yet. Create one, then check manually or run it on launch, daily, or weekly.",
   "alerts.lastRun": "Last checked",
   "alerts.never": "Never",
   "alerts.results": "New findings",
@@ -908,7 +1116,7 @@ export const en: Record<TKey, string> = {
   "concepts.name": "Concept Name",
   "concepts.description": "Description",
   "concepts.delete": "Delete Concept",
-  "concepts.deleteConfirm": "Delete concept \"{name}\"?",
+  "concepts.deleteConfirm": 'Delete concept "{name}"?',
   "concepts.relations": "Relations",
   "concepts.noRelations": "No concept relations yet",
   "concepts.addRelation": "Add Relation",
@@ -936,7 +1144,8 @@ export const en: Record<TKey, string> = {
   "graph.concepts": "Concepts",
 
   "update.section": "App updates",
-  "update.sectionHint": "Fetch and install the latest version from GitHub Releases.",
+  "update.sectionHint":
+    "Fetch and install the latest version from GitHub Releases.",
   "update.check": "Check for updates",
   "update.checking": "Checking…",
   "update.title": "LitFolio Update",
@@ -945,5 +1154,18 @@ export const en: Record<TKey, string> = {
   "update.upToDate": "You're on the latest version.",
   "update.declined": "Update cancelled.",
   "update.unsupported": "Updates are only available in the desktop app.",
+  "update.busy": "An update check is already running. Try again shortly.",
+  "update.stage.checking": "Contacting the update server…",
+  "update.stage.available":
+    "Version {version} found, waiting for confirmation…",
+  "update.stage.downloading": "Downloading update…",
+  "update.stage.installing": "Download complete, installing…",
+  "update.stage.relaunching": "Install complete, preparing restart…",
+  "update.progressBytes": "Downloaded {downloaded} / {total} ({percent}%)",
+  "update.progressDownloaded": "Downloaded {downloaded}",
+  "update.progressUnknown":
+    "Downloading. The server did not report the total size.",
+  "update.stalled":
+    "No new progress for over 60 seconds. Windows may still be working in the background. Keep the network connected; if it does not recover, retry later or download manually.",
   "update.failed": "Update check failed: {message}",
 };

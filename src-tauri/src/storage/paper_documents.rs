@@ -14,6 +14,13 @@ pub struct PaperDocumentIndexStatus {
     pub indexed_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaperDocumentIndexCounts {
+    pub indexed: i64,
+    pub failed: i64,
+    pub total: i64,
+}
+
 pub struct PaperDocumentRepo<'a> {
     pool: &'a Pool,
 }
@@ -60,6 +67,23 @@ impl<'a> PaperDocumentRepo<'a> {
         .execute(self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn index_counts(&self) -> Result<PaperDocumentIndexCounts> {
+        let row = sqlx::query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN index_status = 'indexed' THEN 1 ELSE 0 END), 0) AS indexed,
+                COALESCE(SUM(CASE WHEN index_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed,
+                COUNT(*) AS total
+             FROM paper_documents",
+        )
+        .fetch_one(self.pool)
+        .await?;
+        Ok(PaperDocumentIndexCounts {
+            indexed: row.try_get("indexed")?,
+            failed: row.try_get("failed")?,
+            total: row.try_get("total")?,
+        })
     }
 
     pub async fn index_status_for_papers(

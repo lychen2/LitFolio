@@ -12,7 +12,7 @@ use super::common::{
 use crate::bibtex::generate_bibtex;
 use crate::commands::events::emit_or_warn;
 use crate::ingest::{fetch_doi, import_pdf_file};
-use crate::storage::{LibraryPaths, Paper, PaperRepo, Pool};
+use crate::storage::{JobDraft, JobProgress, JobRepo, LibraryPaths, Paper, PaperRepo, Pool};
 use crate::AppState;
 
 #[derive(serde::Serialize, Clone)]
@@ -33,6 +33,19 @@ pub async fn import_folder(
     let library = state.paths.clone();
     let http = state.http.clone();
     let pool = state.pool.clone();
+    let dir = PathBuf::from(&dir_path);
+    let job_repo = JobRepo::new(&state.pool);
+    let job = job_repo
+        .create(&JobDraft {
+            kind: "folder_import".into(),
+            scope: Some(dir_path.clone()),
+            title: format!("Import PDF folder: {}", dir.display()),
+            details: serde_json::json!({ "dir_path": dir_path }),
+            max_attempts: Some(3),
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    job_repo.start(&job.id).await.map_err(|e| e.to_string())?;
 
     // 1. Scan directory recursively for PDFs
     emit_or_warn(
@@ -47,11 +60,21 @@ pub async fn import_folder(
         },
     );
 
-    let dir = PathBuf::from(&dir_path);
     let pdf_paths = walk_pdfs(&dir);
     let total = pdf_paths.len();
+    job_repo
+        .update_progress(
+            &job.id,
+            JobProgress {
+                current: 0,
+                total: total as i64,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
 
     if total == 0 {
+        job_repo.succeed(&job.id).await.map_err(|e| e.to_string())?;
         return Ok(PdfImportSummary {
             imported: Vec::new(),
             failed: Vec::new(),
@@ -80,6 +103,16 @@ pub async fn import_folder(
                 Ok(paper) => imported.push(paper),
                 Err(failure) => failed.push(failure),
             }
+            job_repo
+                .update_progress(
+                    &job.id,
+                    JobProgress {
+                        current: done as i64,
+                        total: total as i64,
+                    },
+                )
+                .await
+                .map_err(|e| e.to_string())?;
             emit_or_warn(
                 &app,
                 "folder-import-progress",
@@ -105,6 +138,15 @@ pub async fn import_folder(
             failed: failed.len(),
         },
     );
+
+    if failed.is_empty() {
+        job_repo.succeed(&job.id).await.map_err(|e| e.to_string())?;
+    } else {
+        job_repo
+            .fail(&job.id, &format!("{} of {total} PDFs failed", failed.len()))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
 
     Ok(PdfImportSummary { imported, failed })
 }

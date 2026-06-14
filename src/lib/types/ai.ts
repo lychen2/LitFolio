@@ -113,6 +113,44 @@ export interface AskLibraryResult {
   retrieved_count: number;
 }
 
+export type AskCapabilityKind =
+  | "search_only"
+  | "needs_model"
+  | "answer_ready"
+  | "indexing"
+  | "degraded";
+
+export interface AskCapabilityState {
+  state: AskCapabilityKind;
+  has_model: boolean;
+  indexed_documents: number;
+  failed_documents: number;
+  total_documents: number;
+  reason: string | null;
+}
+
+export interface AskSession {
+  id: string;
+  project_id: number | null;
+  title: string;
+  pinned_paper_ids: string[];
+  model: string | null;
+  conversation: unknown;
+  saved_artifacts: unknown;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AskSessionDraft {
+  id?: string | null;
+  project_id?: number | null;
+  title: string;
+  pinned_paper_ids: string[];
+  model?: string | null;
+  conversation: unknown;
+  saved_artifacts: unknown;
+}
+
 export interface SaveAskNoteInput {
   question: string;
   answer: string;

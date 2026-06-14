@@ -15,7 +15,7 @@ pub(super) fn build_sources(
     document_snippets: &HashMap<String, String>,
     terms: &[String],
 ) -> Vec<AskSource> {
-    papers
+    let mut sources = papers
         .iter()
         .filter_map(|p| {
             let hl = highlights.get(&p.id).map(Vec::as_slice).unwrap_or(&[]);
@@ -24,15 +24,20 @@ pub(super) fn build_sources(
             if snippet.is_empty() {
                 return None;
             }
-            Some(AskSource {
-                paper_id: p.id.clone(),
-                title: p.title.clone(),
-                year: p.year,
-                authors: p.authors.clone(),
-                snippet,
-            })
+            Some((
+                paper_relevance_score(p, &snippet, terms),
+                AskSource {
+                    paper_id: p.id.clone(),
+                    title: p.title.clone(),
+                    year: p.year,
+                    authors: p.authors.clone(),
+                    snippet,
+                },
+            ))
         })
-        .collect()
+        .collect::<Vec<_>>();
+    sources.sort_by(|a, b| b.0.cmp(&a.0));
+    sources.into_iter().map(|(_, source)| source).collect()
 }
 
 fn paper_snippet(
@@ -45,27 +50,10 @@ fn paper_snippet(
     push_part(&mut parts, "TL;DR", p.tldr.as_deref());
     push_part(&mut parts, "Abstract", p.abstract_text.as_deref());
     push_part(&mut parts, "Document excerpts (Markdown)", document_snippet);
-
-    let terms_lower: Vec<String> = terms.iter().map(|t| t.to_lowercase()).collect();
-    push_if_relevant(
-        &mut parts,
-        "Problem",
-        p.research_question.as_deref(),
-        &terms_lower,
-    );
-    push_if_relevant(&mut parts, "Method", p.method.as_deref(), &terms_lower);
-    push_if_relevant(
-        &mut parts,
-        "Comparison",
-        p.comparison.as_deref(),
-        &terms_lower,
-    );
-    push_if_relevant(
-        &mut parts,
-        "Limitations",
-        p.limitations.as_deref(),
-        &terms_lower,
-    );
+    push_if_relevant(&mut parts, "Problem", p.research_question.as_deref(), terms);
+    push_if_relevant(&mut parts, "Method", p.method.as_deref(), terms);
+    push_if_relevant(&mut parts, "Comparison", p.comparison.as_deref(), terms);
+    push_if_relevant(&mut parts, "Limitations", p.limitations.as_deref(), terms);
 
     if !p.key_findings.is_empty() {
         parts.push(format!("Key findings: {}", p.key_findings.join("; ")));
@@ -96,15 +84,47 @@ fn push_part(parts: &mut Vec<String>, label: &str, value: Option<&str>) {
 
 fn push_if_relevant(parts: &mut Vec<String>, label: &str, value: Option<&str>, terms: &[String]) {
     if let Some(text) = value.map(str::trim).filter(|s| !s.is_empty()) {
-        if terms.is_empty() {
-            parts.push(format!("{label}: {text}"));
-            return;
-        }
-        let text_lower = text.to_lowercase();
-        if terms.iter().any(|t| text_lower.contains(t.as_str())) {
+        if terms.is_empty() || token_overlap_score(text, terms) > 0 {
             parts.push(format!("{label}: {text}"));
         }
     }
+}
+
+fn paper_relevance_score(paper: &Paper, snippet: &str, terms: &[String]) -> usize {
+    title_overlap_score(&paper.title, terms) * 4 + token_overlap_score(snippet, terms)
+}
+
+fn title_overlap_score(title: &str, terms: &[String]) -> usize {
+    token_overlap_score(title, terms)
+}
+
+fn token_overlap_score(text: &str, terms: &[String]) -> usize {
+    if terms.is_empty() {
+        return 0;
+    }
+    let tokens = text_tokens(text);
+    terms
+        .iter()
+        .map(|term| {
+            text_tokens(term)
+                .into_iter()
+                .filter(|token| tokens.contains(token))
+                .count()
+        })
+        .sum()
+}
+
+fn text_tokens(text: &str) -> Vec<String> {
+    let mut tokens = text
+        .split(|ch: char| !ch.is_alphanumeric())
+        .filter_map(|raw| {
+            let token = raw.trim().to_lowercase();
+            (token.chars().count() >= 3).then_some(token)
+        })
+        .collect::<Vec<_>>();
+    tokens.sort();
+    tokens.dedup();
+    tokens
 }
 
 pub(super) fn build_context(sources: &[AskSource]) -> String {
@@ -222,6 +242,41 @@ mod tests {
         let sources = build_sources(&[paper()], &highlights, &documents, &["methods".into()]);
         assert_eq!(sources.len(), 1);
         assert!(!sources[0].snippet.contains("Comparison"));
+    }
+
+    #[test]
+    fn relevance_filter_uses_token_overlap() {
+        let highlights = HashMap::new();
+        let documents = HashMap::new();
+        let mut paper = paper();
+        paper.method = Some("Uses graph neural networks for citation ranking".into());
+        let sources = build_sources(
+            &[paper],
+            &highlights,
+            &documents,
+            &["neural ranking".into()],
+        );
+        assert!(sources[0].snippet.contains("Method"));
+    }
+
+    #[test]
+    fn title_overlap_ranks_source_first() {
+        let highlights = HashMap::new();
+        let documents = HashMap::new();
+        let mut title_hit = paper();
+        title_hit.id = "title".into();
+        title_hit.title = "Graph Retrieval for Scientific Papers".into();
+        let mut body_hit = paper();
+        body_hit.id = "body".into();
+        body_hit.title = "Unrelated".into();
+        body_hit.tldr = Some("Graph retrieval appears in the abstract body".into());
+        let sources = build_sources(
+            &[body_hit, title_hit],
+            &highlights,
+            &documents,
+            &["graph retrieval".into()],
+        );
+        assert_eq!(sources[0].paper_id, "title");
     }
 
     fn paper() -> Paper {

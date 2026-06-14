@@ -88,6 +88,7 @@ function ReaderSinglePane({
     queryFn: () => api.paperGet(paperId),
   });
   const scrollFn = useRef<((id: string) => void) | null>(null);
+  const pendingJumpId = useRef<string | null>(null);
   const highlightsRef = useRef<Array<{ id: string }>>([]);
   const currentHighlightIdx = useRef<number>(-1);
   const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
@@ -112,6 +113,10 @@ function ReaderSinglePane({
 
   const handleScrollRef = useCallback((fn: (id: string) => void) => {
     scrollFn.current = fn;
+    if (pendingJumpId.current) {
+      fn(pendingJumpId.current);
+      pendingJumpId.current = null;
+    }
   }, []);
   const handleTranslateSelection = useCallback((text: string) => {
     setSelectionTextRef.current?.(text);
@@ -121,7 +126,11 @@ function ReaderSinglePane({
     setSelectionTextRef.current = setter;
   }, []);
   const handleJump = useCallback((h: { id: string }) => {
-    scrollFn.current?.(h.id);
+    if (!scrollFn.current) {
+      pendingJumpId.current = h.id;
+      return;
+    }
+    scrollFn.current(h.id);
   }, []);
 
   useEffect(() => {

@@ -18,7 +18,8 @@ mod translate;
 pub use client::{chat_complete, ChatMessage};
 pub use concept_extract::{extract_concepts, ExtractedConcept};
 pub use library_qa::{
-    answer_library_question, empty_result, AskLibraryResult, AskSource, LibraryQuestionRequest,
+    answer_library_question, empty_result, local_search_result, AskLibraryResult, AskSource,
+    LibraryQuestionRequest,
 };
 pub use link_discover::discover_links;
 pub use lit_review::{generate_review, GroupingStrategy, LitReviewResult};

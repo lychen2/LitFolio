@@ -1,4 +1,6 @@
 import type {
+  AskCapabilityState,
+  AskSession,
   ArxivDraft,
   CandidatePaper,
   CandidateStatus,
@@ -9,6 +11,8 @@ import type {
   GraphEdge,
   GraphNode,
   Highlight,
+  JobRecord,
+  JobStatus,
   LlmConfig,
   LlmProfile,
   Paper,
@@ -36,7 +40,13 @@ import {
   stringField,
   type Shape,
 } from "./apiSchemaCore";
-import type { SyncReport } from "./syncApi";
+import type {
+  SyncPreviewAction,
+  SyncPreviewChange,
+  SyncPreviewDirection,
+  SyncPreviewReport,
+  SyncReport,
+} from "./syncApi";
 
 const READ_STATUSES = new Set<ReadStatus>([
   "unread",
@@ -63,6 +73,31 @@ const PDF_MARKDOWN_ENGINES = new Set([
 ]);
 const NODE_TYPES = new Set(["paper", "concept"]);
 const EDGE_SOURCE_TYPES = new Set(["user", "ai", "derived"]);
+const SYNC_PREVIEW_DIRECTIONS = new Set<SyncPreviewDirection>(["push", "pull"]);
+const SYNC_PREVIEW_ACTIONS = new Set<SyncPreviewAction>([
+  "upload_new",
+  "upload_replace",
+  "delete_remote",
+  "download_new",
+  "download_replace",
+  "delete_local",
+]);
+const JOB_STATUSES = new Set<JobStatus>([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+const ASK_CAPABILITY_STATES = new Set([
+  "search_only",
+  "needs_model",
+  "answer_ready",
+  "indexing",
+  "degraded",
+]);
+
+
 
 export function parsePaper(value: unknown, path = "Paper"): Paper {
   const obj = object(value, path);
@@ -117,6 +152,72 @@ export function parsePdfImportSummary(
     ),
   };
 }
+
+export function parseAskSession(value: unknown, path = "AskSession"): AskSession {
+  const obj = object(value, path);
+  return {
+    id: stringField(obj, "id", path),
+    project_id: nullableNumberField(obj, "project_id", path),
+    title: stringField(obj, "title", path),
+    pinned_paper_ids: stringArrayField(obj, "pinned_paper_ids", path),
+    model: nullableStringField(obj, "model", path),
+    conversation: field(obj, "conversation", path),
+    saved_artifacts: field(obj, "saved_artifacts", path),
+    created_at: numberField(obj, "created_at", path),
+    updated_at: numberField(obj, "updated_at", path),
+  };
+}
+
+export function parseAskSessionMaybe(
+  value: unknown,
+  path = "AskSession | null"
+): AskSession | null {
+  if (value === null || value === undefined) return null;
+  return parseAskSession(value, path);
+}
+
+
+export function parseAskCapabilityState(
+  value: unknown,
+  path = "AskCapabilityState"
+): AskCapabilityState {
+  const obj = object(value, path);
+  const state = enumStringField(
+    obj,
+    "state",
+    path,
+    ASK_CAPABILITY_STATES
+  ) as AskCapabilityState["state"];
+  return {
+    state,
+    has_model: booleanField(obj, "has_model", path),
+    indexed_documents: numberField(obj, "indexed_documents", path),
+    failed_documents: numberField(obj, "failed_documents", path),
+    total_documents: numberField(obj, "total_documents", path),
+    reason: nullableStringField(obj, "reason", path),
+  };
+}
+export function parseJobRecord(value: unknown, path = "JobRecord"): JobRecord {
+  const obj = object(value, path);
+  return {
+    id: stringField(obj, "id", path),
+    kind: stringField(obj, "kind", path),
+    scope: nullableStringField(obj, "scope", path),
+    title: stringField(obj, "title", path),
+    status: jobStatusField(obj, "status", path),
+    details: field(obj, "details", path),
+    progress_current: numberField(obj, "progress_current", path),
+    progress_total: numberField(obj, "progress_total", path),
+    error: nullableStringField(obj, "error", path),
+    attempts: numberField(obj, "attempts", path),
+    max_attempts: numberField(obj, "max_attempts", path),
+    created_at: numberField(obj, "created_at", path),
+    updated_at: numberField(obj, "updated_at", path),
+    started_at: nullableNumberField(obj, "started_at", path),
+    finished_at: nullableNumberField(obj, "finished_at", path),
+  };
+}
+
 
 export function parseLlmConfig(value: unknown, path = "LlmConfig"): LlmConfig {
   const obj = object(value, path);
@@ -345,6 +446,44 @@ export function parseSyncReport(
   };
 }
 
+export function parseSyncPreviewReport(
+  value: unknown,
+  path = "SyncPreviewReport"
+): SyncPreviewReport {
+  const obj = object(value, path);
+  return {
+    direction: syncPreviewDirectionField(obj, "direction", path),
+    remote_root: stringField(obj, "remote_root", path),
+    add_count: numberField(obj, "add_count", path),
+    update_count: numberField(obj, "update_count", path),
+    delete_count: numberField(obj, "delete_count", path),
+    unchanged_count: numberField(obj, "unchanged_count", path),
+    transfer_bytes: numberField(obj, "transfer_bytes", path),
+    restart_required: booleanField(obj, "restart_required", path),
+    backup_path:
+      "backup_path" in obj
+        ? nullableStringField(obj, "backup_path", path)
+        : null,
+    changes: parseArray(
+      field(obj, "changes", path),
+      `${path}.changes`,
+      parseSyncPreviewChange
+    ),
+  };
+}
+
+function parseSyncPreviewChange(
+  value: unknown,
+  path: string
+): SyncPreviewChange {
+  const obj = object(value, path);
+  return {
+    path: stringField(obj, "path", path),
+    action: syncPreviewActionField(obj, "action", path),
+    size: numberField(obj, "size", path),
+  };
+}
+
 function parseLlmProfile(value: unknown, path: string): LlmProfile {
   const obj = object(value, path);
   return {
@@ -452,6 +591,11 @@ function parsePdfFailure(
   };
 }
 
+function jobStatusField(obj: Shape, key: string, path: string): JobStatus {
+  const value = enumStringField(obj, key, path, JOB_STATUSES);
+  return value as JobStatus;
+}
+
 function readStatusField(obj: Shape, key: string, path: string): ReadStatus {
   const value = enumStringField(obj, key, path, READ_STATUSES);
   return value as ReadStatus;
@@ -473,4 +617,22 @@ function projectStatusField(
 ): ProjectStatus {
   const value = enumStringField(obj, key, path, PROJECT_STATUSES);
   return value as ProjectStatus;
+}
+
+function syncPreviewDirectionField(
+  obj: Shape,
+  key: string,
+  path: string
+): SyncPreviewDirection {
+  const value = enumStringField(obj, key, path, SYNC_PREVIEW_DIRECTIONS);
+  return value as SyncPreviewDirection;
+}
+
+function syncPreviewActionField(
+  obj: Shape,
+  key: string,
+  path: string
+): SyncPreviewAction {
+  const value = enumStringField(obj, key, path, SYNC_PREVIEW_ACTIONS);
+  return value as SyncPreviewAction;
 }

@@ -17,6 +17,7 @@ pub mod folders;
 pub mod graph;
 pub mod highlights;
 pub mod imports;
+pub mod jobs;
 pub mod lit_review;
 pub mod llm;
 pub mod notes;
@@ -139,6 +140,14 @@ macro_rules! command_paths_imports_pdf {
             commands::pdf::local::paper_open_pdf,
             commands::pdf::local::paper_pdf_asset_path,
             commands::pdf::folder::import_folder,
+            commands::jobs::jobs_list,
+            commands::jobs::job_create,
+            commands::jobs::job_start,
+            commands::jobs::job_update_progress,
+            commands::jobs::job_succeed,
+            commands::jobs::job_fail,
+            commands::jobs::job_cancel,
+            commands::jobs::job_retry,
         ])
     };
 }
@@ -155,6 +164,8 @@ macro_rules! command_paths_config_sync_ai {
             commands::sync::sync_get_config,
             commands::sync::sync_save_config,
             commands::sync::sync_test,
+            commands::sync::sync_preview_push_library,
+            commands::sync::sync_preview_pull_library,
             commands::sync::sync_push_library,
             commands::sync::sync_pull_library,
             commands::summaries::paper_tldr,
@@ -167,6 +178,9 @@ macro_rules! command_paths_config_sync_ai {
             commands::batch::ai::batch_tldr,
             commands::batch::ai::batch_quick_read,
             commands::batch::ai::batch_translate,
+            commands::ask::ask_session_latest,
+            commands::ask::ask_session_save,
+            commands::ask::ask_capability_state,
             commands::batch::batch_cancel,
         ])
     };

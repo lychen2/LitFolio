@@ -5,6 +5,11 @@ import { errorMessage } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import { MIN_SUMMARY_CHARS } from "../HighlightList";
+import {
+  HIGHLIGHT_TYPES,
+  highlightStyleVars,
+  highlightTypeKey,
+} from "../highlightTypes";
 import { ActionRow } from "./HighlightRowActions";
 import {
   ErrorText,
@@ -15,19 +20,11 @@ import {
   OriginalBlock,
   TranslationIcon,
 } from "./HighlightRowBlocks";
-import { countChars, hasCondensedAction, hasCondensedContent } from "./highlightRowUtils";
-
-const HIGHLIGHT_TYPES = [
-  "background",
-  "motivation",
-  "method",
-  "dataset",
-  "result",
-  "limitation",
-  "comparison",
-  "quote",
-  "question",
-] as const;
+import {
+  countChars,
+  hasCondensedAction,
+  hasCondensedContent,
+} from "./highlightRowUtils";
 
 export function HighlightRow({
   highlight,
@@ -40,7 +37,9 @@ export function HighlightRow({
 }) {
   const t = useT();
   const [editing, setEditing] = useState(false);
-  const [showOriginal, setShowOriginal] = useState(!hasCondensedContent(highlight));
+  const [showOriginal, setShowOriginal] = useState(
+    !hasCondensedContent(highlight)
+  );
   const [draftNote, setDraftNote] = useState(highlight.note ?? "");
   const [confirming, setConfirming] = useState(false);
   const [projectId, setProjectId] = useState<number | "">("");
@@ -50,7 +49,8 @@ export function HighlightRow({
     queryFn: api.projectsList,
   });
   const saveNote = useMutation({
-    mutationFn: (note: string) => api.highlightUpdateNote(highlight.id, note || null),
+    mutationFn: (note: string) =>
+      api.highlightUpdateNote(highlight.id, note || null),
     onSuccess: async () => {
       setEditing(false);
       await onRefresh();
@@ -82,7 +82,8 @@ export function HighlightRow({
     onSuccess: onRefresh,
   });
   const updateType = useMutation({
-    mutationFn: (label: string | null) => api.highlightUpdateLabel(highlight.id, label),
+    mutationFn: (label: string | null) =>
+      api.highlightUpdateLabel(highlight.id, label),
     onSuccess: onRefresh,
   });
   const addEvidence = useMutation({
@@ -93,22 +94,55 @@ export function HighlightRow({
     onSuccess: () => setEvidenceAdded(true),
   });
   const canSummarize = countChars(highlight.text) >= MIN_SUMMARY_CHARS;
+  const typeKey = highlightTypeKey(highlight.label);
+  const typeLabel =
+    typeKey === "default"
+      ? t("reader.highlightType.none")
+      : t(`reader.highlightType.${typeKey}` as TKey);
 
   useEffect(() => {
     setDraftNote(highlight.note ?? "");
   }, [highlight.note]);
 
   useEffect(() => {
-    if (highlight.summary_text || highlight.translation_text || highlight.explanation_text) {
+    if (
+      highlight.summary_text ||
+      highlight.translation_text ||
+      highlight.explanation_text
+    ) {
       setShowOriginal(false);
     }
-  }, [highlight.summary_text, highlight.translation_text, highlight.explanation_text]);
+  }, [
+    highlight.summary_text,
+    highlight.translation_text,
+    highlight.explanation_text,
+  ]);
 
   return (
-    <li className="group px-3 py-2.5 hover:bg-litera-panel/40 transition-colors">
-      <button onClick={onJump} className="w-full text-left">
-        <div className="text-[10px] uppercase tracking-wider text-amber-400/70 mb-1">
-          {t("reader.page", { page: highlight.page })}
+    <li
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        if (isInteractiveTarget(event.target)) return;
+        onJump();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (isInteractiveTarget(event.target)) return;
+        event.preventDefault();
+        onJump();
+      }}
+      className="group cursor-pointer px-2.5 py-2 transition-colors hover:bg-[var(--litera-highlight-soft)]"
+      style={highlightStyleVars(highlight.label)}
+    >
+      <div className="w-full text-left">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[10px]">
+          <span className="uppercase tracking-wider text-litera-mute">
+            {t("reader.page", { page: highlight.page })}
+          </span>
+          <span className="inline-flex items-center rounded-full bg-[var(--litera-highlight-soft)] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--litera-highlight-fg)] ring-1 ring-inset ring-[var(--litera-highlight-ring)]">
+            {typeLabel}
+          </span>
         </div>
         {highlight.summary_text && (
           <MetaTextBlock
@@ -119,7 +153,9 @@ export function HighlightRow({
         )}
         {highlight.translation_text && (
           <MetaTextBlock
-            label={highlight.translation_target_lang ?? t("reader.translateLabel")}
+            label={
+              highlight.translation_target_lang ?? t("reader.translateLabel")
+            }
             model={highlight.translation_model}
             text={highlight.translation_text}
             icon={<TranslationIcon />}
@@ -134,12 +170,15 @@ export function HighlightRow({
         {(!hasCondensedContent(highlight) || showOriginal) && (
           <OriginalBlock text={highlight.text} />
         )}
-      </button>
+      </div>
       {confirming ? (
         <div className="mt-2 flex items-center gap-1.5 text-[10px]">
           <span className="text-red-400/90">{t("reader.confirmDelete")}</span>
           <button
-            onClick={() => { remove.mutate(); setConfirming(false); }}
+            onClick={() => {
+              remove.mutate();
+              setConfirming(false);
+            }}
             className="litera-btn-primary text-[10px] px-2 py-0.5"
           >
             {t("reader.confirm")}
@@ -181,18 +220,16 @@ export function HighlightRow({
         </div>
       )}
       {highlight.note && !editing && <NoteBlock note={highlight.note} />}
-      <HighlightTypeRow
+      <HighlightMetaRow
         highlight={highlight}
-        isSaving={updateType.isPending}
-        onChange={(label) => updateType.mutate(label)}
-      />
-      <EvidenceTargetRow
         projects={projects.data ?? []}
         projectId={projectId}
-        isSaving={addEvidence.isPending}
-        added={evidenceAdded}
+        isTypeSaving={updateType.isPending}
+        isEvidenceSaving={addEvidence.isPending}
+        evidenceAdded={evidenceAdded}
+        onTypeChange={(label) => updateType.mutate(label)}
         onProjectChange={setProjectId}
-        onAdd={() => addEvidence.mutate()}
+        onAddEvidence={() => addEvidence.mutate()}
       />
       {editing && (
         <NoteEditor
@@ -206,15 +243,9 @@ export function HighlightRow({
           onSave={() => saveNote.mutate(draftNote)}
         />
       )}
-      {summarize.error && (
-        <ErrorText message={errorMessage(summarize.error)} />
-      )}
-      {translate.error && (
-        <ErrorText message={errorMessage(translate.error)} />
-      )}
-      {explain.error && (
-        <ErrorText message={errorMessage(explain.error)} />
-      )}
+      {summarize.error && <ErrorText message={errorMessage(summarize.error)} />}
+      {translate.error && <ErrorText message={errorMessage(translate.error)} />}
+      {explain.error && <ErrorText message={errorMessage(explain.error)} />}
       {updateType.error && (
         <ErrorText message={errorMessage(updateType.error)} />
       )}
@@ -225,74 +256,93 @@ export function HighlightRow({
   );
 }
 
-function HighlightTypeRow({
-  highlight,
-  isSaving,
-  onChange,
-}: {
-  highlight: Highlight;
-  isSaving: boolean;
-  onChange: (label: string | null) => void;
-}) {
-  const t = useT();
-  return (
-    <div className="mt-2 flex items-center gap-2 text-[11px] text-litera-mute">
-      <span>{t("reader.highlightType")}</span>
-      <select
-        value={highlight.label ?? ""}
-        onChange={(event) => onChange(event.target.value || null)}
-        disabled={isSaving}
-        className="litera-input py-0.5 text-[11px]"
-      >
-        <option value="">{t("reader.highlightType.none")}</option>
-        {HIGHLIGHT_TYPES.map((type) => (
-          <option key={type} value={type}>
-            {t(`reader.highlightType.${type}` as TKey)}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    ? !!target.closest("button, select, input, textarea, a")
+    : false;
 }
 
-function EvidenceTargetRow({
+function HighlightMetaRow({
+  highlight,
   projects,
   projectId,
-  isSaving,
-  added,
+  isTypeSaving,
+  isEvidenceSaving,
+  evidenceAdded,
+  onTypeChange,
   onProjectChange,
-  onAdd,
+  onAddEvidence,
 }: {
+  highlight: Highlight;
   projects: ResearchProject[];
   projectId: number | "";
-  isSaving: boolean;
-  added: boolean;
+  isTypeSaving: boolean;
+  isEvidenceSaving: boolean;
+  evidenceAdded: boolean;
+  onTypeChange: (label: string | null) => void;
   onProjectChange: (id: number | "") => void;
-  onAdd: () => void;
+  onAddEvidence: () => void;
 }) {
   const t = useT();
-  if (projects.length === 0) return null;
+  const hasProjects = projects.length > 0;
+
   return (
-    <div className="mt-2 flex items-center gap-2 text-[11px] text-litera-mute">
-      <span>{t("reader.evidenceProject")}</span>
-      <select
-        value={projectId}
-        onChange={(event) => onProjectChange(event.target.value ? Number(event.target.value) : "")}
-        className="litera-input py-0.5 text-[11px] min-w-0 flex-1"
-      >
-        <option value="">{t("common.none")}</option>
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>{project.name}</option>
-        ))}
-      </select>
-      <button
-        onClick={onAdd}
-        disabled={isSaving || projectId === ""}
-        className="litera-btn text-[11px] px-2 py-0.5 disabled:opacity-50"
-      >
-        {t("reader.addEvidence")}
-      </button>
-      {added && <span className="text-emerald-400">{t("reader.evidenceAdded")}</span>}
+    <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] text-litera-mute">
+      <label className="flex min-w-0 flex-[0_1_10rem] items-center gap-1">
+        <span className="shrink-0 uppercase tracking-wide">
+          {t("reader.highlightType")}
+        </span>
+        <select
+          value={highlight.label ?? ""}
+          onChange={(event) => onTypeChange(event.target.value || null)}
+          disabled={isTypeSaving}
+          className="litera-input h-6 min-w-0 flex-1 px-1.5 py-0 text-[10px]"
+        >
+          <option value="">{t("reader.highlightType.none")}</option>
+          {HIGHLIGHT_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(`reader.highlightType.${type}` as TKey)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {hasProjects ? (
+        <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-1">
+          <label className="flex min-w-0 flex-1 items-center gap-1">
+            <span className="shrink-0 uppercase tracking-wide">
+              {t("reader.evidenceProject")}
+            </span>
+            <select
+              value={projectId}
+              onChange={(event) =>
+                onProjectChange(
+                  event.target.value ? Number(event.target.value) : ""
+                )
+              }
+              className="litera-input h-6 min-w-0 flex-1 px-1.5 py-0 text-[10px]"
+            >
+              <option value="">{t("common.none")}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={onAddEvidence}
+            disabled={isEvidenceSaving || projectId === ""}
+            className="litera-btn h-6 shrink-0 px-1.5 py-0 text-[10px] disabled:opacity-50"
+          >
+            {t("reader.addEvidence")}
+          </button>
+        </div>
+      ) : null}
+      {evidenceAdded && hasProjects ? (
+        <span className="text-[10px] text-litera-accent2">
+          {t("reader.evidenceAdded")}
+        </span>
+      ) : null}
     </div>
   );
 }

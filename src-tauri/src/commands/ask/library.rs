@@ -1,8 +1,8 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::ai::{
-    active_profile_for_task, answer_library_question, empty_result, AskLibraryResult, ChatMessage,
-    LibraryQuestionRequest, LlmProfile, TaskKind,
+    active_profile_for_task, answer_library_question, empty_result, local_search_result,
+    AskLibraryResult, ChatMessage, LibraryQuestionRequest, LlmProfile, TaskKind,
 };
 use crate::commands::pdf::common::generate_and_index_pdf_markdown_or_warn;
 use crate::storage::{Highlight, HighlightRepo, Paper, PaperDocumentRepo, PaperRepo};
@@ -38,7 +38,7 @@ pub(super) async fn run(
 ) -> Result<AskLibraryResult, String> {
     let question = normalize_question(&input.question)?;
     let cfg = crate::ai::load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Ask).map_err(|e| e.to_string())?;
+    let profile = active_profile_for_task(&cfg, TaskKind::Ask).ok();
     let history = to_ai_history(input.conversation_history.unwrap_or_default());
     let retrieval_question = retrieval_question(&question, &history);
     let repo = PaperRepo::new(&state.pool);
@@ -49,7 +49,7 @@ pub(super) async fn run(
             state,
             &repo,
             PinnedAnswerRequest {
-                profile: &profile,
+                profile: profile.as_ref(),
                 question: &question,
                 retrieval_question: &retrieval_question,
                 history: &history,
@@ -64,7 +64,7 @@ pub(super) async fn run(
         state,
         &repo,
         RetrievalRequest {
-            profile: &profile,
+            profile: profile.as_ref(),
             question: &retrieval_question,
             limit,
         },
@@ -80,19 +80,28 @@ pub(super) async fn run(
         &snippet_terms(&retrieval_question, &retrieved.used_terms),
     )
     .await?;
-    answer(
-        state,
-        AnswerRequest {
-            profile: &profile,
-            question: &question,
-            papers: &retrieved.papers,
-            highlights: &highlights,
-            document_snippets: &document_snippets,
-            terms: &retrieved.used_terms,
-            history: &history,
-        },
-    )
-    .await
+    if let Some(profile) = profile.as_ref() {
+        return answer(
+            state,
+            AnswerRequest {
+                profile,
+                question: &question,
+                papers: &retrieved.papers,
+                highlights: &highlights,
+                document_snippets: &document_snippets,
+                terms: &retrieved.used_terms,
+                history: &history,
+            },
+        )
+        .await;
+    }
+    Ok(local_search_result(
+        &question,
+        &retrieved.papers,
+        &highlights,
+        &document_snippets,
+        &retrieved.used_terms,
+    ))
 }
 
 async fn answer_pinned(
@@ -109,23 +118,32 @@ async fn answer_pinned(
         &snippet_terms(request.retrieval_question, &terms),
     )
     .await?;
-    answer(
-        state,
-        AnswerRequest {
-            profile: request.profile,
-            question: request.question,
-            papers: &papers,
-            highlights: &highlights,
-            document_snippets: &document_snippets,
-            terms: &terms,
-            history: request.history,
-        },
-    )
-    .await
+    if let Some(profile) = request.profile {
+        return answer(
+            state,
+            AnswerRequest {
+                profile,
+                question: request.question,
+                papers: &papers,
+                highlights: &highlights,
+                document_snippets: &document_snippets,
+                terms: &terms,
+                history: request.history,
+            },
+        )
+        .await;
+    }
+    Ok(local_search_result(
+        request.question,
+        &papers,
+        &highlights,
+        &document_snippets,
+        &terms,
+    ))
 }
 
 struct PinnedAnswerRequest<'a> {
-    profile: &'a LlmProfile,
+    profile: Option<&'a LlmProfile>,
     question: &'a str,
     retrieval_question: &'a str,
     history: &'a [ChatMessage],

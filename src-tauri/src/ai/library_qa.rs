@@ -83,6 +83,33 @@ pub fn empty_result(terms: Vec<String>) -> AskLibraryResult {
     }
 }
 
+pub fn local_search_result(
+    question: &str,
+    papers: &[Paper],
+    highlights: &HashMap<String, Vec<Highlight>>,
+    document_snippets: &HashMap<String, String>,
+    terms: &[String],
+) -> AskLibraryResult {
+    let sources = build_sources(papers, highlights, document_snippets, terms);
+    if sources.is_empty() {
+        return empty_result(terms.to_vec());
+    }
+    let answer = format!(
+        "未配置 Ask 模型,已先完成本地检索。找到 {} 篇候选文献与“{}”相关;可先查看下方片段,选择置顶文献后再配置模型生成综合回答。",
+        sources.len(),
+        truncate(question.trim(), 160)
+    );
+    AskLibraryResult {
+        answer,
+        sources,
+        model: "local-search".into(),
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        terms: terms.to_vec(),
+        retrieved_count: papers.len(),
+    }
+}
+
 pub struct LibraryQuestionRequest<'a> {
     pub client: &'a reqwest::Client,
     pub profile: &'a LlmProfile,

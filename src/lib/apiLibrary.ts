@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import {
   parseArxivDraft,
+  parseJobRecord,
   parsePaper,
   parsePdfImportSummary,
 } from "./apiSchema";
@@ -11,6 +12,8 @@ import type {
   ArxivDraft,
   BulkAddSummary,
   Folder,
+  JobDraft,
+  JobStatus,
   FolderWithCount,
   Paper,
   ReadStatus,
@@ -78,6 +81,27 @@ export const libraryApi = {
     ),
   importPdfFiles: (paths: string[]) =>
     invokeParsed("import_pdf_files", { paths }, parsePdfImportSummary),
+  jobsList: (status?: JobStatus | null, limit?: number) =>
+    invokeParsed("jobs_list", { status: status ?? null, limit }, (value, path) =>
+      parseArray(value, path, parseJobRecord),
+    ),
+  jobCreate: (draft: JobDraft) =>
+    invokeParsed("job_create", { draft }, parseJobRecord),
+  jobStart: (id: string) => invokeParsed("job_start", { id }, parseJobRecord),
+  jobUpdateProgress: (id: string, current: number, total: number) =>
+    invokeParsed(
+      "job_update_progress",
+      { id, current, total },
+      parseJobRecord,
+    ),
+  jobSucceed: (id: string) =>
+    invokeParsed("job_succeed", { id }, parseJobRecord),
+  jobFail: (id: string, error: string) =>
+    invokeParsed("job_fail", { id, error }, parseJobRecord),
+  jobCancel: (id: string) =>
+    invokeParsed("job_cancel", { id }, parseJobRecord),
+  jobRetry: (id: string) =>
+    invokeParsed("job_retry", { id }, parseJobRecord),
   searchPapers: (query: string, limit?: number) =>
     invoke<SearchHit[]>("search_papers", { query, limit }),
   addFromSearch: (result: SearchHit) =>

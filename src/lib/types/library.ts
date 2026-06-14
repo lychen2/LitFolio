@@ -33,6 +33,39 @@ export interface PdfImportSummary {
   failed: { path: string; error: string }[];
 }
 
+export type JobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+export interface JobRecord {
+  id: string;
+  kind: string;
+  scope: string | null;
+  title: string;
+  status: JobStatus;
+  details: unknown;
+  progress_current: number;
+  progress_total: number;
+  error: string | null;
+  attempts: number;
+  max_attempts: number;
+  created_at: number;
+  updated_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+}
+
+export interface JobDraft {
+  kind: string;
+  scope?: string | null;
+  title: string;
+  details?: unknown;
+  max_attempts?: number | null;
+}
+
 export interface ArxivDraft {
   title: string;
   authors: string[];

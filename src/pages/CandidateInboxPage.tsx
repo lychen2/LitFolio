@@ -1,11 +1,36 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Archive, DownloadCloud, ExternalLink, ListPlus, Loader2, SearchX, Star, Trash2 } from "lucide-react";
-import { api, type ArxivDraft, type CandidatePaper, type CandidateStatus, type Paper } from "@/lib/api";
+import {
+  Archive,
+  DownloadCloud,
+  ExternalLink,
+  ListPlus,
+  Loader2,
+  SearchX,
+  Star,
+  Trash2,
+} from "lucide-react";
+import {
+  api,
+  type ArxivDraft,
+  type CandidatePaper,
+  type CandidateStatus,
+  type Paper,
+} from "@/lib/api";
 import { extractSourceIdentifier } from "@/lib/identifier";
 import { useT } from "@/i18n/I18nProvider";
 import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
+import {
+  duplicateStatusFromError,
+  importJobId,
+  pdfStatusFromPaper,
+  subtitleFromDraft,
+  titleFromDraft,
+  upsertImportJob,
+  type ImportJobStatus,
+  type ImportJobStepStatus,
+} from "./import/importJobs";
 
 export function CandidateInboxPage() {
   const t = useT();
@@ -16,7 +41,7 @@ export function CandidateInboxPage() {
   });
   const selectedCandidates = useMemo(
     () => (data ?? []).filter((candidate) => selected.has(candidate.id)),
-    [data, selected],
+    [data, selected]
   );
 
   function toggleCandidate(id: number, checked: boolean) {
@@ -55,7 +80,9 @@ export function CandidateInboxPage() {
                 key={candidate.id}
                 candidate={candidate}
                 selected={selected.has(candidate.id)}
-                onSelectedChange={(checked) => toggleCandidate(candidate.id, checked)}
+                onSelectedChange={(checked) =>
+                  toggleCandidate(candidate.id, checked)
+                }
               />
             ))}
           </ul>
@@ -114,7 +141,11 @@ function CandidateBatchToolbar({
           disabled={disabled}
           className="litera-btn text-xs disabled:opacity-50"
         >
-          {batch.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DownloadCloud className="h-3.5 w-3.5" />}
+          {batch.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <DownloadCloud className="h-3.5 w-3.5" />
+          )}
           {t("candidate.batchImport")}
         </button>
         <button
@@ -126,13 +157,18 @@ function CandidateBatchToolbar({
           {t("candidate.batchIgnore")}
         </button>
         {candidates.length > 0 && (
-          <button onClick={onClear} className="text-litera-mute hover:text-litera-text px-1">
+          <button
+            onClick={onClear}
+            className="text-litera-mute hover:text-litera-text px-1"
+          >
             {t("common.cancel")}
           </button>
         )}
       </div>
       {batch.error && (
-        <div className="mt-1.5 text-xs text-red-400/90">✕ {(batch.error as Error).message}</div>
+        <div className="mt-1.5 text-xs text-red-400/90">
+          ✕ {(batch.error as Error).message}
+        </div>
       )}
     </div>
   );
@@ -150,7 +186,8 @@ function CandidateRow({
   const t = useT();
   const qc = useQueryClient();
   const status = useMutation({
-    mutationFn: (next: CandidateStatus) => api.candidateSetStatus(candidate.id, next),
+    mutationFn: (next: CandidateStatus) =>
+      api.candidateSetStatus(candidate.id, next),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["candidates"] }),
   });
   const importHref = importUrl(candidate);
@@ -167,24 +204,35 @@ function CandidateRow({
         />
         <CandidateStatusPill status={candidate.status} />
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-litera-text leading-snug">{candidate.title}</div>
+          <div className="font-medium text-litera-text leading-snug">
+            {candidate.title}
+          </div>
           <div className="text-xs text-litera-mute mt-1 flex items-center gap-2 flex-wrap">
             {candidate.authors.length > 0 && (
               <span className="truncate max-w-[440px]">
-                {candidate.authors.slice(0, 3).join(", ")}{candidate.authors.length > 3 ? " et al." : ""}
+                {candidate.authors.slice(0, 3).join(", ")}
+                {candidate.authors.length > 3 ? " et al." : ""}
               </span>
             )}
             {candidate.year && <span>· {candidate.year}</span>}
             <span>· {candidate.source_type}</span>
-            {candidate.doi && <span className="font-mono">· doi:{candidate.doi}</span>}
-            {candidate.arxiv_id && <span className="font-mono">· arXiv:{candidate.arxiv_id}</span>}
+            {candidate.doi && (
+              <span className="font-mono">· doi:{candidate.doi}</span>
+            )}
+            {candidate.arxiv_id && (
+              <span className="font-mono">· arXiv:{candidate.arxiv_id}</span>
+            )}
           </div>
           {candidate.abstract_text && (
             <p className="text-xs text-litera-text/70 mt-2 line-clamp-2 leading-relaxed">
               {candidate.abstract_text}
             </p>
           )}
-          {status.error && <div className="mt-1.5 text-xs text-red-400/90">✕ {(status.error as Error).message}</div>}
+          {status.error && (
+            <div className="mt-1.5 text-xs text-red-400/90">
+              ✕ {(status.error as Error).message}
+            </div>
+          )}
         </div>
         <div className="shrink-0 flex items-center gap-1.5">
           <button
@@ -213,7 +261,11 @@ function CandidateRow({
             className="p-1.5 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
             title={t("candidate.ignore")}
           >
-            {status.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {status.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
           </button>
         </div>
       </div>
@@ -235,14 +287,39 @@ function EmptyState() {
 
 type BatchAction = "shortlisted" | "queued" | "ignored" | "imported";
 
-async function runBatchAction(action: BatchAction, candidates: CandidatePaper[]) {
+async function runBatchAction(
+  action: BatchAction,
+  candidates: CandidatePaper[]
+) {
   if (candidates.length === 0) return;
   if (action !== "imported") {
-    await Promise.all(candidates.map((candidate) => api.candidateSetStatus(candidate.id, action)));
+    await Promise.all(
+      candidates.map((candidate) =>
+        api.candidateSetStatus(candidate.id, action)
+      )
+    );
     return;
   }
-  for (const candidate of candidates) {
-    await importCandidate(candidate, api);
+  const job = await api.jobCreate({
+    kind: "candidate_batch_import",
+    scope: "candidate_inbox",
+    title: `Import ${candidates.length} candidates`,
+    details: { candidate_ids: candidates.map((candidate) => candidate.id) },
+    max_attempts: 1,
+  });
+  await api.jobStart(job.id);
+  await api.jobUpdateProgress(job.id, 0, candidates.length);
+
+  try {
+    for (const [index, candidate] of candidates.entries()) {
+      await importCandidate(candidate, api);
+      await api.jobUpdateProgress(job.id, index + 1, candidates.length);
+    }
+    await api.jobSucceed(job.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await api.jobFail(job.id, message);
+    throw error;
   }
 }
 
@@ -253,28 +330,60 @@ export type CandidateImportApi = {
   candidateSetStatus: (id: number, status: CandidateStatus) => Promise<void>;
 };
 
-export async function importCandidate(candidate: CandidatePaper, candidateApi: CandidateImportApi) {
-  const sourceIds = candidate.source_url ? extractSourceIdentifier(candidate.source_url) : null;
-  const arxivId = candidate.arxiv_id ?? sourceIds?.arxivId ?? null;
-  if (arxivId) {
-    await candidateApi.arxivAddWithPdf(arxivId);
+export async function importCandidate(
+  candidate: CandidatePaper,
+  candidateApi: CandidateImportApi
+) {
+  markCandidateImportJob(candidate, {
+    status: "running",
+    metadataStatus: "completed",
+    pdfStatus: "running",
+    duplicateStatus: "checking",
+  });
+
+  try {
+    const paper = await importCandidatePaper(candidate, candidateApi);
     await candidateApi.candidateSetStatus(candidate.id, "imported");
-    return;
+    markCandidateImportJob(candidate, {
+      status: "completed",
+      metadataStatus: "completed",
+      pdfStatus: pdfStatusFromPaper(paper),
+      duplicateStatus: "clear",
+      paper,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    markCandidateImportJob(candidate, {
+      status: "failed",
+      metadataStatus: candidate.title.trim() ? "completed" : "failed",
+      pdfStatus: "failed",
+      duplicateStatus: duplicateStatusFromError(message),
+      error: message,
+    });
+    throw error;
   }
+}
+
+async function importCandidatePaper(
+  candidate: CandidatePaper,
+  candidateApi: CandidateImportApi
+): Promise<Paper> {
+  const sourceIds = candidate.source_url
+    ? extractSourceIdentifier(candidate.source_url)
+    : null;
+  const arxivId = candidate.arxiv_id ?? sourceIds?.arxivId ?? null;
+  if (arxivId) return candidateApi.arxivAddWithPdf(arxivId);
 
   const doi = candidate.doi ?? sourceIds?.doi ?? null;
-  if (doi) {
-    await candidateApi.importDoi(doi);
-    await candidateApi.candidateSetStatus(candidate.id, "imported");
-    return;
-  }
+  if (doi) return candidateApi.importDoi(doi);
 
   const draft = candidateToDraft(candidate);
   if (!draft.title.trim()) {
-    throw new Error(`Cannot import candidate ${candidate.id}: missing title, arXiv ID, and DOI.`);
+    throw new Error(
+      `Cannot import candidate ${candidate.id}: missing title, arXiv ID, and DOI.`
+    );
   }
-  await candidateApi.arxivAddDraft(draft);
-  await candidateApi.candidateSetStatus(candidate.id, "imported");
+  return candidateApi.arxivAddDraft(draft);
 }
 
 function candidateToDraft(candidate: CandidatePaper): ArxivDraft {
@@ -289,10 +398,41 @@ function candidateToDraft(candidate: CandidatePaper): ArxivDraft {
   };
 }
 
+function markCandidateImportJob(
+  candidate: CandidatePaper,
+  update: CandidateImportJobUpdate
+) {
+  const draft = candidateToDraft(candidate);
+  upsertImportJob({
+    id: importJobId("candidate", String(candidate.id)),
+    source: "candidate",
+    title: update.paper?.title ?? titleFromDraft(draft, candidate.title),
+    subtitle: subtitleFromDraft(draft) ?? candidate.source_url ?? undefined,
+    status: update.status,
+    metadataStatus: update.metadataStatus,
+    pdfStatus: update.pdfStatus,
+    duplicateStatus: update.duplicateStatus,
+    evidence: candidate.source_url ?? undefined,
+    error: update.error,
+    paperId: update.paper?.id,
+    candidateId: candidate.id,
+  });
+}
+
+type CandidateImportJobUpdate = {
+  status: ImportJobStatus;
+  metadataStatus: ImportJobStepStatus;
+  pdfStatus: ImportJobStepStatus;
+  duplicateStatus: ImportJobStepStatus;
+  paper?: Paper;
+  error?: string;
+};
+
 function importUrl(candidate: CandidatePaper) {
   const params = new URLSearchParams({ title: candidate.title });
   params.set("candidateId", String(candidate.id));
-  const link = candidate.source_url ?? candidate.doi ?? candidate.arxiv_id ?? "";
+  const link =
+    candidate.source_url ?? candidate.doi ?? candidate.arxiv_id ?? "";
   if (link) params.set("link", link);
   return `/import?${params.toString()}`;
 }

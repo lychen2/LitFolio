@@ -1,11 +1,32 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, CheckCircle2, FolderOpen, Loader2, Rocket, Search } from "lucide-react";
-import { api, pickSinglePdf, type SearchHit } from "@/lib/api";
+import {
+  Archive,
+  CheckCircle2,
+  FolderOpen,
+  Loader2,
+  Rocket,
+  Search,
+} from "lucide-react";
+import { api, pickSinglePdf, type Paper, type SearchHit } from "@/lib/api";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 import { useT } from "@/i18n/I18nProvider";
 import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
-import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState";
+import {
+  candidateIsHidden,
+  useCandidateLookup,
+} from "@/hooks/useCandidateState";
+import {
+  duplicateStatusFromError,
+  importJobId,
+  pdfStatusFromPaper,
+  subtitleFromDraft,
+  titleFromDraft,
+  upsertImportJob,
+  type ImportJobStatus,
+  type ImportJobStepStatus,
+} from "./importJobs";
+import { notifyRecentImportsChanged } from "./recentImports";
 
 export function SearchTab() {
   const t = useT();
@@ -13,13 +34,18 @@ export function SearchTab() {
   const [submitted, setSubmitted] = useState("");
   const { data, isFetching, error } = useQuery({
     queryKey: ["search", submitted],
-    queryFn: () => (submitted ? api.searchPapers(submitted, 15) : Promise.resolve([] as SearchHit[])),
+    queryFn: () =>
+      submitted
+        ? api.searchPapers(submitted, 15)
+        : Promise.resolve([] as SearchHit[]),
     enabled: !!submitted,
   });
   return (
     <div className="max-w-3xl space-y-4">
       <div className="litera-panel p-5">
-        <label className="text-xs uppercase tracking-wider text-litera-mute">{t("import.search.label")}</label>
+        <label className="text-xs uppercase tracking-wider text-litera-mute">
+          {t("import.search.label")}
+        </label>
         <div className="flex gap-2 mt-2">
           <input
             value={q}
@@ -28,20 +54,41 @@ export function SearchTab() {
             placeholder={t("import.search.placeholder")}
             className="litera-input flex-1"
           />
-          <button onClick={() => setSubmitted(q.trim())} disabled={!q.trim()} className="litera-btn-primary disabled:opacity-50">
+          <button
+            onClick={() => setSubmitted(q.trim())}
+            disabled={!q.trim()}
+            className="litera-btn-primary disabled:opacity-50"
+          >
             <Search className="h-4 w-4" /> {t("common.search")}
           </button>
         </div>
-        <p className="mt-2 text-xs text-litera-mute">{t("import.search.hint")}</p>
+        <p className="mt-2 text-xs text-litera-mute">
+          {t("import.search.hint")}
+        </p>
       </div>
-      {error && <div className="text-sm text-red-400/90">✕ {(error as Error).message}</div>}
-      {isFetching && <div className="text-sm text-litera-mute flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("import.search.searching")}</div>}
+      {error && (
+        <div className="text-sm text-red-400/90">
+          ✕ {(error as Error).message}
+        </div>
+      )}
+      {isFetching && (
+        <div className="text-sm text-litera-mute flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />{" "}
+          {t("import.search.searching")}
+        </div>
+      )}
       {data && data.length > 0 && (
         <ul className="divide-y divide-litera-line border border-litera-line rounded-md overflow-hidden">
-          {data.map((h, i) => <SearchHitRow key={(h.paper_id ?? "") + i} h={h} />)}
+          {data.map((h, i) => (
+            <SearchHitRow key={(h.paper_id ?? "") + i} h={h} />
+          ))}
         </ul>
       )}
-      {submitted && !isFetching && data && data.length === 0 && <div className="text-sm text-litera-mute">{t("import.search.empty")}</div>}
+      {submitted && !isFetching && data && data.length === 0 && (
+        <div className="text-sm text-litera-mute">
+          {t("import.search.empty")}
+        </div>
+      )}
     </div>
   );
 }
@@ -49,46 +96,120 @@ export function SearchTab() {
 function SearchHitRow({ h }: { h: SearchHit }) {
   const t = useT();
   const qc = useQueryClient();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
+    null
+  );
   const { data: importedIds } = useImportedArxivIds();
   const { findCandidate } = useCandidateLookup();
   const candidateDraft = searchHitToCandidate(h);
   const syncedCandidate = findCandidate(candidateDraft);
   const alreadyImported = useMemo(
     () => importedIds?.includes(h.draft.arxiv_id ?? "") ?? false,
-    [importedIds, h.draft.arxiv_id],
+    [importedIds, h.draft.arxiv_id]
   );
   const savePdf = useMutation({
     mutationFn: async () => {
       const pdf = await pickSinglePdf();
       if (!pdf) return null;
+      upsertSearchImportJob(h, {
+        status: "running",
+        metadataStatus: "completed",
+        pdfStatus: "running",
+        duplicateStatus: "checking",
+      });
       return api.paperSaveWithPdf(h.draft, pdf);
     },
     onSuccess: (p) => {
       if (!p) return;
+      upsertSearchImportJob(h, {
+        status: "completed",
+        metadataStatus: "completed",
+        pdfStatus: pdfStatusFromPaper(p),
+        duplicateStatus: "clear",
+        paper: p,
+      });
       setMsg({ kind: "ok", text: t("import.saved", { title: p.title }) });
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyRecentImportsChanged();
     },
-    onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
+    onError: (e: Error) => {
+      upsertSearchImportJob(h, {
+        status: "failed",
+        metadataStatus: "completed",
+        pdfStatus: "failed",
+        duplicateStatus: duplicateStatusFromError(e.message),
+        error: e.message,
+      });
+      setMsg({ kind: "err", text: e.message });
+    },
   });
   const arxivAuto = useMutation({
+    onMutate: () => {
+      upsertSearchImportJob(h, {
+        status: "running",
+        metadataStatus: "completed",
+        pdfStatus: "running",
+        duplicateStatus: "checking",
+      });
+    },
     mutationFn: () => {
       if (!h.draft.arxiv_id) throw new Error("Missing arXiv ID");
       return api.arxivAddWithPdf(h.draft.arxiv_id);
     },
     onSuccess: (p) => {
+      upsertSearchImportJob(h, {
+        status: "completed",
+        metadataStatus: "completed",
+        pdfStatus: pdfStatusFromPaper(p),
+        duplicateStatus: "clear",
+        paper: p,
+      });
       setMsg({ kind: "ok", text: t("import.downloaded", { title: p.title }) });
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyRecentImportsChanged();
     },
-    onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
+    onError: (e: Error) => {
+      upsertSearchImportJob(h, {
+        status: "failed",
+        metadataStatus: "completed",
+        pdfStatus: "failed",
+        duplicateStatus: duplicateStatusFromError(e.message),
+        error: e.message,
+      });
+      setMsg({ kind: "err", text: e.message });
+    },
   });
   const candidate = useMutation({
-    mutationFn: () => api.candidateUpsert(candidateDraft),
-    onSuccess: () => {
+    mutationFn: () => {
+      upsertSearchImportJob(h, {
+        status: "running",
+        metadataStatus: "completed",
+        pdfStatus: "skipped",
+        duplicateStatus: "checking",
+      });
+      return api.candidateUpsert(candidateDraft);
+    },
+    onSuccess: (savedCandidate) => {
+      upsertSearchImportJob(h, {
+        status: "waiting",
+        metadataStatus: "completed",
+        pdfStatus: "pending",
+        duplicateStatus: "candidate",
+        candidateId: savedCandidate.id,
+      });
       setMsg({ kind: "ok", text: t("candidate.added") });
       qc.invalidateQueries({ queryKey: ["candidates"] });
     },
-    onError: (e: Error) => setMsg({ kind: "err", text: e.message }),
+    onError: (e: Error) => {
+      upsertSearchImportJob(h, {
+        status: "failed",
+        metadataStatus: "completed",
+        pdfStatus: "skipped",
+        duplicateStatus: duplicateStatusFromError(e.message),
+        error: e.message,
+      });
+      setMsg({ kind: "err", text: e.message });
+    },
   });
   if (candidateIsHidden(syncedCandidate)) return null;
 
@@ -98,16 +219,34 @@ function SearchHitRow({ h }: { h: SearchHit }) {
         <div className="min-w-0 flex-1">
           <div className="font-medium text-litera-text">
             {h.draft.title}
-            {syncedCandidate && <span className="ml-2 align-middle"><CandidateStatusPill status={syncedCandidate.status} /></span>}
+            {syncedCandidate && (
+              <span className="ml-2 align-middle">
+                <CandidateStatusPill status={syncedCandidate.status} />
+              </span>
+            )}
           </div>
           <div className="text-xs text-litera-mute mt-1">
-            {h.draft.authors.slice(0, 4).join(", ")}{h.draft.authors.length > 4 ? " et al." : ""}
+            {h.draft.authors.slice(0, 4).join(", ")}
+            {h.draft.authors.length > 4 ? " et al." : ""}
             {h.draft.year ? ` · ${h.draft.year}` : ""}
             {h.draft.venue ? ` · ${h.draft.venue}` : ""}
             {h.draft.arxiv_id ? ` · arXiv:${h.draft.arxiv_id}` : ""}
           </div>
-          {h.draft.abstract_text && <p className="text-xs text-litera-text/70 mt-1.5 line-clamp-3">{h.draft.abstract_text}</p>}
-          {msg && <div className={"mt-1.5 text-xs " + (msg.kind === "ok" ? "text-litera-accent" : "text-red-400/90")}>{msg.text}</div>}
+          {h.draft.abstract_text && (
+            <p className="text-xs text-litera-text/70 mt-1.5 line-clamp-3">
+              {h.draft.abstract_text}
+            </p>
+          )}
+          {msg && (
+            <div
+              className={
+                "mt-1.5 text-xs " +
+                (msg.kind === "ok" ? "text-litera-accent" : "text-red-400/90")
+              }
+            >
+              {msg.text}
+            </div>
+          )}
         </div>
         <SearchHitActions
           alreadyImported={alreadyImported}
@@ -128,12 +267,55 @@ function searchHitToCandidate(h: SearchHit) {
   return {
     ...h.draft,
     source_type: "semantic_scholar",
-    source_url: h.paper_id ? `https://www.semanticscholar.org/paper/${h.paper_id}` : null,
+    source_url: h.paper_id
+      ? `https://www.semanticscholar.org/paper/${h.paper_id}`
+      : null,
   };
 }
 
+type SearchImportJobUpdate = {
+  status: ImportJobStatus;
+  metadataStatus: ImportJobStepStatus;
+  pdfStatus: ImportJobStepStatus;
+  duplicateStatus: ImportJobStepStatus;
+  paper?: Paper;
+  candidateId?: number;
+  error?: string;
+};
+
+function upsertSearchImportJob(hit: SearchHit, update: SearchImportJobUpdate) {
+  const identity = searchImportIdentity(hit);
+  upsertImportJob({
+    id: importJobId("search", identity),
+    source: "search",
+    title: update.paper?.title ?? titleFromDraft(hit.draft, identity),
+    subtitle: subtitleFromDraft(hit.draft) ?? hit.paper_id ?? undefined,
+    status: update.status,
+    metadataStatus: update.metadataStatus,
+    pdfStatus: update.pdfStatus,
+    duplicateStatus: update.duplicateStatus,
+    evidence: hit.paper_id
+      ? `https://www.semanticscholar.org/paper/${hit.paper_id}`
+      : undefined,
+    error: update.error,
+    paperId: update.paper?.id,
+    candidateId: update.candidateId,
+  });
+}
+
+function searchImportIdentity(hit: SearchHit): string {
+  return hit.draft.arxiv_id ?? hit.draft.doi ?? hit.paper_id ?? hit.draft.title;
+}
+
 function SearchHitActions({
-  alreadyImported, hasArxiv, savePending, autoPending, candidatePending, onSave, onAuto, onCandidate,
+  alreadyImported,
+  hasArxiv,
+  savePending,
+  autoPending,
+  candidatePending,
+  onSave,
+  onAuto,
+  onCandidate,
 }: {
   alreadyImported: boolean;
   hasArxiv: boolean;
@@ -154,17 +336,44 @@ function SearchHitActions({
   }
   return (
     <div className="shrink-0 flex flex-col items-end gap-1.5">
-      <button onClick={onCandidate} disabled={candidatePending} className="litera-btn text-xs whitespace-nowrap disabled:opacity-50" title={t("candidate.add")}>
-        {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+      <button
+        onClick={onCandidate}
+        disabled={candidatePending}
+        className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+        title={t("candidate.add")}
+      >
+        {candidatePending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Archive className="h-3.5 w-3.5" />
+        )}
         {t("candidate.addShort")}
       </button>
-      <button onClick={onSave} disabled={savePending} className="litera-btn text-xs whitespace-nowrap disabled:opacity-50" title={t("import.search.pickSaveTitle")}>
-        {savePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
+      <button
+        onClick={onSave}
+        disabled={savePending}
+        className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+        title={t("import.search.pickSaveTitle")}
+      >
+        {savePending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <FolderOpen className="h-3.5 w-3.5" />
+        )}
         {t("import.search.pickSave")}
       </button>
       {hasArxiv && (
-        <button onClick={onAuto} disabled={autoPending} className="litera-btn text-xs whitespace-nowrap disabled:opacity-50" title={t("import.search.arxivAutoTitle")}>
-          {autoPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+        <button
+          onClick={onAuto}
+          disabled={autoPending}
+          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          title={t("import.search.arxivAutoTitle")}
+        >
+          {autoPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Rocket className="h-3.5 w-3.5" />
+          )}
           {t("import.search.arxivAuto")}
         </button>
       )}
