@@ -22,6 +22,7 @@ mod note_sections;
 pub mod notes;
 mod paper_documents;
 mod paper_links;
+mod paper_supplements;
 mod paper_terms;
 mod papers;
 mod paths;
@@ -51,6 +52,7 @@ pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTe
 pub use note_sections::{NoteSection, NoteSectionRepo};
 pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
+pub use paper_supplements::{NewPaperSupplement, PaperSupplement, PaperSupplementRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
 pub use paths::{default_library_root, LibraryPaths};

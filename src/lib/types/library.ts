@@ -26,6 +26,23 @@ export interface Paper {
   bibtex: string | null;
 }
 
+export interface PaperSupplement {
+  id: number;
+  paper_id: string;
+  title: string;
+  file_path: string;
+  file_kind: string;
+  note: string;
+  converted_pdf_path: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SupplementConversionResult {
+  supplement: PaperSupplement;
+  pdf_path: string;
+}
+
 export type ReadStatus = "unread" | "reading" | "read" | "must";
 
 export interface PdfImportSummary {

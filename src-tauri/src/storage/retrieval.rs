@@ -1,10 +1,8 @@
 //! Centralized full-text search and retrieval helpers.
 //!
-//! Consolidates FTS5 query building, paper search, multi-term Ask retrieval,
-//! and unified cross-source search that were previously scattered across
+//! Consolidates FTS5 query building, Ask retrieval support, and unified
+//! cross-source search that were previously scattered across
 //! `papers.rs`, `search.rs`, and `commands/ask.rs`.
-
-use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 
@@ -92,46 +90,4 @@ async fn append_document_hits(
         }
     }
     Ok(())
-}
-
-// ── Multi-term Ask retrieval ───────────────────────────────────────────
-
-/// Fan out per-term FTS5 searches and merge by paper_id. Score = number of
-/// distinct terms that retrieved a given paper; ties broken by year DESC
-/// then added_at DESC. This gives "papers that match many of the
-/// LLM-rewritten terms" priority over "papers that happened to score high
-/// in one term's bm25".
-pub async fn search_papers_multi_term(pool: &Pool, terms: &[String], limit: i64) -> Vec<Paper> {
-    let per_term_limit = (limit * 3).max(8);
-    let mut scored: HashMap<String, (Paper, u32)> = HashMap::new();
-    for term in terms {
-        let term = term.trim();
-        if term.is_empty() {
-            continue;
-        }
-        let escaped = escape_fts(term);
-        if escaped.is_empty() {
-            continue;
-        }
-        let hits = search_papers(pool, &escaped, per_term_limit)
-            .await
-            .unwrap_or_default();
-        for p in hits {
-            scored
-                .entry(p.id.clone())
-                .and_modify(|(_, s)| *s += 1)
-                .or_insert((p, 1));
-        }
-    }
-    let mut entries: Vec<(Paper, u32)> = scored.into_values().collect();
-    entries.sort_by(|a, b| {
-        b.1.cmp(&a.1)
-            .then_with(|| b.0.year.unwrap_or(0).cmp(&a.0.year.unwrap_or(0)))
-            .then_with(|| b.0.added_at.cmp(&a.0.added_at))
-    });
-    entries
-        .into_iter()
-        .take(limit as usize)
-        .map(|(p, _)| p)
-        .collect()
 }

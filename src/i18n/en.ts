@@ -210,6 +210,14 @@ export const en: Record<TKey, string> = {
   "paper.detail.enrichFailed": "Failed to fetch metadata",
   "paper.detail.enrichSuccess": "Metadata updated",
 
+  "supplements.title": "Supplementary materials",
+  "supplements.description": "Attach supporting files for this paper, open them later, and keep notes per file.",
+  "supplements.add": "Add supplement",
+  "supplements.empty": "No supplementary materials yet.",
+  "supplements.notePlaceholder": "Notes for this supplement…",
+  "supplements.convertPrompt": "This is a Word supplement. Convert it to PDF before opening? Cancel opens the original file.",
+  "supplements.convertedPdfReady": "PDF ready",
+
   "folders.title": "Folders",
   "folders.all": "All papers",
   "folders.emptyTitle": "No folders yet.",

@@ -5,7 +5,7 @@ use crate::storage::{Highlight, Paper};
 use super::AskSource;
 
 const MAX_CONTEXT_TOKENS: usize = 10_000;
-const MAX_SNIPPET_TOKENS: usize = 800;
+const MAX_SNIPPET_TOKENS: usize = 1_200;
 const MAX_HIGHLIGHTS_PER_PAPER: usize = 3;
 const MAX_HIGHLIGHT_TEXT_CHARS: usize = 240;
 

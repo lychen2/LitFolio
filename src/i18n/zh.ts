@@ -200,6 +200,14 @@ export const zh = {
   "paper.detail.enrichFailed": "获取元数据失败",
   "paper.detail.enrichSuccess": "元数据已更新",
 
+  "supplements.title": "补充材料",
+  "supplements.description": "为这篇文献挂载补充文件，之后可打开查看，并给每个文件记录笔记。",
+  "supplements.add": "添加补充材料",
+  "supplements.empty": "还没有补充材料。",
+  "supplements.notePlaceholder": "记录这个补充材料的笔记…",
+  "supplements.convertPrompt": "这是 Word 补充材料。是否先转换为 PDF 再打开？取消则打开原文件。",
+  "supplements.convertedPdfReady": "PDF 已就绪",
+
   "folders.title": "分类文件夹",
   "folders.all": "全部文献",
   "folders.emptyTitle": "还没有分类文件夹。",

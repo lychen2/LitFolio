@@ -1,6 +1,7 @@
 use crate::ai::{expand_search_query, LlmProfile};
 use crate::storage::{retrieval, Paper, PaperRepo};
 use crate::AppState;
+use std::collections::{BTreeSet, HashMap};
 
 pub(super) struct RetrievalRequest<'a> {
     pub profile: Option<&'a LlmProfile>,
@@ -19,17 +20,11 @@ struct SearchRequest<'a> {
     expanded_terms: &'a [String],
 }
 
-struct RawSearchRequest<'a, 'b> {
-    question: &'a str,
-    limit: i64,
-    used_terms: &'b mut Vec<String>,
-}
-
-struct FinishRequest<'a> {
-    question: &'a str,
-    limit: i64,
-    papers: Vec<Paper>,
-    used_terms: Vec<String>,
+#[derive(Debug)]
+struct ScoredPaper {
+    paper: Paper,
+    score: i64,
+    matched_terms: BTreeSet<String>,
 }
 
 pub(super) async fn retrieve_papers(
@@ -46,46 +41,106 @@ pub(super) async fn retrieve_papers(
         limit: request.limit,
         expanded_terms: &expanded_terms,
     };
-    let mut local_used_terms = Vec::new();
-    let explicit_papers = explicit_title_search(repo, request.question, request.limit).await;
-    let local_papers = raw_search(
-        repo,
-        RawSearchRequest {
-            question: request.question,
-            limit: request.limit,
-            used_terms: &mut local_used_terms,
-        },
-    )
-    .await;
-    let semantic_papers = initial_search(state, repo, search).await;
-    let mut papers = merge_paper_lists(explicit_papers, local_papers, request.limit);
-    papers = merge_paper_lists(papers, semantic_papers, request.limit);
-    let mut used_terms = terms_for_search(request.question, &expanded_terms);
+    let papers = hybrid_search(state, repo, search).await;
+    let used_terms = terms_for_search(request.question, &expanded_terms);
+    RetrievalResult { papers, used_terms }
+}
 
-    if papers.is_empty() && !expanded_terms.is_empty() {
-        papers = raw_search(
-            repo,
-            RawSearchRequest {
-                question: request.question,
-                limit: request.limit,
-                used_terms: &mut used_terms,
-            },
-        )
-        .await;
+fn add_candidates(
+    scored: &mut HashMap<String, ScoredPaper>,
+    hits: Vec<Paper>,
+    base_score: i64,
+    matched_term: &str,
+) {
+    let term = matched_term.trim();
+    for (index, paper) in hits.into_iter().enumerate() {
+        let increment = base_score + (20_i64 - index as i64).max(0);
+        let entry = scored
+            .entry(paper.id.clone())
+            .or_insert_with(|| ScoredPaper {
+                paper,
+                score: 0,
+                matched_terms: BTreeSet::new(),
+            });
+        entry.score += increment;
+        if !term.is_empty() {
+            entry.matched_terms.insert(term.to_string());
+        }
     }
-    if papers.is_empty() && !expanded_terms.is_empty() {
-        papers = expanded_or_search(repo, &expanded_terms, request.limit).await;
+}
+
+fn ranked_candidates(scored: HashMap<String, ScoredPaper>, limit: i64) -> Vec<Paper> {
+    let mut entries = scored.into_values().collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| b.matched_terms.len().cmp(&a.matched_terms.len()))
+            .then_with(|| b.paper.year.unwrap_or(0).cmp(&a.paper.year.unwrap_or(0)))
+            .then_with(|| b.paper.added_at.cmp(&a.paper.added_at))
+    });
+    entries
+        .into_iter()
+        .take(limit as usize)
+        .map(|entry| entry.paper)
+        .collect()
+}
+
+async fn hybrid_search(
+    state: &AppState,
+    repo: &PaperRepo<'_>,
+    request: SearchRequest<'_>,
+) -> Vec<Paper> {
+    let mut scored: HashMap<String, ScoredPaper> = HashMap::new();
+    let per_route_limit = (request.limit * 4).max(32);
+
+    // Route 1: Title match
+    let title_hits = explicit_title_search(repo, request.question, per_route_limit).await;
+    add_candidates(&mut scored, title_hits, 1000, request.question);
+
+    // Route 2: Expanded terms strict
+    for term in request.expanded_terms {
+        let escaped = retrieval::escape_fts(term);
+        if !escaped.is_empty() {
+            let hits = retrieval::search_papers(&state.pool, &escaped, per_route_limit)
+                .await
+                .unwrap_or_default();
+            add_candidates(&mut scored, hits, 160, term);
+        }
     }
-    finish_search(
-        repo,
-        FinishRequest {
-            question: request.question,
-            limit: request.limit,
-            papers,
-            used_terms,
-        },
-    )
-    .await
+
+    // Route 3: Raw question strict
+    let raw_hits = repo
+        .search(request.question, per_route_limit)
+        .await
+        .unwrap_or_default();
+    add_candidates(&mut scored, raw_hits, 120, request.question);
+
+    // Route 4: Expanded terms OR
+    if !request.expanded_terms.is_empty() {
+        let expanded_joined = request.expanded_terms.join(" ");
+        let or_hits = expanded_or_search(repo, request.expanded_terms, per_route_limit).await;
+        add_candidates(&mut scored, or_hits, 90, &expanded_joined);
+    }
+
+    // Route 5: Raw question OR
+    let or_hits = repo
+        .search_or(request.question, per_route_limit)
+        .await
+        .unwrap_or_default();
+    add_candidates(&mut scored, or_hits, 70, request.question);
+
+    // Route 6: Chinese fuzzy OR
+    let fuzzy = fuzzy_phrases(request.question);
+    if !fuzzy.is_empty() {
+        let fuzzy_joined = fuzzy.join(" ");
+        let fuzzy_hits = repo
+            .search_or(&fuzzy_joined, per_route_limit)
+            .await
+            .unwrap_or_default();
+        add_candidates(&mut scored, fuzzy_hits, 60, &fuzzy_joined);
+    }
+
+    ranked_candidates(scored, request.limit)
 }
 
 async fn explicit_title_search(repo: &PaperRepo<'_>, question: &str, limit: i64) -> Vec<Paper> {
@@ -180,50 +235,11 @@ fn normalize_title_for_match(title: &str) -> String {
         .join(" ")
 }
 
-async fn finish_search(repo: &PaperRepo<'_>, request: FinishRequest<'_>) -> RetrievalResult {
-    let mut papers = request.papers;
-    if papers.is_empty() {
-        papers = fuzzy_search(repo, request.question, request.limit).await;
-    }
-    if papers.is_empty() {
-        papers = repo.list_recent(request.limit).await.unwrap_or_default();
-    }
-    RetrievalResult {
-        papers,
-        used_terms: request.used_terms,
-    }
-}
-
 async fn expand_terms(state: &AppState, profile: &LlmProfile, question: &str) -> Vec<String> {
     match expand_search_query(&state.http, profile, question).await {
         Ok(eq) => eq.terms,
         Err(_) => Vec::new(),
     }
-}
-
-async fn initial_search(
-    state: &AppState,
-    repo: &PaperRepo<'_>,
-    request: SearchRequest<'_>,
-) -> Vec<Paper> {
-    if request.expanded_terms.is_empty() {
-        return repo
-            .search(request.question, request.limit)
-            .await
-            .unwrap_or_default();
-    }
-    retrieval::search_papers_multi_term(&state.pool, request.expanded_terms, request.limit).await
-}
-
-async fn raw_search(repo: &PaperRepo<'_>, request: RawSearchRequest<'_, '_>) -> Vec<Paper> {
-    let raw_hits = repo
-        .search(request.question, request.limit)
-        .await
-        .unwrap_or_default();
-    if !raw_hits.is_empty() {
-        request.used_terms.push(request.question.to_string());
-    }
-    raw_hits
 }
 
 async fn expanded_or_search(
@@ -235,27 +251,32 @@ async fn expanded_or_search(
     repo.search_or(&all_words, limit).await.unwrap_or_default()
 }
 
-async fn fuzzy_search(repo: &PaperRepo<'_>, question: &str, limit: i64) -> Vec<Paper> {
-    let fuzzy = fuzzy_phrases(question);
-    if fuzzy.is_empty() {
-        return Vec::new();
+fn terms_for_search(question: &str, expanded_terms: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    // 1. Expanded terms
+    for term in expanded_terms {
+        push_unique_term(&mut out, term);
     }
-    repo.search_or(&fuzzy.join(" "), limit)
-        .await
-        .unwrap_or_default()
+    // 2. Raw question
+    push_unique_term(&mut out, question);
+    // 3. Fuzzy phrases
+    for phrase in fuzzy_phrases(question) {
+        push_unique_term(&mut out, &phrase);
+    }
+    out
 }
 
-fn terms_for_search(question: &str, expanded_terms: &[String]) -> Vec<String> {
-    if expanded_terms.is_empty() {
-        return vec![question.to_string()];
+fn push_unique_term(out: &mut Vec<String>, raw: &str) {
+    let term = raw.trim();
+    if !term.is_empty() && !out.iter().any(|existing| existing == term) {
+        out.push(term.to_string());
     }
-    expanded_terms.to_vec()
 }
 
 /// Split a Chinese question into meaningful keyword phrases by stripping
 /// common grammar particles and stop words. Used as a last-ditch fuzzy
 /// search when the exact AND/OR strategies miss.
-fn fuzzy_phrases(question: &str) -> Vec<String> {
+pub(super) fn fuzzy_phrases(question: &str) -> Vec<String> {
     let stop: &[char] = &[
         '的', '是', '了', '在', '和', '与', '及', '对', '把', '被', '从', '而', '且', '但', '或',
         '也', '都', '就', '着', '过', '之', '不', '要', '会', '能', '可', '以', '到', '为', '上',
@@ -316,5 +337,69 @@ mod tests {
             ),
             "towards zeptosecond scale pulses from x ray free electron lasers"
         );
+    }
+
+    fn paper(id: &str, title: &str, year: i32, added_at: &str) -> Paper {
+        Paper {
+            id: id.to_string(),
+            title: title.to_string(),
+            authors: Vec::new(),
+            year: Some(year),
+            venue: None,
+            doi: None,
+            arxiv_id: None,
+            abstract_text: None,
+            pdf_path: None,
+            note_path: None,
+            added_at: added_at.parse().unwrap(),
+            updated_at: added_at.parse().unwrap(),
+            read_status: crate::storage::ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: Vec::new(),
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        }
+    }
+
+    #[test]
+    fn ranked_candidates_prefers_multi_route_hit_over_single_route_hit() {
+        let mut scored = HashMap::new();
+        let a = paper("A", "Raw Match", 2025, "100");
+        let b = paper("B", "Multi Route Match", 2024, "90");
+
+        add_candidates(&mut scored, vec![a], 120, "raw");
+        add_candidates(&mut scored, vec![b.clone()], 70, "or");
+        add_candidates(&mut scored, vec![b], 60, "fuzzy");
+
+        let ranked = ranked_candidates(scored, 2);
+        assert_eq!(ranked[0].id, "B");
+        assert_eq!(ranked[1].id, "A");
+    }
+
+    #[test]
+    fn terms_for_search_keeps_expanded_raw_and_fuzzy_terms() {
+        let question = "飞秒激光在材料加工中的应用";
+        let expanded_terms = vec![
+            "femtosecond laser".to_string(),
+            "laser micromachining".to_string(),
+        ];
+
+        let terms = terms_for_search(question, &expanded_terms);
+
+        assert!(terms.iter().any(|term| term == "femtosecond laser"));
+        assert!(terms.iter().any(|term| term == "laser micromachining"));
+        assert!(terms.iter().any(|term| term == question));
+        assert!(terms
+            .iter()
+            .any(|term| term == "飞秒激光" || term == "材料加工"));
     }
 }

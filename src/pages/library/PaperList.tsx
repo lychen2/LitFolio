@@ -10,6 +10,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { FolderPicker } from "./FolderPicker";
 import { PaperActions } from "./PaperActions";
 import { usePaperActions } from "./usePaperActions";
+import { updatePaperStatusCache } from "./paperStatusCache";
 
 const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread: { labelKey: "common.unread", icon: Circle, tone: "text-litera-mute" },
@@ -19,6 +20,7 @@ const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentT
 };
 
 const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
+
 
 export function VirtualPaperList({
   papers, tagsByPaper, selectedIds, onToggleSelection, onInspect, onQuickRead,
@@ -179,14 +181,15 @@ function StatusToggle({ paper }: { paper: Paper }) {
   const qc = useQueryClient();
   const { t } = useI18n();
   const m = useMutation({
-    mutationFn: (next: ReadStatus) => api.paperSetReadStatus(paper.id, next),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" }),
+    mutationFn: ({ paperId, status }: { paperId: string; status: ReadStatus }) =>
+      api.paperSetReadStatus(paperId, status),
+    onSuccess: (_result, { paperId, status }) => updatePaperStatusCache(qc, paperId, status),
   });
   const meta = STATUS_META[paper.read_status];
   const Icon = meta.icon;
   function cycle() {
     const idx = STATUS_ORDER.indexOf(paper.read_status);
-    m.mutate(STATUS_ORDER[(idx + 1) % STATUS_ORDER.length]);
+    m.mutate({ paperId: paper.id, status: STATUS_ORDER[(idx + 1) % STATUS_ORDER.length] });
   }
   return (
     <button

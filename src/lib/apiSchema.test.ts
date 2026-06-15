@@ -6,6 +6,8 @@ import {
   parseGraphData,
   parseLlmConfig,
   parsePaper,
+  parsePaperSupplement,
+  parseSupplementConversionResult,
   parseResearchProject,
   parseSyncPreviewReport,
   parseSyncReport,
@@ -28,6 +30,27 @@ describe("api schema parsers", () => {
     const paper = { ...validPaper(), read_status: "archived" };
 
     expect(() => parsePaper(paper)).toThrow("Paper.read_status");
+  });
+
+  it("accepts supplement DTOs and conversion results", () => {
+    const supplement = validSupplement();
+
+    expect(parsePaperSupplement(supplement).converted_pdf_path).toBeNull();
+    expect(
+      parseSupplementConversionResult({
+        supplement: { ...supplement, converted_pdf_path: "/library/papers/p1/supplement.pdf" },
+        pdf_path: "/library/papers/p1/supplement.pdf",
+      }).supplement.converted_pdf_path,
+    ).toBe("/library/papers/p1/supplement.pdf");
+  });
+
+  it("rejects malformed supplement DTOs with precise paths", () => {
+    expect(() =>
+      parsePaperSupplement({ ...validSupplement(), converted_pdf_path: 1 }),
+    ).toThrow("PaperSupplement.converted_pdf_path");
+    expect(() =>
+      parseSupplementConversionResult({ supplement: validSupplement(), pdf_path: null }),
+    ).toThrow("SupplementConversionResult.pdf_path");
   });
 
   it("validates LLM config task bindings", () => {
@@ -131,6 +154,20 @@ function validPaper() {
     translate_target_lang: null,
     translated_at: null,
     bibtex: null,
+  };
+}
+
+function validSupplement() {
+  return {
+    id: 1,
+    paper_id: "p1",
+    title: "supplement.docx",
+    file_path: "/library/papers/p1/supplements/supplement.docx",
+    file_kind: "docx",
+    note: "",
+    converted_pdf_path: null,
+    created_at: 1,
+    updated_at: 2,
   };
 }
 

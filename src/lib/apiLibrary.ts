@@ -4,7 +4,9 @@ import {
   parseArxivDraft,
   parseJobRecord,
   parsePaper,
+  parsePaperSupplement,
   parsePdfImportSummary,
+  parseSupplementConversionResult,
 } from "./apiSchema";
 import { parseArray, parseNullable } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
@@ -146,4 +148,17 @@ export const libraryApi = {
     invokeParsed("paper_attach_pdf", { id, sourcePdfPath }, parsePaper),
   paperOpenPdf: (id: string) => invoke<void>("paper_open_pdf", { id }),
   paperPdfAssetPath: (id: string) => invoke<string>("paper_pdf_asset_path", { id }),
+  paperSupplementsList: (paperId: string) =>
+    invokeParsed("paper_supplements_list", { paperId }, (value, path) =>
+      parseArray(value, path, parsePaperSupplement),
+    ),
+  paperSupplementAddFile: (paperId: string, sourcePath: string) =>
+    invokeParsed("paper_supplement_add_file", { paperId, sourcePath }, parsePaperSupplement),
+  paperSupplementUpdateNote: (id: number, note: string) =>
+    invokeParsed("paper_supplement_update_note", { id, note }, parsePaperSupplement),
+  paperSupplementDelete: (id: number) => invoke<void>("paper_supplement_delete", { id }),
+  paperSupplementOpen: (id: number, preferPdf?: boolean) =>
+    invoke<void>("paper_supplement_open", { id, preferPdf: preferPdf ?? null }),
+  paperSupplementConvertDocxToPdf: (id: number) =>
+    invokeParsed("paper_supplement_convert_docx_to_pdf", { id }, parseSupplementConversionResult),
 };

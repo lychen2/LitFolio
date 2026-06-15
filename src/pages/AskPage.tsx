@@ -12,6 +12,7 @@ import { WorkflowCard } from "./ask/WorkflowCard";
 import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
 
 const SOURCE_LIMIT = 8;
+const ASK_RETRIEVAL_LIMIT = 24;
 
 interface ConversationTurn {
   role: "user" | "assistant";
@@ -130,7 +131,7 @@ export function AskPage() {
         role: turn.role,
         content: turn.content,
       }));
-      return api.libraryAsk(question, SOURCE_LIMIT, history, pinnedIds);
+      return api.libraryAsk(question, ASK_RETRIEVAL_LIMIT, history, pinnedIds);
     },
     onSuccess: (nextResult, vars) => {
       setConversation((prev) => [

@@ -33,6 +33,7 @@ pub mod reader_translate;
 pub mod search;
 pub mod smart_collections;
 pub mod summaries;
+pub mod supplements;
 pub mod survey;
 pub mod sync;
 pub mod tags;
@@ -242,6 +243,12 @@ macro_rules! command_paths_reader_notes {
             commands::notes::note_sections_save,
             commands::notes::note_sections_reorder,
             commands::notes::note_section_delete,
+            commands::supplements::paper_supplements_list,
+            commands::supplements::paper_supplement_add_file,
+            commands::supplements::paper_supplement_update_note,
+            commands::supplements::paper_supplement_delete,
+            commands::supplements::paper_supplement_open,
+            commands::supplements::paper_supplement_convert_docx_to_pdf,
             commands::search::search_expand_query,
             commands::survey::topic_survey,
             commands::survey::topic_survey_save_as_note,

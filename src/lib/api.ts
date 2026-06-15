@@ -59,6 +59,7 @@ export type {
   LlmTestResult,
   NoteSection,
   Paper,
+  PaperSupplement,
   PdfMarkdownConfig,
   PdfMarkdownEngine,
   PaperComparison,
@@ -102,6 +103,7 @@ export type {
   TopicSurvey,
   TopicSurveyPhase,
   TopicSurveyProgress,
+  SupplementConversionResult,
   TranslationResult,
   UnifiedSearchResult,
 } from "./types/api";

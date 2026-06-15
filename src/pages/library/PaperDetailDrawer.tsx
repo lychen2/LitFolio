@@ -11,6 +11,7 @@ import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { SimilarPapersPanel } from "./SimilarPapersPanel";
 import { DoiEnrichRow } from "./DoiEnrichRow";
 import { CustomFieldsSection } from "./PaperCustomFieldsSection";
+import { PaperSupplementsSection } from "./PaperSupplementsSection";
 import { CopyCitationDropdown } from "./CopyCitationDropdown";
 
 export function PaperDetailDrawer({
@@ -128,6 +129,7 @@ export function PaperDetailDrawer({
           {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
           {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
           {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
+          <PaperSupplementsSection paperId={paper.id} />
           <CustomFieldsSection paperId={paper.id} />
           {translate.error && <ErrorLine error={translate.error} />}
         </div>

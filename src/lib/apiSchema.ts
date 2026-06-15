@@ -17,6 +17,8 @@ import type {
   LlmProfile,
   Paper,
   PdfImportSummary,
+  PaperSupplement,
+  SupplementConversionResult,
   ProjectStatus,
   ReadStatus,
   ResearchProject,
@@ -131,6 +133,32 @@ export function parsePaper(value: unknown, path = "Paper"): Paper {
     ),
     translated_at: nullableNumberField(obj, "translated_at", path),
     bibtex: nullableStringField(obj, "bibtex", path),
+  };
+}
+
+export function parsePaperSupplement(value: unknown, path = "PaperSupplement"): PaperSupplement {
+  const obj = object(value, path);
+  return {
+    id: numberField(obj, "id", path),
+    paper_id: stringField(obj, "paper_id", path),
+    title: stringField(obj, "title", path),
+    file_path: stringField(obj, "file_path", path),
+    file_kind: stringField(obj, "file_kind", path),
+    note: stringField(obj, "note", path),
+    converted_pdf_path: nullableStringField(obj, "converted_pdf_path", path),
+    created_at: numberField(obj, "created_at", path),
+    updated_at: numberField(obj, "updated_at", path),
+  };
+}
+
+export function parseSupplementConversionResult(
+  value: unknown,
+  path = "SupplementConversionResult",
+): SupplementConversionResult {
+  const obj = object(value, path);
+  return {
+    supplement: parsePaperSupplement(field(obj, "supplement", path), `${path}.supplement`),
+    pdf_path: stringField(obj, "pdf_path", path),
   };
 }
 

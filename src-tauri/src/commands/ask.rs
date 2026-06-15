@@ -1,14 +1,17 @@
 //! IPC command for library question answering (RAG).
 //!
 //! Retrieval pipeline:
-//!   1. LLM-rewrite the user's natural-language question into 2-4 English search
-//!      terms (via [`expand_search_query`]). This is load-bearing: feeding a raw
-//!      Chinese question into FTS5's AND-of-tokens path is essentially 0-recall.
-//!   2. Fan out per-term FTS5 searches, merge by paper_id, score by the number of
-//!      terms that matched (higher == more on-topic), then by year and added-at.
-//!   3. If the rewrite path returns nothing, fall back to a raw-question FTS5 hit.
-//!   4. Load up to a few user highlights per retrieved paper so the LLM sees
-//!      passages the user marked as important.
+//!   1. LLM-rewrite the user's natural-language question into English search
+//!      terms when an Ask-capable profile is configured.
+//!   2. For unpinned library Ask, route title matches, expanded-term strict FTS,
+//!      expanded-term OR FTS, raw-question strict FTS, raw-question OR FTS, and
+//!      Chinese fuzzy OR FTS into one candidate pool. Rank by route weights,
+//!      multi-route hits, year, then added-at before packing answer sources.
+//!   3. For @/pinned papers, skip library-wide hybrid retrieval. Treat the
+//!      pinned ids as the corpus, scan their indexed Markdown full text, and
+//!      pack the most relevant bounded snippets for the answer.
+//!   4. Load user highlights per answer source so the LLM sees passages the user
+//!      marked as important.
 //!   5. Hand off to [`answer_library_question`] which packs everything into a
 //!      bounded context and calls the LLM with a citation-strict prompt.
 

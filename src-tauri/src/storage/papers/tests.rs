@@ -99,6 +99,23 @@ async fn search_finds_inserted_paper() {
 }
 
 #[tokio::test]
+async fn search_or_recovers_single_token_match_when_strict_and_misses() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    let mut p = sample("HYBRID");
+    p.title = "Hybrid Retrieval for Local Literature QA".into();
+    p.abstract_text = Some("rank fusion improves recall".into());
+    repo.insert(&p).await.unwrap();
+
+    let strict_hits = repo.search("hybrid nonexistenttoken", 10).await.unwrap();
+    assert!(strict_hits.is_empty());
+
+    let or_hits = repo.search_or("hybrid nonexistenttoken", 10).await.unwrap();
+    assert_eq!(or_hits[0].id, p.id);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
 async fn search_finds_imported_document_markdown() {
     let (pool, dir) = temp_pool().await;
     let repo = PaperRepo::new(&pool);
