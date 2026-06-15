@@ -1,18 +1,16 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Search, LibraryBig, Inbox, Compass, Settings, MessagesSquare,
-  Network, Rss, Atom, FileText, Download, Highlighter, BookMarked,
-} from "lucide-react";
+import { Search, FileText, Download, Highlighter, BookMarked, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { NAVIGATION_ITEMS } from "@/lib/navigationRegistry";
 
 interface CommandItem {
   id: string;
   label: string;
   category: "navigation" | "papers" | "highlights" | "terms" | "actions";
-  icon: typeof Search;
+  icon: LucideIcon;
   action: () => void;
   keywords: string[];
   snippet?: string;
@@ -46,18 +44,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     enabled: open && debouncedQuery.length >= 2,
   });
 
-  // Static commands.
   const commands = useMemo<CommandItem[]>(() => [
-    // Navigation
-    { id: "nav:library", label: t("nav.library"), category: "navigation", icon: LibraryBig, action: () => navigate("/library"), keywords: ["library", "文献"] },
-    { id: "nav:import", label: t("nav.import"), category: "navigation", icon: Inbox, action: () => navigate("/import"), keywords: ["import", "导入"] },
-    { id: "nav:browse", label: t("nav.browse"), category: "navigation", icon: Atom, action: () => navigate("/browse"), keywords: ["browse", "arxiv", "浏览"] },
-    { id: "nav:feeds", label: t("nav.feeds"), category: "navigation", icon: Rss, action: () => navigate("/feeds"), keywords: ["feeds", "rss", "订阅"] },
-    { id: "nav:topic", label: t("nav.topic"), category: "navigation", icon: Compass, action: () => navigate("/topic"), keywords: ["topic", "discover", "主题"] },
-    { id: "nav:ask", label: t("nav.ask"), category: "navigation", icon: MessagesSquare, action: () => navigate("/ask"), keywords: ["ask", "提问"] },
-    { id: "nav:graph", label: t("nav.graph"), category: "navigation", icon: Network, action: () => navigate("/graph"), keywords: ["graph", "图谱"] },
-    { id: "nav:settings", label: t("nav.settings"), category: "navigation", icon: Settings, action: () => navigate("/settings"), keywords: ["settings", "设置"] },
-    // Actions
+    ...NAVIGATION_ITEMS.map((item) => ({
+      id: `nav:${item.to.slice(1) || "home"}`,
+      label: t(item.labelKey),
+      category: "navigation" as const,
+      icon: item.icon,
+      action: () => navigate(item.to),
+      keywords: [...item.keywords],
+    })),
     { id: "act:export", label: t("export.title"), category: "actions", icon: Download, action: () => navigate("/settings"), keywords: ["export", "markdown", "导出"] },
   ], [t, navigate]);
 

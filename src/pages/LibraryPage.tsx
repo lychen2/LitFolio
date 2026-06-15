@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Atom, Compass, Download, GitCompareArrows, Inbox, LibraryBig, ListPlus, Loader2,
-  Rss, X, Search, Clock, PenLine,
+  Rss, X, Search, PenLine,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
 import { FolderSidebar } from "./library/FolderSidebar";
@@ -11,6 +11,7 @@ import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
 import { ReadingQueue } from "./library/ReadingQueue";
 import { QuickReadDrawer } from "./library/QuickReadDrawer";
 import { VirtualPaperList } from "./library/PaperList";
+import { LibraryFilterBar, type LibraryViewMode } from "./library/LibraryFilterBar";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -21,7 +22,7 @@ export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
   const [smartCollectionId, setSmartCollectionId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"papers" | "queue">("papers");
+  const [viewMode, setViewMode] = useState<LibraryViewMode>("papers");
   const trimmed = search.trim();
   const { t } = useI18n();
 
@@ -44,6 +45,18 @@ export function LibraryPage() {
   });
   const tagsByPaper = tagsQ.data ?? {};
 
+  const resultLabel = viewMode === "queue"
+    ? ""
+    : trimmed
+    ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
+    : papers
+    ? t("library.recentPapers", { count: String(papers.length) })
+    : t("common.loading");
+  const canReviewCollection =
+    (folderId != null || smartCollectionId != null) &&
+    viewMode === "papers" &&
+    !!papers &&
+    papers.length > 0;
   const [reading, setReading] = useState<Paper | null>(null);
   const [preview, setPreview] = useState<Paper | null>(null);
   const [showLitReview, setShowLitReview] = useState(false);
@@ -78,62 +91,16 @@ export function LibraryPage() {
 
   return (
     <section className="h-full flex flex-col">
-      <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
-        <div className="min-w-0 flex items-center gap-3">
-          <div>
-            <h1 className="font-serif text-2xl tracking-tight">
-              {viewMode === "queue" ? t("queue.title") : t("library.title")}
-            </h1>
-            <p className="text-sm text-litera-mute">
-              {viewMode === "queue"
-                ? ""
-                : trimmed
-                ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
-                : papers
-                ? t("library.recentPapers", { count: String(papers.length) })
-                : t("common.loading")}
-            </p>
-          </div>
-          <button
-            onClick={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
-            className={`litera-btn text-xs ${viewMode === "queue" ? "bg-litera-accent/15 text-litera-accent border-litera-accent/30" : ""}`}
-            title={t("queue.title")}
-            aria-label={t("queue.title")}
-          >
-            <Clock className="h-3.5 w-3.5" />
-          </button>
-          {(folderId != null || smartCollectionId != null) && viewMode === "papers" && papers && papers.length > 0 && (
-            <button
-              onClick={() => setShowLitReview(true)}
-              className="litera-btn text-xs"
-              title={t("litReview.title")}
-              aria-label={t("litReview.title")}
-            >
-              <PenLine className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        {viewMode === "papers" && (
-          <div className="relative w-80 max-w-[40vw]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-litera-mute" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("library.searchPlaceholder")}
-              className="litera-input pl-9 pr-8 w-full"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-litera-mute hover:text-litera-text"
-                aria-label={t("common.cancel")}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-      </header>
+      <LibraryFilterBar
+        viewMode={viewMode}
+        search={search}
+        resultLabel={resultLabel}
+        canReviewCollection={canReviewCollection}
+        onSearchChange={setSearch}
+        onClearSearch={() => setSearch("")}
+        onToggleViewMode={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
+        onReviewCollection={() => setShowLitReview(true)}
+      />
       {viewMode === "queue" ? (
         <div className="flex-1 min-h-0 overflow-hidden">
           <ReadingQueue />

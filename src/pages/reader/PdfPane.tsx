@@ -37,6 +37,11 @@ import {
   type PdfZoom,
 } from "./PdfPaneZoom";
 import { extractPdfText } from "./pdfTextExtraction";
+import {
+  pushPdfNavigationPosition,
+  shouldRecordPdfNavigation,
+  type PdfNavigationPosition,
+} from "./pdfNavigationHistory";
 
 type PdfPaneError = {
   stage: "asset-path" | "asset-url" | "pdfjs-load" | "text-cache";
@@ -99,6 +104,7 @@ export const PdfPane = memo(function PdfPane({
   const [searchSignal, setSearchSignal] = useState(0);
   const [zoom, setZoom] = useState<PdfZoom>("page-width");
   const [doiImport, setDoiImport] = useState<string | null>(null);
+  const [navigationStack, setNavigationStack] = useState<PdfNavigationPosition[]>([]);
   const scrollFnRef = useRef<((h: PdfHighlight) => void) | null>(null);
   const highlighterRef = useRef<PdfHighlighter<PdfHighlight> | null>(null);
   const pendingScrollIdRef = useRef<string | null>(null);
@@ -136,6 +142,10 @@ export const PdfPane = memo(function PdfPane({
       cancelled = true;
     };
   }, [paperId]);
+
+  useEffect(() => {
+    setNavigationStack([]);
+  }, [paperId, pdfUrl]);
 
   // Ctrl+F → open the search bar. Only fires when the PDF pane has the
   // intent (i.e. the keystroke happened inside our container, not while
@@ -328,6 +338,41 @@ export const PdfPane = memo(function PdfPane({
     window.dispatchEvent(new Event("resize"));
   }, [refreshHighlighter, renderManualHighlightLayers]);
 
+  const scrollContainer = useCallback(() => {
+    const highlighter = highlighterRef.current as PdfHighlighterApi | null;
+    return highlighter?.viewer?.container ?? containerRef.current;
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a");
+      if (!anchor || !container.contains(anchor)) return;
+      if (!shouldRecordPdfNavigation(anchor, pdfUrl)) return;
+      const scroller = scrollContainer();
+      if (!scroller) return;
+      setNavigationStack((current) =>
+        pushPdfNavigationPosition(current, { scrollTop: scroller.scrollTop }),
+      );
+    };
+    container.addEventListener("click", handleClick, true);
+    return () => container.removeEventListener("click", handleClick, true);
+  }, [pdfUrl, scrollContainer]);
+
+  const returnToPreviousPosition = useCallback(() => {
+    const scroller = scrollContainer();
+    if (!scroller) return;
+    setNavigationStack((current) => {
+      const previous = current.at(-1);
+      if (!previous) return current;
+      scroller.scrollTo({ top: previous.scrollTop, behavior: "smooth" });
+      return current.slice(0, -1);
+    });
+  }, [scrollContainer]);
+
   const scheduleHighlightLayerRefresh = useCallback(() => {
     let secondFrameId = 0;
     const firstFrameId = window.requestAnimationFrame(() => {
@@ -449,6 +494,8 @@ export const PdfPane = memo(function PdfPane({
       <PdfToolbar
         dark={dark}
         zoomLabel={zoomLabel}
+        canReturn={navigationStack.length > 0}
+        onReturn={returnToPreviousPosition}
         onZoomOut={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
         onZoomReset={() => setZoom(DEFAULT_ZOOM)}
         onZoomIn={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}

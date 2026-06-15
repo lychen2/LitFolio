@@ -1,28 +1,16 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Archive, LibraryBig, Inbox, MessagesSquare, Settings, BookOpenText, Compass, Atom, Rss, Network, PanelLeftClose, PanelLeftOpen, FolderKanban } from "lucide-react";
+import { BookOpenText, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { clsx } from "clsx";
 import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/i18n/I18nProvider";
-import type { TKey } from "@/i18n/dict";
 import { api } from "@/lib/api";
+import { NAVIGATION_ITEMS } from "@/lib/navigationRegistry";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useFileDrop } from "@/hooks/useFileDrop";
 import { DropZoneOverlay } from "@/components/DropZoneOverlay";
 import { CommandPalette } from "@/components/CommandPalette";
 
-const navItems: { to: string; labelKey: TKey; icon: typeof LibraryBig }[] = [
-  { to: "/library", labelKey: "nav.library", icon: LibraryBig },
-  { to: "/import",  labelKey: "nav.import",  icon: Inbox },
-  { to: "/browse",  labelKey: "nav.browse",  icon: Atom },
-  { to: "/feeds",   labelKey: "nav.feeds",   icon: Rss },
-  { to: "/candidates", labelKey: "nav.candidates", icon: Archive },
-  { to: "/projects", labelKey: "nav.projects", icon: FolderKanban },
-  { to: "/topic",   labelKey: "nav.topic",   icon: Compass },
-  { to: "/ask",     labelKey: "nav.ask",     icon: MessagesSquare },
-  { to: "/graph",   labelKey: "nav.graph",   icon: Network },
-  { to: "/settings",labelKey: "nav.settings",icon: Settings },
-];
 
 const PIN_NAV_KEY = "litera-pin-nav";
 
@@ -166,7 +154,7 @@ function NavContent({
         )}
       </div>
       <nav className="flex flex-col gap-0.5">
-        {navItems.map(({ to, labelKey, icon: Icon }) => (
+        {NAVIGATION_ITEMS.map(({ to, labelKey, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

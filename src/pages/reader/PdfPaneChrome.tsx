@@ -1,10 +1,12 @@
-import { Copy, Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
+import { ArrowLeft, Copy, Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
 type PdfToolbarProps = {
   dark: boolean;
   zoomLabel: string;
+  canReturn: boolean;
+  onReturn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomIn: () => void;
@@ -23,6 +25,8 @@ type SelectionActionsProps = {
 export function PdfToolbar({
   dark,
   zoomLabel,
+  canReturn,
+  onReturn,
   onZoomOut,
   onZoomReset,
   onZoomIn,
@@ -33,6 +37,13 @@ export function PdfToolbar({
   return (
     <>
       <div className="absolute top-2 left-2 z-20 litera-overlay flex items-center gap-1 px-1.5 py-1">
+        <IconButton
+          onClick={onReturn}
+          title={t("reader.backToPreviousPositionTitle")}
+          disabled={!canReturn}
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+        </IconButton>
         <IconButton onClick={onZoomOut} title={t("reader.zoomOutTitle")}>
           <Minus className="h-3.5 w-3.5" />
         </IconButton>
@@ -195,13 +206,14 @@ export function PdfStatusBadge({ highlights, terms }: { highlights: number; term
   );
 }
 
-function IconButton({ onClick, title, children }: {
+function IconButton({ onClick, title, children, disabled }: {
   onClick: () => void;
   title: string;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   return (
-    <button onClick={onClick} className="litera-btn text-xs px-1.5 py-0.5" title={title}>
+    <button disabled={disabled} onClick={onClick} className="litera-btn text-xs px-1.5 py-0.5 disabled:opacity-40" title={title}>
       {children}
     </button>
   );

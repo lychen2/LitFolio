@@ -4,17 +4,19 @@ import {
   Atom, Loader2, RefreshCw, Search, ChevronDown, ChevronRight,
   ChevronsDown,
 } from "lucide-react";
-import { api, type ArxivDraft } from "@/lib/api";
+import { api, type ArxivDraft, type TranslationResult } from "@/lib/api";
+import { draftTranslationKey, setDraftTranslation } from "./browse/draftTranslations";
 import { ARXIV_GROUPS, findCategoryLabel } from "@/lib/arxiv-categories";
 import { DraftDetailDrawer } from "./browse/DraftDetailDrawer";
 import { DraftRow } from "./browse/DraftRow";
-import { useT } from "@/i18n/I18nProvider";
+import { useI18n } from "@/i18n/I18nProvider";
+import { llmLanguageNameFor } from "@/i18n/dict";
 
 const DEFAULT_CATEGORY = "physics.optics";
 const PAGE_SIZE = 50;
 
 export function BrowsePage() {
-  const t = useT();
+  const { t, lang } = useI18n();
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [filter, setFilter] = useState("");
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(["Physics"]));
@@ -24,6 +26,8 @@ export function BrowsePage() {
   // is how we get past that ceiling.
   const [drafts, setDrafts] = useState<ArxivDraft[]>([]);
   const [preview, setPreview] = useState<ArxivDraft | null>(null);
+  const [translations, setTranslations] = useState<Map<string, TranslationResult>>(new Map());
+  const translationTargetLang = llmLanguageNameFor(lang);
   const [exhausted, setExhausted] = useState(false);
   const [firstLoadErr, setFirstLoadErr] = useState<string | null>(null);
 
@@ -72,6 +76,10 @@ export function BrowsePage() {
       if (n.has(label)) n.delete(label); else n.add(label);
       return n;
     });
+  }
+
+  function applyTranslation(draft: ArxivDraft, result: TranslationResult) {
+    setTranslations((current) => setDraftTranslation(current, draft, result));
   }
 
   const initialLoading = loadMore.isPending && drafts.length === 0;
@@ -181,6 +189,8 @@ export function BrowsePage() {
                     key={(d.arxiv_id ?? "") + i}
                     draft={d}
                     rank={i + 1}
+                    translation={translations.get(draftTranslationKey(d, translationTargetLang)) ?? null}
+                    onTranslated={(result) => applyTranslation(d, result)}
                     onOpen={() => setPreview(d)}
                   />
                 ))}
@@ -207,7 +217,14 @@ export function BrowsePage() {
         </div>
       </div>
       </div>
-      {preview && <DraftDetailDrawer draft={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <DraftDetailDrawer
+          draft={preview}
+          translation={translations.get(draftTranslationKey(preview, translationTargetLang)) ?? null}
+          onTranslated={(result) => applyTranslation(preview, result)}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </section>
   );
 }

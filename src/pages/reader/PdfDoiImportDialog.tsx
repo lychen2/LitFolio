@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, Paperclip, X } from "lucide-react";
+import { Download, FileText, Loader2, Paperclip, X } from "lucide-react";
 import { api, pickSinglePdf } from "@/lib/api";
 import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 import { useT } from "@/i18n/I18nProvider";
+import { importDoiWithAutoPdfAndLink } from "./doiImportActions";
 
 interface Props {
   doi: string | null;
@@ -28,31 +29,54 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
   });
   const existingPaper = existingQ.data ?? null;
   const pointsToCurrentPaper = existingPaper?.id === sourcePaperId;
+  const doiLookupPending =
+    existingQ.isLoading ||
+    existingQ.isFetching ||
+    draftQ.isLoading ||
+    draftQ.isFetching;
 
-  useEffect(() => {
-    setPdfPath(null);
-  }, [doi]);
+  const linkImportedPaper = useCallback(
+    async (paperId: string) => {
+      await api.paperLinkCreateOrGet(
+        sourcePaperId,
+        paperId,
+        "builds_on",
+        doi ? `DOI link clicked in PDF: ${doi}` : null,
+      );
+    },
+    [doi, sourcePaperId],
+  );
+
+
+  const autoDownload = useMutation({
+    mutationFn: async () => {
+      if (pointsToCurrentPaper) throw new Error(t("reader.doiSelfLink"));
+      const normalizedDoi = doi ?? "";
+      const existing = await api.paperFindByDoi(normalizedDoi);
+      if (existing) {
+        if (existing.id === sourcePaperId) throw new Error(t("reader.doiSelfLink"));
+        await linkImportedPaper(existing.id);
+        return existing;
+      }
+      return importDoiWithAutoPdfAndLink(api, sourcePaperId, normalizedDoi);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["papers"] });
+      qc.invalidateQueries({ queryKey: ["paper-links", sourcePaperId] });
+      onClose();
+    },
+  });
 
   const save = useMutation({
     mutationFn: async () => {
       if (pointsToCurrentPaper) throw new Error(t("reader.doiSelfLink"));
       if (existingPaper) {
-        await api.paperLinkCreateOrGet(
-          sourcePaperId,
-          existingPaper.id,
-          "builds_on",
-          doi ? `DOI link clicked in PDF: ${doi}` : null,
-        );
+        await linkImportedPaper(existingPaper.id);
         return existingPaper;
       }
       if (!draftQ.data || !pdfPath) throw new Error(t("reader.doiPdfRequired"));
       const paper = await api.paperSaveWithPdf(draftQ.data, pdfPath);
-      await api.paperLinkCreateOrGet(
-        sourcePaperId,
-        paper.id,
-        "builds_on",
-        doi ? `DOI link clicked in PDF: ${doi}` : null,
-      );
+      await linkImportedPaper(paper.id);
       return paper;
     },
     onSuccess: () => {
@@ -61,10 +85,17 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
       onClose();
     },
   });
+  const resetAutoDownload = autoDownload.reset;
+  const resetSave = save.reset;
+  useEffect(() => {
+    setPdfPath(null);
+    resetAutoDownload();
+    resetSave();
+  }, [doi, resetAutoDownload, resetSave]);
   const handlePdfDrop = useCallback((paths: string[]) => {
     if (paths[0]) setPdfPath(paths[0]);
   }, []);
-  usePdfDropTarget(dropRef, handlePdfDrop, !!doi && !save.isPending);
+  usePdfDropTarget(dropRef, handlePdfDrop, !!doi && !save.isPending && !autoDownload.isPending);
 
   if (!doi) return null;
 
@@ -123,8 +154,16 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => autoDownload.mutate()}
+              disabled={doiLookupPending || autoDownload.isPending || save.isPending || pointsToCurrentPaper}
+              className="litera-btn-primary text-xs disabled:opacity-50"
+            >
+              {autoDownload.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {t("reader.doiAutoDownload")}
+            </button>
+            <button
               onClick={async () => setPdfPath(await pickSinglePdf())}
-              disabled={save.isPending}
+              disabled={doiLookupPending || autoDownload.isPending || save.isPending}
               className="litera-btn text-xs disabled:opacity-50"
             >
               <Paperclip className="h-3.5 w-3.5" />
@@ -143,6 +182,11 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
           </div>
         </div>
         )}
+        {autoDownload.error && (
+          <div className="break-all text-xs text-red-400/90">
+            {t("reader.doiAutoDownloadFailed", { message: (autoDownload.error as Error).message })}
+          </div>
+        )}
         {save.error && (
           <div className="break-all text-xs text-red-400/90">
             {t("reader.doiImportFailed", { message: (save.error as Error).message })}
@@ -156,8 +200,9 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
             onClick={() => save.mutate()}
             disabled={
               pointsToCurrentPaper ||
-              (!existingPaper && (!draftQ.data || !pdfPath)) ||
-              save.isPending
+              (!existingPaper && (doiLookupPending || !draftQ.data || !pdfPath)) ||
+              save.isPending ||
+              autoDownload.isPending
             }
             className="litera-btn-primary text-xs disabled:opacity-50"
           >

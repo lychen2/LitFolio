@@ -11,16 +11,18 @@ import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill
 import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState";
 
 export function DraftRow({
-  draft, rank, onOpen,
+  draft, rank, translation, onTranslated, onOpen,
 }: {
   draft: ArxivDraft;
   rank: number;
+  translation: TranslationResult | null;
+  onTranslated: (translation: TranslationResult) => void;
   onOpen: () => void;
 }) {
   const qc = useQueryClient();
   const { lang } = useI18n();
   const [saved, setSaved] = useState<Paper | null>(null);
-  const [translation, setTranslation] = useState<TranslationResult | null>(null);
+
   const { data: importedIds } = useImportedArxivIds();
   const { findCandidate } = useCandidateLookup();
   const syncedCandidate = findCandidate(draftToCandidate(draft));
@@ -40,7 +42,7 @@ export function DraftRow({
   });
   const translate = useMutation({
     mutationFn: () => api.draftTranslate(draft, llmLanguageNameFor(lang)),
-    onSuccess: (result) => setTranslation(result),
+    onSuccess: onTranslated,
   });
   const candidate = useMutation({
     mutationFn: () => api.candidateUpsert(draftToCandidate(draft)),

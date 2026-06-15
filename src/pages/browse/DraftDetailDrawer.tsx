@@ -9,15 +9,17 @@ import { llmLanguageNameFor } from "@/i18n/dict";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 
 export function DraftDetailDrawer({
-  draft, onClose,
+  draft, translation, onTranslated, onClose,
 }: {
   draft: ArxivDraft;
+  translation: TranslationResult | null;
+  onTranslated: (translation: TranslationResult) => void;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const { lang } = useI18n();
   const [saved, setSaved] = useState<Paper | null>(null);
-  const [translation, setTranslation] = useState<TranslationResult | null>(null);
+
   const { data: importedIds } = useImportedArxivIds();
   const alreadyImported = useMemo(
     () => importedIds?.includes(draft.arxiv_id ?? "") ?? false,
@@ -25,7 +27,7 @@ export function DraftDetailDrawer({
   );
   const translate = useMutation({
     mutationFn: () => api.draftTranslate(draft, llmLanguageNameFor(lang)),
-    onSuccess: setTranslation,
+    onSuccess: onTranslated,
   });
   const add = useMutation({
     mutationFn: () => {
