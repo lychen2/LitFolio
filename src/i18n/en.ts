@@ -203,6 +203,8 @@ export const en: Record<TKey, string> = {
   "paper.detail.translateFailed": "Translation failed",
   "paper.detail.emptyValue": "--",
   "paper.detail.doiPlaceholder": "Enter DOI, e.g. 10.1145/3530819",
+  "paper.detail.officialLink": "Official",
+  "paper.detail.openDoiOfficial": "Open DOI official page",
   "paper.detail.fetchMeta": "Fetch metadata",
   "paper.detail.refetchMeta": "Re-fetch",
   "paper.detail.enrichFailed": "Failed to fetch metadata",

@@ -193,6 +193,8 @@ export const zh = {
   "paper.detail.translateFailed": "翻译失败",
   "paper.detail.emptyValue": "--",
   "paper.detail.doiPlaceholder": "输入 DOI,如 10.1145/3530819",
+  "paper.detail.officialLink": "官网",
+  "paper.detail.openDoiOfficial": "打开 DOI 官网页面",
   "paper.detail.fetchMeta": "获取元数据",
   "paper.detail.refetchMeta": "重新获取",
   "paper.detail.enrichFailed": "获取元数据失败",
