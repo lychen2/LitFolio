@@ -67,7 +67,7 @@ struct CrossRefAuthor {
 #[derive(Debug, Deserialize)]
 struct CrossRefDate {
     #[serde(rename = "date-parts", default)]
-    date_parts: Vec<Vec<i32>>,
+    date_parts: Vec<Vec<Option<i32>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,7 +99,7 @@ fn first_year(m: &CrossRefMessage) -> Option<i32> {
         .as_ref()
         .or(m.published_online.as_ref())
         .or(m.issued.as_ref())
-        .and_then(|d| d.date_parts.first()?.first().copied())
+        .and_then(|d| d.date_parts.first()?.first().and_then(|y| *y))
 }
 
 fn strip_jats(s: &str) -> String {
@@ -129,7 +129,16 @@ pub async fn search_doi_by_title(
         let body = resp.text().await.unwrap_or_default();
         return Err(anyhow!("CrossRef returned {status}: {body}"));
     }
-    let body: CrossRefSearchResponse = resp.json().await.context("decode CrossRef JSON")?;
+    let body_text = resp.text().await.with_context(|| "read response body")?;
+    
+    tracing::debug!(
+        response_length = body_text.len(),
+        response_preview = &body_text.chars().take(200).collect::<String>(),
+        "CrossRef response received"
+    );
+    
+    let body: CrossRefSearchResponse = serde_json::from_str(&body_text)
+        .with_context(|| format!("decode CrossRef JSON (length: {}, preview: {})", body_text.len(), body_text.chars().take(200).collect::<String>()))?;
     Ok(body
         .message
         .items
@@ -508,5 +517,32 @@ mod tests {
         let mut links = vec!["b".to_string(), "a".to_string(), "b".to_string()];
         dedup_preserving_order(&mut links);
         assert_eq!(links, vec!["b".to_string(), "a".to_string()]);
+    }
+}
+
+#[cfg(test)]
+mod crossref_parse_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_matrix_dichroism_article() {
+        let json = std::fs::read_to_string("/tmp/crossref_matrix.json")
+            .expect("Failed to read test JSON file");
+        
+        let result: Result<CrossRefSearchResponse, _> = serde_json::from_str(&json);
+        
+        match result {
+            Ok(resp) => {
+                println!("✓ Parse SUCCESS!");
+                assert!(!resp.message.items.is_empty(), "No items in response");
+                let item = &resp.message.items[0];
+                println!("  DOI: {:?}", item.doi);
+                println!("  Title: {:?}", item.title.first());
+                println!("  Authors: {}", item.author.len());
+            }
+            Err(e) => {
+                panic!("✗ Parse FAILED: {}", e);
+            }
+        }
     }
 }

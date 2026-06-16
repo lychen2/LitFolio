@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { BookOpenText, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { BookOpenText, HardDrive, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { clsx } from "clsx";
 import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +44,12 @@ export function Shell({ children }: { children: ReactNode }) {
     queryFn: api.appVersion,
     staleTime: Infinity,
   });
+  const { data: storage } = useQuery({
+    queryKey: ["storage-stats"],
+    queryFn: api.storageStats,
+    refetchOnMount: true,
+    staleTime: 60_000,
+  });
 
   const handlePaletteToggle = useCallback(() => setPaletteOpen((o) => !o), []);
   const handlePaletteClose = useCallback(() => setPaletteOpen(false), []);
@@ -59,6 +65,15 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [handlePaletteToggle]);
 
+  const storageBytes =
+    storage != null
+      ? storage.papers_bytes +
+        storage.notes_bytes +
+        storage.attachments_bytes +
+        storage.vectors_bytes +
+        storage.database_bytes
+      : null;
+
   return (
     <>
     <CommandPalette open={paletteOpen} onClose={handlePaletteClose} />
@@ -70,10 +85,10 @@ export function Shell({ children }: { children: ReactNode }) {
         onDismiss={clearResult}
       />
       {autoHide ? (
-        <AutoHideNav unseenCount={unseenCount} appVersion={appVersion} pinned={pinned} onTogglePin={togglePinned} />
+        <AutoHideNav unseenCount={unseenCount} appVersion={appVersion} storageBytes={storageBytes} pinned={pinned} onTogglePin={togglePinned} />
       ) : (
         <aside className="w-[210px] shrink-0 border-r border-litera-line bg-litera-paper/40 px-3 py-4 flex flex-col">
-          <NavContent unseenCount={unseenCount} appVersion={appVersion} showPinToggle={onReader} pinned={pinned} onTogglePin={togglePinned} />
+          <NavContent unseenCount={unseenCount} appVersion={appVersion} storageBytes={storageBytes} showPinToggle={onReader} pinned={pinned} onTogglePin={togglePinned} />
         </aside>
       )}
       <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
@@ -86,10 +101,11 @@ export function Shell({ children }: { children: ReactNode }) {
 /// cursor reaches the far-left edge (or hovers the panel). Rendered as an
 /// absolute overlay so it never squeezes the PDF area.
 function AutoHideNav({
-  unseenCount, appVersion, pinned, onTogglePin,
+  unseenCount, appVersion, storageBytes, pinned, onTogglePin,
 }: {
   unseenCount: number;
   appVersion: string | undefined;
+  storageBytes: number | null;
   pinned: boolean;
   onTogglePin: () => void;
 }) {
@@ -98,8 +114,6 @@ function AutoHideNav({
 
   return (
     <>
-      {/* Far-left hover trigger: a wide transparent hit area (easy to hit by
-          slamming the cursor to the edge) with a thin visible hint line. */}
       <div
         onMouseEnter={() => setOpen(true)}
         className={clsx(
@@ -120,17 +134,18 @@ function AutoHideNav({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <NavContent unseenCount={unseenCount} appVersion={appVersion} showPinToggle pinned={pinned} onTogglePin={onTogglePin} />
+        <NavContent unseenCount={unseenCount} appVersion={appVersion} storageBytes={storageBytes} showPinToggle pinned={pinned} onTogglePin={onTogglePin} />
       </aside>
     </>
   );
 }
 
 function NavContent({
-  unseenCount, appVersion, showPinToggle, pinned, onTogglePin,
+  unseenCount, appVersion, storageBytes, showPinToggle, pinned, onTogglePin,
 }: {
   unseenCount: number;
   appVersion: string | undefined;
+  storageBytes: number | null;
   showPinToggle: boolean;
   pinned: boolean;
   onTogglePin: () => void;
@@ -179,8 +194,24 @@ function NavContent({
       </nav>
       <div className="mt-auto px-2 flex flex-col gap-2">
         <LanguageSwitcher />
-        <div className="text-xs text-litera-mute">{appVersion ? `v${appVersion}` : ""} {t("shell.footer")}</div>
+        <div className="flex items-center gap-2 text-xs text-litera-mute">
+          {appVersion ? <span>v{appVersion}</span> : null}
+          {storageBytes != null && (
+            <span className="flex items-center gap-1">
+              <HardDrive className="h-3 w-3" />
+              {fmtBytes(storageBytes)}
+            </span>
+          )}
+          <span>{t("shell.footer")}</span>
+        </div>
       </div>
     </>
   );
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes === 0) return "0B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)}${units[i]}`;
 }

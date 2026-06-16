@@ -269,8 +269,11 @@ export const zh = {
   "feeds.metaFeed": "订阅源",
   "feeds.metaAuthors": "作者",
   "feeds.metaUnknown": "(unknown)",
+  "feeds.metaVenue": "期刊/会议",
   "feeds.metaPublished": "发布时间",
   "feeds.metaLink": "链接",
+  "feeds.fetchMeta": "获取元数据",
+  "feeds.fetchingMeta": "获取中…",
   "feeds.metaNone": "(none)",
 
   "ask.title": "提问",
@@ -1151,6 +1154,18 @@ export const zh = {
   "update.stalled":
     "超过 60 秒没有新的进度。Windows 可能仍在后台处理，请保持网络连接；如果长时间没有恢复，可稍后重试或手动下载。",
   "update.failed": "检查更新失败：{message}",
+
+  // ─── Storage ──────────────────────────────────────────────────────
+  "nav.storage": "存储空间",
+  "storage.title": "存储空间",
+  "storage.subtitle": "文献库占用的磁盘空间：论文、笔记、附件和数据库。",
+  "storage.papers": "论文",
+  "storage.notes": "笔记",
+  "storage.attachments": "附件",
+  "storage.vectors": "向量",
+  "storage.database": "数据库",
+  "storage.total": "总计",
+  "storage.loadFailed": "加载存储统计失败：{message}",
 } as const;
 
 export type TKey = keyof typeof zh;

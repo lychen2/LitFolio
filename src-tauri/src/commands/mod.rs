@@ -60,6 +60,73 @@ pub fn app_version() -> &'static str {
 pub fn library_root(state: State<'_, Arc<AppState>>) -> String {
     state.paths.root.display().to_string()
 }
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StorageStats {
+    pub papers_bytes: u64,
+    pub notes_bytes: u64,
+    pub attachments_bytes: u64,
+    pub vectors_bytes: u64,
+    pub database_bytes: u64,
+}
+
+#[tauri::command]
+pub async fn storage_stats(state: State<'_, Arc<AppState>>) -> Result<StorageStats, String> {
+    let paths = &state.paths;
+    let papers_bytes = dir_size(&paths.papers_dir())
+        .map_err(|e| format!("Failed to scan papers directory: {}", e))?;
+    let notes_bytes = dir_size(&paths.notes_dir())
+        .map_err(|e| format!("Failed to scan notes directory: {}", e))?;
+    let attachments_bytes = dir_size(&paths.attachments_dir())
+        .map_err(|e| format!("Failed to scan attachments directory: {}", e))?;
+    let vectors_bytes = dir_size(&paths.vectors_dir())
+        .map_err(|e| format!("Failed to scan vectors directory: {}", e))?;
+
+    // Include the main database file plus WAL and SHM sidecars
+    let db_path = paths.db_file();
+    let mut database_bytes = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+
+    // Add WAL sidecar if present
+    if let Some(wal_path) = db_path.to_str().map(|s| format!("{}-wal", s)) {
+        if let Ok(meta) = std::fs::metadata(&wal_path) {
+            database_bytes += meta.len();
+        }
+    }
+    // Add SHM sidecar if present
+    if let Some(shm_path) = db_path.to_str().map(|s| format!("{}-shm", s)) {
+        if let Ok(meta) = std::fs::metadata(&shm_path) {
+            database_bytes += meta.len();
+        }
+    }
+
+    Ok(StorageStats {
+        papers_bytes,
+        notes_bytes,
+        attachments_bytes,
+        vectors_bytes,
+        database_bytes,
+    })
+}
+
+fn dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
+    let mut total: u64 = 0;
+    let entries = std::fs::read_dir(path)?;
+    for entry in entries {
+        let entry = entry?;
+        // Use symlink_metadata to avoid following symlinks
+        let meta = entry.metadata()?;
+        let file_type = meta.file_type();
+
+        if file_type.is_symlink() {
+            // Skip symlinks entirely to avoid cycles and escaping library root
+            continue;
+        } else if file_type.is_file() {
+            total += meta.len();
+        } else if file_type.is_dir() {
+            total += dir_size(&entry.path())?;
+        }
+    }
+    Ok(total)
+}
 
 #[allow(unused_macros)]
 macro_rules! command_paths_core {
@@ -69,6 +136,7 @@ macro_rules! command_paths_core {
             commands::greet,
             commands::app_version,
             commands::library_root,
+            commands::storage_stats,
         ])
     };
 }

@@ -282,7 +282,10 @@ export const en: Record<TKey, string> = {
   "feeds.metaAuthors": "Authors",
   "feeds.metaUnknown": "(unknown)",
   "feeds.metaPublished": "Published",
+  "feeds.metaVenue": "Venue",
   "feeds.metaLink": "Link",
+  "feeds.fetchMeta": "Fetch metadata",
+  "feeds.fetchingMeta": "Fetching…",
   "feeds.metaNone": "(none)",
 
   "ask.title": "Ask",
@@ -1212,4 +1215,16 @@ export const en: Record<TKey, string> = {
   "update.stalled":
     "No new progress for over 60 seconds. Windows may still be working in the background. Keep the network connected; if it does not recover, retry later or download manually.",
   "update.failed": "Update check failed: {message}",
+
+  // ─── Storage ──────────────────────────────────────────────────────
+  "nav.storage": "Storage",
+  "storage.title": "Storage Usage",
+  "storage.subtitle": "Disk space used by your library: papers, notes, attachments, and database.",
+  "storage.papers": "Papers",
+  "storage.notes": "Notes",
+  "storage.attachments": "Attachments",
+  "storage.vectors": "Vectors",
+  "storage.database": "Database",
+  "storage.total": "Total",
+  "storage.loadFailed": "Failed to load storage stats: {message}",
 };

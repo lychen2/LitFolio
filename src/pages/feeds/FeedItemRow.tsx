@@ -7,6 +7,7 @@ import {
   EyeOff,
   Languages,
   Loader2,
+  Search,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type FeedItem, type TranslationResult } from "@/lib/api";
@@ -77,6 +78,12 @@ export function FeedItemRow({
       });
     },
   });
+  const fetchMeta = useMutation({
+    mutationFn: () => api.feedItemPrepareDraft(item.id),
+    onSuccess: () => {
+      invalidateFeeds(qc);
+    },
+  });
 
   function openExternal() {
     if (!item.link) return;
@@ -143,14 +150,21 @@ export function FeedItemRow({
               })}
             </div>
           )}
+          {fetchMeta.error && (
+            <div className="mt-1 text-[11px] text-red-400/90">
+              ✕ {(fetchMeta.error as Error).message || "Failed to fetch metadata"}
+            </div>
+          )}
         </div>
         <ItemActions
           item={item}
           seenPending={seen.isPending}
           translatePending={translate.isPending}
           candidatePending={candidate.isPending}
+          metaPending={fetchMeta.isPending}
           onTranslate={() => translate.mutate()}
           onCandidate={() => candidate.mutate()}
+          onFetchMeta={() => fetchMeta.mutate()}
           onOpenExternal={openExternal}
           onImport={() =>
             navigate(importUrl(item, syncedCandidate?.id ?? null))
@@ -211,8 +225,10 @@ function ItemActions({
   seenPending,
   translatePending,
   candidatePending,
+  metaPending,
   onTranslate,
   onCandidate,
+  onFetchMeta,
   onOpenExternal,
   onImport,
   onToggleSeen,
@@ -221,8 +237,10 @@ function ItemActions({
   seenPending: boolean;
   translatePending: boolean;
   candidatePending: boolean;
+  metaPending: boolean;
   onTranslate: () => void;
   onCandidate: () => void;
+  onFetchMeta: () => void;
   onOpenExternal: () => void;
   onImport: () => void;
   onToggleSeen: () => void;
@@ -230,6 +248,21 @@ function ItemActions({
   const t = useT();
   return (
     <div className="shrink-0 flex items-center gap-1.5">
+      {!item.metadata && !item.imported_paper_id && (
+        <button
+          onClick={onFetchMeta}
+          disabled={metaPending}
+          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          title={t("feeds.fetchMeta")}
+        >
+          {metaPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Search className="h-3.5 w-3.5" />
+          )}
+          {metaPending ? t("feeds.fetchingMeta") : t("feeds.fetchMeta")}
+        </button>
+      )}
       <button
         onClick={onTranslate}
         disabled={translatePending}

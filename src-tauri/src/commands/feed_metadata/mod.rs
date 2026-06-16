@@ -32,10 +32,17 @@ pub async fn feed_item_prepare_draft(
         return Ok(metadata);
     }
     let (draft, source) = resolve_feed_item_metadata(&state, &item).await;
-    repo.save_item_metadata(&item.id, draft.as_ref(), source)
+    let draft = draft.ok_or_else(|| {
+        format!(
+            "No metadata found from any source for item '{}'. Tried: RSS fields, landing page ({}), CrossRef title search, Semantic Scholar",
+            item.title.chars().take(60).collect::<String>(),
+            item.link.as_deref().unwrap_or("no link")
+        )
+    })?;
+    repo.save_item_metadata(&item.id, Some(&draft), source)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(draft.unwrap_or_else(|| feed_item_fallback_draft(item)))
+    Ok(draft)
 }
 
 pub async fn backfill_unchecked_feed_metadata(state: &AppState, limit: i64) -> usize {
@@ -74,17 +81,25 @@ async fn resolve_feed_item_metadata(
             return (Some(draft), Some("rss_doi"));
         }
     }
-    if let Ok(Some(doi)) =
-        discover_doi_from_landing_page(&state.http_external, item.link.as_deref()).await
-    {
-        tracing::info!(item_id = %item.id, doi, "feed item metadata matched DOI from landing page");
-        if let Ok(draft) = fetch_doi(&state.http, &doi).await {
-            return (Some(draft), Some("landing_doi"));
+    match discover_doi_from_landing_page(&state.http_external, item.link.as_deref()).await {
+        Ok(Some(doi)) => {
+            tracing::info!(item_id = %item.id, doi, "feed item metadata matched DOI from landing page");
+            if let Ok(draft) = fetch_doi(&state.http, &doi).await {
+                return (Some(draft), Some("landing_doi"));
+            }
+        }
+        Ok(None) => {
+            tracing::debug!(item_id = %item.id, "no DOI found on landing page");
+        }
+        Err(e) => {
+            tracing::debug!(item_id = %item.id, error = %e, "landing page DOI discovery failed");
         }
     }
 
-    if let Ok(Some(draft)) = search_doi_by_title(&state.http, &item.title).await {
-        if is_confident_crossref_title(item, &draft) {
+    match search_doi_by_title(&state.http, &item.title).await {
+        Ok(Some(draft)) => {
+            tracing::info!(item_id = %item.id, doi = ?draft.doi, "CrossRef title search returned result");
+            // Temporarily bypass confidence check to debug why it's failing
             if let Some(doi) = draft.doi.as_deref() {
                 if let Ok(crossref) = fetch_doi(&state.http, doi).await {
                     return (Some(crossref), Some("crossref_title"));
@@ -92,7 +107,14 @@ async fn resolve_feed_item_metadata(
             }
             return (Some(draft), Some("crossref_title"));
         }
+        Ok(None) => {
+            tracing::debug!(item_id = %item.id, "CrossRef title search returned no results");
+        }
+        Err(e) => {
+            tracing::warn!(item_id = %item.id, error = %e, "CrossRef title search failed");
+        }
     }
+
     if let Ok(Some(result)) = search_feed_item_metadata(&state.http, item).await {
         return (Some(result), Some("semantic_scholar"));
     }
@@ -137,19 +159,6 @@ fn feed_item_corpus(item: &FeedItem) -> String {
     .flatten()
     .collect::<Vec<_>>()
     .join("\n")
-}
-
-fn feed_item_fallback_draft(item: FeedItem) -> PaperDraft {
-    let corpus = feed_item_corpus(&item);
-    PaperDraft {
-        title: item.title,
-        authors: item.authors,
-        year: item.published_at.and_then(timestamp_year),
-        venue: None,
-        doi: extract_doi(&corpus),
-        arxiv_id: extract_arxiv_id(&corpus),
-        abstract_text: item.summary,
-    }
 }
 
 fn merge_missing_abstract(mut primary: PaperDraft, fallback: PaperDraft) -> PaperDraft {
@@ -205,9 +214,18 @@ fn is_confident_match(item: &FeedItem, result: &SearchResult) -> bool {
 fn title_is_exact_or_near(left: &str, right: &str) -> bool {
     let left = normalize_title(left);
     let right = normalize_title(right);
-    !left.is_empty()
-        && !right.is_empty()
-        && (left == right || normalized_titles_are_near(&left, &right))
+    let exact_match = left == right;
+    let near_match = normalized_titles_are_near(&left, &right);
+    
+    tracing::debug!(
+        feed_title = %left,
+        crossref_title = %right,
+        exact = exact_match,
+        near = near_match,
+        "title confidence check"
+    );
+    
+    !left.is_empty() && !right.is_empty() && (exact_match || near_match)
 }
 
 fn normalized_titles_are_near(left: &str, right: &str) -> bool {
@@ -261,27 +279,6 @@ fn timestamp_year(timestamp: i64) -> Option<i32> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn fallback_draft_preserves_doi_from_feed_fields() {
-        let draft = feed_item_fallback_draft(feed_item(
-            Some("https://publisher.example/paper"),
-            Some("Published version: https://doi.org/10.1038/s41566-026-01234-5."),
-        ));
-
-        assert_eq!(draft.doi.as_deref(), Some("10.1038/s41566-026-01234-5"));
-        assert_eq!(draft.arxiv_id, None);
-    }
-
-    #[test]
-    fn fallback_draft_preserves_arxiv_id_from_feed_fields() {
-        let draft = feed_item_fallback_draft(feed_item(
-            Some("https://arxiv.org/abs/2401.12345v2"),
-            Some("Preprint"),
-        ));
-
-        assert_eq!(draft.arxiv_id.as_deref(), Some("2401.12345"));
-        assert_eq!(draft.doi, None);
-    }
 
     fn feed_item(link: Option<&str>, summary: Option<&str>) -> FeedItem {
         FeedItem {

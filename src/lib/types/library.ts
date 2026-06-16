@@ -141,3 +141,11 @@ export interface FolderImportProgress {
   current_file: string;
   failed: number;
 }
+
+export interface StorageStats {
+  papers_bytes: number;
+  notes_bytes: number;
+  attachments_bytes: number;
+  vectors_bytes: number;
+  database_bytes: number;
+}

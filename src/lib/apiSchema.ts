@@ -25,6 +25,7 @@ import type {
   TaskAssignments,
   TaskBinding,
   TopicAlertResult,
+  StorageStats,
 } from "./types/api";
 import {
   booleanField,
@@ -663,4 +664,15 @@ function syncPreviewActionField(
 ): SyncPreviewAction {
   const value = enumStringField(obj, key, path, SYNC_PREVIEW_ACTIONS);
   return value as SyncPreviewAction;
+}
+
+export function parseStorageStats(value: unknown, path = "StorageStats"): StorageStats {
+  const obj = object(value, path);
+  return {
+    papers_bytes: numberField(obj, "papers_bytes", path),
+    notes_bytes: numberField(obj, "notes_bytes", path),
+    attachments_bytes: numberField(obj, "attachments_bytes", path),
+    vectors_bytes: numberField(obj, "vectors_bytes", path),
+    database_bytes: numberField(obj, "database_bytes", path),
+  };
 }

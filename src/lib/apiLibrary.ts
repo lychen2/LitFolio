@@ -6,6 +6,7 @@ import {
   parsePaper,
   parsePaperSupplement,
   parsePdfImportSummary,
+  parseStorageStats,
   parseSupplementConversionResult,
 } from "./apiSchema";
 import { parseArray, parseNullable } from "./apiSchemaCore";
@@ -161,4 +162,6 @@ export const libraryApi = {
     invoke<void>("paper_supplement_open", { id, preferPdf: preferPdf ?? null }),
   paperSupplementConvertDocxToPdf: (id: number) =>
     invokeParsed("paper_supplement_convert_docx_to_pdf", { id }, parseSupplementConversionResult),
+  storageStats: () =>
+    invokeParsed("storage_stats", {}, parseStorageStats),
 };

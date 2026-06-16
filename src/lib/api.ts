@@ -106,6 +106,7 @@ export type {
   SupplementConversionResult,
   TranslationResult,
   UnifiedSearchResult,
+  StorageStats,
 } from "./types/api";
 
 export const api = {
