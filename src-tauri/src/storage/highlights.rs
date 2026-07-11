@@ -146,6 +146,20 @@ impl<'a> HighlightRepo<'a> {
         Ok(())
     }
 
+    pub async fn update_rect(&self, id: &str, rect: &serde_json::Value) -> Result<()> {
+        let rect_json = serde_json::to_string(rect)?;
+        let res = sqlx::query("UPDATE highlights SET rect_json = ?1 WHERE id = ?2")
+            .bind(rect_json)
+            .bind(id)
+            .execute(self.pool)
+            .await
+            .context("update highlight rect")?;
+        if res.rows_affected() == 0 {
+            return Err(anyhow::anyhow!("highlight {id} not found"));
+        }
+        Ok(())
+    }
+
     pub async fn delete(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM highlights WHERE id = ?1")
             .bind(id)

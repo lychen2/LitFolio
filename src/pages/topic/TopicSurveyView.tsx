@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  BookOpenText, Loader2, Compass, Sparkles, AlertCircle, Save, Trash2,
+  BookOpenText, Loader2, Compass, Sparkles, AlertCircle, Save, Trash2, Download,
 } from "lucide-react";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -22,6 +22,8 @@ import {
   type SavedSurvey,
   upsertSavedSurvey,
 } from "./surveyStorage";
+import { renderTopicSurveyMarkdown, topicSurveyMarkdownFilename } from "./surveyMarkdown";
+import { surveySourcePaperCount, toggleSurveyMustRead, updateSurveySubareaSummary } from "./topicSurveyState";
 
 export function TopicSurveyView() {
   const t = useT();
@@ -66,6 +68,7 @@ export function TopicSurveyView() {
   const mustReadPapers = survey
     ? survey.subareas.flatMap((s) => s.papers).filter((p) => p.must_read)
     : [];
+  const sourceCount = survey ? surveySourcePaperCount(survey) : 0;
 
   const submit = () => { if (topic.trim()) run.mutate(topic.trim()); };
   const saveNote = useMutation({
@@ -79,6 +82,18 @@ export function TopicSurveyView() {
     persistSavedSurveys(next);
     saveNote.mutate(survey);
   };
+  const exportMarkdown = () => {
+    if (!survey) return;
+    const generatedAt = new Date().toISOString();
+    const markdown = renderTopicSurveyMarkdown(survey, generatedAt);
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = topicSurveyMarkdownFilename(survey, generatedAt);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const deleteSaved = (id: string) => {
     const next = saved.filter((item) => item.id !== id);
     setSaved(next);
@@ -88,6 +103,22 @@ export function TopicSurveyView() {
     setSurvey(item.survey);
     setTopic(item.topic);
     saveCurrentSurvey(item.survey);
+  };
+  const toggleMustRead = (paperId: string) => {
+    setSurvey((current) => {
+      if (!current) return current;
+      const next = toggleSurveyMustRead(current, paperId);
+      saveCurrentSurvey(next);
+      return next;
+    });
+  };
+  const updateSummary = (subareaName: string, summary: string) => {
+    setSurvey((current) => {
+      if (!current) return current;
+      const next = updateSurveySubareaSummary(current, subareaName, summary);
+      saveCurrentSurvey(next);
+      return next;
+    });
   };
 
   return (
@@ -141,8 +172,10 @@ export function TopicSurveyView() {
           <SavedSurveyBar
             saved={saved}
             canSave={!!survey}
+            sourceCount={survey ? sourceCount : null}
             isSaving={saveNote.isPending}
             onSave={saveSurvey}
+            onExportMarkdown={exportMarkdown}
             onRestore={restoreSaved}
             onDelete={deleteSaved}
           />
@@ -159,15 +192,20 @@ export function TopicSurveyView() {
 
       <div className="flex-1 overflow-auto">
         {survey ? (
-          <div className="grid grid-cols-[1fr_280px] gap-6 px-6 py-4">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-6 px-6 py-4">
             <div className="min-w-0">
               <MustReadShortlist papers={mustReadPapers} />
               <div className="space-y-4">
                 {survey.subareas.map((s) => (
-                  <SubareaCard key={s.name} subarea={s} />
+                  <SubareaCard
+                    key={s.name}
+                    subarea={s}
+                    onToggleMustRead={toggleMustRead}
+                    onSummaryChange={updateSummary}
+                  />
                 ))}
               </div>
-              <SurveyFooter survey={survey} />
+              <SurveyFooter survey={survey} sourceCount={sourceCount} />
             </div>
             <KeyPiList keyPis={survey.key_pis} />
           </div>
@@ -180,12 +218,14 @@ export function TopicSurveyView() {
 }
 
 function SavedSurveyBar({
-  saved, canSave, isSaving, onSave, onRestore, onDelete,
+  saved, canSave, sourceCount, isSaving, onSave, onExportMarkdown, onRestore, onDelete,
 }: {
   saved: SavedSurvey[];
   canSave: boolean;
+  sourceCount: number | null;
   isSaving: boolean;
   onSave: () => void;
+  onExportMarkdown: () => void;
   onRestore: (item: SavedSurvey) => void;
   onDelete: (id: string) => void;
 }) {
@@ -193,9 +233,18 @@ function SavedSurveyBar({
   const t = useT();
   return (
     <div className="mt-3 flex items-center gap-2 flex-wrap">
+      {sourceCount != null && (
+        <span className="text-xs text-litera-mute mr-1">
+          {t("topic.survey.sourceCount", { count: String(sourceCount) })}
+        </span>
+      )}
       <button onClick={onSave} disabled={!canSave || isSaving} className="litera-btn text-xs disabled:opacity-50">
         {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
         {t("topic.survey.save")}
+      </button>
+      <button onClick={onExportMarkdown} disabled={!canSave} className="litera-btn text-xs disabled:opacity-50">
+        <Download className="h-3.5 w-3.5" />
+        {t("topic.survey.exportMarkdown")}
       </button>
       {saved.length > 0 && (
         <select
@@ -285,11 +334,12 @@ function EmptyState({ pending }: { pending: boolean }) {
   );
 }
 
-function SurveyFooter({ survey }: { survey: TopicSurvey }) {
+function SurveyFooter({ survey, sourceCount }: { survey: TopicSurvey; sourceCount: number }) {
   const t = useT();
   return (
     <footer className="mt-6 p-3 border-t border-litera-line text-xs text-litera-mute flex flex-wrap gap-4">
       <span>{t("topic.survey.planStats", { model: survey.plan_model, tokens: survey.plan_tokens })}</span>
+      <span>{t("topic.survey.sourceCount", { count: String(sourceCount) })}</span>
       {survey.annotated && survey.annotate_model
         ? <span>{t("topic.survey.annotateStats", { model: survey.annotate_model, tokens: survey.annotate_tokens })}</span>
         : <span className="italic">{t("topic.survey.annotateSkipped")}</span>}

@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Highlighter, Loader2, Minus, Moon, Plus, RotateCcw, Sun } from "lucide-react";
+import { ArrowLeft, Copy, Highlighter, Loader2, MessageSquarePlus, Minus, Moon, Plus, RotateCcw, Send, Sun } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -6,7 +6,10 @@ type PdfToolbarProps = {
   dark: boolean;
   zoomLabel: string;
   canReturn: boolean;
+  notePending: boolean;
+  noteActive: boolean;
   onReturn: () => void;
+  onAddNote: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomIn: () => void;
@@ -16,6 +19,7 @@ type PdfToolbarProps = {
 
 type SelectionActionsProps = {
   onHighlight: () => void;
+  onAsk: () => void;
   onCopy: () => void;
   onTranslate: () => void;
   onAddTerm: () => void;
@@ -26,7 +30,10 @@ export function PdfToolbar({
   dark,
   zoomLabel,
   canReturn,
+  notePending,
+  noteActive,
   onReturn,
+  onAddNote,
   onZoomOut,
   onZoomReset,
   onZoomIn,
@@ -43,6 +50,18 @@ export function PdfToolbar({
           disabled={!canReturn}
         >
           <ArrowLeft className="h-3.5 w-3.5" />
+        </IconButton>
+        <IconButton
+          onClick={onAddNote}
+          title={noteActive ? t("reader.noteDrawActiveTitle") : t("reader.addStandaloneNoteTitle")}
+          disabled={notePending}
+          active={noteActive}
+        >
+          {notePending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <MessageSquarePlus className="h-3.5 w-3.5" />
+          )}
         </IconButton>
         <IconButton onClick={onZoomOut} title={t("reader.zoomOutTitle")}>
           <Minus className="h-3.5 w-3.5" />
@@ -75,6 +94,7 @@ export function PdfToolbar({
 
 export function SelectionActions({
   onHighlight,
+  onAsk,
   onCopy,
   onTranslate,
   onAddTerm,
@@ -85,6 +105,10 @@ export function SelectionActions({
     <div className="litera-overlay p-1.5 flex items-center gap-1.5 litera-slide-up">
       <button onClick={onHighlight} className="litera-btn-primary text-xs px-2 py-1">
         {t("reader.addHighlight")}
+      </button>
+      <button onClick={onAsk} className="litera-btn text-xs px-2 py-1">
+        <Send className="h-3 w-3" />
+        {t("reader.askSelection")}
       </button>
       <button onClick={onCopy} className="litera-btn text-xs px-2 py-1">
         <Copy className="h-3 w-3" />
@@ -206,14 +230,16 @@ export function PdfStatusBadge({ highlights, terms }: { highlights: number; term
   );
 }
 
-function IconButton({ onClick, title, children, disabled }: {
+function IconButton({ onClick, title, children, disabled, active }: {
   onClick: () => void;
   title: string;
   children: ReactNode;
   disabled?: boolean;
+  active?: boolean;
 }) {
+  const className = active ? "litera-btn-primary text-xs px-1.5 py-0.5 disabled:opacity-40" : "litera-btn text-xs px-1.5 py-0.5 disabled:opacity-40";
   return (
-    <button disabled={disabled} onClick={onClick} className="litera-btn text-xs px-1.5 py-0.5 disabled:opacity-40" title={title}>
+    <button disabled={disabled} onClick={onClick} className={className} title={title}>
       {children}
     </button>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, NotebookPen, Check } from "lucide-react";
+import { Loader2, NotebookPen, Check, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -59,7 +59,7 @@ export function NotesPane({ paperId }: { paperId: string }) {
         <div className="text-xs uppercase tracking-wider text-litera-mute flex items-center gap-1.5">
           <NotebookPen className="h-3.5 w-3.5" /> {t("reader.tabNotes")}
         </div>
-        <SaveStatus status={status} error={save.error as Error | null} />
+        <SaveStatus status={status} error={save.error as Error | null} onRetry={() => save.mutate(content)} />
       </div>
       <textarea
         value={content}
@@ -73,10 +73,27 @@ export function NotesPane({ paperId }: { paperId: string }) {
   );
 }
 
-function SaveStatus({ status, error }: { status: "saving" | "dirty" | "saved"; error: Error | null }) {
+export function SaveStatus({
+  status,
+  error,
+  onRetry,
+}: {
+  status: "saving" | "dirty" | "saved";
+  error: Error | null;
+  onRetry?: () => void;
+}) {
   const t = useT();
   if (error) {
-    return <span className="text-[11px] text-red-400/90">✕ {t("reader.saveFailed")}: {error.message}</span>;
+    return (
+      <span className="text-[11px] text-red-400/90 inline-flex items-center gap-1.5">
+        ✕ {t("reader.saveFailed")}: {error.message}
+        {onRetry && (
+          <button type="button" onClick={onRetry} className="underline underline-offset-2 hover:text-red-300 inline-flex items-center gap-1">
+            <RotateCcw className="h-3 w-3" /> {t("common.retry")}
+          </button>
+        )}
+      </span>
+    );
   }
   if (status === "saving") {
     return <span className="text-[11px] text-litera-accent2 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("reader.saving")}</span>;

@@ -67,6 +67,131 @@ async fn create_list_upsert_roundtrip() {
 }
 
 #[tokio::test]
+async fn list_items_prioritizes_unread_then_later_fetch_for_same_publish_time() {
+    let (pool, dir) = temp().await;
+    let repo = FeedRepo::new(&pool);
+    let feed = repo
+        .create("https://example.com/rss", "Example", None)
+        .await
+        .unwrap();
+    let items = vec![
+        NewFeedItem {
+            entry_id: "older-fetch".into(),
+            title: "Older fetch".into(),
+            link: None,
+            summary: None,
+            authors: vec![],
+            published_at: Some(1_700_000_000),
+        },
+        NewFeedItem {
+            entry_id: "newer-fetch".into(),
+            title: "Newer fetch".into(),
+            link: None,
+            summary: None,
+            authors: vec![],
+            published_at: Some(1_700_000_000),
+        },
+    ];
+    repo.upsert_items(feed.id, &items).await.unwrap();
+    sqlx::query("UPDATE feed_items SET fetched_at = ?1 WHERE entry_id = ?2")
+        .bind(10_i64)
+        .bind("older-fetch")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE feed_items SET fetched_at = ?1 WHERE entry_id = ?2")
+        .bind(20_i64)
+        .bind("newer-fetch")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let entries = repo.list_items(Some(feed.id), false, 10, 0).await.unwrap();
+    assert_eq!(entries[0].entry_id, "newer-fetch");
+    assert_eq!(entries[1].entry_id, "older-fetch");
+
+    repo.set_item_seen(&entries[0].id, true).await.unwrap();
+    let entries = repo.list_items(Some(feed.id), false, 10, 0).await.unwrap();
+    assert_eq!(entries[0].entry_id, "older-fetch");
+    assert_eq!(entries[1].entry_id, "newer-fetch");
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
+async fn upsert_prunes_only_old_seen_unimported_items() {
+    let (pool, dir) = temp().await;
+    let repo = FeedRepo::new(&pool);
+    let feed = repo
+        .create("https://example.com/prune.xml", "Prune", None)
+        .await
+        .unwrap();
+    let items: Vec<NewFeedItem> = (0..=1001)
+        .map(|i| NewFeedItem {
+            entry_id: format!("entry-{i}"),
+            title: format!("Entry {i}"),
+            link: None,
+            summary: None,
+            authors: vec![],
+            published_at: Some(i),
+        })
+        .collect();
+    repo.upsert_items(feed.id, &items).await.unwrap();
+    sqlx::query("UPDATE feed_items SET seen = 1 WHERE feed_id = ?1")
+        .bind(feed.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE feed_items SET seen = 0 WHERE entry_id = 'entry-0'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO papers (id, title, authors_json, pdf_path, added_at, updated_at)
+         VALUES ('paper-imported', 'Imported', '[]', 'papers/imported.pdf', 1, 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE feed_items SET imported_paper_id = 'paper-imported' WHERE entry_id = 'entry-1'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    repo.upsert_items(
+        feed.id,
+        &[NewFeedItem {
+            entry_id: "trigger".into(),
+            title: "Trigger".into(),
+            link: None,
+            summary: None,
+            authors: vec![],
+            published_at: Some(2_000),
+        }],
+    )
+    .await
+    .unwrap();
+
+    assert!(item_exists(&pool, "entry-0").await);
+    assert!(item_exists(&pool, "entry-1").await);
+    assert!(!item_exists(&pool, "entry-2").await);
+    assert!(item_exists(&pool, "trigger").await);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+async fn item_exists(pool: &Pool, entry_id: &str) -> bool {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feed_items WHERE entry_id = ?1")
+        .bind(entry_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    count > 0
+}
+
+#[tokio::test]
 async fn repair_default_urls_repoints_legacy_optica_feeds() {
     let (pool, dir) = temp().await;
     let repo = FeedRepo::new(&pool);

@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use tauri::State;
 
-use crate::ai::{active_profile_for_task, chat_complete, load_config, ChatMessage, TaskKind};
+use crate::ai::{
+    active_profile_for_task, chat_complete_for_task, load_config, ChatMessage, TaskKind,
+};
 use crate::storage::{ComparisonRepo, Paper, PaperComparison, PaperRepo};
 use crate::AppState;
 
@@ -62,9 +64,10 @@ pub async fn paper_comparison_generate(
         .map_err(|e| e.to_string())?
         .clone();
     let content = comparison_prompt(&papers, cfg.output_language.as_str());
-    let response = chat_complete(
+    let response = chat_complete_for_task(
         &state.http,
         &profile,
+        TaskKind::LitReview,
         &[
             ChatMessage {
                 role: "system".into(),

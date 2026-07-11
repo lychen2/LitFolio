@@ -5,7 +5,7 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::ai::{
-    active_profile_for_task, chat_complete, load_config, ChatMessage, LlmProfile, TaskKind,
+    active_profile_for_task, chat_complete_for_task, load_config, ChatMessage, LlmProfile, TaskKind,
 };
 use crate::storage::{Highlight, HighlightExplanationUpdate, HighlightRepo, Paper, PaperRepo};
 use crate::AppState;
@@ -79,9 +79,10 @@ async fn explain_highlight(
         .replace("{year}", &year)
         .replace("{full_text}", body)
         .replace("{selection}", selection);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         client,
         profile,
+        TaskKind::Tldr,
         &[
             ChatMessage {
                 role: "system".into(),

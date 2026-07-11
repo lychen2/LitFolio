@@ -63,6 +63,7 @@ describe("api schema parsers", () => {
         translate: null,
         tag: null,
         link: null,
+        lit_review: null,
         topic_survey: null,
         ask: null,
       },
@@ -83,6 +84,46 @@ describe("api schema parsers", () => {
     expect(() => parseGraphData(graph, "graph_data")).toThrow(
       "graph_data.nodes[0].node_type"
     );
+  });
+
+  it("accepts the unified graph node and edge taxonomy", () => {
+    const graph = parseGraphData({
+      nodes: [
+        { id: "p1", node_type: "paper", label: "Paper", sublabel: null },
+        { id: "c1", node_type: "concept", label: "Concept", sublabel: null },
+        { id: "tag:ml", node_type: "tag", label: "ml", sublabel: null },
+        { id: "folder:inbox", node_type: "folder", label: "Inbox", sublabel: null },
+      ],
+      edges: [
+        edge("e1", "citation", null),
+        edge("e2", "similar", "related"),
+        edge("e3", "manual", "builds_on"),
+        edge("e4", "concept", "has_concept"),
+      ],
+    });
+
+    expect(graph.nodes.map((node) => node.node_type)).toEqual([
+      "paper",
+      "concept",
+      "tag",
+      "folder",
+    ]);
+    expect(graph.edges.map((item) => item.edge_type)).toEqual([
+      "citation",
+      "similar",
+      "manual",
+      "concept",
+    ]);
+    expect(graph.edges[2].relation).toBe("builds_on");
+  });
+
+  it("rejects graph edges outside the unified taxonomy", () => {
+    expect(() =>
+      parseGraphData({
+        nodes: [{ id: "p1", node_type: "paper", label: "Paper", sublabel: null }],
+        edges: [edge("e1", "builds_on", "builds_on")],
+      }, "graph_data"),
+    ).toThrow("graph_data.edges[0].edge_type");
   });
 
   it("validates priority cross-boundary DTOs", () => {
@@ -154,6 +195,19 @@ function validPaper() {
     translate_target_lang: null,
     translated_at: null,
     bibtex: null,
+  };
+}
+
+function edge(id: string, edgeType: string, relation: string | null) {
+  return {
+    id,
+    source: "p1",
+    target: "c1",
+    edge_type: edgeType,
+    relation,
+    source_type: "derived",
+    confidence: 1,
+    snippet: null,
   };
 }
 

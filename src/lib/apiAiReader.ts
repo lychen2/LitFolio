@@ -15,6 +15,8 @@ import type {
   QuickReadResult,
   ReaderPaperTerm,
   ReaderTranslateResult,
+  ReaderMarkdownTranslationEstimate,
+  ReaderMarkdownTranslationResult,
   ReadStatus,
   SaveAskNoteInput,
   SaveAskNoteResult,
@@ -96,6 +98,8 @@ export const aiReaderApi = {
     ),
   highlightUpdateNote: (id: string, note: string | null) =>
     invoke<void>("highlight_update_note", { id, note }),
+  highlightUpdateRect: (id: string, rect: unknown) =>
+    invoke<void>("highlight_update_rect", { id, rect }),
   highlightUpdateLabel: (id: string, label: string | null) =>
     invoke<void>("highlight_update_label", { id, label }),
   highlightSummarize: (id: string) =>
@@ -117,6 +121,20 @@ export const aiReaderApi = {
       paperId,
       selection,
       targetLang: targetLang ?? "Chinese",
+    }),
+  paperTranslatedMarkdownGet: (paperId: string, targetLang?: string) =>
+    invoke<ReaderMarkdownTranslationResult | null>("paper_translated_markdown_get", {
+      paperId,
+      targetLang: targetLang ?? null,
+    }),
+  paperTranslateMarkdownEstimate: (paperId: string) =>
+    invoke<ReaderMarkdownTranslationEstimate | null>("paper_translate_markdown_estimate", {
+      paperId,
+    }),
+  paperTranslateMarkdown: (paperId: string, targetLang?: string) =>
+    invoke<ReaderMarkdownTranslationResult>("paper_translate_markdown", {
+      paperId,
+      targetLang: targetLang ?? null,
     }),
   paperTermsList: (paperId: string) =>
     invoke<ReaderPaperTerm[]>("paper_terms_list", { paperId }),

@@ -1,7 +1,9 @@
 //! Paper library IPC commands.
 
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::State;
+use tracing::Instrument;
 
 use crate::bibtex::generate_bibtex;
 use crate::ingest::{fetch_doi, PaperDraft};
@@ -10,10 +12,27 @@ use crate::AppState;
 
 #[tauri::command]
 pub async fn papers_count(state: State<'_, Arc<AppState>>) -> Result<i64, String> {
-    PaperRepo::new(&state.pool)
+    let started = Instant::now();
+    let result = PaperRepo::new(&state.pool)
         .count()
+        .instrument(tracing::info_span!("papers_count"))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    match &result {
+        Ok(count) => tracing::info!(
+            command = "papers_count",
+            count,
+            elapsed_ms = elapsed_ms(started),
+            "paper command completed"
+        ),
+        Err(error) => tracing::error!(
+            command = "papers_count",
+            error = %error,
+            elapsed_ms = elapsed_ms(started),
+            "paper command failed"
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -21,10 +40,18 @@ pub async fn papers_recent(
     state: State<'_, Arc<AppState>>,
     limit: Option<i64>,
 ) -> Result<Vec<Paper>, String> {
-    PaperRepo::new(&state.pool)
-        .list_recent(limit.unwrap_or(50))
+    let started = Instant::now();
+    let effective_limit = limit.unwrap_or(50);
+    let result = PaperRepo::new(&state.pool)
+        .list_recent(effective_limit)
+        .instrument(tracing::info_span!(
+            "papers_recent",
+            limit = effective_limit
+        ))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    log_paper_list_command("papers_recent", started, effective_limit, None, &result);
+    result
 }
 
 #[tauri::command]
@@ -34,15 +61,43 @@ pub async fn papers_in_folder(
     limit: Option<i64>,
     query: Option<String>,
 ) -> Result<Vec<Paper>, String> {
+    let started = Instant::now();
+    let effective_limit = limit.unwrap_or(200);
+    let query_len = query.as_deref().map(str::trim).map(str::len).unwrap_or(0);
     let repo = PaperRepo::new(&state.pool);
-    match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+    let result = match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
         Some(q) => {
-            repo.search_by_folder(folder_id, q, limit.unwrap_or(200))
+            repo.search_by_folder(folder_id, q, effective_limit)
+                .instrument(tracing::info_span!(
+                    "papers_in_folder",
+                    folder_id,
+                    limit = effective_limit,
+                    query_len,
+                    mode = "search"
+                ))
                 .await
         }
-        None => repo.list_by_folder(folder_id, limit.unwrap_or(200)).await,
+        None => {
+            repo.list_by_folder(folder_id, effective_limit)
+                .instrument(tracing::info_span!(
+                    "papers_in_folder",
+                    folder_id,
+                    limit = effective_limit,
+                    query_len,
+                    mode = "list"
+                ))
+                .await
+        }
     }
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    log_paper_list_command(
+        "papers_in_folder",
+        started,
+        effective_limit,
+        Some(query_len),
+        &result,
+    );
+    result
 }
 
 #[tauri::command]
@@ -50,10 +105,29 @@ pub async fn paper_get(
     state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<Option<Paper>, String> {
-    PaperRepo::new(&state.pool)
+    let started = Instant::now();
+    let result = PaperRepo::new(&state.pool)
         .get(&id)
+        .instrument(tracing::info_span!("paper_get", paper_id = %id))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    match &result {
+        Ok(paper) => tracing::info!(
+            command = "paper_get",
+            paper_id = %id,
+            found = paper.is_some(),
+            elapsed_ms = elapsed_ms(started),
+            "paper command completed"
+        ),
+        Err(error) => tracing::error!(
+            command = "paper_get",
+            paper_id = %id,
+            error = %error,
+            elapsed_ms = elapsed_ms(started),
+            "paper command failed"
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -62,10 +136,26 @@ pub async fn papers_search(
     query: String,
     limit: Option<i64>,
 ) -> Result<Vec<Paper>, String> {
-    PaperRepo::new(&state.pool)
-        .search(&query, limit.unwrap_or(100))
+    let started = Instant::now();
+    let effective_limit = limit.unwrap_or(100);
+    let query_len = query.trim().len();
+    let result = PaperRepo::new(&state.pool)
+        .search(&query, effective_limit)
+        .instrument(tracing::info_span!(
+            "papers_search",
+            limit = effective_limit,
+            query_len
+        ))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    log_paper_list_command(
+        "papers_search",
+        started,
+        effective_limit,
+        Some(query_len),
+        &result,
+    );
+    result
 }
 
 #[tauri::command]
@@ -172,6 +262,37 @@ fn merge_draft_into_paper(paper: &mut Paper, draft: PaperDraft, resolved_doi: St
         paper.abstract_text = draft.abstract_text;
     }
     paper.doi = Some(resolved_doi);
+}
+
+fn elapsed_ms(started: Instant) -> u128 {
+    started.elapsed().as_millis()
+}
+
+fn log_paper_list_command(
+    command: &str,
+    started: Instant,
+    limit: i64,
+    query_len: Option<usize>,
+    result: &Result<Vec<Paper>, String>,
+) {
+    match result {
+        Ok(papers) => tracing::info!(
+            command,
+            limit,
+            query_len,
+            result_count = papers.len(),
+            elapsed_ms = elapsed_ms(started),
+            "paper command completed"
+        ),
+        Err(error) => tracing::error!(
+            command,
+            limit,
+            query_len,
+            error = %error,
+            elapsed_ms = elapsed_ms(started),
+            "paper command failed"
+        ),
+    }
 }
 
 #[cfg(test)]

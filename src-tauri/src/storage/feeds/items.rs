@@ -7,6 +7,8 @@ use crate::ingest::PaperDraft;
 use super::rows::row_to_feed_item;
 use super::{FeedItem, FeedRepo, NewFeedItem};
 
+const FEED_ITEMS_KEEP_PER_FEED: i64 = 1000;
+
 impl FeedRepo<'_> {
     /// Upsert a batch of entries for a feed, returning the count of NEW rows.
     /// Existing `(feed_id, entry_id)` rows are left as-is so the user's "seen"
@@ -21,6 +23,7 @@ impl FeedRepo<'_> {
             self.insert_item_if_missing(feed_id, item, now).await?;
         }
         let after = self.count_feed_items(feed_id).await?;
+        self.prune_old_seen_items(feed_id).await?;
         Ok((after - before).max(0) as usize)
     }
 
@@ -30,6 +33,27 @@ impl FeedRepo<'_> {
             .fetch_one(self.pool)
             .await
             .context("count feed_items")
+    }
+
+    async fn prune_old_seen_items(&self, feed_id: i64) -> Result<()> {
+        sqlx::query(
+            "DELETE FROM feed_items
+             WHERE feed_id = ?1
+               AND seen = 1
+               AND imported_paper_id IS NULL
+               AND id NOT IN (
+                 SELECT id FROM feed_items
+                 WHERE feed_id = ?1
+                 ORDER BY COALESCE(published_at, fetched_at) DESC, fetched_at DESC, id DESC
+                 LIMIT ?2
+               )",
+        )
+        .bind(feed_id)
+        .bind(FEED_ITEMS_KEEP_PER_FEED)
+        .execute(self.pool)
+        .await
+        .context("prune old seen feed_items")?;
+        Ok(())
     }
 
     async fn insert_item_if_missing(
@@ -104,7 +128,7 @@ impl FeedRepo<'_> {
                     metadata_json, metadata_source, metadata_checked_at
              FROM feed_items
              WHERE metadata_checked_at IS NULL
-             ORDER BY COALESCE(published_at, fetched_at) DESC
+             ORDER BY COALESCE(published_at, fetched_at) DESC, fetched_at DESC, id DESC
              LIMIT ?1",
         )
         .bind(limit.clamp(1, 500))
@@ -179,7 +203,9 @@ fn item_list_sql(has_feed: bool, only_unread: bool) -> String {
         clauses.push("seen = 0");
     }
     append_where(&mut sql, &clauses);
-    sql.push_str(" ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT ? OFFSET ?");
+    sql.push_str(
+        " ORDER BY seen ASC, COALESCE(published_at, fetched_at) DESC, fetched_at DESC, id DESC LIMIT ? OFFSET ?",
+    );
     sql
 }
 

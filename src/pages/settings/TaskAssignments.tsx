@@ -21,6 +21,7 @@ const TASK_LABELS: { key: TaskKey; labelKey: TKey; hintKey: TKey }[] = [
   { key: "ask", labelKey: "settings.tasks.ask", hintKey: "settings.tasks.askHint" },
   { key: "tag", labelKey: "settings.tasks.tag", hintKey: "settings.tasks.tagHint" },
   { key: "link", labelKey: "settings.tasks.link", hintKey: "settings.tasks.linkHint" },
+  { key: "lit_review", labelKey: "settings.tasks.litReview", hintKey: "settings.tasks.litReviewHint" },
 ];
 
 export function TaskAssignments({
@@ -81,6 +82,7 @@ function TaskRow({
   const [models, setModels] = useState<string[] | null>(null);
   const modelListId = `task-models-${taskKey}`;
   // Re-prime the model dropdown when the bound profile changes
+  const effectiveModel = binding?.model || selectedProfile?.chat_model || null;
   useEffect(() => { setModels(null); }, [binding?.profile]);
 
   const listModels = useMutation({
@@ -94,6 +96,11 @@ function TaskRow({
         <div className="text-sm text-litera-text">{label}</div>
         <div className="text-[11px] text-litera-mute mt-0.5">{hint}</div>
       </div>
+        {binding?.profile && effectiveModel && (
+          <div className="mt-1 text-[11px] font-mono text-litera-accent">
+            {binding.profile} / {effectiveModel}
+          </div>
+        )}
 
       <select
         value={binding?.profile ?? ""}

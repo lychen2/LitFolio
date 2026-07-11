@@ -2,6 +2,11 @@ use super::response::parse_response;
 use super::utils::{endpoint, request_chars, truncate};
 use super::{chat_complete, ChatMessage};
 use crate::ai::profile::LlmProfile;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -92,6 +97,31 @@ async fn chat_complete_reports_non_success_status() {
 }
 
 #[tokio::test]
+async fn chat_complete_reports_provider_overload_actionably() {
+    let body = r#"{"error":{"message":"system cpu overloaded (current: 98.9%, threshold: 90%)","type":"new_api_error","param":"","code":"system_cpu_overloaded"}}"#;
+    let url = serve_once(503, "application/json", body).await;
+    let err = chat_error(&url).await;
+
+    assert!(err.contains("LLM provider is temporarily overloaded"));
+    assert!(err.contains("503 Service Unavailable"));
+    assert!(err.contains("Retry later or switch to another LLM profile/model"));
+    assert!(err.contains("system_cpu_overloaded"));
+}
+
+#[tokio::test]
+async fn chat_complete_reports_cloudflare_timeout_without_html_dump() {
+    let body = r#"<!DOCTYPE html><html><head><title>zonazcy.xyz | 522: Connection timed out</title></head><body><div id="cf-error-details">cloudflare timeout</div></body></html>"#;
+    let url = serve_once(522, "text/html", body).await;
+    let err = chat_error(&url).await;
+
+    assert!(err.contains("LLM gateway timed out"));
+    assert!(err.contains("522"));
+    assert!(err.contains("HTML error page: zonazcy.xyz | 522: Connection timed out"));
+    assert!(!err.contains("<!DOCTYPE html>"));
+    assert!(!err.contains("cf-error-details"));
+}
+
+#[tokio::test]
 async fn chat_complete_reports_empty_success_body() {
     let url = serve_once(200, "text/event-stream", "").await;
     let err = chat_error(&url).await;
@@ -109,6 +139,56 @@ async fn chat_complete_reports_malformed_sse_body() {
     assert!(err.contains("decode SSE data frame"));
 }
 
+#[tokio::test]
+async fn chat_complete_serializes_concurrent_requests() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let max_active = Arc::new(AtomicUsize::new(0));
+    let url = serve_many(2, active.clone(), max_active.clone()).await;
+    let client = reqwest::Client::new();
+    let first_profile = profile(&url);
+    let second_profile = profile(&url);
+    let first_messages = sample_messages();
+    let second_messages = sample_messages();
+
+    let (first, second) = tokio::join!(
+        chat_complete(&client, &first_profile, &first_messages),
+        chat_complete(&client, &second_profile, &second_messages),
+    );
+
+    first.unwrap();
+    second.unwrap();
+    assert_eq!(max_active.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn chat_complete_cools_down_after_provider_overload() {
+    let bodies = vec![
+        http_response(
+            503,
+            "application/json",
+            r#"{"error":{"message":"system cpu overloaded (current: 98.9%, threshold: 90%)","code":"system_cpu_overloaded"}}"#,
+        ),
+        http_response(
+            200,
+            "application/json",
+            r#"{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#,
+        ),
+    ];
+    let url = serve_sequence(bodies).await;
+    let client = reqwest::Client::new();
+    let profile = profile(&url);
+    let messages = sample_messages();
+
+    let first = chat_complete(&client, &profile, &messages).await;
+    assert!(first
+        .unwrap_err()
+        .to_string()
+        .contains("temporarily overloaded"));
+
+    let started = Instant::now();
+    chat_complete(&client, &profile, &messages).await.unwrap();
+    assert!(started.elapsed() >= Duration::from_millis(25));
+}
 async fn chat_error(base_url: &str) -> String {
     let client = reqwest::Client::new();
     let err = chat_complete(&client, &profile(base_url), &sample_messages())
@@ -149,6 +229,59 @@ async fn serve_once(status: u16, content_type: &str, body: &str) -> String {
     format!("http://{addr}/v1")
 }
 
+async fn serve_sequence(responses: Vec<String>) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        for response in responses {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 2048];
+            let _ = socket.read(&mut request).await.unwrap();
+            socket.write_all(response.as_bytes()).await.unwrap();
+        }
+    });
+    format!("http://{addr}/v1")
+}
+
+async fn serve_many(
+    count: usize,
+    active: Arc<AtomicUsize>,
+    max_active: Arc<AtomicUsize>,
+) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        for _ in 0..count {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let active = active.clone();
+            let max_active = max_active.clone();
+            tokio::spawn(async move {
+                let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                update_max(&max_active, current);
+                tokio::time::sleep(Duration::from_millis(25)).await;
+                let mut request = [0_u8; 2048];
+                let _ = socket.read(&mut request).await.unwrap();
+                let body = r#"{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#;
+                socket
+                    .write_all(http_response(200, "application/json", body).as_bytes())
+                    .await
+                    .unwrap();
+                active.fetch_sub(1, Ordering::SeqCst);
+            });
+        }
+    });
+    format!("http://{addr}/v1")
+}
+
+fn update_max(max_active: &AtomicUsize, current: usize) {
+    let mut previous = max_active.load(Ordering::SeqCst);
+    while current > previous {
+        match max_active.compare_exchange(previous, current, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return,
+            Err(actual) => previous = actual,
+        }
+    }
+}
 fn http_response(status: u16, content_type: &str, body: &str) -> String {
     format!(
         "HTTP/1.1 {status} Test\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\r\n{body}",

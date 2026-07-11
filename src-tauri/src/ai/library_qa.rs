@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
-use super::profile::LlmProfile;
+use super::client::{chat_complete_for_task, ChatMessage};
+use super::profile::{LlmProfile, TaskKind};
 use crate::storage::{Highlight, Paper};
 
 mod context;
@@ -177,7 +177,7 @@ pub async fn answer_library_question(
         content: user,
     });
 
-    let resp = chat_complete(client, profile, &messages).await?;
+    let resp = chat_complete_for_task(client, profile, TaskKind::Ask, &messages).await?;
     let retrieved_count = sources.len();
     Ok(AskLibraryResult {
         answer: resp.content,

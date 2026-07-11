@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { save } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
-  Cloud, Database, ExternalLink, Globe2, HardDrive, KeyRound, Loader2, ShieldCheck,
+  BrainCircuit, Cloud, Database, Download, ExternalLink, Globe2, HardDrive, KeyRound, Loader2, ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { api, type LlmConfig } from "@/lib/api";
@@ -18,9 +19,20 @@ const NETWORK_FEATURES = [
   "settings.privacy.network.sync",
 ] as const;
 
+const AI_DATA_ITEMS = [
+  "settings.privacy.ai.translate",
+  "settings.privacy.ai.summary",
+  "settings.privacy.ai.ask",
+  "settings.privacy.ai.survey",
+  "settings.privacy.ai.discovery",
+] as const;
+
 export function DataPrivacyPanel() {
   const t = useT();
   const [openError, setOpenError] = useState<string | null>(null);
+  const [diagnosticsResult, setDiagnosticsResult] = useState<string | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);
   const root = useQuery({ queryKey: ["library-root"], queryFn: api.libraryRoot });
   const llm = useQuery({ queryKey: ["llm", "config"], queryFn: api.llmGetConfig });
   const sync = useQuery({ queryKey: ["sync", "config"], queryFn: syncApi.getConfig });
@@ -38,10 +50,30 @@ export function DataPrivacyPanel() {
     }
   }
 
+  async function exportDiagnosticsLog() {
+    setDiagnosticsError(null);
+    setDiagnosticsResult(null);
+    setDiagnosticsExporting(true);
+    try {
+      const destPath = await save({
+        defaultPath: "litfolio-diagnostics.log",
+        filters: [{ name: "Log", extensions: ["log", "txt"] }],
+      });
+      if (!destPath) return;
+      const exportedPath = await api.diagnosticsExportLog(destPath);
+      setDiagnosticsResult(t("settings.privacy.exportDiagnosticsDone", { path: exportedPath }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDiagnosticsError(t("settings.privacy.exportDiagnosticsFailed", { message }));
+    } finally {
+      setDiagnosticsExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <section className="litera-panel p-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-litera-text font-medium mb-1 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-litera-accent2" />
@@ -49,14 +81,27 @@ export function DataPrivacyPanel() {
             </h2>
             <p className="text-xs text-litera-mute">{t("settings.privacy.subtitle")}</p>
           </div>
-          <button
-            onClick={openLibraryRoot}
-            disabled={!root.data}
-            className="litera-btn text-xs disabled:opacity-50"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            {t("settings.privacy.openDataDir")}
-          </button>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <button
+              onClick={openLibraryRoot}
+              disabled={!root.data}
+              className="litera-btn text-xs disabled:opacity-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("settings.privacy.openDataDir")}
+            </button>
+            <button
+              onClick={exportDiagnosticsLog}
+              disabled={diagnosticsExporting}
+              title={t("settings.privacy.exportDiagnosticsTitle")}
+              className="litera-btn text-xs disabled:opacity-50"
+            >
+              {diagnosticsExporting
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Download className="h-3.5 w-3.5" />}
+              {t("settings.privacy.exportDiagnostics")}
+            </button>
+          </div>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <Fact icon={HardDrive} label={t("settings.privacy.storageLocation")}>
@@ -75,6 +120,8 @@ export function DataPrivacyPanel() {
           </Fact>
         </div>
         {openError && <div className="mt-3 text-xs text-red-400/90">✕ {openError}</div>}
+        {diagnosticsError && <div className="mt-3 text-xs text-red-400/90">✕ {diagnosticsError}</div>}
+        {diagnosticsResult && <div className="mt-3 text-xs text-litera-accent">{diagnosticsResult}</div>}
       </section>
 
       <section className="litera-panel p-5">
@@ -85,6 +132,20 @@ export function DataPrivacyPanel() {
           {NETWORK_FEATURES.map((key) => (
             <div key={key} className="flex items-start gap-2 text-sm text-litera-text">
               <Globe2 className="h-3.5 w-3.5 mt-0.5 text-litera-mute shrink-0" />
+              <span>{t(key)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="litera-panel p-5">
+        <h3 className="text-xs uppercase tracking-wider text-litera-mute mb-3">
+          {t("settings.privacy.aiDataTitle")}
+        </h3>
+        <div className="grid gap-2 md:grid-cols-2">
+          {AI_DATA_ITEMS.map((key) => (
+            <div key={key} className="flex items-start gap-2 text-sm text-litera-text">
+              <BrainCircuit className="h-3.5 w-3.5 mt-0.5 text-litera-mute shrink-0" />
               <span>{t(key)}</span>
             </div>
           ))}

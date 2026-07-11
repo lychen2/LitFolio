@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
+use super::client::{chat_complete_for_task, ChatMessage};
 use super::profile::{active_profile_for_task, load_config};
 use super::TaskKind;
 use crate::storage::LibraryPaths;
@@ -61,7 +61,7 @@ Return ONLY the JSON array, no markdown fences."#;
         },
     ];
 
-    let resp = chat_complete(http, &profile, &messages)
+    let resp = chat_complete_for_task(http, &profile, TaskKind::Tldr, &messages)
         .await
         .context("concept extraction LLM call")?;
 

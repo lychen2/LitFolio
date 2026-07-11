@@ -3,8 +3,8 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
-use super::profile::LlmProfile;
+use super::client::{chat_complete_for_task, ChatMessage};
+use super::profile::{LlmProfile, TaskKind};
 use crate::storage::Paper;
 
 /// How to group papers in the generated review.
@@ -77,9 +77,10 @@ pub async fn generate_review(
     }
 
     let user_content = format_papers_prompt(papers, grouping, output_language);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         client,
         profile,
+        TaskKind::LitReview,
         &[
             ChatMessage {
                 role: "system".into(),

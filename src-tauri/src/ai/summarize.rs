@@ -3,9 +3,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
+use super::client::{chat_complete_for_task, ChatMessage};
 use super::json_utils::parse_lenient_value;
-use super::profile::LlmProfile;
+use super::profile::{LlmProfile, TaskKind};
 
 #[cfg(test)]
 mod tests;
@@ -78,9 +78,10 @@ pub async fn summarize_paper_text(
     request: &PaperSummaryRequest<'_>,
 ) -> Result<TldrResult> {
     let user_content = format_user_prompt(request);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         client,
         profile,
+        TaskKind::Tldr,
         &[
             ChatMessage {
                 role: "system".into(),
@@ -125,9 +126,10 @@ pub async fn quick_read_paper_text(
     request: &PaperSummaryRequest<'_>,
 ) -> Result<QuickReadResult> {
     let user_content = format_user_prompt(request);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         client,
         profile,
+        TaskKind::QuickRead,
         &[
             ChatMessage {
                 role: "system".into(),

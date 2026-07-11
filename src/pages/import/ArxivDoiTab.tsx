@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { pickSinglePdf, type ArxivDraft } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { api, pickSinglePdf, type ArxivDraft } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 import { DraftSavePanel, IdentifierPanel } from "./ArxivDoiPanels";
@@ -18,6 +20,7 @@ import { type ImportSource } from "./types";
 
 export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const t = useT();
+  const navigate = useNavigate();
   const [value, setValue] = useState(source.prefill ?? "");
   const [draft, setDraft] = useState<ArxivDraft | null>(null);
   const [sourceKind, setSourceKind] = useState<"arxiv" | "doi" | null>(null);
@@ -29,6 +32,13 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
   const pdfDropRef = useRef<HTMLDivElement>(null);
   const trimmed = value.trim();
   const kind = detectSourceKind(trimmed);
+  const existingByDoi = useQuery({
+    queryKey: ["paper-by-doi", trimmed],
+    queryFn: () => api.paperFindByDoi(trimmed),
+    enabled: kind === "doi" && trimmed.length > 0,
+    staleTime: 30_000,
+  });
+  const existingPaper = existingByDoi.data ?? null;
 
   const fetchMeta = useFetchMetaMutation({
     value,
@@ -93,6 +103,11 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
     setError(null);
     setSuccess(null);
     setAutoDownloadFailure(null);
+    if (existingByDoi.data) {
+      setDraft(null);
+      setSourceKind("doi");
+      return;
+    }
     fetchMeta.mutate(trimmed);
   }
 
@@ -122,9 +137,13 @@ export function ArxivDoiTab({ source }: { source: ImportSource }) {
       <IdentifierPanel
         value={value}
         setValue={setValue}
-        fetching={fetching}
+        fetching={fetching || existingByDoi.isFetching}
         error={error}
         success={success}
+        existingPaper={existingPaper}
+        onOpenExisting={
+          existingPaper ? () => navigate(`/reader/${existingPaper.id}`) : undefined
+        }
         onSubmit={submit}
       />
       {draft && (

@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { I18nProvider } from "@/i18n/I18nProvider";
 import type { JobRecord } from "@/lib/api";
 
 import {
@@ -6,6 +10,7 @@ import {
   clearResolvedImportJobs,
   duplicateStatusFromError,
   duplicateStatusFromFailures,
+  formatPdfImportError,
   importJobId,
   mergeImportJob,
   pdfStatusFromPaper,
@@ -15,7 +20,7 @@ import {
   upsertImportJob,
   type ImportJob,
 } from "./importJobs";
-import { mergeInboxItems } from "./ImportJobInbox";
+import { ImportJobInbox, mergeInboxItems } from "./ImportJobInbox";
 
 const STORAGE_KEY = "litera.import.jobs";
 
@@ -93,6 +98,20 @@ describe("import job helpers", () => {
     expect(pdfStatusFromPaper({ title: "x", pdf_path: "/tmp/p.pdf" })).toBe("completed");
     expect(pdfStatusFromPaper({ title: "x", pdf_path: null })).toBe("missing");
   });
+
+  it("maps backend PDF import errors to readable messages", () => {
+    const t = (key: string) => key;
+
+    expect(formatPdfImportError("/tmp/a.txt does not start with the %PDF- header", t)).toBe(
+      "import.error.pdfInvalid"
+    );
+    expect(formatPdfImportError("only .pdf files are accepted (got .txt)", t)).toBe(
+      "import.error.pdfWrongExtension"
+    );
+    expect(formatPdfImportError("PDF source /library/papers/x.pdf is already inside the library; pick an external file", t)).toBe(
+      "import.error.pdfInsideLibrary"
+    );
+  });
 });
 
 describe("import inbox merging", () => {
@@ -105,7 +124,60 @@ describe("import inbox merging", () => {
     expect(merged[0]?.updatedAt).toBe(40);
     expect(merged[1]?.updatedAt).toBe(30);
   });
+
+  it("renders failed local jobs with failed steps, progress, and error", () => {
+    installWindowMock([
+      job({
+        id: "pdf:failed",
+        source: "pdf",
+        title: "Broken PDF",
+        status: "failed",
+        metadataStatus: "failed",
+        pdfStatus: "failed",
+        duplicateStatus: "unknown",
+        error: "Only .pdf files are accepted.",
+        progress: { done: 0, total: 1, failed: 1 },
+      }),
+    ]);
+
+    const html = renderImportJobInbox();
+
+    expect(html).toContain("Broken PDF");
+    expect(html).toContain("失败");
+    expect(html).toContain("0/1");
+    expect(html).toContain("1 失败");
+    expect(html).toContain("Only .pdf files are accepted.");
+  });
+
+  it("does not count failed local jobs as active", () => {
+    installWindowMock([
+      job({ id: "pdf:failed", status: "failed" }),
+      job({ id: "doi:running", source: "doi", status: "running" }),
+    ]);
+
+    const html = renderImportJobInbox();
+
+    expect(html).toContain("共 2 个");
+    expect(html).toContain("1 个进行中");
+  });
 });
+
+function renderImportJobInbox() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return renderToString(
+    createElement(
+      I18nProvider,
+      { lang: "zh", children: null },
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(ImportJobInbox)
+      )
+    )
+  );
+}
 
 describe("import job storage", () => {
   it("upserts jobs into localStorage and dispatches change events", () => {

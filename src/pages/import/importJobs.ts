@@ -1,3 +1,5 @@
+import { type TKey } from "@/i18n/dict";
+
 import { useEffect, useState } from "react";
 
 export const IMPORT_JOBS_CHANGED_EVENT = "litera:import-jobs-changed";
@@ -176,6 +178,31 @@ export function duplicateStatusFromFailures(
   )
     ? "duplicate"
     : "unknown";
+}
+
+type Translate = (key: TKey, vars?: Record<string, string>) => string;
+
+export function formatPdfImportError(error: string, t: Translate): string {
+  const detail = { detail: error };
+  if (/cannot be canonicalized|No such file|os error 2/i.test(error)) {
+    return t("import.error.pdfMissing", detail);
+  }
+  if (/is not a regular file/i.test(error)) {
+    return t("import.error.pdfNotFile", detail);
+  }
+  if (/only \.pdf files are accepted/i.test(error)) {
+    return t("import.error.pdfWrongExtension", detail);
+  }
+  if (/already inside the library/i.test(error)) {
+    return t("import.error.pdfInsideLibrary", detail);
+  }
+  if (/%PDF- header|not a valid PDF|read PDF header/i.test(error)) {
+    return t("import.error.pdfInvalid", detail);
+  }
+  if (/copy PDF|create paper dir/i.test(error)) {
+    return t("import.error.pdfCopyFailed", detail);
+  }
+  return error;
 }
 
 export type ImportJobDraftLike = {

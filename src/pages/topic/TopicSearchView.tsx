@@ -6,13 +6,14 @@ import {
 import { api, type TopicReport } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { Column } from "./TopicSearchResults";
+import { loadCurrentTopicReport, saveCurrentTopicReport } from "./topicSearchStorage";
 
 export function TopicSearchView() {
   const t = useT();
   const [query, setQuery] = useState("");
   const [window, setWindow] = useState(3);
-  const [report, setReport] = useState<TopicReport | null>(null);
-  const [expandedTerms, setExpandedTerms] = useState<string[] | null>(null);
+  const [report, setReport] = useState<TopicReport | null>(() => loadCurrentTopicReport()?.report ?? null);
+  const [expandedTerms, setExpandedTerms] = useState<string[] | null>(() => loadCurrentTopicReport()?.expandedTerms ?? null);
 
   const discover = useMutation({
     mutationFn: (q: string) =>
@@ -23,7 +24,7 @@ export function TopicSearchView() {
         classicLimit: 20,
         recentWindowYears: window,
       }),
-    onSuccess: (r) => setReport(r),
+    onSuccess: (r) => { setReport(r); saveCurrentTopicReport(r, expandedTerms); },
   });
 
   const expand = useMutation({

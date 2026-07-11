@@ -1,0 +1,14 @@
+{
+  "onSessionStart": [
+    {
+      "description": "Load LitFolio project context for new/resumed Snow sessions",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cat <<'EOF'\nLitFolio project context:\n- Stack: Tauri 2 desktop app with React 18 + TypeScript + Vite frontend and Rust 2021 backend.\n- Common checks: pnpm typecheck, pnpm lint, pnpm test; for backend changes run cargo test from src-tauri when possible.\n- IPC boundary: keep src/lib/api*.ts, src/lib/apiSchema*.ts, src/test/tauriMockCommands.ts, and src-tauri/src/commands/mod.rs aligned.\n- Persistence changes require new migrations in src-tauri/migrations/ and matching storage/repository updates.\n- Do not use page-level dangerouslySetInnerHTML; use src/components/MarkdownView.tsx.\n- Release versions must stay in sync across package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, and src-tauri/Cargo.lock.\nEOF",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

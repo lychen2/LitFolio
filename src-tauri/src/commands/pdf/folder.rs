@@ -7,7 +7,7 @@ use ulid::Ulid;
 
 use super::common::{
     attach_imported_pdf_to_existing, existing_paper_for_draft,
-    generate_and_index_pdf_markdown_or_warn, PdfFailure, PdfImportSummary,
+    generate_and_index_pdf_markdown_or_warn, log_pdf_import_summary, PdfFailure, PdfImportSummary,
 };
 use crate::bibtex::generate_bibtex;
 use crate::commands::events::emit_or_warn;
@@ -40,7 +40,7 @@ pub async fn import_folder(
             kind: "folder_import".into(),
             scope: Some(dir_path.clone()),
             title: format!("Import PDF folder: {}", dir.display()),
-            details: serde_json::json!({ "dir_path": dir_path }),
+            details: serde_json::json!({ "source": "folder", "dir_path": dir_path }),
             max_attempts: Some(3),
         })
         .await
@@ -74,6 +74,14 @@ pub async fn import_folder(
         .map_err(|e| e.to_string())?;
 
     if total == 0 {
+        tracing::info!(
+            import_source = "folder",
+            job_id = %job.id,
+            dir_path = %dir.display(),
+            imported_count = 0,
+            failed_count = 0,
+            "folder import completed"
+        );
         job_repo.succeed(&job.id).await.map_err(|e| e.to_string())?;
         return Ok(PdfImportSummary {
             imported: Vec::new(),
@@ -139,11 +147,20 @@ pub async fn import_folder(
         },
     );
 
+    log_pdf_import_summary("folder", imported.len(), &failed);
     if failed.is_empty() {
         job_repo.succeed(&job.id).await.map_err(|e| e.to_string())?;
     } else {
+        let failure_reason = format!("{} of {total} PDFs failed", failed.len());
+        tracing::warn!(
+            import_source = "folder",
+            job_id = %job.id,
+            dir_path = %dir.display(),
+            failure_reason = %failure_reason,
+            "folder import job failed"
+        );
         job_repo
-            .fail(&job.id, &format!("{} of {total} PDFs failed", failed.len()))
+            .fail(&job.id, &failure_reason)
             .await
             .map_err(|e| e.to_string())?;
     }

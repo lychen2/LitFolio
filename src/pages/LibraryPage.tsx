@@ -12,6 +12,8 @@ import { ReadingQueue } from "./library/ReadingQueue";
 import { QuickReadDrawer } from "./library/QuickReadDrawer";
 import { VirtualPaperList } from "./library/PaperList";
 import { LibraryFilterBar, type LibraryViewMode } from "./library/LibraryFilterBar";
+import { filterLibraryPapers, type LibraryFilterState } from "./library/libraryFilters";
+import { toggleLibrarySelection } from "./library/librarySelection";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -23,6 +25,7 @@ export function LibraryPage() {
   const [folderId, setFolderId] = useState<number | null>(null);
   const [smartCollectionId, setSmartCollectionId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<LibraryViewMode>("papers");
+  const [filters, setFilters] = useState<LibraryFilterState>({ year: "", readStatus: "", tagId: "" });
   const trimmed = search.trim();
   const { t } = useI18n();
 
@@ -44,19 +47,22 @@ export function LibraryPage() {
     enabled: paperIds.length > 0,
   });
   const tagsByPaper = tagsQ.data ?? {};
-
+  const tagOptions = Array.from(
+    new Map(Object.values(tagsByPaper).flat().map((tag) => [tag.id, tag])).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredPapers = papers ? filterLibraryPapers(papers, tagsByPaper, filters) : papers;
   const resultLabel = viewMode === "queue"
     ? ""
     : trimmed
-    ? t("library.searchResults", { query: trimmed, count: String(papers?.length ?? 0) })
-    : papers
-    ? t("library.recentPapers", { count: String(papers.length) })
+    ? t("library.searchResults", { query: trimmed, count: String(filteredPapers?.length ?? 0) })
+    : filteredPapers
+    ? t("library.recentPapers", { count: String(filteredPapers.length) })
     : t("common.loading");
   const canReviewCollection =
     (folderId != null || smartCollectionId != null) &&
     viewMode === "papers" &&
-    !!papers &&
-    papers.length > 0;
+    !!filteredPapers &&
+    filteredPapers.length > 0;
   const [reading, setReading] = useState<Paper | null>(null);
   const [preview, setPreview] = useState<Paper | null>(null);
   const [showLitReview, setShowLitReview] = useState(false);
@@ -81,12 +87,7 @@ export function LibraryPage() {
     },
   });
   const toggleSelection = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelectedIds((prev) => toggleLibrarySelection(prev, id));
   };
 
   return (
@@ -98,6 +99,9 @@ export function LibraryPage() {
         canReviewCollection={canReviewCollection}
         onSearchChange={setSearch}
         onClearSearch={() => setSearch("")}
+        filters={filters}
+        tagOptions={tagOptions}
+        onFiltersChange={setFilters}
         onToggleViewMode={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
         onReviewCollection={() => setShowLitReview(true)}
       />
@@ -134,11 +138,11 @@ export function LibraryPage() {
           )}
           {isLoading ? (
             <div className="overflow-auto h-full"><LibrarySkeleton /></div>
-          ) : !papers || papers.length === 0 ? (
-            trimmed ? <NoResults q={trimmed} /> : <Empty />
+          ) : !filteredPapers || filteredPapers.length === 0 ? (
+            trimmed ? <NoResults q={trimmed} /> : <LibraryEmptyState />
           ) : (
             <VirtualPaperList
-              papers={papers}
+              papers={filteredPapers}
               tagsByPaper={tagsByPaper}
               selectedIds={selectedIds}
               onToggleSelection={toggleSelection}
@@ -151,10 +155,10 @@ export function LibraryPage() {
       )}
       {reading && <QuickReadDrawer paper={reading} onClose={() => setReading(null)} />}
       {preview && <PaperDetailDrawer paper={preview} onClose={() => setPreview(null)} />}
-      {showLitReview && papers && (
+      {showLitReview && filteredPapers && (
         <LitReviewDialog
-          paperIds={selected.length > 0 ? selected : papers.map((p) => p.id)}
-          paperCount={selected.length > 0 ? selected.length : papers.length}
+          paperIds={selected.length > 0 ? selected : filteredPapers.map((p) => p.id)}
+          paperCount={selected.length > 0 ? selected.length : filteredPapers.length}
           onClose={() => setShowLitReview(false)}
         />
       )}
@@ -242,14 +246,18 @@ function LibrarySkeleton() {
   );
 }
 
-function Empty() {
-  const t = useI18n().t;
-  const actions = [
+export function libraryEmptyActions(t: (key: Parameters<ReturnType<typeof useI18n>["t"]>[0]) => string) {
+  return [
     { to: "/import?tab=pdf", icon: Inbox, label: t("library.emptyImportPdf") },
     { to: "/import?tab=arxiv_doi", icon: Atom, label: t("library.emptyAddIdentifier") },
     { to: "/topic", icon: Compass, label: t("library.emptyStartTopic") },
     { to: "/feeds", icon: Rss, label: t("library.emptyTrackFeeds") },
   ];
+}
+
+export function LibraryEmptyState() {
+  const t = useI18n().t;
+  const actions = libraryEmptyActions(t);
   return (
     <div className="h-full overflow-auto px-6 py-10 litera-fade-in">
       <div className="mx-auto max-w-xl">

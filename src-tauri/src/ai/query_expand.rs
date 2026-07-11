@@ -7,7 +7,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
+use super::client::{chat_complete_with_task_kind, ChatMessage};
 use super::profile::LlmProfile;
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,7 +65,7 @@ pub async fn expand_search_query(
             content: trimmed.into(),
         },
     ];
-    let resp = chat_complete(client, profile, &messages).await?;
+    let resp = chat_complete_with_task_kind(client, profile, "search_expand", &messages).await?;
     let parsed = parse_terms(&resp.content)
         .with_context(|| format!("LLM returned: {}", truncate(&resp.content, 300)))?;
     Ok(ExpandedQuery {

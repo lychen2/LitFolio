@@ -1,0 +1,37 @@
+{
+  "afterToolCall": [
+    {
+      "matcher": "terminal-execute",
+      "description": "Remind about LitFolio verification after terminal commands",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cat <<'EOF'\nVerification reminder for LitFolio:\n- Frontend changes: run pnpm typecheck && pnpm lint && pnpm test when appropriate.\n- Backend/Rust changes: run cargo test from src-tauri when appropriate.\n- E2E-sensitive UI changes: run pnpm test:e2e when feasible.\nEOF",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "matcher": "filesystem-create",
+      "description": "Remind about tests and generated-file rules after file creation",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cat <<'EOF'\nFile creation reminder:\n- Add/update nearby tests for new behavior.\n- Do not commit generated release notes or extra docs under docs/ except docs/manual/manual.pdf and docs/manual/manual-en.pdf.\n- If creating a migration, use the next numbered file in src-tauri/migrations/ and do not rewrite shipped migrations.\nEOF",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "matcher": "filesystem-edit",
+      "description": "Remind about tests after file edits",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cat <<'EOF'\nEdit verification reminder:\n- Keep TypeScript API wrappers, schemas, Tauri mocks, and Rust command registration in sync.\n- Run focused tests first, then typecheck/lint/test before handoff for substantive changes.\nEOF",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

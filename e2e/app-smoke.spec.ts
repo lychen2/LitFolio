@@ -23,4 +23,13 @@ test.describe("app smoke", () => {
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
   });
+
+  test("opens an existing paper from a repeated DOI import", async ({ page }) => {
+    await page.goto("/import?tab=arxiv_doi&link=https%3A%2F%2Fdoi.org%2F10.1145%2F3530819");
+
+    await expect(page.getByText("Already in library: Browser Smoke Paper")).toBeVisible();
+    await page.getByRole("button", { name: "Open existing paper" }).click();
+
+    await expect(page).toHaveURL(/\/reader\/paper-1$/);
+  });
 });

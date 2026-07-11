@@ -103,6 +103,7 @@ pub async fn export_paper_md(
 
     // Title as H1.
     md.push_str(&format!("# {}\n\n", paper.title));
+    md.push_str(&render_paper_metadata(paper));
 
     // Notes section.
     md.push_str("## Notes\n\n");
@@ -152,6 +153,41 @@ pub async fn export_paper_md(
         .await?;
 
     Ok(out_path)
+}
+
+fn render_paper_metadata(paper: &Paper) -> String {
+    let mut out = String::from("## Paper Metadata\n\n");
+    if !paper.authors.is_empty() {
+        out.push_str(&format!("- **Authors:** {}\n", paper.authors.join(", ")));
+    }
+    if let Some(year) = paper.year {
+        out.push_str(&format!("- **Year:** {year}\n"));
+    }
+    if let Some(venue) = paper.venue.as_deref() {
+        out.push_str(&format!("- **Venue:** {venue}\n"));
+    }
+    if let Some(doi) = paper.doi.as_deref() {
+        out.push_str(&format!("- **DOI:** {doi}\n"));
+    }
+    if let Some(arxiv) = paper.arxiv_id.as_deref() {
+        out.push_str(&format!("- **arXiv:** {arxiv}\n"));
+    }
+    if let Some(tldr) = paper
+        .tldr
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        out.push_str(&format!("- **TL;DR:** {tldr}\n"));
+    }
+    if let Some(abstract_text) = paper
+        .abstract_text
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        out.push_str(&format!("- **Abstract:** {abstract_text}\n"));
+    }
+    out.push('\n');
+    out
 }
 
 /// Export all papers (optionally incremental) to the given directory.
@@ -231,6 +267,36 @@ fn escape_yaml(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn sample_paper() -> Paper {
+        Paper {
+            id: "t".into(),
+            title: "Attention Is All You Need".into(),
+            authors: vec!["Vaswani, Ashish".into()],
+            year: Some(2017),
+            venue: Some("NeurIPS".into()),
+            doi: Some("10.48550/arXiv.1706.03762".into()),
+            arxiv_id: Some("1706.03762".into()),
+            abstract_text: None,
+            pdf_path: None,
+            note_path: None,
+            added_at: 0,
+            updated_at: 0,
+            read_status: crate::storage::ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        }
+    }
 
     #[test]
     fn sanitize_filename_basic() {
@@ -263,5 +329,21 @@ mod tests {
             last_exported_at: None,
         };
         assert_eq!(sanitize_filename(&p), "vaswani_2017_attention.md");
+    }
+
+    #[test]
+    fn renders_readable_paper_metadata_section() {
+        let mut p = sample_paper();
+        p.tldr = Some("Short summary".into());
+        p.abstract_text = Some("Long abstract".into());
+
+        let section = render_paper_metadata(&p);
+
+        assert!(section.contains("## Paper Metadata"));
+        assert!(section.contains("- **Authors:** Vaswani, Ashish"));
+        assert!(section.contains("- **Year:** 2017"));
+        assert!(section.contains("- **DOI:** 10.48550/arXiv.1706.03762"));
+        assert!(section.contains("- **TL;DR:** Short summary"));
+        assert!(section.contains("- **Abstract:** Long abstract"));
     }
 }

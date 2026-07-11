@@ -15,7 +15,7 @@ mod topic_survey;
 mod topic_survey_annotate;
 mod translate;
 
-pub use client::{chat_complete, ChatMessage};
+pub use client::{chat_complete_for_task, chat_complete_with_task_kind, ChatMessage};
 pub use concept_extract::{extract_concepts, ExtractedConcept};
 pub use library_qa::{
     answer_library_question, empty_result, local_search_result, AskLibraryResult, AskSource,
@@ -34,4 +34,8 @@ pub use summarize::{
 };
 pub use topic_survey::{plan_survey, PiHint, SubareaSpec, SurveySkeleton};
 pub use topic_survey_annotate::{annotate_survey, AnnotateInputPaper, SurveyAnnotation};
-pub use translate::{translate_paper_text, TranslationResult};
+pub use translate::{
+    estimate_markdown_translation, translate_markdown_text, translate_paper_text,
+    MarkdownTranslationEstimate, MarkdownTranslationResult, TranslationResult,
+    MARKDOWN_CHUNK_CHARS,
+};

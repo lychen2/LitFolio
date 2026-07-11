@@ -59,11 +59,31 @@ where
             });
             continue;
         };
-        emit_progress(&app, kind, ok + errors.len(), total, &paper, "start", None);
+        emit_progress(
+            &app,
+            BatchProgress {
+                kind,
+                done: ok + errors.len(),
+                total,
+                paper: &paper,
+                phase: "start",
+                error: None,
+            },
+        );
         match op(paper.clone()).await {
             Ok(()) => {
                 ok += 1;
-                emit_progress(&app, kind, ok + errors.len(), total, &paper, "ok", None);
+                emit_progress(
+                    &app,
+                    BatchProgress {
+                        kind,
+                        done: ok + errors.len(),
+                        total,
+                        paper: &paper,
+                        phase: "ok",
+                        error: None,
+                    },
+                );
             }
             Err(error) => {
                 let message = error.to_string();
@@ -74,12 +94,14 @@ where
                 });
                 emit_progress(
                     &app,
-                    kind,
-                    ok + errors.len(),
-                    total,
-                    &paper,
-                    "fail",
-                    Some(&message),
+                    BatchProgress {
+                        kind,
+                        done: ok + errors.len(),
+                        total,
+                        paper: &paper,
+                        phase: "fail",
+                        error: Some(&message),
+                    },
                 );
             }
         }
@@ -98,26 +120,27 @@ where
     Ok(summary)
 }
 
-fn emit_progress(
-    app: &AppHandle,
-    kind: &str,
+struct BatchProgress<'a> {
+    kind: &'a str,
     done: usize,
     total: usize,
-    paper: &Paper,
-    phase: &str,
-    error: Option<&str>,
-) {
+    paper: &'a Paper,
+    phase: &'a str,
+    error: Option<&'a str>,
+}
+
+fn emit_progress(app: &AppHandle, progress: BatchProgress<'_>) {
     emit_or_warn(
         app,
         "batch-progress",
         &serde_json::json!({
-            "kind": kind,
-            "done": done,
-            "total": total,
-            "current_id": paper.id,
-            "current_title": paper.title,
-            "phase": phase,
-            "error": error,
+            "kind": progress.kind,
+            "done": progress.done,
+            "total": progress.total,
+            "current_id": progress.paper.id,
+            "current_title": progress.paper.title,
+            "phase": progress.phase,
+            "error": progress.error,
         }),
     );
 }

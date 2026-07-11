@@ -1,6 +1,8 @@
 //! Resolve the user's library root and the canonical paths inside it.
 
 use anyhow::{anyhow, Context, Result};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -13,6 +15,24 @@ pub struct LegacyPdfTextMigration {
     pub converted: usize,
     pub removed_legacy: usize,
     pub markdown_documents: Vec<(String, String)>,
+}
+
+const TRANSLATED_PAPER_MARKDOWN_CACHE_VERSION: u32 = 2;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TranslatedPaperMarkdownCache {
+    pub(crate) markdown: String,
+    pub(crate) model: String,
+    pub(crate) generated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TranslatedPaperMarkdownMeta {
+    #[serde(default)]
+    cache_version: u32,
+    source_sha256: String,
+    model: String,
+    generated_at: i64,
 }
 
 impl LibraryPaths {
@@ -60,6 +80,19 @@ impl LibraryPaths {
     pub fn paper_markdown_file(&self, paper_id: &str) -> PathBuf {
         self.paper_dir(paper_id).join("document.md")
     }
+    /// Where the AI-translated Markdown lives for a target reading language.
+    pub fn translated_paper_markdown_file(&self, paper_id: &str, target_lang: &str) -> PathBuf {
+        self.paper_dir(paper_id).join(format!(
+            "document.translated.{}.md",
+            target_language_slug(target_lang)
+        ))
+    }
+    fn translated_paper_markdown_meta_file(&self, paper_id: &str, target_lang: &str) -> PathBuf {
+        self.paper_dir(paper_id).join(format!(
+            "document.translated.{}.meta.json",
+            target_language_slug(target_lang)
+        ))
+    }
     /// Legacy plain-text cache path. Read for compatibility with existing
     /// libraries; new extraction writes `document.md`.
     pub fn pdf_text_file(&self, paper_id: &str) -> PathBuf {
@@ -74,6 +107,29 @@ impl LibraryPaths {
     }
     pub fn read_paper_markdown(&self, paper_id: &str) -> Option<String> {
         read_non_empty_file(self.paper_markdown_file(paper_id))
+    }
+    pub(crate) fn read_translated_paper_markdown_cache(
+        &self,
+        paper_id: &str,
+        target_lang: &str,
+        source_markdown: &str,
+    ) -> Option<TranslatedPaperMarkdownCache> {
+        let meta = read_translated_paper_markdown_meta(
+            self.translated_paper_markdown_meta_file(paper_id, target_lang),
+        )?;
+        if meta.cache_version != TRANSLATED_PAPER_MARKDOWN_CACHE_VERSION {
+            return None;
+        }
+        if meta.source_sha256 != markdown_sha256(source_markdown) {
+            return None;
+        }
+        let markdown =
+            read_non_empty_file(self.translated_paper_markdown_file(paper_id, target_lang))?;
+        Some(TranslatedPaperMarkdownCache {
+            markdown,
+            model: meta.model,
+            generated_at: meta.generated_at,
+        })
     }
     fn read_legacy_pdf_text(&self, paper_id: &str) -> Option<String> {
         read_non_empty_file(self.pdf_text_file(paper_id))
@@ -90,6 +146,30 @@ impl LibraryPaths {
                 .map_err(|e| anyhow!("remove legacy PDF text cache {}: {e}", legacy.display()))?;
         }
         Ok(())
+    }
+    /// Persist AI-translated Markdown next to the source document cache.
+    pub fn write_translated_paper_markdown(
+        &self,
+        paper_id: &str,
+        target_lang: &str,
+        markdown: &str,
+        source_markdown: &str,
+        model: &str,
+        generated_at: i64,
+    ) -> Result<()> {
+        let dir = self.paper_dir(paper_id);
+        std::fs::create_dir_all(&dir).map_err(|e| anyhow!("create {}: {e}", dir.display()))?;
+        let path = self.translated_paper_markdown_file(paper_id, target_lang);
+        std::fs::write(&path, markdown).map_err(|e| anyhow!("write {}: {e}", path.display()))?;
+        let meta_path = self.translated_paper_markdown_meta_file(paper_id, target_lang);
+        let meta = TranslatedPaperMarkdownMeta {
+            cache_version: TRANSLATED_PAPER_MARKDOWN_CACHE_VERSION,
+            source_sha256: markdown_sha256(source_markdown),
+            model: model.to_string(),
+            generated_at,
+        };
+        std::fs::write(&meta_path, serde_json::to_vec_pretty(&meta)?)
+            .map_err(|e| anyhow!("write {}: {e}", meta_path.display()))
     }
     /// Persist body text next to the paper. Used by the lopdf fallback so
     /// the next TLDR/QuickRead skips re-extraction.
@@ -248,6 +328,42 @@ fn ensure_dir(p: &Path) -> Result<()> {
     Ok(())
 }
 
+fn target_language_slug(target_lang: &str) -> String {
+    let mut slug = String::with_capacity(target_lang.len().min(48));
+    let mut last_dash = false;
+    for ch in target_lang.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            last_dash = false;
+        } else if !slug.is_empty() && !last_dash {
+            slug.push('-');
+            last_dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        return "target".to_string();
+    }
+    slug.truncate(48);
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    slug
+}
+
+fn markdown_sha256(markdown: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(markdown.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn read_translated_paper_markdown_meta(path: PathBuf) -> Option<TranslatedPaperMarkdownMeta> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
 fn read_non_empty_file(path: PathBuf) -> Option<String> {
     let raw = std::fs::read_to_string(path).ok()?;
     let trimmed = raw.trim();
@@ -304,6 +420,106 @@ mod tests {
         );
         assert!(!legacy.exists());
         fs::remove_dir_all(&tmp).ok();
+    }
+    #[test]
+    fn translated_markdown_round_trip_uses_target_language_slug() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdtranslate-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+
+        paths
+            .write_translated_paper_markdown(
+                "abc",
+                "Simplified Chinese",
+                "# 中文译文",
+                "# Source",
+                "mock-model",
+                123,
+            )
+            .unwrap();
+
+        assert_eq!(
+            paths.translated_paper_markdown_file("abc", "Simplified Chinese"),
+            paths
+                .paper_dir("abc")
+                .join("document.translated.simplified-chinese.md")
+        );
+        assert_eq!(
+            paths.read_translated_paper_markdown_cache("abc", "Simplified Chinese", "# Source"),
+            Some(TranslatedPaperMarkdownCache {
+                markdown: "# 中文译文".to_string(),
+                model: "mock-model".to_string(),
+                generated_at: 123,
+            })
+        );
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn translated_markdown_cache_version_misses_old_metadata() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdtranslate-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+        fs::create_dir_all(paths.paper_dir("abc")).unwrap();
+
+        fs::write(
+            paths.translated_paper_markdown_file("abc", "Chinese"),
+            "# Old",
+        )
+        .unwrap();
+        fs::write(
+            paths.translated_paper_markdown_meta_file("abc", "Chinese"),
+            serde_json::json!({
+                "source_sha256": markdown_sha256("source"),
+                "model": "old",
+                "generated_at": 1
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            paths.read_translated_paper_markdown_cache("abc", "Chinese", "source"),
+            None
+        );
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn translated_markdown_cache_misses_when_source_changes() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdtranslate-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+
+        paths
+            .write_translated_paper_markdown(
+                "abc",
+                "Chinese",
+                "# 中文译文",
+                "old source",
+                "mock",
+                1,
+            )
+            .unwrap();
+
+        assert_eq!(
+            paths.read_translated_paper_markdown_cache("abc", "Chinese", "new source"),
+            None
+        );
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn translated_markdown_slug_rejects_path_characters() {
+        let root = PathBuf::from("/tmp/litfolio-test-root");
+        let paths = LibraryPaths::new(&root);
+
+        assert_eq!(
+            paths.translated_paper_markdown_file("abc", "../中文/English"),
+            root.join("papers")
+                .join("abc")
+                .join("document.translated.english.md")
+        );
     }
 
     #[test]

@@ -43,7 +43,7 @@ export function edgeToEvidenceDraft(
     paper_id: source?.node_type === "paper" ? source.id : target?.node_type === "paper" ? target.id : null,
     highlight_id: null,
     page: null,
-    label: edge.edge_type,
+    label: edge.relation ?? edge.edge_type,
     excerpt: edge.snippet ?? `${source?.label ?? edge.source} -> ${target?.label ?? edge.target}`,
     note: `${source?.label ?? edge.source} -> ${target?.label ?? edge.target}`,
   };

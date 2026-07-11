@@ -9,7 +9,9 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::ai::{
-    active_profile_for_task, chat_complete, load_config, ChatMessage, LlmProfile, TaskKind,
+    active_profile_for_task, chat_complete_for_task, estimate_markdown_translation, load_config,
+    translate_markdown_text, ChatMessage, LlmProfile, MarkdownTranslationEstimate,
+    MarkdownTranslationResult, TaskKind, MARKDOWN_CHUNK_CHARS,
 };
 use crate::storage::{
     Highlight, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate, Paper, PaperRepo,
@@ -18,8 +20,31 @@ use crate::storage::{
 use crate::AppState;
 
 use self::terms::build_term_insights;
-use translate::translate_selection;
 pub use translate::ReaderTranslateResult;
+use translate::{translate_selection, TranslateSelectionInput};
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ReaderMarkdownTranslationResult {
+    pub markdown: String,
+    pub target_lang: String,
+    pub model: String,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub cached: bool,
+}
+
+impl From<MarkdownTranslationResult> for ReaderMarkdownTranslationResult {
+    fn from(result: MarkdownTranslationResult) -> Self {
+        Self {
+            markdown: result.markdown,
+            target_lang: result.target_lang,
+            model: result.model,
+            prompt_tokens: result.prompt_tokens,
+            completion_tokens: result.completion_tokens,
+            cached: false,
+        }
+    }
+}
 
 const MAX_SELECTION_CHARS: usize = 2_000;
 const MIN_SUMMARY_CHARS: usize = 240;
@@ -47,9 +72,107 @@ pub async fn reader_translate_selection(
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let profile = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
-    translate_selection(&state.http, &profile, &paper, &clipped, &terms, &lang)
+    translate_selection(TranslateSelectionInput {
+        client: &state.http,
+        profile: &profile,
+        paper: &paper,
+        selection: &clipped,
+        terms: &terms,
+        target_lang: &lang,
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn paper_translated_markdown_get(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    target_lang: Option<String>,
+) -> Result<Option<ReaderMarkdownTranslationResult>, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let lang = target_lang.unwrap_or(cfg.output_language);
+    let repo = PaperRepo::new(&state.pool);
+    load_paper(&repo, &paper_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let Some(source) = state.paths.read_pdf_text(&paper_id) else {
+        return Ok(None);
+    };
+    Ok(state
+        .paths
+        .read_translated_paper_markdown_cache(&paper_id, &lang, &source)
+        .map(|cache| ReaderMarkdownTranslationResult {
+            markdown: cache.markdown,
+            target_lang: lang,
+            model: cache.model,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            cached: true,
+        }))
+}
+
+#[tauri::command]
+pub async fn paper_translate_markdown_estimate(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Option<MarkdownTranslationEstimate>, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = load_paper(&repo, &paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(body) = crate::commands::summaries::load_or_extract_pdf_body(
+        &state.paths,
+        &paper_id,
+        paper.pdf_path.as_deref(),
+    )
+    .await
+    else {
+        return Ok(None);
+    };
+    Ok(Some(estimate_markdown_translation(
+        &body,
+        MARKDOWN_CHUNK_CHARS,
+    )))
+}
+
+#[tauri::command]
+pub async fn paper_translate_markdown(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+    target_lang: Option<String>,
+) -> Result<ReaderMarkdownTranslationResult, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let profile = active_profile_for_task(&cfg, TaskKind::Translate)
+        .map_err(|e| e.to_string())?
+        .clone();
+    let lang = target_lang.unwrap_or(cfg.output_language);
+    let repo = PaperRepo::new(&state.pool);
+    let paper = load_paper(&repo, &paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let body = crate::commands::summaries::load_or_extract_pdf_body(
+        &state.paths,
+        &paper_id,
+        paper.pdf_path.as_deref(),
+    )
+    .await
+    .ok_or_else(|| "paper markdown is not available".to_string())?;
+    let result = translate_markdown_text(&state.http, &profile, &paper.title, &body, &lang)
+        .await
+        .map_err(|e| e.to_string())?;
+    state
+        .paths
+        .write_translated_paper_markdown(
+            &paper_id,
+            &lang,
+            &result.markdown,
+            &body,
+            &result.model,
+            Utc::now().timestamp(),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(ReaderMarkdownTranslationResult::from(result))
 }
 
 #[tauri::command]
@@ -78,9 +201,16 @@ pub async fn highlight_translate(
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let profile = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
-    let result = translate_selection(&state.http, &profile, &paper, &clipped, &terms, &lang)
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = translate_selection(TranslateSelectionInput {
+        client: &state.http,
+        profile: &profile,
+        paper: &paper,
+        selection: &clipped,
+        terms: &terms,
+        target_lang: &lang,
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     if result.translation.trim().is_empty() {
         return Err("empty translation response".into());
     }
@@ -184,9 +314,10 @@ async fn summarize_highlight(
     let user_content = crate::ai::prompts::SUMMARIZE_HIGHLIGHT_USER
         .replace("{title}", &paper.title)
         .replace("{selection}", selection);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         client,
         profile,
+        TaskKind::Tldr,
         &[
             ChatMessage {
                 role: "system".into(),

@@ -39,7 +39,7 @@ pub fn build_api_client() -> Result<Client> {
 /// blocking the classic "redirect into the internal network" SSRF pivot.
 pub fn build_external_client() -> Result<Client> {
     let policy = redirect::Policy::custom(|attempt| {
-        if attempt.previous().len() >= 3 {
+        if attempt.previous().len() > 3 {
             return attempt.error("too many redirects (cap is 3)");
         }
         let url = attempt.url();
@@ -135,5 +135,57 @@ mod tests {
     fn api_client_builds() {
         assert!(build_api_client().is_ok());
         assert!(build_external_client().is_ok());
+    }
+
+    #[tokio::test]
+    async fn external_client_allows_three_public_redirects() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            for _ in 0..4 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut buffer = [0_u8; 1024];
+                let read = stream.read(&mut buffer).await.unwrap();
+                let request = std::str::from_utf8(&buffer[..read]).unwrap();
+                let path = request
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .unwrap();
+
+                let response = match path {
+                    "/start" => redirect_response(port, "/step-1"),
+                    "/step-1" => redirect_response(port, "/step-2"),
+                    "/step-2" => redirect_response(port, "/feed"),
+                    "/feed" => {
+                        "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok"
+                            .to_string()
+                    }
+                    _ => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        .to_string(),
+                };
+                stream.write_all(response.as_bytes()).await.unwrap();
+            }
+        });
+
+        let response = build_external_client()
+            .unwrap()
+            .get(format!("http://localhost:{port}/start"))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(response.text().await.unwrap(), "ok");
+        server.await.unwrap();
+    }
+
+    fn redirect_response(port: u16, path: &str) -> String {
+        format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://localhost:{port}{path}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        )
     }
 }

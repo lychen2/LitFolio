@@ -16,7 +16,28 @@ pub async fn paper_save_with_pdf(
     draft: PaperDraft,
     source_pdf_path: String,
 ) -> Result<Paper, String> {
-    paper_save_with_pdf_inner(state.inner().as_ref(), draft, &source_pdf_path).await
+    match paper_save_with_pdf_inner(state.inner().as_ref(), draft, &source_pdf_path).await {
+        Ok(paper) => {
+            tracing::info!(
+                import_source = "pdf_manual",
+                source_path = %source_pdf_path,
+                paper_id = %paper.id,
+                imported_count = 1,
+                failed_count = 0,
+                "paper import completed"
+            );
+            Ok(paper)
+        }
+        Err(error) => {
+            tracing::warn!(
+                import_source = "pdf_manual",
+                source_path = %source_pdf_path,
+                failure_reason = %error,
+                "paper import failed"
+            );
+            Err(error)
+        }
+    }
 }
 
 async fn paper_save_with_pdf_inner(

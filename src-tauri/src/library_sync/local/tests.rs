@@ -229,6 +229,12 @@ fn push_preview_reports_new_updated_deleted_and_unchanged_files() {
     let preview = build_push_preview(&local, Some(&remote), "https://dav.test/lib".into());
 
     assert_eq!(preview.direction, "push");
+    assert_eq!(preview.manifest_version, SYNC_MANIFEST_VERSION);
+    assert_eq!(preview.manifest_file_count, 3);
+    assert_eq!(
+        preview.manifest_total_bytes,
+        b"new".len() as u64 + b"local-newer".len() as u64 + b"same".len() as u64
+    );
     assert_eq!(preview.add_count, 1);
     assert_eq!(preview.update_count, 1);
     assert_eq!(preview.delete_count, 1);
@@ -279,6 +285,12 @@ fn pull_preview_reports_local_replacement_and_backup_requirement() {
     let preview = build_pull_preview(&local, &remote, "https://dav.test/lib".into());
 
     assert_eq!(preview.direction, "pull");
+    assert_eq!(preview.manifest_version, SYNC_MANIFEST_VERSION);
+    assert_eq!(preview.manifest_file_count, 3);
+    assert_eq!(
+        preview.manifest_total_bytes,
+        b"download".len() as u64 + b"remote-newer".len() as u64 + b"same".len() as u64
+    );
     assert_eq!(preview.add_count, 1);
     assert_eq!(preview.update_count, 1);
     assert_eq!(preview.delete_count, 1);
@@ -307,6 +319,39 @@ fn pull_preview_reports_local_replacement_and_backup_requirement() {
         .iter()
         .any(|change| change.path == "papers/local-only/original.pdf"
             && change.action == "delete_local"));
+}
+
+#[test]
+fn sync_report_includes_manifest_summary() {
+    let manifest = SyncManifest {
+        version: SYNC_MANIFEST_VERSION,
+        generated_at: "now".into(),
+        files: vec![
+            manifest_file("papers/a/original.pdf", b"pdf"),
+            manifest_file("library.db", b"db"),
+        ],
+    };
+    let snapshot = Snapshot::new_empty("litera-sync-report", manifest).unwrap();
+
+    let report = snapshot.report_with_stats(
+        "https://dav.test/lib".into(),
+        SyncTransferStats {
+            file_count: 1,
+            total_bytes: 3,
+            skipped_count: 1,
+            skipped_bytes: 2,
+        },
+        false,
+    );
+
+    assert_eq!(report.manifest_version, SYNC_MANIFEST_VERSION);
+    assert_eq!(report.manifest_file_count, 2);
+    assert_eq!(
+        report.manifest_total_bytes,
+        b"pdf".len() as u64 + b"db".len() as u64
+    );
+    assert_eq!(report.file_count, 1);
+    assert_eq!(report.total_bytes, 3);
 }
 
 fn temp_root() -> PathBuf {

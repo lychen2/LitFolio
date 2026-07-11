@@ -6,19 +6,10 @@ const CONCEPT_COLOR = "#059669";
 const CONCEPT_COLOR_LIGHT = "#34d399";
 
 const EDGE_COLORS: Record<string, string> = {
-  extends: "#a78bfa",
-  contradicts: "#f87171",
-  compares: "#fbbf24",
-  builds_on: "#38bdf8",
-  uses_method: "#2dd4bf",
-  related: "#9ca3af",
-  has_concept: "#6ee7b7",
-  discusses: "#6ee7b7",
-  replaces: "#f472b6",
-  extends_concept: "#c084fc",
-  requires: "#fb923c",
-  enables: "#34d399",
-  competes_with: "#ef4444",
+  citation: "#38bdf8",
+  similar: "#a78bfa",
+  manual: "#fbbf24",
+  concept: "#6ee7b7",
 };
 
 type PositionedNode = GraphNode & { x: number; y: number };
@@ -29,11 +20,13 @@ export function drawGraphNode({
   ctx,
   globalScale,
   selectedNodeId,
+  showLabel,
 }: {
   node: PositionedNode;
   ctx: CanvasRenderingContext2D;
   globalScale: number;
   selectedNodeId: string | null;
+  showLabel: boolean;
 }) {
   if (!isFinite(node.x) || !isFinite(node.y)) return;
   const isPaper = node.node_type === "paper";
@@ -41,15 +34,19 @@ export function drawGraphNode({
     drawSelection({ node, ctx, isPaper });
   }
   isPaper ? drawPaperNode(node.x, node.y, ctx) : drawConceptNode(node.x, node.y, ctx);
-  drawNodeLabel({ node, ctx, globalScale, isPaper });
+  if (showLabel) {
+    drawNodeLabel({ node, ctx, globalScale, isPaper });
+  }
 }
 
 export function drawGraphLink({
   link,
   ctx,
+  showArrowhead,
 }: {
   link: PositionedLink;
   ctx: CanvasRenderingContext2D;
+  showArrowhead: boolean;
 }) {
   const src = typeof link.source === "object" ? link.source as PositionedNode : null;
   const tgt = typeof link.target === "object" ? link.target as PositionedNode : null;
@@ -59,7 +56,9 @@ export function drawGraphLink({
   if (!geometry) return;
   const color = EDGE_COLORS[link.edge_type] ?? "#9ca3af";
   drawEdgePath(ctx, geometry, color, link.source_type === "ai");
-  drawArrowhead(ctx, geometry, color);
+  if (showArrowhead) {
+    drawArrowhead(ctx, geometry, color);
+  }
 }
 
 function drawPaperNode(x: number, y: number, ctx: CanvasRenderingContext2D) {

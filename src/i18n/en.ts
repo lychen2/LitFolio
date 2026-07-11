@@ -21,6 +21,7 @@ export const en: Record<TKey, string> = {
   "common.read": "Read",
   "common.reading": "Reading",
   "common.unread": "Unread",
+  "common.must": "Must-read",
   "common.create": "New",
   "common.delete": "Delete",
   "common.loading": "Loading…",
@@ -114,6 +115,13 @@ export const en: Record<TKey, string> = {
   "compare.addEvidence": "Add evidence",
   "compare.evidenceProject": "Evidence project",
   "compare.evidenceAdded": "Comparison added to evidence.",
+  "compare.differenceTable": "Difference table",
+  "compare.noDifferenceTable": "This comparison report does not include a parseable structured difference table.",
+  "compare.paper": "Paper",
+  "compare.problem": "Problem",
+  "compare.method": "Method",
+  "compare.data": "Data / setting",
+  "compare.limitation": "Limitation",
   "projects.overview": "Overview",
   "projects.saved": "Project saved.",
   "projects.searchPapers": "Search library papers",
@@ -183,6 +191,9 @@ export const en: Record<TKey, string> = {
   "library.translatedPrefix": "Trans:",
   "library.searchResults": '"{query}" — {count} results',
   "library.recentPapers": "{count} recent papers",
+  "library.filterYear": "Year",
+  "library.filterStatus": "Status",
+  "library.filterTag": "Tag",
   "library.resultProblem": "1 · Problem addressed",
   "library.resultMethod": "2 · Proposed method",
   "library.resultComparison": "3 · Key differences",
@@ -319,6 +330,7 @@ export const en: Record<TKey, string> = {
   "ask.evidenceTitle": "Evidence",
   "ask.retrievedCount": "{count} source papers were sent to the model",
   "ask.citationCount": "{count} cited papers",
+  "ask.contextSummary": "{papers} papers · {highlights} highlights · {documents} doc snippets",
   "ask.savedTo": "Saved to {path}",
   "ask.empty.card1Title": "Rewrite, then retrieve",
   "ask.empty.card1Body":
@@ -364,6 +376,8 @@ export const en: Record<TKey, string> = {
     "arXiv papers can be auto-downloaded; DOI imports try public PDF links or a local file",
   "import.step1.placeholder":
     "1706.03762  ·  arXiv:2310.06825  ·  10.1145/3530819",
+  "import.existingDoi": "Already in library: {title}",
+  "import.openExisting": "Open existing paper",
   "import.step2.label": "Step 2 · Metadata preview",
   "import.step3.label": "Step 3 · Bind PDF",
   "import.step3.pickPdf": "Select local PDF file…",
@@ -421,6 +435,18 @@ export const en: Record<TKey, string> = {
     "A public PDF link was found for this DOI, but the download failed. Select a local PDF and save it manually. Details: {detail}",
   "import.error.doiAllMethodsFailed":
     "Sci-Hub and CrossRef both failed to retrieve a PDF for this DOI. Select a local PDF and save it manually. Details: {detail}",
+  "import.error.doiInvalid": "Enter a valid DOI, for example 10.1234/example.",
+  "import.error.doiNotFound": "CrossRef could not find metadata for this DOI.",
+  "import.error.doiCrossrefUnavailable": "CrossRef is temporarily unavailable. Try again later. Details: {detail}",
+  "import.error.doiCrossrefRejected": "CrossRef rejected this DOI lookup. Details: {detail}",
+  "import.error.doiCrossrefMalformed": "CrossRef returned metadata Litera could not read. Try again later.",
+  "import.error.doiNetwork": "Could not reach CrossRef. Check the network and try again. Details: {detail}",
+  "import.error.pdfMissing": "The selected PDF could not be found. Pick the file again.",
+  "import.error.pdfNotFile": "The selected path is not a file. Pick a PDF file.",
+  "import.error.pdfWrongExtension": "Only .pdf files are accepted.",
+  "import.error.pdfInsideLibrary": "The selected PDF is already inside the library. Pick an external file.",
+  "import.error.pdfInvalid": "The selected file does not look like a valid PDF.",
+  "import.error.pdfCopyFailed": "The PDF could not be copied into the library. Try another location.",
   "import.stats.count": "Library: {count} papers",
   "import.stats.root": "{path}",
   "import.sidebar.recent": "Recent imports",
@@ -522,8 +548,13 @@ export const en: Record<TKey, string> = {
   "topic.survey.placeholder": "e.g. extreme ultrashort pulse lasers",
   "topic.survey.annotate": "Mark must-reads",
   "topic.survey.generate": "Generate survey",
+  "topic.survey.addMustRead": "Add must-read",
+  "topic.survey.removeMustRead": "Remove must-read",
+  "topic.survey.editSummary": "Edit subarea summary",
+  "topic.survey.sourceCount": "Sources before draft: {count} papers",
   "topic.survey.regenerate": "Regenerate",
   "topic.survey.save": "Save this survey",
+  "topic.survey.exportMarkdown": "Download Markdown",
   "topic.survey.savedTo": "Saved to {path}",
   "topic.survey.restorePlaceholder": "Restore a saved survey...",
   "topic.survey.deleteSaved": "Delete {topic}",
@@ -556,6 +587,8 @@ export const en: Record<TKey, string> = {
   "topic.survey.importDisabled": "Add",
   "topic.survey.importDisabledTitle":
     "Adding requires Unpaywall integration for direct PDF links (see STATUS §4 Phase 2, not available yet)",
+  "smartCollections.errorEmptyValue": "Rule value cannot be empty.",
+  "smartCollections.errorEmptyGroup": "Rule group must contain at least one condition.",
 
   "browse.title": "Browse arXiv",
   "browse.subtitle": "arXiv latest submissions · sorted by submission time",
@@ -588,6 +621,13 @@ export const en: Record<TKey, string> = {
   "settings.privacy.subtitle":
     "Local storage, model endpoints, network access, and sync visibility.",
   "settings.privacy.openDataDir": "Open data directory",
+  "settings.privacy.exportDiagnostics": "Export diagnostics log",
+  "settings.privacy.exportDiagnosticsTitle":
+    "Save the current diagnostics log to a file",
+  "settings.privacy.exportDiagnosticsDone":
+    "Diagnostics log exported to {path}",
+  "settings.privacy.exportDiagnosticsFailed":
+    "Failed to export diagnostics log: {message}",
   "settings.privacy.storageLocation": "Storage location",
   "settings.privacy.activeEndpoint": "Active endpoint",
   "settings.privacy.activeProfile": "Active profile",
@@ -606,6 +646,17 @@ export const en: Record<TKey, string> = {
     "RSS refresh fetches configured feeds and linked landing pages.",
   "settings.privacy.network.sync":
     "Sync uses the configured WebDAV server only when you run sync actions.",
+  "settings.privacy.aiDataTitle": "Data sent by AI requests",
+  "settings.privacy.ai.translate":
+    "Translation sends the selected text, title and abstract, or full-text Markdown chunks.",
+  "settings.privacy.ai.summary":
+    "Summaries, quick read, and batch AI send paper metadata plus available PDF body snippets.",
+  "settings.privacy.ai.ask":
+    "Library Q&A sends the question, retrieved papers, relevant highlights, note snippets, and conversation history.",
+  "settings.privacy.ai.survey":
+    "Topic and literature review send the topic, grouping requirements, candidate paper metadata, and selected sources.",
+  "settings.privacy.ai.discovery":
+    "Term extraction and link discovery send paper titles, abstracts, local body text, terms, and relationship context.",
   "settings.privacy.taskBindings": "Task model bindings",
   "settings.privacy.defaultBinding": "current profile",
   "settings.privacy.lastSyncNotTracked":
@@ -647,6 +698,8 @@ export const en: Record<TKey, string> = {
   "settings.tasks.tagHint": "Reserved for future auto-tagging",
   "settings.tasks.link": "Linking",
   "settings.tasks.linkHint": "Reserved for future paper linking",
+  "settings.tasks.litReview": "Literature review",
+  "settings.tasks.litReviewHint": "Draft comparison and literature review sections",
   "settings.tasks.useCurrent": "— Use current ({profile}) —",
   "settings.tasks.modelPlaceholder": "Default: {model}",
   "settings.tasks.modelTitle":
@@ -674,6 +727,18 @@ export const en: Record<TKey, string> = {
     "Use an HTTPS WebDAV URL. Plain HTTP is accepted only for localhost testing.",
   "settings.sync.pullConfirm":
     "This will replace the local library with the full remote snapshot and restart the app afterwards. Continue?",
+  "settings.sync.currentConfig": "Current config",
+  "settings.sync.notConfigured": "No complete WebDAV target configured",
+  "settings.sync.authUser": "Authenticated as {username}",
+  "settings.sync.authAnonymous": "No username set",
+  "settings.sync.lastResult": "Last result",
+  "settings.sync.lastResultNone": "No sync action has run since opening settings.",
+  "settings.sync.lastKind.save": "Save config",
+  "settings.sync.lastKind.test": "Connection test",
+  "settings.sync.lastKind.previewPush": "Push preview",
+  "settings.sync.lastKind.previewPull": "Pull preview",
+  "settings.sync.lastKind.push": "Push",
+  "settings.sync.lastKind.pull": "Pull",
   "settings.sync.saved": "✓ Sync config saved.",
   "settings.sync.testOk": "✓ Connected to {remote}",
   "settings.sync.pushOk":
@@ -737,6 +802,15 @@ export const en: Record<TKey, string> = {
   "reader.tabNotes": "Reading Card",
   "reader.tabTranslate": "Translate",
   "reader.tabTerms": "Terms",
+  "reader.nativeReadTitle": "Native reading",
+  "reader.nativeReadGenerate": "Generate full translation",
+  "reader.nativeReadRegenerate": "Translate again",
+  "reader.nativeReadPreparing": "Preparing a readable full-text translation. The first run can take a little while.",
+  "reader.nativeReadEmpty": "Generate a full-text translation, then read the paper in your native language.",
+  "reader.nativeReadEstimate": "Will send about {count} text chunks before generation.",
+  "reader.nativeReadCached": "Cached {lang} translation",
+  "reader.nativeReadGenerated": "Translated into {lang} by {model}",
+  "reader.showPdf": "PDF source",
   "reader.card.problem": "Problem",
   "reader.card.problemPlaceholder":
     "What problem does this paper address, and why does it matter?",
@@ -895,6 +969,22 @@ export const en: Record<TKey, string> = {
   "reader.summarizeLabel": "Summary",
   "reader.translateLabel": "Translation",
   "reader.copySelection": "Copy",
+  "reader.addLinkedNote": "Add note",
+  "reader.addStandaloneNoteTitle": "Add a note on the current PDF page",
+  "reader.noteDrawActiveTitle": "Click and drag on the PDF to draw a note box",
+  "reader.noteDrawHint": "Drag on the PDF page to place a note box",
+  "reader.noteResizeTitle": "Drag to resize note box",
+  "reader.noteFontSmaller": "Smaller note text",
+  "reader.noteFontLarger": "Larger note text",
+  "reader.askSelection": "Ask",
+  "reader.askSelectionTitle": "Ask about selection",
+  "reader.askSelectionPlaceholder": "Ask a question about the selected passage…",
+  "reader.askSelectionHint": "Ctrl+Enter to send",
+  "reader.askSelectionSend": "Ask",
+  "reader.askSelectionFailed": "Question failed: {message}",
+  "reader.standaloneNoteText": "Page {page} note",
+  "reader.linkedNote": "Highlight note",
+  "reader.linkedNotePlaceholder": "A short note for this highlighted sentence…",
   "reader.copyBibtex": "Copy BibTeX",
   "reader.toggleHighlights": "Collapse / expand highlights panel",
   "reader.toggleWorkspace": "Collapse / expand notes panel",
@@ -942,6 +1032,8 @@ export const en: Record<TKey, string> = {
   "graph.noGraph": "No relationships yet",
   "graph.noGraphHint":
     "Create links between papers manually, or use AI Discover to find implicit connections.",
+  "graph.largeMode":
+    "Large graph mode: {nodes} nodes and {edges} edges. Only the selected node label is shown and arrows are simplified to keep interaction responsive.",
   "graph.addLink": "Add link",
   "graph.addLinkTitle": "Create a relationship between two papers",
   "graph.sourcePaper": "Source paper",
@@ -1093,15 +1185,15 @@ export const en: Record<TKey, string> = {
   "settings.tab.tools": "Tools",
   "pdfMarkdown.title": "PDF to Markdown",
   "pdfMarkdown.description":
-    "After importing or binding a PDF, generate document.md automatically and index it for full-text retrieval. MinerU failures fall back to local conversion.",
+    "After importing or binding a PDF, generate document.md automatically and index it for full-text retrieval. MinerU is the default; failures fall back to local text conversion.",
   "pdfMarkdown.docsLink": "MinerU docs",
   "pdfMarkdown.engineLabel": "Conversion engine",
-  "pdfMarkdown.engine.local": "Local lopdf",
+  "pdfMarkdown.engine.local": "Local text fallback",
   "pdfMarkdown.engine.localHint":
-    "Default option, no network required. Quality depends on the PDF font and text layer.",
+    "Offline fallback using the PDF text layer. Quality depends on the PDF font and embedded text.",
   "pdfMarkdown.engine.agent": "MinerU Agent API",
   "pdfMarkdown.engine.agentHint":
-    "No token required. Best for PDFs within 10MB / 20 pages. Uses network parsing.",
+    "Default option. No token required. Best for PDFs within 10MB / 20 pages. Uses network parsing, then falls back locally if MinerU fails.",
   "pdfMarkdown.engine.precise": "MinerU Precise API",
   "pdfMarkdown.engine.preciseHint":
     "Requires a token, uses the vlm model, and targets higher-quality parsing.",
@@ -1189,6 +1281,12 @@ export const en: Record<TKey, string> = {
   "relation.competes_with": "Competes with",
 
   "graph.concepts": "Concepts",
+  "graph.edge.citation": "Citation",
+  "graph.edge.similar": "Similar",
+  "graph.edge.manual": "Manual relation",
+  "graph.edge.concept": "Concept relation",
+  "graph.deleteLink": "Delete relation",
+  "graph.confirmDeleteLink": "Delete this relation?",
 
   "update.section": "App updates",
   "update.sectionHint":

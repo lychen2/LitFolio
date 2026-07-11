@@ -47,6 +47,7 @@ export function SettingsPage() {
       link: null,
       topic_survey: null,
       ask: null,
+      lit_review: null,
     },
   });
   useEffect(() => { if (data) setDraft(data); }, [data]);

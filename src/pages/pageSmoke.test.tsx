@@ -6,18 +6,33 @@ import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { invokeMockCommand } from "@/test/tauriMockCommands";
+import { AskPage } from "./AskPage";
+import { BrowsePage } from "./BrowsePage";
+import { CandidateInboxPage } from "./CandidateInboxPage";
+import { ComparePage } from "./ComparePage";
+import { FeedsPage } from "./FeedsPage";
+import { GraphPage } from "./GraphPage";
 import { ImportPage } from "./ImportPage";
 import { LibraryPage } from "./LibraryPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { ReaderPage } from "./ReaderPage";
 import { SettingsPage } from "./SettingsPage";
+import { TopicPage } from "./TopicPage";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((command: string) => Promise.resolve(mockInvoke(command))),
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => undefined)),
+}));
+
 vi.mock("./reader/PdfPane", () => ({
   PdfPane: () => <div data-testid="pdf-pane" />,
+}));
+
+vi.mock("./graph/NetworkGraphView", () => ({
+  NetworkGraphView: () => <div data-testid="network-graph" />,
 }));
 
 describe("page smoke render", () => {
@@ -35,12 +50,50 @@ describe("page smoke render", () => {
     ).toContain("第 1 步");
   });
 
+  it("renders the DOI import route with a prefilled DOI", () => {
+    expect(
+      renderPage(
+        <ImportPage />,
+        "/import?tab=arxiv_doi&link=https%3A%2F%2Fdoi.org%2F10.1145%2F3530819",
+        "/import"
+      )
+    ).toContain("10.1145/3530819");
+  });
+
   it("renders the settings shell", () => {
     expect(renderPage(<SettingsPage />, "/settings")).toContain("设置");
   });
 
   it("renders the projects shell", () => {
     expect(renderPage(<ProjectsPage />, "/projects")).toContain("研究项目");
+  });
+
+  it("renders the topic shell", () => {
+    expect(renderPage(<TopicPage />, "/topic")).toContain("生成综述");
+  });
+
+  it("renders the browse shell", () => {
+    expect(renderPage(<BrowsePage />, "/browse")).toContain("arXiv 最新提交");
+  });
+
+  it("renders the feeds shell", () => {
+    expect(renderPage(<FeedsPage />, "/feeds")).toContain("RSS 订阅");
+  });
+
+  it("renders the candidate inbox shell", () => {
+    expect(renderPage(<CandidateInboxPage />, "/candidates")).toContain("候选池");
+  });
+
+  it("renders the ask shell", () => {
+    expect(renderPage(<AskPage />, "/ask")).toContain("提问");
+  });
+
+  it("renders the graph shell", () => {
+    expect(renderPage(<GraphPage />, "/graph")).toContain("知识图谱");
+  });
+
+  it("renders the compare shell", () => {
+    expect(renderPage(<ComparePage />, "/compare")).toContain("Comparisons");
   });
 
   it("renders the reader route while paper data is loading", () => {

@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Result;
 use tauri::{AppHandle, State};
+use tracing::Instrument;
 
 use super::events::emit_or_warn;
 use crate::ai::{active_profile_for_task, load_config, TaskKind};
@@ -22,10 +24,46 @@ pub async fn graph_data(
     state: State<'_, Arc<AppState>>,
     filter: GraphFilter,
 ) -> Result<GraphData, String> {
-    PaperLinkRepo::new(&state.pool)
+    let started = Instant::now();
+    let include_concepts = filter.include_concepts.unwrap_or(true);
+    let relation_count = filter.relations.as_ref().map(Vec::len).unwrap_or(0);
+    let paper_id_count = filter.paper_ids.as_ref().map(Vec::len).unwrap_or(0);
+    let min_confidence = filter.min_confidence.unwrap_or(0.0);
+    let result = PaperLinkRepo::new(&state.pool)
         .graph_data(&filter)
+        .instrument(tracing::info_span!(
+            "graph_data",
+            include_concepts,
+            relation_count,
+            paper_id_count,
+            min_confidence
+        ))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    match &result {
+        Ok(graph) => tracing::info!(
+            command = "graph_data",
+            include_concepts,
+            relation_count,
+            paper_id_count,
+            min_confidence,
+            node_count = graph.nodes.len(),
+            edge_count = graph.edges.len(),
+            elapsed_ms = started.elapsed().as_millis(),
+            "graph command completed"
+        ),
+        Err(error) => tracing::error!(
+            command = "graph_data",
+            include_concepts,
+            relation_count,
+            paper_id_count,
+            min_confidence,
+            error = %error,
+            elapsed_ms = started.elapsed().as_millis(),
+            "graph command failed"
+        ),
+    }
+    result
 }
 
 // ─── Manual link CRUD ─────────────────────────────────────────────────────

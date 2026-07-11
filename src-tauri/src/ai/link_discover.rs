@@ -4,8 +4,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::client::{chat_complete, ChatMessage};
-use super::profile::LlmProfile;
+use super::client::{chat_complete_for_task, ChatMessage};
+use super::profile::{LlmProfile, TaskKind};
 use crate::storage::Paper;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ pub async fn discover_links(
                 content: user_prompt,
             },
         ];
-        let response = chat_complete(http, profile, &messages).await?;
+        let response = chat_complete_for_task(http, profile, TaskKind::Link, &messages).await?;
         let parsed = parse_discovered_links(&response.content, &batch);
         all_links.extend(parsed);
     }

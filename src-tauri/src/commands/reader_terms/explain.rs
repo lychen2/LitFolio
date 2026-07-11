@@ -12,7 +12,9 @@ use tauri::State;
 
 use super::candidates::CandidateTerm;
 use super::evidence;
-use crate::ai::{active_profile_for_task, chat_complete, load_config, ChatMessage, TaskKind};
+use crate::ai::{
+    active_profile_for_task, chat_complete_for_task, load_config, ChatMessage, TaskKind,
+};
 use crate::commands::term_filter;
 use crate::storage::Paper;
 use crate::AppState;
@@ -42,9 +44,10 @@ pub(super) async fn explain_terms(
     let user_content = crate::ai::prompts::EXPLAIN_TERMS_USER
         .replace("{title}", &paper.title)
         .replace("{items}", &items);
-    let resp = chat_complete(
+    let resp = chat_complete_for_task(
         &state.http,
         &profile,
+        TaskKind::Tag,
         &[
             ChatMessage {
                 role: "system".into(),

@@ -1,19 +1,10 @@
 import { useT } from "@/i18n/I18nProvider";
 
 const RELATION_COLORS: Record<string, string> = {
-  extends: "border-violet-400",
-  contradicts: "border-red-400",
-  compares: "border-amber-400",
-  builds_on: "border-sky-400",
-  uses_method: "border-teal-400",
-  related: "border-gray-400",
-  has_concept: "border-emerald-300",
-  discusses: "border-emerald-300",
-  replaces: "border-pink-400",
-  extends_concept: "border-purple-400",
-  requires: "border-orange-400",
-  enables: "border-green-400",
-  competes_with: "border-red-500",
+  citation: "border-sky-400",
+  similar: "border-violet-400",
+  manual: "border-amber-400",
+  concept: "border-emerald-300",
 };
 
 export function GraphLegend() {
@@ -38,7 +29,7 @@ export function GraphLegend() {
         {Object.entries(RELATION_COLORS).map(([rel, cls]) => (
           <div key={rel} className="flex items-center gap-2">
             <span className={`h-0.5 w-4 border-t-2 ${cls}`} />
-            <span className="text-litera-mute">{t(`relation.${rel}` as any)}</span>
+            <span className="text-litera-mute">{t(`graph.edge.${rel}` as any)}</span>
           </div>
         ))}
       </div>

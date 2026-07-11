@@ -275,10 +275,19 @@ pub async fn arxiv_add_with_pdf(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
 ) -> Result<Paper, String> {
-    let draft = fetch_arxiv(&state.http, &arxiv_id)
+    let result = arxiv_add_with_pdf_inner(state.inner().as_ref(), &arxiv_id).await;
+    log_import_command_result("arxiv_pdf", Some(arxiv_id.as_str()), &result);
+    result
+}
+
+async fn arxiv_add_with_pdf_inner(state: &AppState, arxiv_id: &str) -> Result<Paper, String> {
+    let draft = fetch_arxiv(&state.http, arxiv_id)
         .await
         .map_err(|e| e.to_string())?;
-    let resolved_id = draft.arxiv_id.clone().unwrap_or(arxiv_id.clone());
+    let resolved_id = draft
+        .arxiv_id
+        .clone()
+        .unwrap_or_else(|| arxiv_id.to_string());
     let stripped = resolved_id
         .split('v')
         .next()
@@ -323,7 +332,13 @@ pub async fn doi_add_with_pdf(
     state: State<'_, Arc<AppState>>,
     doi: String,
 ) -> Result<Paper, String> {
-    let draft = fetch_doi(&state.http, &doi)
+    let result = doi_add_with_pdf_inner(state.inner().as_ref(), &doi).await;
+    log_import_command_result("doi_pdf", Some(doi.as_str()), &result);
+    result
+}
+
+async fn doi_add_with_pdf_inner(state: &AppState, doi: &str) -> Result<Paper, String> {
+    let draft = fetch_doi(&state.http, doi)
         .await
         .map_err(|e| e.to_string())?;
     let normalized_doi = draft
@@ -442,6 +457,29 @@ pub async fn doi_add_with_pdf(
         doi_error_code_for_crossref(crossref_outcome),
         detail,
     ))
+}
+
+fn log_import_command_result(
+    import_source: &'static str,
+    identifier: Option<&str>,
+    result: &Result<Paper, String>,
+) {
+    match result {
+        Ok(paper) => tracing::info!(
+            import_source,
+            identifier = identifier.unwrap_or(""),
+            paper_id = %paper.id,
+            imported_count = 1,
+            failed_count = 0,
+            "paper import completed"
+        ),
+        Err(error) => tracing::warn!(
+            import_source,
+            identifier = identifier.unwrap_or(""),
+            failure_reason = %error,
+            "paper import failed"
+        ),
+    }
 }
 
 #[cfg(test)]

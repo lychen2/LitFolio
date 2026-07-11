@@ -73,6 +73,16 @@ async fn insert_list_update_delete_roundtrip() {
     let list = repo.list_by_paper("A").await.unwrap();
     assert!(list[0].note.is_none());
 
+    let moved_rect = serde_json::json!({
+        "pageNumber": 1,
+        "boundingRect": {"x1": 32, "y1": 48, "x2": 232, "y2": 138, "width": 612, "height": 792},
+        "rects": [{"x1": 32, "y1": 48, "x2": 232, "y2": 138, "width": 612, "height": 792, "pageNumber": 1}]
+    });
+    repo.update_rect(&h1.id, &moved_rect).await.unwrap();
+    let moved = repo.get(&h1.id).await.unwrap().unwrap();
+    assert_eq!(moved.rect, moved_rect);
+
+
     repo.update_translation(
         &h1.id,
         &HighlightTranslationUpdate {

@@ -54,6 +54,18 @@ pub async fn highlight_update_note(
 }
 
 #[tauri::command]
+pub async fn highlight_update_rect(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    rect: serde_json::Value,
+) -> Result<(), String> {
+    HighlightRepo::new(&state.pool)
+        .update_rect(&id, &rect)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn highlight_update_label(
     state: State<'_, Arc<AppState>>,
     id: String,

@@ -207,9 +207,12 @@ export interface PaperLink {
   updated_at: number;
 }
 
+export type GraphNodeType = "paper" | "concept" | "tag" | "folder";
+export type GraphEdgeType = "citation" | "similar" | "manual" | "concept";
+
 export interface GraphNode {
   id: string;
-  node_type: "paper" | "concept";
+  node_type: GraphNodeType;
   label: string;
   sublabel: string | null;
   year?: number;
@@ -221,7 +224,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  edge_type: string;
+  edge_type: GraphEdgeType;
+  relation?: string | null;
   source_type: "user" | "ai" | "derived";
   confidence: number;
   snippet: string | null;

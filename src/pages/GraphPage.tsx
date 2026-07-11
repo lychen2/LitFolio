@@ -10,6 +10,7 @@ import { GraphSidebar } from "./graph/GraphSidebar";
 import { GraphLegend } from "./graph/GraphLegend";
 import { LinkCreateDialog } from "./graph/LinkCreateDialog";
 import { GraphDecisionPanel } from "./graph/GraphDecisionPanel";
+import { graphRenderProfile } from "./graph/graphPerformance";
 
 const ALL_RELATIONS = ["extends", "contradicts", "compares", "builds_on", "uses_method", "related"];
 
@@ -55,6 +56,10 @@ export function GraphPage() {
   });
 
   const gd = graphData ?? { nodes: [], edges: [] };
+  const renderProfile = graphRenderProfile({
+    nodeCount: gd.nodes.length,
+    edgeCount: gd.edges.length,
+  });
 
   // Selected node
   const selectedNode = gd.nodes.find((n) => n.id === selectedNodeId) ?? null;
@@ -180,6 +185,11 @@ export function GraphPage() {
               width={size.w}
               height={size.h}
             />
+          )}
+          {viewMode === "network" && renderProfile.mode !== "full" && (
+            <div className="pointer-events-none absolute left-4 top-4 rounded border border-litera-line bg-litera-paper/90 px-3 py-2 text-xs text-litera-mute shadow-sm">
+              {t("graph.largeMode", { nodes: gd.nodes.length, edges: gd.edges.length })}
+            </div>
           )}
           {gd.nodes.length > 0 && <GraphLegend />}
         </div>

@@ -17,6 +17,27 @@ pub struct PdfFailure {
     pub error: String,
 }
 
+pub fn log_pdf_import_summary(
+    import_source: &'static str,
+    imported_count: usize,
+    failed: &[PdfFailure],
+) {
+    for failure in failed {
+        tracing::warn!(
+            import_source,
+            path = %failure.path,
+            failure_reason = %failure.error,
+            "PDF import item failed"
+        );
+    }
+    tracing::info!(
+        import_source,
+        imported_count,
+        failed_count = failed.len(),
+        "PDF import completed"
+    );
+}
+
 pub async fn attach_imported_pdf_to_existing(
     repo: &PaperRepo<'_>,
     paths: &crate::storage::LibraryPaths,
@@ -61,7 +82,7 @@ async fn markdown_for_configured_engine(
     let config = match load_config(paths) {
         Ok(config) => config.pdf_markdown,
         Err(error) => {
-            tracing::warn!(paper_id, error = %error, "failed to load PDF Markdown engine config; using local engine");
+            tracing::warn!(paper_id, error = %error, "failed to load PDF Markdown engine config; using local text fallback");
             return extract_local_markdown(pdf_path).await;
         }
     };
@@ -74,7 +95,7 @@ async fn markdown_for_configured_engine(
             {
                 Ok(markdown) => Ok(markdown),
                 Err(error) => {
-                    tracing::warn!(paper_id, error = %error, "MinerU Agent PDF Markdown conversion failed; falling back to local engine");
+                    tracing::warn!(paper_id, error = %error, "MinerU Agent PDF Markdown conversion failed; falling back to local text conversion");
                     extract_local_markdown(pdf_path).await
                 }
             }
@@ -86,7 +107,7 @@ async fn markdown_for_configured_engine(
             {
                 Ok(markdown) => Ok(markdown),
                 Err(error) => {
-                    tracing::warn!(paper_id, error = %error, "MinerU precise PDF Markdown conversion failed; falling back to local engine");
+                    tracing::warn!(paper_id, error = %error, "MinerU precise PDF Markdown conversion failed; falling back to local text conversion");
                     extract_local_markdown(pdf_path).await
                 }
             }

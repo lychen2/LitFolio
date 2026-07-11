@@ -74,7 +74,8 @@ const PDF_MARKDOWN_ENGINES = new Set([
   "mineru-agent",
   "mineru-precise",
 ]);
-const NODE_TYPES = new Set(["paper", "concept"]);
+const NODE_TYPES = new Set(["paper", "concept", "tag", "folder"]);
+const EDGE_TYPES = new Set(["citation", "similar", "manual", "concept"]);
 const EDGE_SOURCE_TYPES = new Set(["user", "ai", "derived"]);
 const SYNC_PREVIEW_DIRECTIONS = new Set<SyncPreviewDirection>(["push", "pull"]);
 const SYNC_PREVIEW_ACTIONS = new Set<SyncPreviewAction>([
@@ -553,6 +554,7 @@ function parseTaskAssignments(value: unknown, path: string): TaskAssignments {
     link: parseTaskBindingField(obj, "link", path),
     topic_survey: parseTaskBindingField(obj, "topic_survey", path),
     ask: parseTaskBindingField(obj, "ask", path),
+    lit_review: parseTaskBindingField(obj, "lit_review", path),
   };
 }
 
@@ -592,6 +594,7 @@ function parseGraphNode(value: unknown, path: string): GraphNode {
 
 function parseGraphEdge(value: unknown, path: string): GraphEdge {
   const obj = object(value, path);
+  const edgeType = enumStringField(obj, "edge_type", path, EDGE_TYPES);
   const sourceType = enumStringField(
     obj,
     "source_type",
@@ -602,7 +605,8 @@ function parseGraphEdge(value: unknown, path: string): GraphEdge {
     id: stringField(obj, "id", path),
     source: stringField(obj, "source", path),
     target: stringField(obj, "target", path),
-    edge_type: stringField(obj, "edge_type", path),
+    edge_type: edgeType as GraphEdge["edge_type"],
+    relation: "relation" in obj ? nullableStringField(obj, "relation", path) : null,
     source_type: sourceType as GraphEdge["source_type"],
     confidence: numberField(obj, "confidence", path),
     snippet: nullableStringField(obj, "snippet", path),

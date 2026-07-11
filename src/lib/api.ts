@@ -80,6 +80,7 @@ export type {
   ReadStatus,
   ReaderPaperTerm,
   ReaderTranslateResult,
+  ReaderMarkdownTranslationResult,
   Recommendation,
   ResearchProject,
   RelatedPaperTerm,

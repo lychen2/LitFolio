@@ -132,6 +132,21 @@ pub enum TaskKind {
     LitReview,
 }
 
+impl TaskKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Tldr => "tldr",
+            Self::QuickRead => "quick_read",
+            Self::Translate => "translate",
+            Self::Tag => "tag",
+            Self::Link => "link",
+            Self::TopicSurvey => "topic_survey",
+            Self::Ask => "ask",
+            Self::LitReview => "lit_review",
+        }
+    }
+}
+
 #[cfg(test)]
 impl LlmConfig {
     pub fn upsert(&mut self, p: LlmProfile) {

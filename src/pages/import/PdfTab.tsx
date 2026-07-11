@@ -5,6 +5,7 @@ import { api, pickPdfFiles } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import {
   duplicateStatusFromFailures,
+  formatPdfImportError,
   importJobId,
   titleFromPath,
   upsertImportJob,
@@ -49,29 +50,34 @@ export function PdfTab() {
     },
     onSuccess: (s, paths) => {
       const id = importJobId("pdf", paths.join("|"));
-      setResult({ ok: s.imported.length, failed: s.failed });
+      const failed = s.failed.map((item) => ({
+        path: item.path,
+        error: formatPdfImportError(item.error, t),
+      }));
+      setResult({ ok: s.imported.length, failed });
       setPicked([]);
       upsertImportJob({
         id,
         source: "pdf",
         title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
         subtitle: paths.map(titleFromPath).join(" · "),
-        status: s.failed.length > 0 ? "failed" : "completed",
+        status: failed.length > 0 ? "failed" : "completed",
         metadataStatus: s.imported.length > 0 ? "completed" : "failed",
         pdfStatus: s.imported.length > 0 ? "completed" : "failed",
-        duplicateStatus: duplicateStatusFromFailures(s.failed),
-        error: s.failed[0]?.error,
+        duplicateStatus: duplicateStatusFromFailures(failed),
+        error: failed[0]?.error,
         progress: {
           done: s.imported.length,
           total: paths.length,
-          failed: s.failed.length,
+          failed: failed.length,
         },
       });
       qc.invalidateQueries({ queryKey: ["papers"] });
       notifyRecentImportsChanged();
     },
     onError: (e: Error, paths) => {
-      setResult({ ok: 0, failed: [{ path: "(all)", error: e.message }] });
+      const error = formatPdfImportError(e.message, t);
+      setResult({ ok: 0, failed: [{ path: "(all)", error }] });
       upsertImportJob({
         id: importJobId("pdf", paths.join("|")),
         source: "pdf",
@@ -80,13 +86,13 @@ export function PdfTab() {
         status: "failed",
         metadataStatus: "failed",
         pdfStatus: "failed",
-        duplicateStatus: duplicateStatusFromFailures([{ error: e.message }]),
-        error: e.message,
+        duplicateStatus: duplicateStatusFromFailures([{ error }]),
+        error,
         progress: { done: 0, total: paths.length, failed: paths.length },
       });
     },
   });
-  const folderMut = useFolderImportMutation(setFolderProgress, setResult);
+  const folderMut = useFolderImportMutation(setFolderProgress, setResult, t);
 
   async function pick() {
     const files = await pickPdfFiles();
@@ -128,7 +134,8 @@ export function PdfTab() {
 
 function useFolderImportMutation(
   setFolderProgress: (progress: FolderProgress | null) => void,
-  setResult: (result: ImportResult) => void
+  setResult: (result: ImportResult) => void,
+  t: ReturnType<typeof useT>
 ) {
   const qc = useQueryClient();
   return useMutation({
@@ -180,29 +187,34 @@ function useFolderImportMutation(
       }
     },
     onSuccess: (s, dirPath) => {
-      setResult({ ok: s.imported.length, failed: s.failed });
+      const failed = s.failed.map((item) => ({
+        path: item.path,
+        error: formatPdfImportError(item.error, t),
+      }));
+      setResult({ ok: s.imported.length, failed });
       setFolderProgress(null);
       upsertImportJob({
         id: importJobId("folder", dirPath),
         source: "folder",
         title: titleFromPath(dirPath),
         subtitle: dirPath,
-        status: s.failed.length > 0 ? "failed" : "completed",
+        status: failed.length > 0 ? "failed" : "completed",
         metadataStatus: s.imported.length > 0 ? "completed" : "failed",
         pdfStatus: s.imported.length > 0 ? "completed" : "failed",
-        duplicateStatus: duplicateStatusFromFailures(s.failed),
-        error: s.failed[0]?.error,
+        duplicateStatus: duplicateStatusFromFailures(failed),
+        error: failed[0]?.error,
         progress: {
           done: s.imported.length,
-          total: s.imported.length + s.failed.length,
-          failed: s.failed.length,
+          total: s.imported.length + failed.length,
+          failed: failed.length,
         },
       });
       qc.invalidateQueries({ queryKey: ["papers"] });
       notifyRecentImportsChanged();
     },
     onError: (e: Error, dirPath) => {
-      setResult({ ok: 0, failed: [{ path: "(folder)", error: e.message }] });
+      const error = formatPdfImportError(e.message, t);
+      setResult({ ok: 0, failed: [{ path: "(folder)", error }] });
       setFolderProgress(null);
       upsertImportJob({
         id: importJobId("folder", dirPath),
@@ -212,8 +224,8 @@ function useFolderImportMutation(
         status: "failed",
         metadataStatus: "failed",
         pdfStatus: "failed",
-        duplicateStatus: duplicateStatusFromFailures([{ error: e.message }]),
-        error: e.message,
+        duplicateStatus: duplicateStatusFromFailures([{ error }]),
+        error,
       });
     },
   });

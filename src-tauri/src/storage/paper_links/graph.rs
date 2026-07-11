@@ -225,7 +225,8 @@ fn link_edges(links: &[PaperLink]) -> Vec<GraphEdge> {
             id: format!("link:{}", link.id),
             source: link.source_paper_id.clone(),
             target: link.target_paper_id.clone(),
-            edge_type: link.relation.clone(),
+            edge_type: paper_link_edge_type(link).into(),
+            relation: Some(link.relation.clone()),
             source_type: link.source_type.clone(),
             confidence: link.confidence,
             snippet: link.snippet.clone(),
@@ -269,13 +270,54 @@ fn row_to_concept_edge(row: sqlx::sqlite::SqliteRow) -> Result<GraphEdge> {
         id: format!("term:{paper_id}:{term}"),
         source: paper_id,
         target: format!("concept:{term}"),
-        edge_type: "has_concept".into(),
+        edge_type: "concept".into(),
+        relation: Some("has_concept".into()),
         source_type: "derived".into(),
         confidence: 1.0,
         snippet: None,
     })
 }
 
+fn paper_link_edge_type(link: &PaperLink) -> &'static str {
+    match link.source_type.as_str() {
+        "user" => "manual",
+        "ai" => "similar",
+        _ => "manual",
+    }
+}
+
 fn placeholders(count: usize) -> String {
     vec!["?"; count].join(",")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_edges_keep_relation_while_normalizing_edge_type() {
+        let edges = link_edges(&[
+            paper_link(1, "user", "builds_on"),
+            paper_link(2, "ai", "related"),
+        ]);
+
+        assert_eq!(edges[0].edge_type, "manual");
+        assert_eq!(edges[0].relation.as_deref(), Some("builds_on"));
+        assert_eq!(edges[1].edge_type, "similar");
+        assert_eq!(edges[1].relation.as_deref(), Some("related"));
+    }
+
+    fn paper_link(id: i64, source_type: &str, relation: &str) -> PaperLink {
+        PaperLink {
+            id,
+            source_paper_id: format!("p{id}"),
+            target_paper_id: format!("p{}", id + 1),
+            relation: relation.into(),
+            source_type: source_type.into(),
+            confidence: 1.0,
+            snippet: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
 }

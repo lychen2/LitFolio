@@ -1,6 +1,7 @@
 import { type Ref } from "react";
 import {
   AlertCircle,
+  BookOpen,
   ExternalLink,
   FolderOpen,
   Loader2,
@@ -8,7 +9,7 @@ import {
   Save,
   Search,
 } from "lucide-react";
-import { type ArxivDraft } from "@/lib/api";
+import { type Paper, type ArxivDraft } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { type TKey } from "@/i18n/dict";
 import {
@@ -25,6 +26,8 @@ export function IdentifierPanel({
   fetching,
   error,
   success,
+  existingPaper,
+  onOpenExisting,
   onSubmit,
 }: {
   value: string;
@@ -32,6 +35,8 @@ export function IdentifierPanel({
   fetching: boolean;
   error: string | null;
   success: string | null;
+  existingPaper?: Paper | null;
+  onOpenExisting?: () => void;
   onSubmit: () => void;
 }) {
   const t = useT();
@@ -68,6 +73,16 @@ export function IdentifierPanel({
       {error && <div className="mt-3 text-sm text-red-400/90">✕ {error}</div>}
       {success && (
         <div className="mt-3 text-sm text-litera-accent">{success}</div>
+      )}
+      {existingPaper && onOpenExisting && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
+          <span className="min-w-0 flex-1 truncate">
+            {t("import.existingDoi", { title: existingPaper.title })}
+          </span>
+          <button type="button" onClick={onOpenExisting} className="litera-btn px-2 py-1 text-xs">
+            <BookOpen className="h-3.5 w-3.5" /> {t("import.openExisting")}
+          </button>
+        </div>
       )}
     </div>
   );

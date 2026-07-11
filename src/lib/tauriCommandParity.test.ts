@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { registeredMockCommands } from "@/test/tauriMockCommands";
 
 declare const __dirname: string;
 declare function require(moduleName: string): unknown;
@@ -85,6 +86,15 @@ describe("Tauri command parity", () => {
     const missing = [...frontend.entries()]
       .filter(([name]) => !backend.has(name))
       .map(([name, files]) => `${name} (${[...new Set(files)].join(", ")})`)
+      .sort();
+
+    expect(missing).toEqual([]);
+  });
+
+  it("keeps registered mock commands backed by Rust commands", () => {
+    const backend = backendCommandNames();
+    const missing = registeredMockCommands
+      .filter((name) => !backend.has(name))
       .sort();
 
     expect(missing).toEqual([]);

@@ -12,8 +12,8 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::client::{chat_complete, ChatMessage};
-use super::profile::LlmProfile;
+use super::client::{chat_complete_for_task, ChatMessage};
+use super::profile::{LlmProfile, TaskKind};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AnnotateInputPaper {
@@ -122,7 +122,7 @@ pub async fn annotate_survey(
             content: user_content,
         },
     ];
-    let resp = chat_complete(client, profile, &messages).await?;
+    let resp = chat_complete_for_task(client, profile, TaskKind::TopicSurvey, &messages).await?;
     let reply = parse_annotations(&resp.content)
         .with_context(|| format!("LLM returned: {}", truncate(&resp.content, 600)))?;
     if reply.annotations.is_empty() {

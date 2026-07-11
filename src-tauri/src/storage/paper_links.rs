@@ -214,3 +214,94 @@ fn row_to_link(row: sqlx::sqlite::SqliteRow) -> Result<PaperLink> {
         updated_at: row.try_get("updated_at")?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::{open_pool, run_migrations, Paper, PaperRepo, ReadStatus};
+    use std::path::PathBuf;
+
+    async fn temp_pool() -> (Pool, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("litera-links-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("library.db");
+        let pool = open_pool(&db).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        (pool, dir)
+    }
+
+    #[tokio::test]
+    async fn create_link_persists_and_appears_in_graph() {
+        let (pool, dir) = temp_pool().await;
+        let papers = PaperRepo::new(&pool);
+        papers.insert(&paper("p1")).await.unwrap();
+        papers.insert(&paper("p2")).await.unwrap();
+
+        let repo = PaperLinkRepo::new(&pool);
+        let created = repo
+            .create(
+                "p1",
+                "p2",
+                "builds_on",
+                "user",
+                1.0,
+                Some("uses the baseline"),
+            )
+            .await
+            .unwrap();
+        let fetched = repo.get(created.id).await.unwrap();
+        assert_eq!(fetched.source_paper_id, "p1");
+        assert_eq!(fetched.target_paper_id, "p2");
+        assert_eq!(fetched.relation, "builds_on");
+
+        let graph = repo
+            .graph_data(&GraphFilter {
+                relations: Some(vec!["builds_on".into()]),
+                min_confidence: None,
+                include_concepts: Some(false),
+                paper_ids: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.edges[0].edge_type, "manual");
+        assert_eq!(graph.edges[0].relation.as_deref(), Some("builds_on"));
+        assert_eq!(graph.edges[0].snippet.as_deref(), Some("uses the baseline"));
+
+        pool.close().await;
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn paper(id: &str) -> Paper {
+        let now = Utc::now().timestamp();
+        Paper {
+            id: id.into(),
+            title: format!("Paper {id}"),
+            authors: vec!["A. Author".into()],
+            year: Some(2026),
+            venue: None,
+            doi: Some(format!("10.123/{id}")),
+            arxiv_id: None,
+            abstract_text: Some("abstract".into()),
+            pdf_path: Some(format!("/tmp/{id}.pdf")),
+            note_path: None,
+            added_at: now,
+            updated_at: now,
+            read_status: ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        }
+    }
+}

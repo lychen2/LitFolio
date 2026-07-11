@@ -34,6 +34,37 @@ fn roundtrip_persists_profile() {
 }
 
 #[test]
+fn default_pdf_markdown_engine_is_mineru_agent() {
+    let cfg = LlmConfig::default();
+    assert_eq!(
+        cfg.pdf_markdown.engine,
+        crate::mineru::PdfMarkdownEngine::MineruAgent
+    );
+}
+
+#[test]
+fn load_migrates_local_pdf_markdown_engine_to_mineru_agent() {
+    let (paths, dir) = tmp_paths();
+    let raw = r#"{
+        "profiles": [],
+        "pdf_markdown": { "engine": "local", "mineru_token": "" }
+    }"#;
+    std::fs::write(paths.config_file(), raw).unwrap();
+
+    let loaded = load_config(&paths).unwrap();
+    assert_eq!(
+        loaded.pdf_markdown.engine,
+        crate::mineru::PdfMarkdownEngine::MineruAgent
+    );
+    let persisted = read_config_file(&paths);
+    assert_eq!(
+        persisted.pdf_markdown.engine,
+        crate::mineru::PdfMarkdownEngine::MineruAgent
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn upsert_overwrites_same_name() {
     let mut cfg = LlmConfig::default();
     cfg.upsert(sample_profile("p1"));
@@ -67,6 +98,18 @@ fn task_binding_overrides_chat_model() {
     assert_eq!(p2.chat_model, "gpt-5.5");
     let p3 = active_profile_for_task(&cfg, TaskKind::Translate).unwrap();
     assert_eq!(p3.chat_model, "gpt-4o-mini");
+}
+
+#[test]
+fn task_kind_as_str_matches_log_field_values() {
+    assert_eq!(TaskKind::Tldr.as_str(), "tldr");
+    assert_eq!(TaskKind::QuickRead.as_str(), "quick_read");
+    assert_eq!(TaskKind::Translate.as_str(), "translate");
+    assert_eq!(TaskKind::Tag.as_str(), "tag");
+    assert_eq!(TaskKind::Link.as_str(), "link");
+    assert_eq!(TaskKind::TopicSurvey.as_str(), "topic_survey");
+    assert_eq!(TaskKind::Ask.as_str(), "ask");
+    assert_eq!(TaskKind::LitReview.as_str(), "lit_review");
 }
 
 fn task_binding(profile: &str, model: Option<&str>) -> Option<TaskBinding> {

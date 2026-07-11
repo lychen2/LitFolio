@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -10,6 +11,29 @@ import { useT } from "@/i18n/I18nProvider";
 import { MarkdownView } from "@/components/MarkdownView";
 import { WorkflowCard } from "./ask/WorkflowCard";
 import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
+
+export function askSourceReaderHref(source: { paper_id: string }): string | null {
+  return source.paper_id ? `/reader/${source.paper_id}` : null;
+}
+
+export function summarizeAskContext(result: { sources: AskSource[] }): {
+  papers: number;
+  highlights: number;
+  documents: number;
+} {
+  const papers = new Set<string>();
+  let highlights = 0;
+  let documents = 0;
+  for (const source of result.sources) {
+    if (source.paper_id) papers.add(source.paper_id);
+    const lines = source.snippet.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("Highlight:")) highlights += 1;
+      if (line.startsWith("Document Markdown:")) documents += 1;
+    }
+  }
+  return { papers: papers.size, highlights, documents };
+}
 
 const SOURCE_LIMIT = 8;
 const ASK_RETRIEVAL_LIMIT = 24;
@@ -267,7 +291,7 @@ export function AskPage() {
                       <div className="mt-4 pt-3 border-t border-litera-line">
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-xs text-litera-mute">
-                            {turn.result.model || "—"} · {turn.result.prompt_tokens + turn.result.completion_tokens} tk · {t("ask.citationCount", { count: turn.result.sources.length })}
+                            {turn.result.model || "—"} · {turn.result.prompt_tokens + turn.result.completion_tokens} tk · {t("ask.contextSummary", summarizeAskContext(turn.result))}
                           </div>
                           <div className="flex items-center gap-2">
                             <button
@@ -493,7 +517,16 @@ function SourcesInline({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="truncate text-xs font-medium text-litera-text">
-                  [{index + 1}] {source.title}
+                  {askSourceReaderHref(source) ? (
+                    <Link
+                      to={askSourceReaderHref(source)!}
+                      className="hover:text-litera-accent"
+                    >
+                      [{index + 1}] {source.title}
+                    </Link>
+                  ) : (
+                    <>[{index + 1}] {source.title}</>
+                  )}
                 </div>
                 <div className="mt-0.5 text-[11px] text-litera-mute">
                   {formatSourceMeta(source)}

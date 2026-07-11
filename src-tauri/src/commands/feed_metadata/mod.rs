@@ -99,13 +99,15 @@ async fn resolve_feed_item_metadata(
     match search_doi_by_title(&state.http, &item.title).await {
         Ok(Some(draft)) => {
             tracing::info!(item_id = %item.id, doi = ?draft.doi, "CrossRef title search returned result");
-            // Temporarily bypass confidence check to debug why it's failing
-            if let Some(doi) = draft.doi.as_deref() {
-                if let Ok(crossref) = fetch_doi(&state.http, doi).await {
-                    return (Some(crossref), Some("crossref_title"));
+            if is_confident_crossref_title(item, &draft) {
+                if let Some(doi) = draft.doi.as_deref() {
+                    if let Ok(crossref) = fetch_doi(&state.http, doi).await {
+                        return (Some(crossref), Some("crossref_title"));
+                    }
                 }
+                return (Some(draft), Some("crossref_title"));
             }
-            return (Some(draft), Some("crossref_title"));
+            tracing::debug!(item_id = %item.id, feed_title = %item.title, crossref_title = %draft.title, "CrossRef title search result rejected by confidence check");
         }
         Ok(None) => {
             tracing::debug!(item_id = %item.id, "CrossRef title search returned no results");
@@ -216,7 +218,7 @@ fn title_is_exact_or_near(left: &str, right: &str) -> bool {
     let right = normalize_title(right);
     let exact_match = left == right;
     let near_match = normalized_titles_are_near(&left, &right);
-    
+
     tracing::debug!(
         feed_title = %left,
         crossref_title = %right,
@@ -224,7 +226,7 @@ fn title_is_exact_or_near(left: &str, right: &str) -> bool {
         near = near_match,
         "title confidence check"
     );
-    
+
     !left.is_empty() && !right.is_empty() && (exact_match || near_match)
 }
 
@@ -279,7 +281,6 @@ fn timestamp_year(timestamp: i64) -> Option<i32> {
 mod tests {
     use super::*;
 
-
     fn feed_item(link: Option<&str>, summary: Option<&str>) -> FeedItem {
         FeedItem {
             id: "feed-item-1".into(),
@@ -297,5 +298,45 @@ mod tests {
             metadata_source: None,
             metadata_checked_at: None,
         }
+    }
+
+    fn draft_with_title(title: &str) -> PaperDraft {
+        PaperDraft {
+            title: title.into(),
+            authors: vec![],
+            year: None,
+            venue: None,
+            doi: Some("10.1234/example".into()),
+            arxiv_id: None,
+            abstract_text: None,
+        }
+    }
+
+    #[test]
+    fn crossref_title_confidence_accepts_normalized_exact_match() {
+        let item = feed_item(None, None);
+
+        assert!(is_confident_crossref_title(
+            &item,
+            &draft_with_title("A feed paper!")
+        ));
+    }
+
+    #[test]
+    fn crossref_title_confidence_rejects_unrelated_result() {
+        let item = feed_item(None, None);
+
+        assert!(!is_confident_crossref_title(
+            &item,
+            &draft_with_title("Unrelated CrossRef Result")
+        ));
+    }
+
+    #[test]
+    fn title_confidence_accepts_near_long_titles() {
+        assert!(title_is_exact_or_near(
+            "A Practical Method for Reliable Feed Metadata Matching",
+            "A Practical Method for Reliable Feed Metadata Maching",
+        ));
     }
 }

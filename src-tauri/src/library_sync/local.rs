@@ -22,6 +22,16 @@ pub struct SyncManifest {
     pub files: Vec<ManifestFile>,
 }
 
+impl SyncManifest {
+    fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    fn total_bytes(&self) -> u64 {
+        self.files.iter().map(|file| file.size).sum()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncConnectionResult {
     pub remote_root: String,
@@ -30,6 +40,9 @@ pub struct SyncConnectionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncReport {
     pub remote_root: String,
+    pub manifest_version: u8,
+    pub manifest_file_count: usize,
+    pub manifest_total_bytes: u64,
     pub file_count: usize,
     pub total_bytes: u64,
     pub skipped_count: usize,
@@ -56,6 +69,9 @@ pub struct SyncPreviewChange {
 pub struct SyncPreviewReport {
     pub direction: String,
     pub remote_root: String,
+    pub manifest_version: u8,
+    pub manifest_file_count: usize,
+    pub manifest_total_bytes: u64,
     pub add_count: usize,
     pub update_count: usize,
     pub delete_count: usize,
@@ -215,6 +231,9 @@ fn build_sync_preview(
     SyncPreviewReport {
         direction: direction.as_str().to_string(),
         remote_root,
+        manifest_version: source_manifest.version,
+        manifest_file_count: source_manifest.file_count(),
+        manifest_total_bytes: source_manifest.total_bytes(),
         add_count,
         update_count,
         delete_count,
@@ -271,6 +290,9 @@ impl Snapshot {
     ) -> SyncReport {
         SyncReport {
             remote_root,
+            manifest_version: self.manifest.version,
+            manifest_file_count: self.manifest.file_count(),
+            manifest_total_bytes: self.manifest.total_bytes(),
             file_count: stats.file_count,
             total_bytes: stats.total_bytes,
             skipped_count: stats.skipped_count,

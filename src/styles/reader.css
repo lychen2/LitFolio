@@ -65,6 +65,212 @@
   background-color: rgba(245, 196, 24, 0.85);
   outline: 2px solid rgba(245, 196, 24, 0.95);
 }
+.litera-pdf-note-draw-hint {
+  position: absolute;
+  top: 3rem;
+  left: 50%;
+  z-index: 22;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--litera-line);
+  border-radius: var(--litera-radius);
+  background: color-mix(in srgb, var(--litera-panel) 88%, transparent);
+  color: var(--litera-text);
+  font-size: 0.72rem;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+  pointer-events: none;
+}
+.litera-pdf-note-draw-cancel {
+  position: absolute;
+  top: 3rem;
+  right: 0.75rem;
+  z-index: 23;
+  pointer-events: auto;
+}
+.litera-pdf-note-draft {
+  position: absolute;
+  z-index: 17;
+  pointer-events: none;
+  border: 1px dashed color-mix(in srgb, var(--litera-accent2) 80%, transparent);
+  background: color-mix(in srgb, var(--litera-accent2) 12%, transparent);
+  border-radius: 0.5rem;
+}
+.litera-pdf-note-box {
+  position: absolute;
+  z-index: 18;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--litera-accent2) 40%, var(--litera-line));
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--litera-panel) 90%, transparent);
+  color: var(--litera-text);
+  box-shadow: 0 18px 45px rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+.litera-pdf-page-note-editor {
+  position: absolute;
+  z-index: 18;
+  pointer-events: auto;
+  display: block;
+  overflow: visible;
+  border: 1px dashed rgba(185, 28, 28, 0.45);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #b91c1c;
+  box-sizing: border-box;
+}
+.litera-pdf-page-note-toolbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1.45em;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35em;
+  min-height: 1.25em;
+  color: #991b1b;
+  font-size: 0.65em;
+  cursor: move;
+  user-select: none;
+}
+.litera-pdf-page-note-textarea {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0.1em 0.2em 0.35em;
+  color: #b91c1c;
+  font-size: inherit;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+.litera-pdf-page-note-textarea::placeholder {
+  color: rgba(185, 28, 28, 0.62);
+}
+.litera-pdf-page-note-status {
+  position: absolute;
+  left: 0;
+  bottom: -1.25em;
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  color: rgba(153, 27, 27, 0.72);
+  font-size: 0.62em;
+}
+.litera-pdf-dark .litera-pdf-page-note-editor,
+.litera-pdf-dark .litera-pdf-page-note-textarea {
+  color: #fca5a5;
+}
+.litera-pdf-dark .litera-pdf-page-note-editor {
+  border-color: rgba(252, 165, 165, 0.5);
+}
+.litera-pdf-dark .litera-pdf-page-note-toolbar,
+.litera-pdf-dark .litera-pdf-page-note-status {
+  color: rgba(252, 165, 165, 0.78);
+}
+.litera-pdf-note-font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  margin-left: auto;
+  margin-right: 0.25em;
+}
+.litera-pdf-note-font-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.05em;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+.litera-pdf-note-font-button:hover {
+  color: #ef4444;
+}
+.litera-pdf-note-text {
+  position: absolute;
+  z-index: 18;
+  pointer-events: auto;
+  display: block;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0.1em 0.2em 0.35em;
+  box-sizing: border-box;
+  color: #b91c1c;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  cursor: text;
+}
+.litera-pdf-dark .litera-pdf-note-text {
+  color: #fca5a5;
+}
+.litera-pdf-note-move {
+  cursor: move;
+  user-select: none;
+}
+.litera-pdf-note-resize {
+  position: absolute;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 0;
+  border-right: 2px solid color-mix(in srgb, var(--litera-accent2) 70%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--litera-accent2) 70%, transparent);
+  background: transparent;
+  cursor: nwse-resize;
+}
+.litera-pdf-note-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--litera-line);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--litera-mute);
+}
+.litera-pdf-note-textarea {
+  display: block;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 4.25rem;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: color-mix(in srgb, var(--litera-paper) 72%, transparent);
+  padding: 0.55rem;
+  color: var(--litera-text);
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+.litera-pdf-note-textarea::placeholder {
+  color: var(--litera-mute);
+}
+.litera-pdf-note-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.65rem;
+  color: var(--litera-mute);
+}
+.litera-pdf-dark .litera-pdf-note-box {
+  background: color-mix(in srgb, var(--litera-ink) 86%, transparent);
+}
 .markdown-body .katex {
   color: var(--litera-text);
   font-size: 1.05em;

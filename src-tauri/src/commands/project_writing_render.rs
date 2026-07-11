@@ -270,3 +270,83 @@ fn trim_block(value: &str, max_chars: usize) -> String {
     let trimmed = normalized.chars().take(max_chars).collect::<String>();
     format!("{}...", trimmed.trim_end())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::{NoteSection, Paper, ReadStatus, ResearchProject};
+
+    #[test]
+    fn outline_reuses_reading_card_notes() {
+        let project = project();
+        let paper = paper();
+        let notes = vec![NoteSection {
+            id: 1,
+            paper_id: paper.id.clone(),
+            section_key: "method".into(),
+            content: "Uses contrastive retrieval to build the index.".into(),
+            source: "user".into(),
+            sort_order: 1,
+            created_at: 0,
+            updated_at: 0,
+        }];
+
+        let markdown = render_outline(
+            &project,
+            std::slice::from_ref(&paper),
+            &[(paper.clone(), notes)],
+            &[],
+            &[],
+        );
+
+        assert!(markdown
+            .contains("**method:** Uses contrastive retrieval to build the index. [P1]:method"));
+        assert!(markdown.contains("## Paper-Level Claims"));
+    }
+
+    fn project() -> ResearchProject {
+        ResearchProject {
+            id: 1,
+            name: "Retrieval Project".into(),
+            description: Some("Study retrieval".into()),
+            research_question: Some("How do retrieval models work?".into()),
+            target_output: Some("paper".into()),
+            status: "active".into(),
+            due_date: None,
+            paper_count: 1,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn paper() -> Paper {
+        Paper {
+            id: "p1".into(),
+            title: "Retrieval Paper".into(),
+            authors: vec!["Author".into()],
+            year: Some(2024),
+            venue: None,
+            doi: None,
+            arxiv_id: None,
+            abstract_text: None,
+            pdf_path: None,
+            note_path: None,
+            added_at: 0,
+            updated_at: 0,
+            read_status: ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        }
+    }
+}

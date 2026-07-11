@@ -17,6 +17,7 @@ pub struct GraphEdge {
     pub source: String,
     pub target: String,
     pub edge_type: String,
+    pub relation: Option<String>,
     pub source_type: String,
     pub confidence: f64,
     pub snippet: Option<String>,

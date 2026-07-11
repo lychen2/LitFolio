@@ -53,7 +53,7 @@ export function ProjectWritingPanel({ project }: { project: ResearchProject }) {
         </div>
       </div>
       {(outline.error || manifest.error) && (
-        <div className="mt-3 text-xs text-red-400/90">{((outline.error ?? manifest.error) as Error).message}</div>
+        <ProjectWritingError error={outline.error ?? manifest.error} />
       )}
       {copied === "outline" && result && (
         <div className="mt-3 text-xs text-emerald-400">
@@ -83,5 +83,14 @@ export function ProjectWritingPanel({ project }: { project: ResearchProject }) {
         </div>
       )}
     </section>
+  );
+}
+
+export function ProjectWritingError({ error }: { error: unknown }) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    <div className="mt-3 text-xs text-red-400/90" role="alert">
+      {message}
+    </div>
   );
 }

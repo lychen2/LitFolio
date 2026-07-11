@@ -14,15 +14,21 @@ use crate::AppState;
 
 #[tauri::command]
 pub async fn import_doi(state: State<'_, Arc<AppState>>, doi: String) -> Result<Paper, String> {
-    let draft = fetch_doi(&state.http, &doi)
-        .await
-        .map_err(|e| e.to_string())?;
+    let normalized = doi.trim().to_string();
+    let draft = match fetch_doi(&state.http, &doi).await {
+        Ok(draft) => draft,
+        Err(error) => {
+            log_import_failure("doi", Some(normalized.as_str()), &error.to_string());
+            return Err(error.to_string());
+        }
+    };
     let mut paper = draft.into_paper();
     paper.bibtex = Some(generate_bibtex(&paper));
-    PaperRepo::new(&state.pool)
-        .insert(&paper)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(error) = PaperRepo::new(&state.pool).insert(&paper).await {
+        log_import_failure("doi", Some(normalized.as_str()), &error.to_string());
+        return Err(error.to_string());
+    }
+    log_import_success("doi", Some(normalized.as_str()), 1, 0);
     Ok(paper)
 }
 
@@ -42,15 +48,21 @@ pub async fn import_arxiv(
     state: State<'_, Arc<AppState>>,
     arxiv_id: String,
 ) -> Result<Paper, String> {
-    let draft = fetch_arxiv(&state.http, &arxiv_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let normalized = arxiv_id.trim().to_string();
+    let draft = match fetch_arxiv(&state.http, &arxiv_id).await {
+        Ok(draft) => draft,
+        Err(error) => {
+            log_import_failure("arxiv", Some(normalized.as_str()), &error.to_string());
+            return Err(error.to_string());
+        }
+    };
     let mut paper = draft.into_paper();
     paper.bibtex = Some(generate_bibtex(&paper));
-    PaperRepo::new(&state.pool)
-        .insert(&paper)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(error) = PaperRepo::new(&state.pool).insert(&paper).await {
+        log_import_failure("arxiv", Some(normalized.as_str()), &error.to_string());
+        return Err(error.to_string());
+    }
+    log_import_success("arxiv", Some(normalized.as_str()), 1, 0);
     Ok(paper)
 }
 
@@ -62,12 +74,22 @@ pub async fn import_bibtex(
     let drafts = parse_bibtex(&text);
     let repo = PaperRepo::new(&state.pool);
     let mut papers = Vec::with_capacity(drafts.len());
+    let total = drafts.len();
     for d in drafts {
         let mut p = d.into_paper();
         p.bibtex = Some(generate_bibtex(&p));
-        repo.insert(&p).await.map_err(|e| e.to_string())?;
+        if let Err(error) = repo.insert(&p).await {
+            log_import_failure("bibtex", None, &error.to_string());
+            return Err(error.to_string());
+        }
         papers.push(p);
     }
+    log_import_success(
+        "bibtex",
+        None,
+        papers.len(),
+        total.saturating_sub(papers.len()),
+    );
     Ok(papers)
 }
 
@@ -89,10 +111,11 @@ pub async fn add_from_search(
 ) -> Result<Paper, String> {
     let mut paper = result.draft.into_paper();
     paper.bibtex = Some(generate_bibtex(&paper));
-    PaperRepo::new(&state.pool)
-        .insert(&paper)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(error) = PaperRepo::new(&state.pool).insert(&paper).await {
+        log_import_failure("search", Some(paper.title.as_str()), &error.to_string());
+        return Err(error.to_string());
+    }
+    log_import_success("search", Some(paper.title.as_str()), 1, 0);
     Ok(paper)
 }
 
@@ -115,9 +138,14 @@ pub async fn add_many_from_search(
         paper.bibtex = Some(generate_bibtex(&paper));
         match repo.insert(&paper).await {
             Ok(()) => imported.push(paper),
-            Err(e) => skipped.push(format!("{}: {}", paper.title, e)),
+            Err(e) => {
+                let error = e.to_string();
+                log_import_failure("search_batch", Some(paper.title.as_str()), &error);
+                skipped.push(format!("{}: {}", paper.title, error));
+            }
         }
     }
+    log_import_success("search_batch", None, imported.len(), skipped.len());
     Ok(BulkAddSummary { imported, skipped })
 }
 
@@ -170,10 +198,11 @@ pub async fn arxiv_add_draft(
 ) -> Result<Paper, String> {
     let mut paper = draft.into_paper();
     paper.bibtex = Some(generate_bibtex(&paper));
-    PaperRepo::new(&state.pool)
-        .insert(&paper)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(error) = PaperRepo::new(&state.pool).insert(&paper).await {
+        log_import_failure("arxiv_draft", paper.arxiv_id.as_deref(), &error.to_string());
+        return Err(error.to_string());
+    }
+    log_import_success("arxiv_draft", paper.arxiv_id.as_deref(), 1, 0);
     Ok(paper)
 }
 
@@ -195,4 +224,28 @@ pub async fn prepare_arxiv_draft(
     fetch_arxiv(&state.http, &arxiv_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+fn log_import_success(
+    import_source: &'static str,
+    identifier: Option<&str>,
+    imported_count: usize,
+    failed_count: usize,
+) {
+    tracing::info!(
+        import_source,
+        identifier = identifier.unwrap_or(""),
+        imported_count,
+        failed_count,
+        "paper import completed"
+    );
+}
+
+fn log_import_failure(import_source: &'static str, identifier: Option<&str>, failure_reason: &str) {
+    tracing::warn!(
+        import_source,
+        identifier = identifier.unwrap_or(""),
+        failure_reason,
+        "paper import failed"
+    );
 }

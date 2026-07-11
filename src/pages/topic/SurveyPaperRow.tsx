@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, Archive, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { Star, StarOff, Archive, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import type { SurveyPaper } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
@@ -9,9 +9,10 @@ import { candidateIsHidden, useCandidateLookup } from "@/hooks/useCandidateState
 interface Props {
   paper: SurveyPaper;
   rank: number;
+  onToggleMustRead?: (paperId: string) => void;
 }
 
-export function SurveyPaperRow({ paper, rank }: Props) {
+export function SurveyPaperRow({ paper, rank, onToggleMustRead }: Props) {
   const t = useT();
   const qc = useQueryClient();
   const { findCandidate } = useCandidateLookup();
@@ -72,6 +73,17 @@ export function SurveyPaperRow({ paper, rank }: Props) {
           </div>
         </div>
         <div className="shrink-0">
+          {onToggleMustRead && (
+            <button
+              type="button"
+              onClick={() => onToggleMustRead(paper.id)}
+              className="litera-btn text-xs whitespace-nowrap inline-flex items-center gap-1 mb-1"
+              title={t(paper.must_read ? "topic.survey.removeMustRead" : "topic.survey.addMustRead")}
+            >
+              {paper.must_read ? <StarOff className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5" />}
+              {t(paper.must_read ? "topic.survey.removeMustRead" : "topic.survey.addMustRead")}
+            </button>
+          )}
           <button
             onClick={() => candidate.mutate()}
             disabled={candidate.isPending}

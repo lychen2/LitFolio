@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, NotebookPen, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { api, type NoteSection } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { nextSectionDraft } from "./noteSectionState";
 import type { TKey } from "@/i18n/dict";
 
 const SECTION_META: Record<string, { icon: string; labelKey: TKey; placeholderKey: TKey }> = {
@@ -153,7 +154,11 @@ function SectionCard({
 
   // Sync draft when section content changes externally (e.g. AI fill).
   useEffect(() => {
-    if (!dirty) setDraft(section.content);
+    setDraft((currentDraft) => nextSectionDraft({
+      currentDraft,
+      incomingContent: section.content,
+      dirty,
+    }));
   }, [section.content, dirty]);
 
   // Debounced autosave.

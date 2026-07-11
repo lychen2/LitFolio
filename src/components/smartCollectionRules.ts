@@ -1,4 +1,4 @@
-import type { FilterRuleCondition, FilterRuleGroup } from "@/lib/api";
+import type { FilterRule, FilterRuleCondition, FilterRuleGroup } from "@/lib/api";
 
 export const FIELDS = [
   { value: "title", labelKey: "smartCollections.fieldTitle" },
@@ -38,4 +38,21 @@ export function defaultCondition(): FilterRuleCondition {
 
 export function defaultGroup(): FilterRuleGroup {
   return { type: "group", combinator: "and", rules: [defaultCondition()] };
+}
+
+export function validateSmartCollectionRule(rule: FilterRule): string[] {
+  if (rule.type === "group") return validateGroup(rule);
+  return validateCondition(rule);
+}
+
+function validateGroup(group: FilterRuleGroup): string[] {
+  if (group.rules.length === 0) return ["empty_group"];
+  return group.rules.flatMap(validateSmartCollectionRule);
+}
+
+function validateCondition(condition: FilterRuleCondition): string[] {
+  if (condition.field === "year") {
+    return Number(condition.value) > 0 ? [] : ["empty_value"];
+  }
+  return String(condition.value ?? "").trim() ? [] : ["empty_value"];
 }

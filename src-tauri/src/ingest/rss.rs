@@ -229,4 +229,16 @@ mod tests {
         let input = "<p>We measured <i>k</i><sub>x</sub> via <b>SPP</b> at 4NA/<i>λ</i>.</p>";
         assert_eq!(strip_html(input), "We measured k_x via SPP at 4NA/λ.");
     }
+
+    #[tokio::test]
+    #[ignore = "uses live nature.com RSS"]
+    async fn fetches_nature_lsa_rss() {
+        let client = crate::http::build_external_client().unwrap();
+        let feed = fetch_feed(&client, "https://www.nature.com/lsa.rss", None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(feed.title.as_deref(), Some("Light: Science & Applications"));
+        assert!(!feed.items.is_empty());
+    }
 }

@@ -12,6 +12,9 @@ describe("LibraryFilterBar", () => {
           search="laser"
           resultLabel="3 results"
           canReviewCollection
+          filters={{ year: "2024", readStatus: "unread", tagId: "1" }}
+          tagOptions={[{ id: 1, name: "Topic", parent_id: null, color: null }]}
+          onFiltersChange={vi.fn()}
           onSearchChange={vi.fn()}
           onClearSearch={vi.fn()}
           onToggleViewMode={vi.fn()}
@@ -23,6 +26,9 @@ describe("LibraryFilterBar", () => {
     expect(html).toContain("文献库");
     expect(html).toContain("laser");
     expect(html).toContain("3 results");
+    expect(html).toContain("年份");
+    expect(html).toContain("阅读状态");
+    expect(html).toContain("Topic");
     expect(html).toContain("文献综述");
   });
 
@@ -34,6 +40,9 @@ describe("LibraryFilterBar", () => {
           search="laser"
           resultLabel=""
           canReviewCollection={false}
+          filters={{ year: "", readStatus: "", tagId: "" }}
+          tagOptions={[]}
+          onFiltersChange={vi.fn()}
           onSearchChange={vi.fn()}
           onClearSearch={vi.fn()}
           onToggleViewMode={vi.fn()}

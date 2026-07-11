@@ -25,9 +25,20 @@ pub async fn sync_test(state: State<'_, Arc<AppState>>) -> Result<SyncConnection
     let _guard = state.sync_lock.lock().await;
     let cfg =
         configured_webdav(&load_config().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    test_connection(&state.http, &cfg)
-        .await
-        .map_err(|e| e.to_string())
+    match test_connection(&state.http, &cfg).await {
+        Ok(result) => {
+            tracing::info!(
+                remote_root = %result.remote_root,
+                "library sync connection test succeeded"
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let error = error.to_string();
+            tracing::error!(error = %error, "library sync connection test failed");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -65,9 +76,17 @@ pub async fn sync_push_library(state: State<'_, Arc<AppState>>) -> Result<SyncRe
     let _guard = state.sync_lock.lock().await;
     let cfg =
         configured_webdav(&load_config().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    push_library(&state.http, &state.pool, &state.paths, &cfg)
-        .await
-        .map_err(|e| e.to_string())
+    match push_library(&state.http, &state.pool, &state.paths, &cfg).await {
+        Ok(report) => {
+            log_sync_report("push", &report);
+            Ok(report)
+        }
+        Err(error) => {
+            let error = error.to_string();
+            tracing::error!(action = "push", error = %error, "library sync failed");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -78,9 +97,17 @@ pub async fn sync_pull_library(
     let _guard = state.sync_lock.lock().await;
     let cfg =
         configured_webdav(&load_config().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    let report = pull_library(&state.http, &state.pool, &state.paths, &cfg)
-        .await
-        .map_err(|e| e.to_string())?;
+    let report = match pull_library(&state.http, &state.pool, &state.paths, &cfg).await {
+        Ok(report) => {
+            log_sync_report("pull", &report);
+            report
+        }
+        Err(error) => {
+            let error = error.to_string();
+            tracing::error!(action = "pull", error = %error, "library sync failed");
+            return Err(error);
+        }
+    };
     app.request_restart();
     Ok(report)
 }
@@ -120,6 +147,23 @@ where
 
     match run().await {
         Ok(report) => {
+            tracing::info!(
+                sync_job_id = %job.id,
+                kind = kind,
+                direction = direction,
+                remote_root = %report.remote_root,
+                manifest_version = report.manifest_version,
+                manifest_file_count = report.manifest_file_count,
+                manifest_total_bytes = report.manifest_total_bytes,
+                add_count = report.add_count,
+                update_count = report.update_count,
+                delete_count = report.delete_count,
+                unchanged_count = report.unchanged_count,
+                transfer_bytes = report.transfer_bytes,
+                restart_required = report.restart_required,
+                backup_path = ?report.backup_path,
+                "library sync preview completed"
+            );
             job_repo
                 .update_progress(
                     &job.id,
@@ -134,6 +178,13 @@ where
             Ok(report)
         }
         Err(error) => {
+            tracing::error!(
+                sync_job_id = %job.id,
+                kind = kind,
+                direction = direction,
+                error = %error,
+                "library sync preview failed"
+            );
             job_repo
                 .fail(&job.id, &error)
                 .await
@@ -141,4 +192,20 @@ where
             Err(error)
         }
     }
+}
+
+fn log_sync_report(action: &str, report: &SyncReport) {
+    tracing::info!(
+        action = action,
+        remote_root = %report.remote_root,
+        manifest_version = report.manifest_version,
+        manifest_file_count = report.manifest_file_count,
+        manifest_total_bytes = report.manifest_total_bytes,
+        file_count = report.file_count,
+        total_bytes = report.total_bytes,
+        skipped_count = report.skipped_count,
+        skipped_bytes = report.skipped_bytes,
+        restart_required = report.restart_required,
+        "library sync completed"
+    );
 }

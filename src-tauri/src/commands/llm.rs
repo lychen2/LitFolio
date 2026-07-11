@@ -8,7 +8,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::ai::{
-    chat_complete, list_models, load_config, save_config, ChatMessage, LlmConfig, LlmProfile,
+    chat_complete_with_task_kind, list_models, load_config, save_config, ChatMessage, LlmConfig,
+    LlmProfile,
 };
 
 use super::AppState;
@@ -35,9 +36,10 @@ pub async fn llm_test(
     state: State<'_, Arc<AppState>>,
     profile: LlmProfile,
 ) -> Result<LlmTestResult, String> {
-    let resp = chat_complete(
+    let resp = chat_complete_with_task_kind(
         &state.http,
         &profile,
+        "llm_test",
         &[
             ChatMessage {
                 role: "system".into(),

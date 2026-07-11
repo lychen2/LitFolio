@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Merge, Search } from "lucide-react";
 import { api, type DuplicatePair, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
 export function DuplicatesPanel() {
   const t = useT();
+  const queryClient = useQueryClient();
   const [pairs, setPairs] = useState<DuplicatePair[] | null>(null);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const scanMut = useMutation({
@@ -14,7 +15,16 @@ export function DuplicatesPanel() {
   });
   const mergeMut = useMutation({
     mutationFn: ({ keepId, mergeId }: { keepId: string; mergeId: string }) => api.paperMerge(keepId, mergeId),
-    onSuccess: () => scanMut.mutate(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["papers"] });
+      queryClient.invalidateQueries({ queryKey: ["paper"] });
+      queryClient.invalidateQueries({ queryKey: ["paper-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["graph"] });
+      queryClient.invalidateQueries({ queryKey: ["queue"] });
+      queryClient.invalidateQueries({ queryKey: ["comparisons"] });
+      scanMut.mutate();
+    },
   });
   const visiblePairs = pairs?.filter((_, index) => !dismissed.has(index)) ?? [];
 
@@ -35,6 +45,7 @@ export function DuplicatesPanel() {
         {scanMut.isPending ? t("dedup.scanning") : t("dedup.scan")}
       </button>
       {scanMut.error && <div className="text-sm text-red-400/90">✕ {(scanMut.error as Error).message}</div>}
+      {mergeMut.error && <div className="text-sm text-red-400/90">✕ {(mergeMut.error as Error).message}</div>}
       {visiblePairs.map((pair) => {
         const globalIdx = pairs!.indexOf(pair);
         return (

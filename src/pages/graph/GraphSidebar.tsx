@@ -1,8 +1,9 @@
-import { ExternalLink, Loader2, MapPin, Sparkles, X } from "lucide-react";
+import { ExternalLink, Loader2, MapPin, Sparkles, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type GraphNode, type GraphData } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { paperLinkIdFromGraphEdge } from "./graphEdgeActions";
 
 interface Props {
   node: GraphNode | null;
@@ -14,6 +15,13 @@ interface Props {
 export function GraphSidebar({ node, graphData, onClose, onCenterConcept }: Props) {
   const t = useT();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const deleteLink = useMutation({
+    mutationFn: (id: number) => api.paperLinkDelete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["graph"] });
+    },
+  });
 
   const { data: paper, isLoading: paperLoading } = useQuery({
     queryKey: ["paper", node?.id],
@@ -69,14 +77,37 @@ export function GraphSidebar({ node, graphData, onClose, onCenterConcept }: Prop
                     (e.source === node.id && e.target === cn.id) ||
                     (e.target === node.id && e.source === cn.id),
                 );
+                const paperLinkId = edge ? paperLinkIdFromGraphEdge(edge) : null;
+                const edgeText = edge
+                  ? t(edge.relation
+                    ? `relation.${edge.relation}` as any
+                    : `graph.edge.${edge.edge_type}` as any)
+                  : null;
                 return (
-                  <div key={cn.id} className="rounded-md bg-litera-panel/60 px-2 py-1.5">
-                    <p className="text-xs text-litera-text truncate">{cn.label}</p>
-                    {edge && (
-                      <span className="text-[11px] text-litera-mute">
-                        {t(`relation.${edge.edge_type}` as any)}
-                        {edge.source_type === "ai" && ` · AI ${(edge.confidence * 100).toFixed(0)}%`}
-                      </span>
+                  <div key={cn.id} className="rounded-md bg-litera-panel/60 px-2 py-1.5 flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-litera-text truncate">{cn.label}</p>
+                      {edge && (
+                        <span className="text-[11px] text-litera-mute">
+                          {edgeText}
+                          {edge.source_type === "ai" && ` · AI ${(edge.confidence * 100).toFixed(0)}%`}
+                        </span>
+                      )}
+                    </div>
+                    {paperLinkId != null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm(t("graph.confirmDeleteLink"))) return;
+                          deleteLink.mutate(paperLinkId);
+                        }}
+                        className="text-litera-mute hover:text-red-400 disabled:opacity-50"
+                        title={t("graph.deleteLink")}
+                        aria-label={t("graph.deleteLink")}
+                        disabled={deleteLink.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
                 );

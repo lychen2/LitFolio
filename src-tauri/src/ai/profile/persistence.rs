@@ -4,6 +4,7 @@ use crate::secret;
 use crate::storage::LibraryPaths;
 
 use super::LlmConfig;
+use crate::mineru::PdfMarkdownEngine;
 
 pub fn config_file(paths: &LibraryPaths) -> std::path::PathBuf {
     paths.config_file()
@@ -18,8 +19,15 @@ pub fn load_config(paths: &LibraryPaths) -> Result<LlmConfig> {
     let mut cfg: LlmConfig =
         serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     let migrated_names = hydrate_profile_keys(&mut cfg);
+    let migrated_mineru_engine = migrate_pdf_markdown_engine(&mut cfg);
     let migrated_mineru = hydrate_mineru_token(&mut cfg);
-    rewrite_sanitized_config(&path, &cfg, &migrated_names, migrated_mineru);
+    rewrite_sanitized_config(
+        &path,
+        &cfg,
+        &migrated_names,
+        migrated_mineru,
+        migrated_mineru_engine,
+    );
     Ok(cfg)
 }
 
@@ -78,13 +86,22 @@ fn hydrate_mineru_token(cfg: &mut LlmConfig) -> bool {
     }
 }
 
+fn migrate_pdf_markdown_engine(cfg: &mut LlmConfig) -> bool {
+    if cfg.pdf_markdown.engine != PdfMarkdownEngine::Local {
+        return false;
+    }
+    cfg.pdf_markdown.engine = PdfMarkdownEngine::MineruAgent;
+    true
+}
+
 fn rewrite_sanitized_config(
     path: &std::path::Path,
     cfg: &LlmConfig,
     migrated_names: &[String],
     migrated_mineru: bool,
+    migrated_mineru_engine: bool,
 ) {
-    if migrated_names.is_empty() && !migrated_mineru {
+    if migrated_names.is_empty() && !migrated_mineru && !migrated_mineru_engine {
         return;
     }
     let mut sanitized = cfg.clone();
@@ -106,7 +123,8 @@ fn rewrite_sanitized_config(
     tracing::info!(
         profiles = migrated_names.len(),
         mineru = migrated_mineru,
-        "migrated secrets from JSON to OS keychain"
+        mineru_engine = migrated_mineru_engine,
+        "migrated secrets/config from JSON to current settings"
     );
 }
 

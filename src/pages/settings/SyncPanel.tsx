@@ -24,6 +24,12 @@ import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import type { I18nVars } from "@/i18n/format";
 import { errorMessageOr } from "@/lib/error";
+import {
+  createSyncLastResult,
+  summarizeSyncConfig,
+  type SyncLastResult,
+  type SyncLastResultKind,
+} from "./syncPanelState";
 
 const PREVIEW_CHANGE_LIMIT = 20;
 
@@ -43,20 +49,37 @@ export function SyncPanel() {
   const [showPassword, setShowPassword] = useState(false);
   const [confirmingPull, setConfirmingPull] = useState(false);
   const [preview, setPreview] = useState<SyncPreviewReport | null>(null);
+  const [lastResult, setLastResult] = useState<SyncLastResult | null>(null);
   useEffect(() => {
     if (data) setDraft(data);
   }, [data]);
 
+  const rememberResult = (
+    kind: SyncLastResultKind,
+    status: SyncLastResult["status"],
+    message: string
+  ) => {
+    setLastResult(createSyncLastResult(kind, status, message, new Date()));
+  };
+
   const save = useMutation({
     mutationFn: (config: SyncConfig) => syncApi.saveConfig(config),
-    onSuccess: () => refetch(),
+    onSuccess: () => {
+      rememberResult("save", "success", t("settings.sync.saved"));
+      void refetch();
+    },
+    onError: (error) => rememberResult("save", "error", syncErrorMessage(error)),
   });
   const test = useMutation({
     mutationFn: async (config: SyncConfig) => {
       await syncApi.saveConfig(config);
       return syncApi.test();
     },
-    onSuccess: () => refetch(),
+    onSuccess: (result) => {
+      rememberResult("test", "success", t("settings.sync.testOk", { remote: result.remote_root }));
+      void refetch();
+    },
+    onError: (error) => rememberResult("test", "error", syncErrorMessage(error)),
   });
   const previewPush = useMutation({
     mutationFn: async (config: SyncConfig) => {
@@ -65,8 +88,10 @@ export function SyncPanel() {
     },
     onSuccess: (report) => {
       setPreview(report);
+      rememberResult("preview_push", "success", previewResultMessage(t, "settings.sync.previewPushTitle", report));
       void refetch();
     },
+    onError: (error) => rememberResult("preview_push", "error", syncErrorMessage(error)),
   });
   const previewPull = useMutation({
     mutationFn: async (config: SyncConfig) => {
@@ -75,28 +100,34 @@ export function SyncPanel() {
     },
     onSuccess: (report) => {
       setPreview(report);
+      rememberResult("preview_pull", "success", previewResultMessage(t, "settings.sync.previewPullTitle", report));
       void refetch();
     },
+    onError: (error) => rememberResult("preview_pull", "error", syncErrorMessage(error)),
   });
   const push = useMutation({
     mutationFn: async (config: SyncConfig) => {
       await syncApi.saveConfig(config);
       return syncApi.pushLibrary();
     },
-    onSuccess: () => {
+    onSuccess: (report) => {
       setPreview(null);
+      rememberResult("push", "success", reportMessage(t, "settings.sync.pushOk", report));
       void refetch();
     },
+    onError: (error) => rememberResult("push", "error", syncErrorMessage(error)),
   });
   const pull = useMutation({
     mutationFn: async (config: SyncConfig) => {
       await syncApi.saveConfig(config);
       return syncApi.pullLibrary();
     },
-    onSuccess: () => {
+    onSuccess: (report) => {
       setPreview(null);
+      rememberResult("pull", "success", reportMessage(t, "settings.sync.pullOk", report));
       void refetch();
     },
+    onError: (error) => rememberResult("pull", "error", syncErrorMessage(error)),
   });
 
   const busy =
@@ -109,6 +140,7 @@ export function SyncPanel() {
   const isReady =
     draft.webdav.base_url.trim() !== "" &&
     draft.webdav.remote_path.trim() !== "";
+  const configSummary = summarizeSyncConfig(draft);
 
   function setField<K extends keyof SyncConfig["webdav"]>(
     key: K,
@@ -194,6 +226,12 @@ export function SyncPanel() {
               </div>
             </Field>
           </div>
+
+          <SyncStatusSummary
+            summary={configSummary}
+            lastResult={lastResult}
+            t={t}
+          />
 
           <div className="mt-5 flex flex-wrap gap-2">
             <button
@@ -360,6 +398,48 @@ function InfoText({ message }: { message: string }) {
   return <div className="mt-3 text-sm text-litera-accent">{message}</div>;
 }
 
+function SyncStatusSummary({
+  summary,
+  lastResult,
+  t,
+}: {
+  summary: ReturnType<typeof summarizeSyncConfig>;
+  lastResult: SyncLastResult | null;
+  t: Translate;
+}) {
+  return (
+    <div className="mt-4 grid gap-2 rounded-[var(--litera-radius)] border border-litera-line bg-litera-ink/20 px-3 py-2 text-xs text-litera-mute md:grid-cols-2">
+      <div>
+        <div className="text-[11px] uppercase tracking-wider text-litera-mute">
+          {t("settings.sync.currentConfig")}
+        </div>
+        <div className="mt-1 break-all font-mono text-litera-text">
+          {summary.configured ? summary.remote : t("settings.sync.notConfigured")}
+        </div>
+        <div className="mt-1">
+          {summary.authMode === "authenticated"
+            ? t("settings.sync.authUser", { username: summary.username })
+            : t("settings.sync.authAnonymous")}
+        </div>
+      </div>
+      <div>
+        <div className="text-[11px] uppercase tracking-wider text-litera-mute">
+          {t("settings.sync.lastResult")}
+        </div>
+        {lastResult ? (
+          <div className={lastResult.status === "success" ? "mt-1 text-litera-accent" : "mt-1 text-red-400/90"}>
+            <span className="font-medium">{t(syncLastResultKindKey(lastResult.kind))}</span>
+            <span className="text-litera-mute"> · {new Date(lastResult.at).toLocaleString()}</span>
+            <div className="mt-0.5 break-words">{lastResult.message}</div>
+          </div>
+        ) : (
+          <div className="mt-1">{t("settings.sync.lastResultNone")}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SyncPreviewPanel({
   preview,
   t,
@@ -473,6 +553,37 @@ function reportMessage(
     skippedCount: report.skipped_count,
     remote: report.remote_root,
   });
+}
+
+function previewResultMessage(
+  t: Translate,
+  titleKey: "settings.sync.previewPushTitle" | "settings.sync.previewPullTitle",
+  report: SyncPreviewReport
+): string {
+  return `${t(titleKey)} · ${t("settings.sync.previewSummary", {
+    add: report.add_count,
+    update: report.update_count,
+    delete: report.delete_count,
+    unchanged: report.unchanged_count,
+    size: formatBytes(report.transfer_bytes),
+  })}`;
+}
+
+function syncLastResultKindKey(kind: SyncLastResultKind): TKey {
+  switch (kind) {
+    case "save":
+      return "settings.sync.lastKind.save";
+    case "test":
+      return "settings.sync.lastKind.test";
+    case "preview_push":
+      return "settings.sync.lastKind.previewPush";
+    case "preview_pull":
+      return "settings.sync.lastKind.previewPull";
+    case "push":
+      return "settings.sync.lastKind.push";
+    case "pull":
+      return "settings.sync.lastKind.pull";
+  }
 }
 
 function syncPreviewActionKey(action: SyncPreviewAction): TKey {

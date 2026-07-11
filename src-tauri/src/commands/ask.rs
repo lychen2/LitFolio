@@ -155,7 +155,11 @@ pub async fn ask_save_as_note(
 
 #[cfg(test)]
 mod tests {
-    use super::notes::{normalize_limit, note_slug, DEFAULT_SOURCE_LIMIT, MAX_SOURCE_LIMIT};
+    use super::notes::{
+        normalize_limit, note_slug, render_note, DEFAULT_SOURCE_LIMIT, MAX_SOURCE_LIMIT,
+    };
+    use super::SaveAskNoteInput;
+    use crate::ai::AskSource;
 
     #[test]
     fn clamps_limit() {
@@ -168,5 +172,32 @@ mod tests {
     fn note_slug_falls_back() {
         let slug = note_slug("%%%");
         assert!(slug.contains("ask-note"));
+    }
+
+    #[test]
+    fn render_note_includes_question_answer_terms_and_sources() {
+        let input = SaveAskNoteInput {
+            question: "What is contrastive retrieval?".into(),
+            answer: "It's a learned retrieval method.".into(),
+            terms: vec!["contrastive".into(), "retrieval".into()],
+            sources: vec![AskSource {
+                paper_id: "p1".into(),
+                title: "Source Paper".into(),
+                year: Some(2024),
+                authors: vec!["Author".into()],
+                snippet: "Method: contrastive learning.".into(),
+            }],
+            model: "gpt-4o".into(),
+        };
+
+        let note = render_note(&input, "2026-06-18 12:00 UTC".into());
+
+        assert!(note.contains("# AI 问答笔记"));
+        assert!(note.contains("- 模型: gpt-4o"));
+        assert!(note.contains("- 检索词: contrastive · retrieval"));
+        assert!(note.contains("## 问题\n\nWhat is contrastive retrieval?"));
+        assert!(note.contains("## 结论\n\nIt's a learned retrieval method."));
+        assert!(note.contains("### [1] Source Paper"));
+        assert!(note.contains("Method: contrastive learning."));
     }
 }

@@ -60,6 +60,45 @@ pub fn app_version() -> &'static str {
 pub fn library_root(state: State<'_, Arc<AppState>>) -> String {
     state.paths.root.display().to_string()
 }
+
+#[tauri::command]
+pub fn diagnostics_export_log(
+    state: State<'_, Arc<AppState>>,
+    dest_path: String,
+) -> Result<String, String> {
+    export_diagnostics_log(&state.paths, std::path::Path::new(&dest_path))
+        .map(|path| path.display().to_string())
+        .map_err(|e| e.to_string())
+}
+
+fn export_diagnostics_log(
+    paths: &crate::storage::LibraryPaths,
+    dest_path: &std::path::Path,
+) -> anyhow::Result<std::path::PathBuf> {
+    if dest_path.as_os_str().is_empty() {
+        anyhow::bail!("destination path is required");
+    }
+    let source = paths.app_log_file();
+    let dest = if dest_path.is_absolute() {
+        dest_path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(dest_path)
+    };
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if source.exists() {
+        let canon_source = std::fs::canonicalize(&source)?;
+        if dest.exists() && std::fs::canonicalize(&dest)? == canon_source {
+            return Ok(dest);
+        }
+        std::fs::copy(&source, &dest)?;
+    } else {
+        std::fs::write(&dest, "LitFolio diagnostic log has not been created yet.\n")?;
+    }
+    Ok(dest)
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct StorageStats {
     pub papers_bytes: u64,
@@ -126,6 +165,47 @@ fn dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
         }
     }
     Ok(total)
+}
+
+#[cfg(test)]
+mod diagnostics_export_tests {
+    use super::*;
+    use crate::storage::LibraryPaths;
+
+    #[test]
+    fn diagnostics_export_log_copies_existing_log() {
+        let root = std::env::temp_dir().join(format!("litera-diag-export-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&root);
+        paths.ensure().unwrap();
+        std::fs::write(paths.app_log_file(), "diagnostic line\n").unwrap();
+
+        let dest = root.join("exports").join("litfolio-diagnostics.log");
+        let exported = export_diagnostics_log(&paths, &dest).unwrap();
+
+        assert_eq!(exported, dest);
+        assert_eq!(
+            std::fs::read_to_string(&exported).unwrap(),
+            "diagnostic line\n"
+        );
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn diagnostics_export_log_writes_placeholder_when_missing() {
+        let root = std::env::temp_dir().join(format!("litera-diag-empty-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&root);
+        paths.ensure().unwrap();
+
+        let dest = root.join("exports").join("litfolio-diagnostics.log");
+        let exported = export_diagnostics_log(&paths, &dest).unwrap();
+
+        assert_eq!(exported, dest);
+        assert_eq!(
+            std::fs::read_to_string(&exported).unwrap(),
+            "LitFolio diagnostic log has not been created yet.\n"
+        );
+        std::fs::remove_dir_all(root).ok();
+    }
 }
 
 #[allow(unused_macros)]
@@ -292,6 +372,7 @@ macro_rules! command_paths_reader_notes {
             commands::highlights::highlight_create,
             commands::highlights::highlight_list,
             commands::highlights::highlight_update_note,
+            commands::highlights::highlight_update_rect,
             commands::highlights::highlight_update_label,
             commands::highlights::highlight_delete,
             commands::reader_terms::paper_terms_list,
@@ -305,6 +386,9 @@ macro_rules! command_paths_reader_notes {
             commands::reader_translate::highlight_translate,
             commands::reader_translate::highlight_explain,
             commands::reader_translate::reader_translate_selection,
+            commands::reader_translate::paper_translated_markdown_get,
+            commands::reader_translate::paper_translate_markdown,
+            commands::reader_translate::paper_translate_markdown_estimate,
             commands::notes::note_get,
             commands::notes::note_save,
             commands::notes::note_sections_get,
@@ -366,6 +450,7 @@ macro_rules! command_paths_collections_data {
             commands::export::export_markdown_all,
             commands::export::export_markdown_paper,
             commands::export::export_citations,
+            commands::diagnostics_export_log,
             commands::search::search_unified,
             commands::comparisons::paper_comparisons_list,
             commands::comparisons::paper_comparison_get,

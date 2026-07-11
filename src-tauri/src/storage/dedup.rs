@@ -32,7 +32,7 @@ pub async fn find_duplicate(pool: &Pool, paper: &Paper) -> Result<Option<Paper>>
         let doi_trimmed = doi.trim().to_lowercase();
         if !doi_trimmed.is_empty() {
             let row = sqlx::query(
-                "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract_text,
+                "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                         pdf_path, note_path, added_at, updated_at, read_status, tldr,
                         research_question, method, dataset, key_findings_json, limitations,
                         comparison, title_translated, abstract_translated, translate_target_lang,
@@ -55,7 +55,7 @@ pub async fn find_duplicate(pool: &Pool, paper: &Paper) -> Result<Option<Paper>>
         let arxiv_trimmed = arxiv.trim().to_lowercase();
         if !arxiv_trimmed.is_empty() {
             let row = sqlx::query(
-                "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract_text,
+                "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                         pdf_path, note_path, added_at, updated_at, read_status, tldr,
                         research_question, method, dataset, key_findings_json, limitations,
                         comparison, title_translated, abstract_translated, translate_target_lang,
@@ -80,7 +80,7 @@ pub async fn find_duplicate(pool: &Pool, paper: &Paper) -> Result<Option<Paper>>
         let min_len = (title_norm.len() as f64 * 0.80) as usize;
         let max_len = (title_norm.len() as f64 * 1.20) as usize;
         let rows = sqlx::query(
-            "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract_text,
+            "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                     pdf_path, note_path, added_at, updated_at, read_status, tldr,
                     research_question, method, dataset, key_findings_json, limitations,
                     comparison, title_translated, abstract_translated, translate_target_lang,
@@ -111,7 +111,7 @@ pub async fn find_duplicate(pool: &Pool, paper: &Paper) -> Result<Option<Paper>>
 /// Scan all papers for duplicate pairs.
 pub async fn scan_all_duplicates(pool: &Pool) -> Result<Vec<DuplicatePair>> {
     let rows = sqlx::query(
-        "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract_text,
+        "SELECT id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                 pdf_path, note_path, added_at, updated_at, read_status, tldr,
                 research_question, method, dataset, key_findings_json, limitations,
                 comparison, title_translated, abstract_translated, translate_target_lang,
@@ -256,5 +256,225 @@ fn pair_key(a: &str, b: &str) -> String {
         format!("{}:{}", a, b)
     } else {
         format!("{}:{}", b, a)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::db::{open_pool, run_migrations};
+    use crate::storage::{PaperRepo, ReadStatus};
+    use chrono::Utc;
+    use std::path::PathBuf;
+
+    async fn temp_pool() -> (Pool, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("litera-dedup-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("library.db");
+        let pool = open_pool(&db).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        (pool, dir)
+    }
+
+    fn paper(id: &str, title: &str) -> Paper {
+        let now = Utc::now().timestamp();
+        Paper {
+            id: id.into(),
+            title: title.into(),
+            authors: vec!["Author".into()],
+            year: Some(2026),
+            venue: Some("Venue".into()),
+            doi: None,
+            arxiv_id: None,
+            abstract_text: None,
+            pdf_path: Some(format!("/tmp/{id}.pdf")),
+            note_path: None,
+            added_at: now,
+            updated_at: now,
+            read_status: ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        }
+    }
+
+    async fn insert(repo: &PaperRepo<'_>, paper: &Paper) {
+        repo.insert(paper).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_matches_doi_case_and_whitespace() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let mut existing = paper("existing", "Existing Paper");
+        existing.doi = Some(" 10.1234/ABC ".into());
+        insert(&repo, &existing).await;
+
+        let mut incoming = paper("incoming", "Different Title");
+        incoming.doi = Some("10.1234/abc".into());
+        let duplicate = find_duplicate(&pool, &incoming).await.unwrap().unwrap();
+
+        assert_eq!(duplicate.id, existing.id);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_ignores_blank_doi_and_uses_arxiv() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let mut existing = paper("existing", "Existing Paper");
+        existing.arxiv_id = Some("2401.01234".into());
+        insert(&repo, &existing).await;
+
+        let mut incoming = paper("incoming", "Different Title");
+        incoming.doi = Some("   ".into());
+        incoming.arxiv_id = Some("2401.01234".into());
+        let duplicate = find_duplicate(&pool, &incoming).await.unwrap().unwrap();
+
+        assert_eq!(duplicate.id, existing.id);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_matches_arxiv_case_and_whitespace() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let mut existing = paper("existing", "Existing Paper");
+        existing.arxiv_id = Some(" ARXIV:2401.01234 ".into());
+        insert(&repo, &existing).await;
+
+        let mut incoming = paper("incoming", "Different Title");
+        incoming.arxiv_id = Some("arxiv:2401.01234".into());
+        let duplicate = find_duplicate(&pool, &incoming).await.unwrap().unwrap();
+
+        assert_eq!(duplicate.id, existing.id);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_matches_similar_titles() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let existing = paper("existing", "Attention Is All You Need!");
+        insert(&repo, &existing).await;
+
+        let incoming = paper("incoming", "attention is all you need");
+        let duplicate = find_duplicate(&pool, &incoming).await.unwrap().unwrap();
+
+        assert_eq!(duplicate.id, existing.id);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_ignores_short_title_similarity() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        insert(&repo, &paper("existing", "AI")).await;
+
+        let incoming = paper("incoming", "AI");
+        let duplicate = find_duplicate(&pool, &incoming).await.unwrap();
+
+        assert!(duplicate.is_none());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn find_duplicate_excludes_same_paper_id() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let mut existing = paper("same", "Existing Paper");
+        existing.doi = Some("10.1234/same".into());
+        insert(&repo, &existing).await;
+
+        let duplicate = find_duplicate(&pool, &existing).await.unwrap();
+
+        assert!(duplicate.is_none());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn merge_papers_removes_duplicate_and_rehomes_related_data() {
+        let (pool, dir) = temp_pool().await;
+        let repo = PaperRepo::new(&pool);
+        let mut keep = paper("keep", "Same Paper");
+        keep.doi = Some("10.1234/keep".into());
+        let mut duplicate = paper("duplicate", "Same Paper Copy");
+        duplicate.doi = Some("10.1234/duplicate".into());
+        insert(&repo, &keep).await;
+        insert(&repo, &duplicate).await;
+
+        sqlx::query("INSERT INTO research_projects (id, name, created_at, updated_at) VALUES (1, 'P', 1, 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO project_papers (project_id, paper_id, added_at) VALUES (1, 'duplicate', 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO paper_documents (paper_id, markdown, updated_at) VALUES ('duplicate', 'markdown', 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO paper_embeddings (paper_id, model, embedding, content_hash, created_at) VALUES ('duplicate', 'm', x'0102', 'h', 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO evidence_items (project_id, source_type, paper_id, excerpt, created_at, updated_at) VALUES (1, 'paper', 'duplicate', 'e', 1, 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO paper_supplements (paper_id, title, file_path, file_kind, created_at, updated_at) VALUES ('duplicate', 'S', '/tmp/s.pdf', 'pdf', 1, 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        merge_papers(&pool, "keep", "duplicate").await.unwrap();
+
+        assert!(repo.get("duplicate").await.unwrap().is_none());
+        assert!(repo.get("keep").await.unwrap().is_some());
+        assert_eq!(
+            count_where(&pool, "project_papers", "paper_id", "keep").await,
+            1
+        );
+        assert_eq!(
+            count_where(&pool, "paper_documents", "paper_id", "keep").await,
+            1
+        );
+        assert_eq!(
+            count_where(&pool, "paper_embeddings", "paper_id", "keep").await,
+            1
+        );
+        assert_eq!(
+            count_where(&pool, "evidence_items", "paper_id", "keep").await,
+            1
+        );
+        assert_eq!(
+            count_where(&pool, "paper_supplements", "paper_id", "keep").await,
+            1
+        );
+        assert_eq!(
+            count_where(&pool, "project_papers", "paper_id", "duplicate").await,
+            0
+        );
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    async fn count_where(pool: &Pool, table: &str, column: &str, value: &str) -> i64 {
+        let sql = format!("SELECT COUNT(*) FROM {table} WHERE {column} = ?1");
+        sqlx::query_scalar(&sql)
+            .bind(value)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 }

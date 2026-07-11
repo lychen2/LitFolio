@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 import type { FilterRule, FilterRuleCondition } from "@/lib/api";
-import { defaultCondition, defaultGroup, FIELDS, OPERATORS, READ_STATUS_OPTIONS } from "./smartCollectionRules";
+import { defaultCondition, defaultGroup, FIELDS, OPERATORS, READ_STATUS_OPTIONS, validateSmartCollectionRule } from "./smartCollectionRules";
 
 
 export function SmartCollectionEditor({
@@ -21,6 +21,8 @@ export function SmartCollectionEditor({
   const [rules, setRules] = useState<FilterRule>(
     initialRules ?? defaultGroup(),
   );
+  const ruleErrors = validateSmartCollectionRule(rules);
+  const canSave = !!name.trim() && ruleErrors.length === 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-litera-ink/40 backdrop-blur-sm" onClick={onCancel}>
@@ -52,6 +54,11 @@ export function SmartCollectionEditor({
             <label className="text-xs text-litera-mute block mb-2">{t("smartCollections.rules")}</label>
             <RuleEditor rule={rules} onChange={setRules} depth={0} />
           </div>
+          {ruleErrors.length > 0 && (
+            <p className="mt-2 rounded-md border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300" role="alert">
+              {t(ruleErrors.includes("empty_group") ? "smartCollections.errorEmptyGroup" : "smartCollections.errorEmptyValue")}
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-3 border-t border-litera-line flex justify-end gap-2 shrink-0">
@@ -60,9 +67,9 @@ export function SmartCollectionEditor({
           </button>
           <button
             onClick={() => {
-              if (name.trim()) onSave(name.trim(), rules);
+              if (canSave) onSave(name.trim(), rules);
             }}
-            disabled={!name.trim()}
+            disabled={!canSave}
             className="litera-btn-primary text-xs disabled:opacity-50"
           >
             {t("smartCollections.save")}

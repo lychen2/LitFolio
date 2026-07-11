@@ -1,0 +1,14 @@
+{
+  "beforeCompress": [
+    {
+      "description": "Preserve LitFolio project invariants before context compression",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cat <<'EOF'\nPreserve these LitFolio invariants in compressed context:\n- Tauri 2 + React/TypeScript frontend + Rust backend; pnpm is the package manager.\n- Build/quality commands: pnpm typecheck, pnpm lint, pnpm test, pnpm build; backend tests from src-tauri via cargo test.\n- IPC changes require synchronized Rust command registration, frontend api wrappers, schemas/parsers, mocks, and tests.\n- DB changes require new SQLite migrations; do not edit shipped migrations.\n- Release version sync: package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock.\n- Docs/release generated files should generally not be committed; only bundled manual PDFs under docs/ are allowed by project rules.\nEOF",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

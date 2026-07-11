@@ -19,6 +19,15 @@ fn propfind_status_reports_http_failure() {
 }
 
 #[test]
+fn propfind_status_reports_auth_failure() {
+    let err = ensure_propfind_status(401, "https://dav.test/lib").unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("WebDAV PROPFIND for https://dav.test/lib failed with HTTP 401"));
+}
+
+#[test]
 fn mkcol_status_accepts_existing_or_created_collection() {
     ensure_mkcol_status(201, "litera/main").unwrap();
     ensure_mkcol_status(405, "litera/main").unwrap();

@@ -4,7 +4,7 @@ import { ClipboardCopy, Download, FileText, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
-const FORMATS = [
+export const citationExportFormats = [
   { value: "bibtex", ext: "bib", mime: "application/x-bibtex" },
   { value: "ris", ext: "ris", mime: "application/x-research-info-systems" },
   { value: "apa", ext: "txt", mime: "text/plain" },
@@ -12,6 +12,8 @@ const FORMATS = [
   { value: "gb/t7714", ext: "txt", mime: "text/plain" },
   { value: "chicago", ext: "txt", mime: "text/plain" },
 ] as const;
+
+const FORMATS = citationExportFormats;
 
 export function ExportCitationsDialog({
   paperIds,

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::ai::{chat_complete, ChatMessage, LlmProfile};
+use crate::ai::{chat_complete_for_task, ChatMessage, LlmProfile, TaskKind};
 use crate::storage::Paper;
 
 use super::terms::TermInsight;
@@ -15,23 +15,28 @@ pub struct ReaderTranslateResult {
     pub completion_tokens: u32,
 }
 
+pub(super) struct TranslateSelectionInput<'a> {
+    pub client: &'a reqwest::Client,
+    pub profile: &'a LlmProfile,
+    pub paper: &'a Paper,
+    pub selection: &'a str,
+    pub terms: &'a [TermInsight],
+    pub target_lang: &'a str,
+}
+
 pub(super) async fn translate_selection(
-    client: &reqwest::Client,
-    profile: &LlmProfile,
-    paper: &Paper,
-    selection: &str,
-    terms: &[TermInsight],
-    target_lang: &str,
+    input: TranslateSelectionInput<'_>,
 ) -> Result<ReaderTranslateResult> {
-    let glossary = format_glossary(terms);
+    let glossary = format_glossary(input.terms);
     let user_content = crate::ai::prompts::READER_TRANSLATE_USER
-        .replace("{lang}", target_lang)
-        .replace("{title}", &paper.title)
-        .replace("{selection}", selection)
+        .replace("{lang}", input.target_lang)
+        .replace("{title}", &input.paper.title)
+        .replace("{selection}", input.selection)
         .replace("{glossary}", &glossary);
-    let resp = chat_complete(
-        client,
-        profile,
+    let resp = chat_complete_for_task(
+        input.client,
+        input.profile,
+        TaskKind::Translate,
         &[
             ChatMessage {
                 role: "system".into(),
@@ -54,7 +59,7 @@ pub(super) async fn translate_selection(
     }
     Ok(ReaderTranslateResult {
         translation,
-        terms: terms.to_vec(),
+        terms: input.terms.to_vec(),
         model: resp.model,
         prompt_tokens: resp.prompt_tokens,
         completion_tokens: resp.completion_tokens,

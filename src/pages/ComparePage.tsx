@@ -192,11 +192,130 @@ function ComparisonDetail({
           className="w-full h-[60vh] px-4 py-3 text-sm font-mono bg-litera-panel border border-litera-line rounded-md text-litera-text"
         />
       ) : (
-        <MarkdownView
-          content={comparison.content}
-          className="prose prose-sm max-w-none dark:prose-invert"
-        />
+        <>
+          <ComparisonDifferenceTable rows={extractComparisonDifferenceRows(comparison.content)} />
+          <MarkdownView
+            content={comparison.content}
+            className="prose prose-sm max-w-none dark:prose-invert"
+          />
+        </>
       )}
     </div>
   );
+}
+
+export interface ComparisonDifferenceRow {
+  paper: string;
+  problem: string;
+  method: string;
+  data: string;
+  limitation: string;
+}
+
+export function extractComparisonDifferenceRows(markdown: string): ComparisonDifferenceRow[] {
+  for (const table of markdownTables(markdown)) {
+    const header = table[0].map(normalizeHeader);
+    const columns = {
+      paper: findColumn(header, ["paper", "title", "论文", "文献"]),
+      problem: findColumn(header, ["problem", "question", "问题"]),
+      method: findColumn(header, ["method", "approach", "方法"]),
+      data: findColumn(header, ["data", "dataset", "setting", "数据", "场景"]),
+      limitation: findColumn(header, ["limitation", "limits", "局限", "限制"]),
+    };
+    if (columns.problem < 0 || columns.method < 0 || columns.data < 0 || columns.limitation < 0) {
+      continue;
+    }
+    return table.slice(2).map((row, index) => ({
+      paper: cell(row, columns.paper >= 0 ? columns.paper : 0) || `P${index + 1}`,
+      problem: cell(row, columns.problem),
+      method: cell(row, columns.method),
+      data: cell(row, columns.data),
+      limitation: cell(row, columns.limitation),
+    })).filter((row) => row.problem || row.method || row.data || row.limitation);
+  }
+  return [];
+}
+
+function ComparisonDifferenceTable({ rows }: { rows: ComparisonDifferenceRow[] }) {
+  const t = useT();
+  return (
+    <section className="rounded-md border border-litera-line bg-litera-panel/40 overflow-hidden">
+      <div className="px-3 py-2 border-b border-litera-line text-sm font-medium text-litera-text">
+        {t("compare.differenceTable")}
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-3 py-3 text-xs text-litera-mute">
+          {t("compare.noDifferenceTable")}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-litera-mute border-b border-litera-line">
+              <tr>
+                <th className="text-left font-medium px-3 py-2 min-w-28">{t("compare.paper")}</th>
+                <th className="text-left font-medium px-3 py-2 min-w-40">{t("compare.problem")}</th>
+                <th className="text-left font-medium px-3 py-2 min-w-40">{t("compare.method")}</th>
+                <th className="text-left font-medium px-3 py-2 min-w-40">{t("compare.data")}</th>
+                <th className="text-left font-medium px-3 py-2 min-w-40">{t("compare.limitation")}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-litera-line/60">
+              {rows.map((row) => (
+                <tr key={row.paper}>
+                  <td className="px-3 py-2 align-top font-medium text-litera-text">{row.paper}</td>
+                  <td className="px-3 py-2 align-top text-litera-text/80">{row.problem || "—"}</td>
+                  <td className="px-3 py-2 align-top text-litera-text/80">{row.method || "—"}</td>
+                  <td className="px-3 py-2 align-top text-litera-text/80">{row.data || "—"}</td>
+                  <td className="px-3 py-2 align-top text-litera-text/80">{row.limitation || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function markdownTables(markdown: string): string[][][] {
+  const lines = markdown.split(/\r?\n/);
+  const tables: string[][][] = [];
+  let index = 0;
+  while (index < lines.length) {
+    if (!isTableRow(lines[index]) || !isSeparatorRow(lines[index + 1] ?? "")) {
+      index += 1;
+      continue;
+    }
+    const rows: string[][] = [];
+    while (index < lines.length && isTableRow(lines[index])) {
+      rows.push(splitTableRow(lines[index]));
+      index += 1;
+    }
+    if (rows.length >= 3) tables.push(rows);
+  }
+  return tables;
+}
+
+function splitTableRow(line: string): string[] {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+}
+
+function isTableRow(line: string): boolean {
+  return /^\s*\|.+\|\s*$/.test(line);
+}
+
+function isSeparatorRow(line: string): boolean {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+}
+
+function normalizeHeader(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, "");
+}
+
+function findColumn(header: string[], needles: string[]): number {
+  return header.findIndex((value) => needles.some((needle) => value.includes(needle)));
+}
+
+function cell(row: string[], index: number): string {
+  return row[index]?.trim() ?? "";
 }

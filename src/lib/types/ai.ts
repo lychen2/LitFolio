@@ -36,6 +36,7 @@ export interface TaskAssignments {
   link: TaskBinding | null;
   topic_survey: TaskBinding | null;
   ask: TaskBinding | null;
+  lit_review: TaskBinding | null;
 }
 
 export interface LlmTestResult {
@@ -184,6 +185,21 @@ export interface ReaderTranslateResult {
   model: string;
   prompt_tokens: number;
   completion_tokens: number;
+}
+
+export interface ReaderMarkdownTranslationResult {
+  markdown: string;
+  target_lang: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cached: boolean;
+}
+
+export interface ReaderMarkdownTranslationEstimate {
+  source_chars: number;
+  cleaned_chars: number;
+  chunk_count: number;
 }
 
 export interface PaperTerm {

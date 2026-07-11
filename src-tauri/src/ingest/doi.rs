@@ -130,15 +130,20 @@ pub async fn search_doi_by_title(
         return Err(anyhow!("CrossRef returned {status}: {body}"));
     }
     let body_text = resp.text().await.with_context(|| "read response body")?;
-    
+
     tracing::debug!(
         response_length = body_text.len(),
         response_preview = &body_text.chars().take(200).collect::<String>(),
         "CrossRef response received"
     );
-    
-    let body: CrossRefSearchResponse = serde_json::from_str(&body_text)
-        .with_context(|| format!("decode CrossRef JSON (length: {}, preview: {})", body_text.len(), body_text.chars().take(200).collect::<String>()))?;
+
+    let body: CrossRefSearchResponse = serde_json::from_str(&body_text).with_context(|| {
+        format!(
+            "decode CrossRef JSON (length: {}, preview: {})",
+            body_text.len(),
+            body_text.chars().take(200).collect::<String>()
+        )
+    })?;
     Ok(body
         .message
         .items
@@ -212,12 +217,20 @@ fn normalize_doi(input: &str) -> Result<String> {
 }
 
 fn urlencode(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' | '/' => c.to_string(),
-            _ => format!("%{:02X}", c as u32),
-        })
-        .collect()
+    use std::fmt::Write as _;
+
+    let mut out = String::with_capacity(s.len());
+    for &byte in s.as_bytes() {
+        match byte {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(byte as char);
+            }
+            _ => {
+                write!(&mut out, "%{byte:02X}").expect("writing to String cannot fail");
+            }
+        }
+    }
+    out
 }
 
 /// Fetch publisher-declared public PDF links from CrossRef metadata for a DOI.
@@ -494,6 +507,7 @@ mod tests {
     fn url_encode_handles_special() {
         assert_eq!(urlencode("10.1038/foo bar"), "10.1038/foo%20bar");
         assert_eq!(urlencode("10.1038/x;y"), "10.1038/x%3By");
+        assert_eq!(urlencode("中文"), "%E4%B8%AD%E6%96%87");
     }
 
     #[test]
@@ -525,24 +539,28 @@ mod crossref_parse_tests {
     use super::*;
 
     #[test]
-    fn test_parse_matrix_dichroism_article() {
-        let json = std::fs::read_to_string("/tmp/crossref_matrix.json")
-            .expect("Failed to read test JSON file");
-        
-        let result: Result<CrossRefSearchResponse, _> = serde_json::from_str(&json);
-        
-        match result {
-            Ok(resp) => {
-                println!("✓ Parse SUCCESS!");
-                assert!(!resp.message.items.is_empty(), "No items in response");
-                let item = &resp.message.items[0];
-                println!("  DOI: {:?}", item.doi);
-                println!("  Title: {:?}", item.title.first());
-                println!("  Authors: {}", item.author.len());
+    fn parses_crossref_search_item() {
+        let json = r#"{
+            "message": {
+                "items": [{
+                    "title": ["Matrix dichroism in crystals"],
+                    "author": [{"given": "Ada", "family": "Lovelace"}],
+                    "container-title": ["Journal of Test Fixtures"],
+                    "published-online": {"date-parts": [[2026, 1, 2]]},
+                    "DOI": "10.1234/matrix"
+                }]
             }
-            Err(e) => {
-                panic!("✗ Parse FAILED: {}", e);
-            }
-        }
+        }"#;
+
+        let resp: CrossRefSearchResponse =
+            serde_json::from_str(json).expect("decode CrossRef search JSON");
+        let draft = crossref_message_to_draft(resp.message.items.into_iter().next().unwrap())
+            .expect("convert CrossRef message to draft");
+
+        assert_eq!(draft.title, "Matrix dichroism in crystals");
+        assert_eq!(draft.authors, vec!["Ada Lovelace".to_string()]);
+        assert_eq!(draft.venue, Some("Journal of Test Fixtures".to_string()));
+        assert_eq!(draft.year, Some(2026));
+        assert_eq!(draft.doi, Some("10.1234/matrix".to_string()));
     }
 }

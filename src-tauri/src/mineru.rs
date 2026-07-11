@@ -12,8 +12,8 @@ const DEFAULT_MAX_POLLS: usize = 120;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PdfMarkdownEngine {
-    #[default]
     Local,
+    #[default]
     MineruAgent,
     MineruPrecise,
 }
@@ -29,7 +29,7 @@ pub struct PdfMarkdownConfig {
 impl Default for PdfMarkdownConfig {
     fn default() -> Self {
         Self {
-            engine: PdfMarkdownEngine::Local,
+            engine: PdfMarkdownEngine::MineruAgent,
             mineru_token: String::new(),
         }
     }

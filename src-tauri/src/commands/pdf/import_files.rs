@@ -6,7 +6,7 @@ use ulid::Ulid;
 
 use super::common::{
     attach_imported_pdf_to_existing, existing_paper_for_draft,
-    generate_and_index_pdf_markdown_or_warn, PdfFailure, PdfImportSummary,
+    generate_and_index_pdf_markdown_or_warn, log_pdf_import_summary, PdfFailure, PdfImportSummary,
 };
 use crate::bibtex::generate_bibtex;
 use crate::ingest::{fetch_doi, import_pdf_file};
@@ -66,6 +66,7 @@ async fn import_pdf_files_inner(
             }),
         }
     }
+    log_pdf_import_summary("pdf_files", imported.len(), &failed);
     Ok(PdfImportSummary { imported, failed })
 }
 

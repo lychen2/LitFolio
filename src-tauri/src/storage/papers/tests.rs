@@ -46,6 +46,25 @@ fn sample(id: &str) -> Paper {
     }
 }
 
+async fn seed_fifty_papers(repo: &PaperRepo<'_>) {
+    for idx in 0..50 {
+        let mut paper = sample(&format!("fixture-{idx:02}"));
+        paper.title = format!("Neural Retrieval Fixture {idx:02}");
+        paper.authors = vec![format!("Author {idx:02}"), "Fixture Builder".into()];
+        paper.year = Some(2000 + (idx % 25));
+        paper.abstract_text = Some(format!(
+            "This abstract discusses neural retrieval and quantum-abstract-{idx:02}."
+        ));
+        paper.read_status = match idx % 4 {
+            0 => ReadStatus::Unread,
+            1 => ReadStatus::Reading,
+            2 => ReadStatus::Read,
+            _ => ReadStatus::Must,
+        };
+        repo.insert(&paper).await.unwrap();
+    }
+}
+
 #[tokio::test]
 async fn insert_get_list_count_roundtrip() {
     let (pool, dir) = temp_pool().await;
@@ -134,6 +153,45 @@ async fn search_finds_imported_document_markdown() {
     let hits = repo.search("reranking", 10).await.unwrap();
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].id, p.id);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
+async fn fifty_paper_fixture_seeds_searchable_library() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    seed_fifty_papers(&repo).await;
+
+    assert_eq!(repo.count().await.unwrap(), 50);
+    assert_eq!(repo.search("neural", 100).await.unwrap().len(), 50);
+    assert_eq!(
+        repo.search("Author 17", 10).await.unwrap()[0].id,
+        "fixture-17"
+    );
+    assert_eq!(
+        repo.search("quantum-abstract-23", 10).await.unwrap()[0].id,
+        "fixture-23"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
+async fn fifty_paper_fixture_document_markdown_is_searchable() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    seed_fifty_papers(&repo).await;
+    PaperDocumentRepo::new(&pool)
+        .upsert_markdown(
+            "fixture-07",
+            "Notebook section mentions spectral-reranker-seven.",
+        )
+        .await
+        .unwrap();
+
+    let hits = repo.search("spectral-reranker-seven", 10).await.unwrap();
+
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].id, "fixture-07");
     std::fs::remove_dir_all(&dir).ok();
 }
 

@@ -29,6 +29,8 @@ import type {
 export const libraryApi = {
   appVersion: () => invoke<string>("app_version"),
   libraryRoot: () => invoke<string>("library_root"),
+  diagnosticsExportLog: (destPath: string) =>
+    invoke<string>("diagnostics_export_log", { destPath }),
   papersCount: () => invoke<number>("papers_count"),
   papersRecent: (limit?: number) =>
     invokeParsed("papers_recent", { limit }, (value, path) =>

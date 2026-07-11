@@ -102,15 +102,17 @@ export function useFetchMetaMutation({
       );
     },
     onError: (e: Error, v) => {
-      setters.setError(e.message);
+      const kind = detectSourceKind(v);
+      const error = formatMetadataFetchError(e.message, kind, t);
+      setters.setError(error);
       upsertArxivDoiJob(
-        { source, sourceKind: detectSourceKind(v), value: v },
+        { source, sourceKind: kind, value: v },
         {
           status: "failed",
           metadataStatus: "failed",
           pdfStatus: "skipped",
-          duplicateStatus: duplicateStatusFromError(e.message),
-          error: e.message,
+          duplicateStatus: duplicateStatusFromError(error),
+          error,
         }
       );
     },
@@ -451,6 +453,33 @@ function importJobIdentity(context: ImportJobContext): string {
     context.source?.title ??
     "unknown"
   );
+}
+
+export function formatMetadataFetchError(
+  message: string,
+  sourceKind: SourceKind | undefined,
+  t: ReturnType<typeof useT>
+): string {
+  if (sourceKind !== "doi") return message;
+  if (/not a DOI/i.test(message)) {
+    return t("import.error.doiInvalid");
+  }
+  if (/CrossRef returned 404/i.test(message)) {
+    return t("import.error.doiNotFound");
+  }
+  if (/CrossRef returned (429|5\d\d)/i.test(message)) {
+    return t("import.error.doiCrossrefUnavailable", { detail: message });
+  }
+  if (/CrossRef returned/i.test(message)) {
+    return t("import.error.doiCrossrefRejected", { detail: message });
+  }
+  if (/decode CrossRef JSON/i.test(message)) {
+    return t("import.error.doiCrossrefMalformed");
+  }
+  if (/GET https:\/\/api\.crossref\.org|request|network|timed out/i.test(message)) {
+    return t("import.error.doiNetwork", { detail: message });
+  }
+  return message;
 }
 
 export function formatAutoDownloadError(

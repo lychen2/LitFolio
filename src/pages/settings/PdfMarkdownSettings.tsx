@@ -26,7 +26,7 @@ export function PdfMarkdownSettings({
   onChange: (next: LlmConfig) => void;
 }) {
   const t = useT();
-  const config = draft.pdf_markdown ?? { engine: "local", mineru_token: "" };
+  const config = draft.pdf_markdown ?? { engine: "mineru-agent", mineru_token: "" };
   const selected = ENGINES.find((engine) => engine.value === config.engine) ?? ENGINES[0];
 
   function update(patch: Partial<LlmConfig["pdf_markdown"]>) {

@@ -40,7 +40,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
     const lineData: { x1: number; y1: number; x2: number; y2: number; ring: number }[] = [];
 
     const paperEdges = data.edges.filter(
-      (e) => e.target === conceptId && (e.edge_type === "has_concept" || e.edge_type === "discusses"),
+      (e) => e.target === conceptId && e.edge_type === "concept",
     );
     const ring1Ids = new Set(paperEdges.map((e) => e.source));
     const ring1Nodes = data.nodes.filter((n) => ring1Ids.has(n.id));
@@ -59,8 +59,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
         ring1Ids.has(e.source) &&
         !ring1Ids.has(e.target) &&
         e.target !== conceptId &&
-        e.edge_type !== "has_concept" &&
-        e.edge_type !== "discusses",
+        e.edge_type !== "concept",
     );
     const ring2Ids = new Set(ring2Edges.map((e) => e.target));
     const ring2Nodes = data.nodes.filter((n) => ring2Ids.has(n.id));

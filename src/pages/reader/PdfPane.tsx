@@ -15,6 +15,8 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api, type Highlight as BackendHighlight } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { PdfTextHighlight } from "./PdfTextHighlight";
+import { PdfSelectionAskBox } from "./PdfSelectionAskBox";
+import { PdfMarginNotesOverlay, type NoteDragStart, type ViewportDraftRect } from "./PdfMarginNotesOverlay";
 import { highlightPalette, highlightTypeKey, type HighlightTypeKey } from "./highlightTypes";
 import { PdfTermsOverlay, type PdfTermEntry } from "./PdfTermsOverlay";
 import { PdfSearchBar } from "./PdfSearchBar";
@@ -42,6 +44,13 @@ import {
   shouldRecordPdfNavigation,
   type PdfNavigationPosition,
 } from "./pdfNavigationHistory";
+import { pushPdfTextCacheAndInvalidateTranslations } from "./pdfTextCache";
+import {
+  READER_MARGIN_NOTE_LABEL,
+  extractPdfSelectionText,
+  highlightNoteUpdateValue,
+  isReaderMarginNote,
+} from "./pdfSelectionHelpers";
 
 type PdfPaneError = {
   stage: "asset-path" | "asset-url" | "pdfjs-load" | "text-cache";
@@ -54,6 +63,7 @@ type PdfPaneError = {
 
 type PdfHighlight = IHighlight & {
   label: string | null;
+  note: string | null;
   typeKey: HighlightTypeKey;
 };
 
@@ -105,11 +115,17 @@ export const PdfPane = memo(function PdfPane({
   const [zoom, setZoom] = useState<PdfZoom>("page-width");
   const [doiImport, setDoiImport] = useState<string | null>(null);
   const [navigationStack, setNavigationStack] = useState<PdfNavigationPosition[]>([]);
+  const [activeNoteHighlightId, setActiveNoteHighlightId] = useState<string | null>(null);
+  const [hiddenNoteHighlightIds, setHiddenNoteHighlightIds] = useState<Set<string>>(() => new Set());
+  const [noteDrawMode, setNoteDrawMode] = useState(false);
+  const [askSelection, setAskSelection] = useState<string | null>(null);
+  const [noteDraftRect, setNoteDraftRect] = useState<ViewportDraftRect | null>(null);
   const scrollFnRef = useRef<((h: PdfHighlight) => void) | null>(null);
   const highlighterRef = useRef<PdfHighlighter<PdfHighlight> | null>(null);
   const pendingScrollIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textPushedRef = useRef<string | null>(null);
+  const noteDragRef = useRef<NoteDragStart | null>(null);
 
   useEffect(() => {
     try {
@@ -153,8 +169,25 @@ export const PdfPane = memo(function PdfPane({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as Node | null;
-      const insidePdf = target && containerRef.current?.contains(target);
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      const container = containerRef.current;
+      const selection = window.getSelection();
+      const editableTarget = isEditableTarget(target);
+      const selectionInsidePdf = selectionBelongsTo(container, selection);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && !editableTarget) {
+        const text = extractPdfSelectionText({
+          highlighterText: null,
+          windowSelectionText: selection?.toString() ?? "",
+          selectionInsidePdf,
+        });
+        if (text) {
+          e.preventDefault();
+          void navigator.clipboard.writeText(text);
+        }
+        return;
+      }
+
+      const insidePdf = target && container?.contains(target);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && !editableTarget) {
         if (insidePdf) {
           e.preventDefault();
           setSearchSignal((n) => n + 1);
@@ -185,8 +218,8 @@ export const PdfPane = memo(function PdfPane({
       e.preventDefault();
       setZoom((current) => wheelZoom(current, e.deltaY));
     };
-    container.addEventListener("wheel", handler, { passive: false });
-    return () => container.removeEventListener("wheel", handler);
+    container.addEventListener("wheel", handler, { passive: false, capture: true });
+    return () => container.removeEventListener("wheel", handler, { capture: true });
   }, [pdfUrl]);
 
   const highlightsQ = useQuery({
@@ -209,12 +242,14 @@ export const PdfPane = memo(function PdfPane({
   }, [termsQ.data]);
 
   const create = useMutation({
-    mutationFn: (h: NewHighlight) =>
+    mutationFn: (h: NewHighlight & { color?: string | null; label?: string | null }) =>
       api.highlightCreate(
         paperId,
         h.position.pageNumber,
         h.position,
-        h.content.text ?? ""
+        h.content.text ?? "",
+        h.color ?? undefined,
+        h.label ?? undefined,
       ),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["highlights", paperId] }),
@@ -227,9 +262,54 @@ export const PdfPane = memo(function PdfPane({
       qc.invalidateQueries({ queryKey: ["paper-terms", paperId] }),
   });
 
+  const saveLinkedNote = useCallback(
+    async (highlightId: string, draft: string) => {
+      await api.highlightUpdateNote(highlightId, highlightNoteUpdateValue(draft));
+      await qc.invalidateQueries({ queryKey: ["highlights", paperId] });
+    },
+    [paperId, qc],
+  );
+
+  const saveHighlightPosition = useCallback(
+    async (highlightId: string, position: ScaledPosition) => {
+      await api.highlightUpdateRect(highlightId, position);
+      await qc.invalidateQueries({ queryKey: ["highlights", paperId] });
+    },
+    [paperId, qc],
+  );
+
+  const deleteHighlight = useCallback(
+    async (highlightId: string) => {
+      await api.highlightDelete(highlightId);
+      setActiveNoteHighlightId((current) => (current === highlightId ? null : current));
+      await qc.invalidateQueries({ queryKey: ["highlights", paperId] });
+    },
+    [paperId, qc],
+  );
+
+  const createMarginNote = useCallback(
+    async (position: ScaledPosition) => {
+      await create.mutateAsync({
+        position,
+        content: { text: t("reader.standaloneNoteText", { page: position.pageNumber }) },
+        comment: { text: "", emoji: "" },
+        label: READER_MARGIN_NOTE_LABEL,
+      });
+      setNoteDrawMode(false);
+      setNoteDraftRect(null);
+    },
+    [create, t],
+  );
+
+  const createStandaloneNote = useCallback(async () => {
+    setNoteDrawMode((value) => !value);
+    setActiveNoteHighlightId(null);
+    setNoteDraftRect(null);
+  }, []);
+
   // Memoize the highlight derivation so PdfHighlighter's prop reference stays
   // stable across renders that don't actually change the highlight set.
-  const highlights: PdfHighlight[] = useMemo(
+  const allHighlights: PdfHighlight[] = useMemo(
     () =>
       (highlightsQ.data ?? []).map((h: BackendHighlight) => {
         const label = h.label ?? null;
@@ -237,12 +317,21 @@ export const PdfPane = memo(function PdfPane({
           id: h.id,
           position: h.rect as ScaledPosition,
           content: { text: h.text },
+          note: h.note,
           comment: { text: h.note ?? "", emoji: "" },
           label,
           typeKey: highlightTypeKey(label),
         };
       }),
-    [highlightsQ.data]
+    [highlightsQ.data],
+  );
+  const highlights = useMemo(
+    () => allHighlights.filter((highlight) => !isReaderMarginNote(highlight)),
+    [allHighlights],
+  );
+  const marginNotes = useMemo(
+    () => allHighlights.filter(isReaderMarginNote),
+    [allHighlights],
   );
 
   const renderManualHighlightLayers = useCallback(() => {
@@ -495,7 +584,10 @@ export const PdfPane = memo(function PdfPane({
         dark={dark}
         zoomLabel={zoomLabel}
         canReturn={navigationStack.length > 0}
+        notePending={create.isPending}
+        noteActive={noteDrawMode}
         onReturn={returnToPreviousPosition}
+        onAddNote={() => void createStandaloneNote()}
         onZoomOut={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
         onZoomReset={() => setZoom(DEFAULT_ZOOM)}
         onZoomIn={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
@@ -503,6 +595,7 @@ export const PdfPane = memo(function PdfPane({
         onToggleDark={() => setDark((d) => !d)}
       />
       <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
+      {noteDrawMode && <div className="litera-pdf-note-draw-hint">{t("reader.noteDrawHint")}</div>}
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}
@@ -530,10 +623,14 @@ export const PdfPane = memo(function PdfPane({
           if (textPushedRef.current !== paperId) {
             textPushedRef.current = paperId;
             extractPdfText(pdfDocument)
-              .then((text) => {
-                if (!text) return;
-                return api.paperSetPdfText(paperId, text);
-              })
+              .then((text) =>
+                pushPdfTextCacheAndInvalidateTranslations({
+                  paperId,
+                  text,
+                  api,
+                  queryClient: qc,
+                })
+              )
               .catch((err) =>
                 console.warn(
                   "[PdfPane] push pdf text failed",
@@ -573,13 +670,18 @@ export const PdfPane = memo(function PdfPane({
                       });
                       hideTipAndSelection();
                     }}
+                    onAsk={() => {
+                      const text = selectedText(content, containerRef.current);
+                      if (text) setAskSelection(text);
+                      hideTipAndSelection();
+                    }}
                     onCopy={() => {
-                      const text = selectedText(content);
+                      const text = selectedText(content, containerRef.current);
                       if (text) void navigator.clipboard.writeText(text);
                       hideTipAndSelection();
                     }}
                     onTranslate={() => {
-                      const text = selectedText(content);
+                      const text = selectedText(content, containerRef.current);
                       if (text) onTranslateSelection?.(text);
                       hideTipAndSelection();
                     }}
@@ -600,13 +702,25 @@ export const PdfPane = memo(function PdfPane({
                   _shot,
                   isScrolledTo
                 ) => (
-                  <PdfTextHighlight
-                    key={highlight.id}
-                    rects={highlight.position.rects}
-                    dark={dark}
-                    isScrolledTo={isScrolledTo}
-                    label={highlight.label}
-                  />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setActiveNoteHighlightId(highlight.id)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      setActiveNoteHighlightId(highlight.id);
+                    }}
+                    className="absolute inset-0 cursor-text"
+                  >
+                    <PdfTextHighlight
+                      key={`${highlight.id}:mark`}
+                      rects={highlight.position.rects}
+                      dark={dark}
+                      isScrolledTo={isScrolledTo}
+                      label={highlight.label}
+                    />
+                  </div>
                 )}
               />
               <FigureLinks pdfDocument={pdfDocument} pdfUrl={pdfUrl} />
@@ -624,6 +738,40 @@ export const PdfPane = memo(function PdfPane({
         onClose={() => setDoiImport(null)}
       />
       <PdfTermsOverlay containerRef={containerRef} terms={termEntries} />
+      <PdfMarginNotesOverlay
+        activeNoteId={activeNoteHighlightId}
+        containerRef={containerRef}
+        draftRect={noteDraftRect}
+        hiddenLinkedNoteIds={hiddenNoteHighlightIds}
+        linkedNotes={highlights}
+        marginNotes={marginNotes}
+        noteDrawMode={noteDrawMode}
+        onCancelDraft={() => {
+          noteDragRef.current = null;
+          setNoteDraftRect(null);
+        }}
+        onCreate={createMarginNote}
+        onDelete={deleteHighlight}
+        onDragStart={(start) => {
+          noteDragRef.current = start;
+        }}
+        onDraftRect={setNoteDraftRect}
+        onHideLinkedNote={(id) => {
+          setActiveNoteHighlightId(null);
+          setHiddenNoteHighlightIds((current) => new Set(current).add(id));
+        }}
+        onSave={saveLinkedNote}
+        onSelect={setActiveNoteHighlightId}
+        onToggleDrawMode={setNoteDrawMode}
+        onUpdatePosition={saveHighlightPosition}
+      />
+      {askSelection && (
+        <PdfSelectionAskBox
+          paperId={paperId}
+          selection={askSelection}
+          onClose={() => setAskSelection(null)}
+        />
+      )}
       <PdfMutationError
         createError={create.error}
         termError={addTerm.error}
@@ -634,7 +782,7 @@ export const PdfPane = memo(function PdfPane({
       />
       {highlightsQ.data && (
         <PdfStatusBadge
-          highlights={highlightsQ.data.length}
+          highlights={highlights.length}
           terms={termEntries.length}
         />
       )}
@@ -642,11 +790,27 @@ export const PdfPane = memo(function PdfPane({
   );
 });
 
-function selectedText(content: { text?: string | null }): string {
-  const fromHighlighter = content.text?.trim();
-  if (fromHighlighter) return fromHighlighter;
-  return window.getSelection()?.toString().trim() ?? "";
+function selectedText(content: { text?: string | null }, container: HTMLElement | null): string {
+  const selection = window.getSelection();
+  return extractPdfSelectionText({
+    highlighterText: content.text,
+    windowSelectionText: selection?.toString() ?? "",
+    selectionInsidePdf: selectionBelongsTo(container, selection),
+  });
 }
+
+function selectionBelongsTo(container: HTMLElement | null, selection: Selection | null): boolean {
+  if (!container || !selection || selection.rangeCount === 0) return false;
+  const anchorInside = !!selection.anchorNode && container.contains(selection.anchorNode);
+  const focusInside = !!selection.focusNode && container.contains(selection.focusNode);
+  return anchorInside || focusInside;
+}
+
+function isEditableTarget(target: Node | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest("input, textarea, select, [contenteditable='true']");
+}
+
 
 type ManualScaledRect = {
   x1?: number;

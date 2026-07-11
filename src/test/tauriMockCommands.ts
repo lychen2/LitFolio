@@ -9,7 +9,7 @@ export const mockPaper: Paper = {
   authors: ["Ada Lovelace"],
   year: 2026,
   venue: "LitFolio E2E",
-  doi: null,
+  doi: "10.1145/3530819",
   arxiv_id: null,
   abstract_text: "Fixture paper used by Playwright smoke tests.",
   pdf_path: null,
@@ -42,6 +42,7 @@ export const mockLlmConfig: LlmConfig = {
     link: null,
     topic_survey: null,
     ask: null,
+    lit_review: null,
   },
   output_language: "Chinese",
   pdf_markdown: { engine: "local", mineru_token: "" },
@@ -127,6 +128,22 @@ const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
   ["paper_get", () => mockPaper],
   ["paper_quick_read", () => mockQuickReadResult],
+  ["paper_find_by_doi", () => mockPaper],
+  ["paper_translated_markdown_get", () => null],
+  ["paper_translate_markdown_estimate", () => ({
+    source_chars: 1200,
+    cleaned_chars: 1000,
+    chunk_count: 2,
+  })],
+  ["paper_translate_markdown", () => ({
+    markdown: "# 中文译文\n\n这是一段译文。",
+    target_lang: "Chinese",
+    model: "mock-model",
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    cached: false,
+  })],
+  ["highlight_update_rect", () => null],
   ["paper_supplements_list", () => []],
   ["paper_supplement_add_file", () => ({
     id: 1,
@@ -168,6 +185,7 @@ const commandFixtures = new Map<string, MockResolver>([
   })],
   ["papers_count", () => 1],
   ["library_root", () => "/tmp/litfolio-test"],
+  ["diagnostics_export_log", () => "/tmp/litfolio-diagnostics.log"],
   [
     "sync_get_config",
     () => ({

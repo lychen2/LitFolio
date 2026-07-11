@@ -12,8 +12,8 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::client::{chat_complete, ChatMessage};
-use super::profile::LlmProfile;
+use super::client::{chat_complete_for_task, ChatMessage};
+use super::profile::{LlmProfile, TaskKind};
 
 #[cfg(test)]
 mod tests;
@@ -118,7 +118,7 @@ pub async fn plan_survey(
             content: trimmed.into(),
         },
     ];
-    let resp = chat_complete(client, profile, &messages).await?;
+    let resp = chat_complete_for_task(client, profile, TaskKind::TopicSurvey, &messages).await?;
     let mut skel = parse_skeleton(&resp.content).with_context(|| {
         if resp.finish_reason.as_deref() == Some("length") {
             return format!(

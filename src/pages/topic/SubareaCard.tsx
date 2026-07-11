@@ -6,10 +6,12 @@ import { SurveyPaperRow } from "./SurveyPaperRow";
 
 interface Props {
   subarea: SurveySubareaResult;
+  onToggleMustRead?: (paperId: string) => void;
   initialOpen?: boolean;
+  onSummaryChange?: (subareaName: string, summary: string) => void;
 }
 
-export function SubareaCard({ subarea, initialOpen = true }: Props) {
+export function SubareaCard({ subarea, initialOpen = true, onToggleMustRead, onSummaryChange }: Props) {
   const t = useT();
   const [open, setOpen] = useState(initialOpen);
   const year = subarea.year_range
@@ -45,9 +47,20 @@ export function SubareaCard({ subarea, initialOpen = true }: Props) {
       </header>
       {open && (
         <div className="border-t border-litera-line/40">
-          <div className="px-5 py-3 text-sm text-litera-text/85 leading-relaxed">
-            {subarea.summary}
-          </div>
+          {onSummaryChange ? (
+            <div className="px-5 py-3">
+              <textarea
+                value={subarea.summary}
+                onChange={(event) => onSummaryChange(subarea.name, event.target.value)}
+                className="litera-input min-h-20 w-full resize-y text-sm leading-relaxed"
+                aria-label={t("topic.survey.editSummary")}
+              />
+            </div>
+          ) : (
+            <div className="px-5 py-3 text-sm text-litera-text/85 leading-relaxed">
+              {subarea.summary}
+            </div>
+          )}
           {subarea.search_terms.length > 0 && (
             <div className="px-5 pb-3 flex gap-1.5 flex-wrap text-[11px] items-center">
               <span className="text-litera-mute">{t("topic.survey.searchTerms")}</span>
@@ -68,7 +81,7 @@ export function SubareaCard({ subarea, initialOpen = true }: Props) {
           ) : (
             <ul className="divide-y divide-litera-line/40 border-t border-litera-line/40">
               {subarea.papers.map((p, i) => (
-                <SurveyPaperRow key={p.id} paper={p} rank={i + 1} />
+                <SurveyPaperRow key={p.id} paper={p} rank={i + 1} onToggleMustRead={onToggleMustRead} />
               ))}
             </ul>
           )}

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectSourceKind,
   formatAutoDownloadError,
+  formatMetadataFetchError,
   parseAutoDownloadFailure,
 } from "./ArxivDoiWorkflow";
 import { type useT } from "@/i18n/I18nProvider";
@@ -26,6 +27,25 @@ describe("detectSourceKind", () => {
     expect(detectSourceKind("not an identifier")).toBeNull();
   });
 });
+describe("formatMetadataFetchError", () => {
+  it("maps DOI metadata failures to readable messages", () => {
+    expect(formatMetadataFetchError("not a DOI: nope", "doi", t)).toBe("import.error.doiInvalid");
+    expect(formatMetadataFetchError("CrossRef returned 404: Resource not found", "doi", t)).toBe(
+      "import.error.doiNotFound"
+    );
+    expect(formatMetadataFetchError("CrossRef returned 503: busy", "doi", t)).toBe(
+      "import.error.doiCrossrefUnavailable: CrossRef returned 503: busy"
+    );
+    expect(formatMetadataFetchError("decode CrossRef JSON", "doi", t)).toBe(
+      "import.error.doiCrossrefMalformed"
+    );
+  });
+
+  it("leaves arXiv metadata failures unchanged", () => {
+    expect(formatMetadataFetchError("arXiv returned 404", "arxiv", t)).toBe("arXiv returned 404");
+  });
+});
+
 
 describe("formatAutoDownloadError", () => {
   it("maps DOI missing public PDF links to an explicit user prompt", () => {
