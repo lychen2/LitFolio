@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit optional metadata/file preservation and rollback"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Audit query validation, merge conflict, path, and cancellation errors"}
+{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit no SQL/core-pool access and optional document integration"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure all Library Plus tables/files are mapped"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Check basic core Library remains intact"}
+{"file":".trellis/tasks/07-23-mono-plugin-library-plus/research/source-map.md","reason":"Check smart, duplicate, and supplement boundary decisions"}

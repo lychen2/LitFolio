@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/state-management.md","reason":"Reader controller, async mutation, and paper-switch state rules"}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Annotation discriminated union and runtime parser requirements"}
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"New pdf_notes schema, repository, migration, and rollback rules"}
+{"file":".trellis/spec/cross-layer/reader-annotations.md","reason":"Current and target annotation cross-layer contract"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"All legacy note models and migration assertions"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Historical migration ownership and immutability"}
+{"file":".trellis/tasks/07-23-mono-reader-annotations/research/source-map.md","reason":"Focused Reader behavior, storage, and conversion seams"}

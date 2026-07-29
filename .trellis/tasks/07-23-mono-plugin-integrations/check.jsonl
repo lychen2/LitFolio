@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit snapshot/config/file backup, atomicity, accepted-document ownership, and restore"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Audit credential redaction, cancellation, lifecycle, and recovery failures"}
+{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit typed grants, no raw DB/plugin directory/secret access, and host execution records"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Check core offline behavior, updater ownership, and independent enablement"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Check core document/basic export behavior remains"}
+{"file":".trellis/tasks/07-23-mono-plugin-integrations/research/source-map.md","reason":"Check mixed config, update, sync, and parser security boundaries"}
+{"file":".trellis/tasks/07-28-mono-neuink-integration-study/design.md","reason":"Audit parser candidate acceptance, evidence survival, manual schedules, and generation revocation"}
+{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Audit data-transfer, updater network ownership, and document-services disable behavior"}

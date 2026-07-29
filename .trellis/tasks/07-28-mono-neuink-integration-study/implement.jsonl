@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-architecture-audit.md", "reason": "Pinned architecture evidence for clean Mono integration decisions"}
+{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-reading-workflows.md", "reason": "Pinned provenance, reader recovery, and V1/V1.1 scope evidence"}
+{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md", "reason": "Pinned context, proposals, jobs, search degradation, and parser acceptance evidence"}
+{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Complexity targets, ownership, evidence limits, and implementation benchmark gates"}

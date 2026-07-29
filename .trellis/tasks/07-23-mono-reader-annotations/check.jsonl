@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check overlay/editor behavior, focus, and component boundaries"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check stale writes, retries, flush, and paper-switch safety"}
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit schema, revisions, backup, idempotence, and restore"}
+{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Check commands, parsers, errors, mocks, and registration parity"}
+{"file":".trellis/spec/cross-layer/reader-annotations.md","reason":"Audit discriminated model and coordinate contract"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"Ensure no legacy note source is lost"}
+{"file":".trellis/tasks/07-23-mono-reader-annotations/research/source-map.md","reason":"Check current interaction parity and migration ownership"}

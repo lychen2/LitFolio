@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Check target moves respect established current conventions"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check lint, tests, and behavior-preserving refactor quality"}
+{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Check command/parser/mock parity after client moves"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check end-to-end behavior did not disappear at a layer boundary"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Audit unrelated worktree preservation"}
+{"file":".trellis/tasks/07-23-mono-core-boundaries/research/source-map.md","reason":"Check every known coupling has an owner or adapter"}

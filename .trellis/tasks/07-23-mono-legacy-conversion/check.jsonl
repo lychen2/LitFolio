@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit every destructive boundary, manifest, and restore path"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Audit future/corrupt/busy/space/path/failure cases and secret redaction"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit startup UI through storage switch and reopen"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Verify every migration/table/file has exactly one target"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"Verify all note systems and sentinel data survive"}
+{"file":".trellis/tasks/07-23-mono-legacy-conversion/research/source-map.md","reason":"Check all child migrator inputs and fixture boundaries"}
+{"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Audit AC-005, AC-009, data preservation, and canonical manifest requirements"}
+{"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Verify converter consumes compiler output and rejects stale plans"}
+{"file":".trellis/tasks/07-28-mono-provenance-reading/prd.md","reason":"Verify accepted provenance survives core-only and parser-excluded conversion"}

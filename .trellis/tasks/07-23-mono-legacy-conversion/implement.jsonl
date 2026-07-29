@@ -1,0 +1,10 @@
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Historical migration, backup, staging, atomic switch, and rollback rules"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Structured preflight/conversion/rollback failures and redaction"}
+{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Startup preview/progress/report command and parser contract"}
+{"file":".trellis/spec/cross-layer/reader-annotations.md","reason":"Margin-note and legacy-note conversion contract"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Authoritative 0001-0035 owner map"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Protect source changes while implementing high-risk migration"}
+{"file":".trellis/tasks/07-23-mono-legacy-conversion/research/source-map.md","reason":"Current startup/layout, canonical inclusion input, owner dispositions, and fixture strategy"}
+{"file":".trellis/tasks/07-23-litfolio-mono/design.md","reason":"Canonical manifest-derived inclusion plan, provenance ownership, and disabled/excluded disposition contract"}
+{"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Upstream compiler ownership and stale resolved-inclusion rejection"}
+{"file":".trellis/tasks/07-28-mono-provenance-reading/design.md","reason":"Core provenance tables/files and plugin-independent conversion verification"}

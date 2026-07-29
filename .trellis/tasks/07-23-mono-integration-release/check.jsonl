@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Audit frontend build/test/E2E evidence"}
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit migration matrix, provenance survival, and rollback evidence"}
+{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit every plugin profile, lifecycle, authority, permission, and artifact state"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Verify every historical owner appears in conversion evidence"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Verify no deferred marketplace/TCP scope and true pruning"}
+{"file":".trellis/tasks/07-23-mono-integration-release/research/source-map.md","reason":"Audit report completeness, AC-009 through AC-014, and evidence provenance"}
+{"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Map all parent acceptance criteria AC-001 through AC-014"}
+{"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Check canonical manifests, binding authority, grants, execution, and terminal disable"}
+{"file":".trellis/tasks/07-28-mono-provenance-reading/prd.md","reason":"Check parser-independent accepted evidence, Reader, backlinks, and export"}
+{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md","reason":"Check fixed-revision clean-room/reuse, Apache notice, branding, and SBOM evidence"}

@@ -1,0 +1,10 @@
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Embedding/session sidecar, typed-part schema, and vector migration rules"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Profile, index, cancellation, degradation, and plugin errors"}
+{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Ask scope, DTO/parser/mock/command parity"}
+{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Papers, AI, storage, jobs, lifecycle, and proposal scopes"}
+{"file":".trellis/tasks/07-23-litfolio-mono/design.md","reason":"Parent-owned explicit scope transition, host authority, execution, terminal disable, and core keyword ownership"}
+{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md","reason":"Fixed-revision evidence for typed parts/runs, retrieval degradation, embedding provenance, proposals, and real cancellation"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"0023/0034 and vector ownership"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"No core storage access and retained-data disable semantics"}
+{"file":".trellis/tasks/07-23-mono-plugin-library-ask/research/source-map.md","reason":"Current Ask coupling and canonical/derived data boundary"}
+{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Top-K RRF, incremental embedding cache, vector backend caveat, and benchmark gates"}

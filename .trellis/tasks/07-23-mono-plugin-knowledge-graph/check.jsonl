@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Audit graph performance and lazy ownership"}
+{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit links/concepts/citations migration and rollback"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Audit missing paper, network, AI, and cancellation cases"}
+{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit data/network/AI isolation and cleanup"}
+{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure graph-owned tables are preserved"}
+{"file":".trellis/tasks/07-23-mono-plugin-knowledge-graph/research/source-map.md","reason":"Check generic citation export remains core"}
