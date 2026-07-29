@@ -3,7 +3,7 @@
   "name": "mono-core-boundaries",
   "title": "Establish Mono Core Boundaries",
   "description": "Separate app, core, features, plugins, typed APIs, and enforce import boundaries without changing product behavior.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

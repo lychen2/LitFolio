@@ -36,17 +36,17 @@ Introduce enforceable app/core/feature/plugin ownership and typed API boundaries
 
 ## Acceptance Criteria
 
-- [ ] Automated import-boundary checks reject core-to-plugin and plugin-to-internal imports.
-- [ ] Current route, navigation, command-palette, import, Reader, and settings smoke behavior remains equivalent.
-- [ ] Every migrated API call uses an explicit typed client/parser and Tauri command parity/mocks remain complete.
-- [ ] TypeScript and Rust conformance consumers accept the same canonical valid manifest/domain/plugin/job fixtures and reject the same invalid fixtures; no second manifest schema or registry input exists.
-- [ ] Job contracts distinguish core ownership from plugin instance ownership, carry monotonic event sequence and cancellation state, allow exactly one terminal result, and expose no raw database, filesystem, secret, generic invoke, process, or socket authority.
-- [ ] `main.tsx` core boot neither calls updater transport nor registers its periodic timer; manual update checking remains reachable through the explicitly named compatibility owner for `updates`.
-- [ ] Instrumented core-only cold boot through Library/Reader readiness plus 30 seconds of idle records zero attempted network requests, and a positive-control fixture proves the observer fails when updater/network transport is invoked.
-- [ ] `ReaderPage` has an explicit assembly boundary and no new persistence logic is added to route components.
-- [ ] Compatibility adapters are documented, tested, and have named removal owners in later child plans.
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, focused Playwright smoke tests, and applicable command-parity checks pass.
-- [ ] No schema, migration, or unrelated user change is modified.
+- [x] Automated import-boundary checks reject core-to-plugin and plugin-to-internal imports.
+- [x] Current route, navigation, command-palette, import, Reader, and settings smoke behavior remains equivalent.
+- [x] Every migrated API call uses an explicit typed client/parser and Tauri command parity/mocks remain complete.
+- [x] TypeScript and Rust conformance consumers accept the same canonical valid manifest/domain/plugin/job fixtures and reject the same invalid fixtures; no second manifest schema or registry input exists.
+- [x] Job contracts distinguish core ownership from plugin instance ownership, carry monotonic event sequence and cancellation state, allow exactly one terminal result, and expose no raw database, filesystem, secret, generic invoke, process, or socket authority.
+- [x] `main.tsx` core boot neither calls updater transport nor registers its periodic timer; manual update checking remains reachable through the explicitly named compatibility owner for `updates`.
+- [ ] Instrumented core-only cold boot through Library/Reader readiness plus 30 seconds of idle records zero attempted network requests, and a positive-control fixture proves the observer fails when updater/network transport is invoked. Current evidence is narrower than this process-wide criterion; see `research/implementation-evidence.md`.
+- [x] `ReaderPage` has an explicit assembly boundary and no new persistence logic is added to route components.
+- [x] Compatibility adapters are documented, tested, and have named removal owners in later child plans.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test`, focused Playwright smoke tests, and applicable command-parity checks pass. Latest checkpoint: strict typecheck/lint, 56 Vitest files with 275 tests, focused Playwright routes/network, and command parity all pass.
+- [x] No schema, migration, or unrelated user change is modified by this task's documentation reconciliation.
 
 ## Source Anchors
 

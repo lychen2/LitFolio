@@ -7,31 +7,31 @@
 
 ## Checklist
 
-1. [ ] Capture status/diffs for all planned paths and inventory existing aliases, route imports, API exports, schema parsers, mocks, parity tests, `startAutoUpdateCheck()`, updater timers, and other startup egress paths.
-2. [ ] Add layer directories, public entrypoints, and import-boundary enforcement with failing negative fixtures.
-3. [ ] Consume the canonical `PluginManifestV1` fixtures and extract minimum stable TypeScript/Rust core domain/resource, plugin declaration, and job owner/state/event/cancellation/terminal value types without adding live grants or lifecycle behavior.
-4. [ ] Add cross-language conformance tests for valid/invalid manifests and domain/plugin/job fixtures; reject forged authority, sequence gaps/duplicates, multiple terminal outcomes, and post-terminal events.
-5. [ ] Extract the typed command-spec/invoke foundation without changing command names or payloads, then split core library/Reader/AI API ownership one domain at a time with tested compatibility re-exports.
-6. [ ] Move app boot/shell/route assembly behind `app/` entrypoints while preserving lazy routes/navigation; remove the unconditional updater boot call and timer, retaining manual Settings checks through an `updates`-owned compatibility adapter.
-7. [ ] Establish `ReaderPage` as an assembly boundary; move only behavior-neutral ownership, leaving annotation and AI redesign to their children.
-8. [ ] Update mocks, schemas, query callers, aliases, and parity tests atomically for each moved client.
-9. [ ] Add frontend fake-time and Tauri host instrumentation for core-only cold boot/readiness plus 30-second idle; require zero egress and a positive control that proves updater/network attempts are observed.
-10. [ ] Run focused tests after every contract/domain move, then full frontend validation, focused Rust conformance tests, route smoke, and zero-network gates.
-11. [ ] Record remaining adapters and owning removal child; review the diff for no schema/visual/feature extraction and no duplicate manifest/registry source.
+1. [x] Capture status/diffs for all planned paths and inventory existing aliases, route imports, API exports, schema parsers, mocks, parity tests, `startAutoUpdateCheck()`, updater timers, and other startup egress paths.
+2. [x] Add layer directories, public entrypoints, and import-boundary enforcement with failing negative fixtures.
+3. [x] Consume the canonical `PluginManifestV1` fixtures and extract minimum stable TypeScript/Rust core domain/resource, plugin declaration, and job owner/state/event/cancellation/terminal value types without adding live grants or lifecycle behavior.
+4. [x] Add cross-language conformance tests for valid/invalid manifests and domain/plugin/job fixtures; reject forged authority, sequence gaps/duplicates, multiple terminal outcomes, and post-terminal events.
+5. [x] Extract the typed command-spec/invoke foundation without changing command names or payloads, then split core library/Reader/AI API ownership one domain at a time with tested compatibility re-exports.
+6. [x] Move app boot/shell/route assembly behind `app/` entrypoints while preserving lazy routes/navigation; remove the unconditional updater boot call and timer, retaining manual Settings checks through an `updates`-owned compatibility adapter.
+7. [x] Establish `ReaderPage` as an assembly boundary; move only behavior-neutral ownership, leaving annotation and AI redesign to their children.
+8. [x] Update mocks, schemas, query callers, aliases, and parity tests atomically for each moved client.
+9. [ ] Add frontend fake-time and Tauri host instrumentation for core-only cold boot/readiness plus 30-second idle; require zero egress and a positive control that proves updater/network attempts are observed. Partial only: frontend primitives/timers, Playwright browser requests/navigation, and the denied backend host adapter are covered; raw `reqwest`, updater transport, WebView/process resources/navigation/CSP, and process-wide egress are not.
+10. [ ] Run focused tests after every contract/domain move, then full frontend validation, focused Rust conformance tests, route smoke, and zero-network gates. Full frontend validation, Rust conformance, command parity, and route smoke pass; only the complete process-wide zero-network gate from item 9 remains open.
+11. [x] Record remaining adapters and owning removal child; review the diff for no schema/visual/feature extraction and no duplicate manifest/registry source. See `research/implementation-evidence.md`.
 
 ## Validation
 
 ```bash
+pnpm test -- --run src/test/architecture/importBoundaries.test.ts src/host/contracts/contracts.test.ts src/core/data/clients.test.ts src/app/coreBootNetwork.test.ts src/lib/apiInvoke.test.ts src/lib/autoUpdate.test.ts src/lib/tauriCommandParity.test.ts
+cargo test --manifest-path src-tauri/Cargo.toml --test mono_contract_fixtures
+cargo test --manifest-path src-tauri/Cargo.toml --test mono_manifest_fixtures
+cargo test --manifest-path src-tauri/Cargo.toml core_boot_host_adapter_observes_no_dispatch_until_called
+pnpm exec playwright test e2e/app-smoke.spec.ts --grep "loads library, import, reader, and settings routes|core AppRoot reaches Library and Reader readiness"
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm test -- --run src/lib/autoUpdate.test.ts
-pnpm test:e2e -- --grep "library|reader|import|settings"
-(cd src-tauri && cargo test <mono-contract-fixture-test> <core-boot-network-test>)
 python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-23-mono-core-boundaries
 ```
-
-Replace angle-bracket Cargo test names with the focused tests created by this task. Use the repository's actual focused Vitest invocation if the Playwright grep syntax differs at implementation time.
 
 ## Rollback Gates
 
