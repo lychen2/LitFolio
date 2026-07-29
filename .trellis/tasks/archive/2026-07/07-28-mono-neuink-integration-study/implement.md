@@ -48,10 +48,10 @@ This task produces reviewed planning amendments and an implementation-ready prov
 ## Validation Commands
 
 ```bash
-python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-28-mono-neuink-integration-study
+python3 ./.trellis/scripts/task.py validate .trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study
 python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-28-mono-provenance-reading
 python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-23-litfolio-mono
-python3 ./.trellis/scripts/task.py list-context .trellis/tasks/07-28-mono-neuink-integration-study
+python3 ./.trellis/scripts/task.py list-context .trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study
 python3 ./.trellis/scripts/task.py list-context .trellis/tasks/07-28-mono-provenance-reading
 git status --short
 ```

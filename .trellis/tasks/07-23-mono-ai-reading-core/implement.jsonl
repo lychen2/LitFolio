@@ -3,7 +3,7 @@
 {"file":".trellis/spec/backend/error-handling.md","reason":"Safe provider/profile errors and secret redaction"}
 {"file":".trellis/spec/cross-layer/api-contracts.md","reason":"AI command arguments, frozen context envelopes, parsers, registration, and mocks"}
 {"file":".trellis/tasks/07-23-litfolio-mono/design.md","reason":"Parent-owned current-paper context, proposal, execution, and non-agentic core AI contracts"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md","reason":"Fixed-revision evidence for explicit context, proposal apply, execution, cancellation, and ownership boundaries"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md","reason":"Fixed-revision evidence for explicit context, proposal apply, execution, cancellation, and ownership boundaries"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Core AI Reading versus plugin workflow ownership"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"Reader controller and annotation integration boundary"}
 {"file":".trellis/tasks/07-23-mono-ai-reading-core/research/source-map.md","reason":"Current AI surface, config mixing, and Reader Ask coupling"}

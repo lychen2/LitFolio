@@ -4,5 +4,5 @@
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Ensure all routes/actions/jobs have one owner"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure every discovery and candidate table is mapped"}
 {"file":".trellis/tasks/07-23-mono-plugin-source-discovery/research/source-map.md","reason":"Check coupling removal and core local import preservation"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/design.md","reason":"Audit typed grants, visible execution, generation revocation, and zero-network startup"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Audit candidate-inbox separation and manual-before-schedule enforcement"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/design.md","reason":"Audit typed grants, visible execution, generation revocation, and zero-network startup"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Audit candidate-inbox separation and manual-before-schedule enforcement"}

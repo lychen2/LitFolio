@@ -183,30 +183,11 @@ interface LitFolioPlugin {
 }
 
 type PluginDisposer = () => void | Promise<void>;
-
-interface PluginManifestV1 {
-  apiVersion: 1;
-  id: PluginId;
-  version: Semver;
-  coreApi: SemverRange;
-  displayName: string;
-  activation: {
-    frontend?: FrontendEntrypoint;
-    backend?: BackendEntrypoint;
-  };
-  dependencies: PluginDependency[];
-  requestedCapabilities: PluginCapabilityRequest[];
-  contributions: PluginContributionDeclaration[];
-  storage: PluginStorageDeclaration;
-  migrations: PluginMigrationDeclaration[];
-  build: {
-    frontendEntry?: string;
-    rustFeature?: string;
-  };
-}
 ```
 
-Plugin identifiers are stable, lowercase, and namespace-safe. This canonical schema is validated at build and runtime. The selected frontend entry list, Cargo features, backend command slices, mocks, conversion inclusion plan, and runtime registry are generated from the same manifest set; contradictory or unsupported declarations fail before build/activation.
+The canonical `PluginManifestV1` schema and versioned target fixtures are owned by [Canonical Target Mono Contracts](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1). This parent owns the cross-child behavioral requirements and activation relationship; child tasks consume the exact spec-owned schema instead of restating it.
+
+The canonical schema is validated at build and runtime. The selected frontend entry list, Cargo features, backend command slices, mocks, conversion inclusion plan, and runtime registry are generated from the same manifest set; contradictory or unsupported declarations fail before build/activation.
 
 Activation is transactional from the host's perspective: contributions become visible only after validation and successful activation. On failure, registered resources are disposed in reverse order.
 
@@ -255,19 +236,7 @@ Capability objects are narrow operation interfaces, not flat permission labels. 
 
 Phase-one capability objects expose no raw `AppState`, SQLx pool, library/plugin path, generic Tauri `invoke`, process spawn, shell, local socket/TCP daemon, MCP runtime, or arbitrary command adapter. No capability implicitly grants another capability.
 
-Structured plugin errors include:
-
-```ts
-type PluginErrorCode =
-  | "plugin_disabled"
-  | "plugin_instance_stale"
-  | "permission_denied"
-  | "scope_not_approved"
-  | "plugin_incompatible"
-  | "plugin_dependency_missing"
-  | "plugin_activation_failed"
-  | "plugin_disable_timeout";
-```
+Stable plugin, authority, scope, proposal, and lifecycle codes are owned by the canonical [`target-mono-v1` error catalog](../../spec/cross-layer/mono-contracts.md#structured-contract-errors). This parent retains the behavioral requirements: excluded, disabled, incompatible, dependency, activation, and disable failures are isolated; missing/stale bindings and denied/out-of-scope/over-limit operations do not dispatch; proposal conflict or invalidity does not mutate user content. All results carry redacted details and an execution correlation ID.
 
 ### 6.4 Lifecycle State Machine
 

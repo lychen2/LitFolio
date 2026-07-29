@@ -15,30 +15,9 @@ Production extraction cannot start until Stages A through C pass. Each Stage D c
 
 ## 2. Canonical Manifest and Inclusion
 
-The child consumes the parent-owned schema without aliases or a second reduced manifest:
+The child consumes the exact schema and fixtures owned by [Canonical Target Mono Contracts](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1). This task owns the compiler, inclusion-plan generation, host activation surface, and runtime behavior; it does not own or restate `PluginManifestV1`.
 
 ```ts
-interface PluginManifestV1 {
-  apiVersion: 1;
-  id: PluginId;
-  version: Semver;
-  coreApi: SemverRange;
-  displayName: string;
-  activation: {
-    frontend?: FrontendEntrypoint;
-    backend?: BackendEntrypoint;
-  };
-  dependencies: PluginDependency[];
-  requestedCapabilities: PluginCapabilityRequest[];
-  contributions: PluginContributionDeclaration[];
-  storage: PluginStorageDeclaration;
-  migrations: PluginMigrationDeclaration[];
-  build: {
-    frontendEntry?: string;
-    rustFeature?: string;
-  };
-}
-
 interface LitFolioPlugin {
   manifest: PluginManifestV1;
   activate(ctx: PluginContext):
@@ -85,24 +64,9 @@ Request payload `pluginId`, contribution ownership, route origin, manifest metad
 
 ### 3.2 Structured Errors
 
-```ts
-type PluginErrorCode =
-  | "plugin_excluded"
-  | "plugin_disabled"
-  | "plugin_instance_missing"
-  | "plugin_instance_stale"
-  | "plugin_incompatible"
-  | "plugin_dependency_missing"
-  | "permission_denied"
-  | "scope_not_approved"
-  | "operation_limit_exceeded"
-  | "plugin_activation_failed"
-  | "plugin_disable_timeout"
-  | "proposal_conflict"
-  | "proposal_invalid";
-```
+The host consumes the stable plugin, authority, scope, proposal, and lifecycle codes owned by the canonical [`target-mono-v1` error catalog](../../spec/cross-layer/mono-contracts.md#structured-contract-errors); it does not define a narrower host-only union. Host behavior remains task-owned: exclusion/disable/incompatibility/dependency/activation/disable-timeout outcomes are isolated, missing or stale bindings and denied/out-of-scope/over-limit operations do not dispatch, and proposal conflicts/invalid proposals do not mutate user content.
 
-Errors expose stable code, correlation ID, and redacted safe details. They never expose bindings, paths, SQL, secret references not already visible to the user, secret values, or private document excerpts.
+Errors expose a catalog code, correlation ID, and redacted safe details. They never expose bindings, paths, SQL, secret references not already visible to the user, secret values, or private document excerpts.
 
 ## 4. Operation-Level Typed Grants
 

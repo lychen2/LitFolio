@@ -5,4 +5,4 @@
 {"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Phase-one runtime and build constraints"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/tauri-command-registry.md","reason":"Compile-time handler and AppState limitations"}
 {"file":".trellis/tasks/07-23-mono-plugin-host-sdk/research/source-map.md","reason":"Current static registries and fixture requirements"}
-{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Real cancellation, owner/generation indexing, progress coalescing, and benchmark gates"}
+{"file": ".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Real cancellation, owner/generation indexing, progress coalescing, and benchmark gates"}

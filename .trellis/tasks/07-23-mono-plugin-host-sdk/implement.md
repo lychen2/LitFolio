@@ -3,12 +3,12 @@
 ## Entry Gate
 
 - `mono-core-boundaries`, `mono-reader-annotations`, and `mono-ai-reading-core` are completed and archived.
-- Parent `PluginManifestV1`, opaque binding, typed grant, execution, proposal, job, lifecycle, build, and rollback contracts remain approved.
+- The spec-owned canonical [`PluginManifestV1`](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1), opaque binding, typed grant, execution, proposal, job, lifecycle, build, and rollback contracts remain approved.
 - Existing core proposal/execution/job storage ownership is identified before adding plugin adapters; this task must extend or reuse it, not create parallel ledgers.
 
 ## Stage A - Canonical Manifest and Build Inputs
 
-1. [ ] Add failing schema/type fixtures for the exact parent `PluginManifestV1`, including activation entries, dependencies, requested capabilities, contributions, storage, migrations, and frontend/Cargo build entries.
+1. [ ] Add failing schema/type consumers for the exact spec-owned `PluginManifestV1` fixtures, including activation entries, dependencies, requested capabilities, contributions, storage, migrations, and frontend/Cargo build entries.
 2. [ ] Implement one manifest compiler and versioned `ResolvedPluginInclusionPlan`; generate frontend entries, Rust features/command slices, runtime registry inputs, mocks, fixtures, and conversion ownership metadata from its digest.
 3. [ ] Reject duplicate IDs, incompatible API/semver ranges, cycles, missing dependencies, unsupported capabilities, contradictory activation/build declarations, and stale inclusion plans before activation or writes.
 4. [ ] Add agreement tests proving every generated registry has the same selected IDs, versions, entries, features, and inclusion-plan digest.

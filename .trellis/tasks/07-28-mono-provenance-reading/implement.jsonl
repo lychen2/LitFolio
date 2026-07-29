@@ -1,5 +1,5 @@
 {"file": ".trellis/spec/backend/storage-and-migrations.md", "reason": "Current SQLite and migration rules for additive provenance storage"}
 {"file": ".trellis/spec/cross-layer/api-contracts.md", "reason": "Typed IPC parsing and parity expectations for provenance APIs"}
 {"file": ".trellis/spec/cross-layer/reader-annotations.md", "reason": "Reader persistence and controller boundary constraints"}
-{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-reading-workflows.md", "reason": "Pinned evidence for source links, snapshots, reflow boundary, and recovery requirements"}
-{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Indexed backlinks, linear normalization, bounded remapping, atomic recovery, and thresholds"}
+{"file": ".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-reading-workflows.md", "reason": "Pinned evidence for source links, snapshots, reflow boundary, and recovery requirements"}
+{"file": ".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Indexed backlinks, linear normalization, bounded remapping, atomic recovery, and thresholds"}

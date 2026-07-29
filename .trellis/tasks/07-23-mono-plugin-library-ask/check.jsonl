@@ -2,8 +2,8 @@
 {"file":".trellis/spec/backend/error-handling.md","reason":"Audit no-profile/index/provider/cancellation behavior"}
 {"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit retrieval scope, live authority, proposal, and lifecycle cleanup"}
 {"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Audit parent requirements for explicit scope, semantic degradation, execution visibility, and plugin isolation"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md","reason":"Check typed parts/runs, keyword fallback, provenance invalidation, and cancellation evidence"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-ai-search-jobs.md","reason":"Check typed parts/runs, keyword fallback, provenance invalidation, and cancellation evidence"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure embeddings, sessions, and project references are preserved"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Ensure current-paper Ask remains core and full-library Ask is plugin-owned"}
 {"file":".trellis/tasks/07-23-mono-plugin-library-ask/research/source-map.md","reason":"Check canonical documents remain core-owned"}
-{"file": ".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Verify complexity, recall/latency evidence, changed-only indexing, and no unsupported vector claim"}
+{"file": ".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-algorithm-efficiency.md", "reason": "Verify complexity, recall/latency evidence, changed-only indexing, and no unsupported vector claim"}

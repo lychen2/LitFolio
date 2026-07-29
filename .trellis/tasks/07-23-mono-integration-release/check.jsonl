@@ -7,4 +7,4 @@
 {"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Map all parent acceptance criteria AC-001 through AC-014"}
 {"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Check canonical manifests, binding authority, grants, execution, and terminal disable"}
 {"file":".trellis/tasks/07-28-mono-provenance-reading/prd.md","reason":"Check parser-independent accepted evidence, Reader, backlinks, and export"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md","reason":"Check fixed-revision clean-room/reuse, Apache notice, branding, and SBOM evidence"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md","reason":"Check fixed-revision clean-room/reuse, Apache notice, branding, and SBOM evidence"}

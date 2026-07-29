@@ -6,7 +6,7 @@ Run only after the host compiler/profile resolver and every feature owner have s
 
 ## 2. Inputs and Signatures
 
-The host/SDK child owns `PluginManifestV1`, manifest validation, dependency resolution, and plan generation. Build pruning consumes its immutable generated output; it does not redefine the metadata example below or resolve plugin IDs independently.
+The canonical target [`PluginManifestV1`](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1) is spec-owned. The host/SDK child owns its compiler, dependency/profile resolver, and generated inclusion plan. Build pruning consumes that immutable generated output; it does not redefine manifest metadata or resolve plugin IDs independently.
 
 ```ts
 type ResolvedBuildPlanV1 = {

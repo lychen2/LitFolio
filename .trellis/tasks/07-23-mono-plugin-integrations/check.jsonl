@@ -4,5 +4,5 @@
 {"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Check core offline behavior, updater ownership, and independent enablement"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Check core document/basic export behavior remains"}
 {"file":".trellis/tasks/07-23-mono-plugin-integrations/research/source-map.md","reason":"Check mixed config, update, sync, and parser security boundaries"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/design.md","reason":"Audit parser candidate acceptance, evidence survival, manual schedules, and generation revocation"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Audit data-transfer, updater network ownership, and document-services disable behavior"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/design.md","reason":"Audit parser candidate acceptance, evidence survival, manual schedules, and generation revocation"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Audit data-transfer, updater network ownership, and document-services disable behavior"}

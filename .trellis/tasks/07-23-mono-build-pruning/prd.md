@@ -6,7 +6,7 @@ Make core-only Mono the canonical default build and prove that excluded plugins,
 
 ## Dependencies
 
-- `mono-plugin-host-sdk` has completed and archived the canonical `PluginManifestV1` compiler, profile resolver, and versioned resolved-inclusion output.
+- `mono-plugin-host-sdk` has completed and archived the compiler and profile resolver for the spec-owned canonical [`PluginManifestV1`](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1), plus its versioned resolved-inclusion output.
 - All core/plugin extraction children and `mono-legacy-conversion` are completed and archived.
 - Compatibility adapters have explicit parity/removal evidence.
 
@@ -50,7 +50,8 @@ Make core-only Mono the canonical default build and prove that excluded plugins,
 
 ## Source Anchors
 
-- `.trellis/tasks/07-23-mono-plugin-host-sdk/{prd,design,implement}.md` canonical compiler and plan contract
+- [Canonical Target Mono Contracts](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1)
+- `.trellis/tasks/07-23-mono-plugin-host-sdk/{prd,design,implement}.md` compiler and plan implementation contract
 - `src-tauri/Cargo.toml`, `Cargo.lock`, `src-tauri/src/lib.rs`, `commands/mod.rs`
 - `src/App.tsx`, plugin entries/registry, `vite.config.ts`, `package.json`, `pnpm-lock.yaml`
 - `src/lib/tauriCommandParity.test.ts`, `src/test/tauriMockCommands.ts`

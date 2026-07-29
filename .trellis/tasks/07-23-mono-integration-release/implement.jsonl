@@ -10,5 +10,5 @@
 {"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Verify no deferred marketplace/TCP scope and true pruning"}
 {"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Canonical compiler, forged/stale binding, grants, execution, and terminal lifecycle contract"}
 {"file":".trellis/tasks/07-28-mono-provenance-reading/prd.md","reason":"Core-only provenance survival and baseline Reader/export contract"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md","reason":"Fixed-revision reuse, Apache/NOTICE, branding, model, and service compliance gates"}
-{"file":".trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Zero-network boot and enforceable authority/lifecycle integration risks"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md","reason":"Fixed-revision reuse, Apache/NOTICE, branding, model, and service compliance gates"}
+{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Zero-network boot and enforceable authority/lifecycle integration risks"}

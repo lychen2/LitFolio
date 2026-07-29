@@ -2,17 +2,17 @@
 
 ## Goal
 
-Provide a typed, least-privilege plugin host that can include and independently enable or disable source-built plugins without granting them ambient LitFolio authority. Establish the canonical manifest/build contract, Rust-resolved instance authority, host-owned lifecycle services, and a local-only fixture before adding privileged capability families.
+Provide a typed, least-privilege plugin host that can include and independently enable or disable source-built plugins without granting them ambient LitFolio authority. Implement the compiler for the spec-owned canonical manifest/build contract, Rust-resolved instance authority, host-owned lifecycle services, and a local-only fixture before adding privileged capability families.
 
 ## Dependencies
 
 - `mono-core-boundaries`, `mono-reader-annotations`, and `mono-ai-reading-core` are completed and archived.
-- Parent `PluginManifestV1`, authority, execution, proposal, job, storage, build, and rollback contracts are approved.
+- The canonical target [`PluginManifestV1`](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1), authority, execution, proposal, job, storage, build, and rollback contracts are approved together with the parent behavioral requirements.
 - Core proposal and execution persistence used by plugins is available through host-owned services; this task may add plugin ownership fields or adapters but must not create a parallel plugin ledger.
 
 ## Requirements
 
-- **HOST-001 - Canonical manifest:** Use the parent-owned `PluginManifestV1` as the only manifest schema. It declares API version, stable ID/version/core API range/display name, frontend/backend activation entries, dependencies, requested capabilities, contributions, storage, migrations, and frontend/Cargo build entries. Generated frontend, Rust, runtime, mock, fixture, and resolved-inclusion registries must derive from the same validated manifest set.
+- **HOST-001 - Canonical manifest:** Consume the spec-owned `PluginManifestV1` as the only manifest schema and implement its compiler. It declares API version, stable ID/version/core API range/display name, frontend/backend activation entries, dependencies, requested capabilities, contributions, storage, migrations, and frontend/Cargo build entries. Generated frontend, Rust, runtime, mock, fixture, and resolved-inclusion registries must derive from the same validated manifest set.
 - **HOST-002 - Source/build inclusion:** Discover only source/build-time plugins. Reject duplicate IDs, incompatible ranges, dependency cycles, unsupported capabilities, contradictory activation/build declarations, and stale resolved-inclusion plans before activation or conversion. Runtime package download, dynamic binary loading, and independent plugin processes are excluded.
 - **HOST-003 - Opaque authority:** After validation, the host issues an opaque instance binding for one enabled plugin generation. Host-owned frontend transport attaches it; Rust resolves it to immutable plugin identity, generation, and granted operations before every plugin-attributed operation. Caller-supplied IDs, routes, manifests, or frontend permission metadata never authorize work.
 - **HOST-004 - Operation-level grants:** Replace broad capability labels with typed operation grants containing resource scope, limits/quotas, consent policy, execution-record redaction, and revocation behavior. No grant implicitly includes another grant.
@@ -64,5 +64,6 @@ Provide a typed, least-privilege plugin host that can include and independently 
 - `src/lib/apiInvoke.ts`, `src/lib/tauriCommandParity.test.ts`
 - `src-tauri/src/lib.rs`, `src-tauri/src/commands/mod.rs`, `src-tauri/src/startup.rs`
 - `src-tauri/src/storage/paths.rs`, `src-tauri/Cargo.toml`, `vite.config.ts`
+- [Canonical Target Mono Contracts](../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1)
 - `.trellis/tasks/07-23-litfolio-mono/design.md` sections 6 through 8
-- `.trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md`
+- `.trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md`

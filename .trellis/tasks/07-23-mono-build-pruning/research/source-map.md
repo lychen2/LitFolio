@@ -16,7 +16,7 @@
 
 ## Ownership Decision
 
-- `mono-plugin-host-sdk` owns `PluginManifestV1`, manifest validation, dependency/profile resolution, and the versioned `ResolvedBuildPlanV1`/resolved inclusion output.
+- [Canonical Target Mono Contracts](../../../spec/cross-layer/mono-contracts.md#canonical-pluginmanifestv1) owns `PluginManifestV1`. `mono-plugin-host-sdk` owns its manifest compiler, dependency/profile resolution, and the versioned `ResolvedBuildPlanV1`/resolved inclusion output.
 - This child consumes that output to generate/build/check frontend, Rust, runtime, mock, conversion, and artifact registries. It must not define a second metadata source or resolver.
 - Every generated artifact carries plan schema, compiler version, profile, profile digest, and manifest-set digest.
 - Core-only evidence must prove excluded manifests, frontend entries/routes/actions/chunks/modules, backend command slices, and exclusive dependencies are absent.

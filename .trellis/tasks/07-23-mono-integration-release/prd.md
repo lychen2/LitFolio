@@ -57,8 +57,8 @@ Produce reviewable evidence that the complete Mono architecture satisfies every 
 ## Source Anchors
 
 - Parent `prd.md`, `design.md`, `implement.md`, research, and all child completion evidence
-- `.trellis/tasks/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md`
-- `.trellis/tasks/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md`
+- `.trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/neuink-license-reuse.md`
+- `.trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md`
 - `package.json`, `vite.config.ts`, `playwright.config.ts`, `scripts/bundle-report.mjs`
 - `e2e/app-smoke.spec.ts`, `e2e/ui-smoke.spec.ts`, plugin/migration E2E added by children
 - `src-tauri/Cargo.toml`, `Cargo.lock`, `tauri.conf.json`, `.github/workflows/`

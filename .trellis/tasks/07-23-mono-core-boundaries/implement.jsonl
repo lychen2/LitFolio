@@ -1,6 +1,8 @@
 {"file":".trellis/spec/frontend/directory-structure.md","reason":"Current frontend ownership and import conventions after bootstrap"}
 {"file":".trellis/spec/frontend/type-safety.md","reason":"Typed API, parser, and public value-type rules"}
 {"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Invoke, parser, Rust registration, and mock parity contract"}
+{"file":".trellis/spec/cross-layer/mono-contracts.md","reason":"Canonical target manifest, resource, authority, registry, and conditional job fixture contract"}
+{"file":".trellis/spec/cross-layer/startup-network.md","reason":"Instrumented core boot/readiness/idle observers and one-control-per-observer contract"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Avoid duplicate clients and compatibility implementations"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Current composite surfaces and reverse dependencies"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Preserve user changes during staged moves"}

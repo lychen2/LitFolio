@@ -26,3 +26,9 @@ Examples in the guides reference current files such as `src/App.tsx`, `src/compo
 ## Language
 
 Frontend documentation is written in English. User-visible application copy remains bilingual through `src/i18n/en.ts`, `src/i18n/zh.ts`, and the i18n provider.
+
+## Related Specs
+
+- [Backend Guidelines](../backend/index.md)
+- [Cross-Layer Guidelines](../cross-layer/index.md)
+- [Thinking Guides](../guides/index.md)

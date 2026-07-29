@@ -1,0 +1,141 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "job.lifecycle.valid.v1",
+  "kind": "job-lifecycle",
+  "status": "planned-unimplemented",
+  "input": {
+    "cases": [
+      {
+        "caseId": "core-job-queued",
+        "record": {
+          "contractVersion": "target-mono-v1",
+          "id": "job-core-queued-1",
+          "owner": { "kind": "core", "component": "library-import" },
+          "kind": "pdf-import",
+          "trigger": { "kind": "user", "id": "local-user-action-queued" },
+          "state": "queued",
+          "progress": { "current": 0, "total": 1 },
+          "executionCorrelationId": "exec-core-queued-1",
+          "cancellation": { "requested": false, "requestedAt": null, "reason": null },
+          "terminal": null,
+          "createdAt": 500,
+          "startedAt": null,
+          "updatedAt": 500,
+          "finishedAt": null
+        },
+        "events": [
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-queued-1", "seq": 1, "at": 500, "kind": "queued", "state": "queued", "data": {} }
+        ]
+      },
+      {
+        "caseId": "core-job-running",
+        "record": {
+          "contractVersion": "target-mono-v1",
+          "id": "job-core-running-1",
+          "owner": { "kind": "core", "component": "library-import" },
+          "kind": "pdf-import",
+          "trigger": { "kind": "user", "id": "local-user-action-running" },
+          "state": "running",
+          "progress": { "current": 1, "total": 3 },
+          "executionCorrelationId": "exec-core-running-1",
+          "cancellation": { "requested": false, "requestedAt": null, "reason": null },
+          "terminal": null,
+          "createdAt": 600,
+          "startedAt": 601,
+          "updatedAt": 602,
+          "finishedAt": null
+        },
+        "events": [
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-running-1", "seq": 1, "at": 600, "kind": "queued", "state": "queued", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-running-1", "seq": 2, "at": 601, "kind": "started", "state": "running", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-running-1", "seq": 3, "at": 602, "kind": "progress", "state": "running", "data": { "current": 1, "total": 3 } }
+        ]
+      },
+      {
+        "caseId": "plugin-job-cancelling",
+        "record": {
+          "contractVersion": "target-mono-v1",
+          "id": "job-plugin-cancelling-1",
+          "owner": { "kind": "plugin", "pluginId": "fixture-reader-tools", "pluginVersion": "1.2.0-rc.1+build.5", "generation": 4 },
+          "kind": "fixture-reader-index",
+          "trigger": { "kind": "plugin", "id": "fixture-action-cancelling" },
+          "state": "cancelling",
+          "progress": { "current": 2, "total": 10 },
+          "executionCorrelationId": "exec-plugin-cancelling-1",
+          "cancellation": { "requested": true, "requestedAt": 703, "reason": "plugin-disabled" },
+          "terminal": null,
+          "createdAt": 700,
+          "startedAt": 701,
+          "updatedAt": 703,
+          "finishedAt": null
+        },
+        "events": [
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-cancelling-1", "seq": 1, "at": 700, "kind": "queued", "state": "queued", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-cancelling-1", "seq": 2, "at": 701, "kind": "started", "state": "running", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-cancelling-1", "seq": 3, "at": 702, "kind": "progress", "state": "running", "data": { "current": 2, "total": 10 } },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-cancelling-1", "seq": 4, "at": 703, "kind": "cancellation_requested", "state": "cancelling", "data": { "reason": "plugin-disabled" } }
+        ]
+      },
+      {
+        "caseId": "core-job-succeeds",
+        "record": {
+          "contractVersion": "target-mono-v1",
+          "id": "job-core-import-1",
+          "owner": { "kind": "core", "component": "library-import" },
+          "kind": "pdf-import",
+          "trigger": { "kind": "user", "id": "local-user-action-1" },
+          "state": "terminal",
+          "progress": { "current": 1, "total": 1 },
+          "executionCorrelationId": "exec-core-import-1",
+          "cancellation": { "requested": false, "requestedAt": null, "reason": null },
+          "terminal": { "outcome": "succeeded", "resultSummary": { "imported": 1 }, "error": null },
+          "createdAt": 1000,
+          "startedAt": 1001,
+          "updatedAt": 1003,
+          "finishedAt": 1003
+        },
+        "events": [
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-import-1", "seq": 1, "at": 1000, "kind": "queued", "state": "queued", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-import-1", "seq": 2, "at": 1001, "kind": "started", "state": "running", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-import-1", "seq": 3, "at": 1002, "kind": "progress", "state": "running", "data": { "current": 1, "total": 1 } },
+          { "contractVersion": "target-mono-v1", "jobId": "job-core-import-1", "seq": 4, "at": 1003, "kind": "terminal", "state": "terminal", "data": { "outcome": "succeeded" } }
+        ]
+      },
+      {
+        "caseId": "plugin-job-cancelled",
+        "record": {
+          "contractVersion": "target-mono-v1",
+          "id": "job-plugin-index-1",
+          "owner": { "kind": "plugin", "pluginId": "fixture-reader-tools", "pluginVersion": "1.2.0-rc.1+build.5", "generation": 4 },
+          "kind": "fixture-reader-index",
+          "trigger": { "kind": "plugin", "id": "fixture-action-1" },
+          "state": "terminal",
+          "progress": { "current": 2, "total": 10 },
+          "executionCorrelationId": "exec-plugin-index-1",
+          "cancellation": { "requested": true, "requestedAt": 2003, "reason": "plugin-disabled" },
+          "terminal": { "outcome": "cancelled", "resultSummary": null, "error": { "code": "cancelled", "message": "cancelled by host" } },
+          "createdAt": 2000,
+          "startedAt": 2001,
+          "updatedAt": 2004,
+          "finishedAt": 2004
+        },
+        "events": [
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-index-1", "seq": 1, "at": 2000, "kind": "queued", "state": "queued", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-index-1", "seq": 2, "at": 2001, "kind": "started", "state": "running", "data": {} },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-index-1", "seq": 3, "at": 2002, "kind": "progress", "state": "running", "data": { "current": 2, "total": 10 } },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-index-1", "seq": 4, "at": 2003, "kind": "cancellation_requested", "state": "cancelling", "data": { "reason": "plugin-disabled" } },
+          { "contractVersion": "target-mono-v1", "jobId": "job-plugin-index-1", "seq": 5, "at": 2004, "kind": "terminal", "state": "terminal", "data": { "outcome": "cancelled" } }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "cases": [
+      { "caseId": "core-job-queued", "valid": true, "terminalOutcome": null, "lastSeq": 1 },
+      { "caseId": "core-job-running", "valid": true, "terminalOutcome": null, "lastSeq": 3 },
+      { "caseId": "plugin-job-cancelling", "valid": true, "terminalOutcome": null, "lastSeq": 4 },
+      { "caseId": "core-job-succeeds", "valid": true, "terminalOutcome": "succeeded", "lastSeq": 4 },
+      { "caseId": "plugin-job-cancelled", "valid": true, "terminalOutcome": "cancelled", "lastSeq": 5 }
+    ]
+  }
+}

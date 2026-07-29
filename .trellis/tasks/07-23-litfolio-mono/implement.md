@@ -10,7 +10,7 @@ The parent task owns sequencing, shared contracts, and integration acceptance. I
 - [ ] Review the parent `prd.md`, `design.md`, research files, and all child plans.
 - [ ] Confirm every child remains `planning`; do not run `task.py start` on the parent.
 - [ ] Confirm the shared worktree snapshot and preserve unrelated modified/untracked files.
-- [ ] Complete and archive `.trellis/tasks/07-28-mono-neuink-integration-study` after its parent/child plan amendments and context validation pass.
+- [ ] Complete and archive `.trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study` after its parent/child plan amendments and context validation pass.
 
 ## Dependency Order
 
