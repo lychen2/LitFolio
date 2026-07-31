@@ -6,18 +6,16 @@ Record current updater/startup behavior and define the planned instrumented zero
 
 ## Current Implementation
 
-- `src/main.tsx` renders the React tree and then unconditionally executes `void startAutoUpdateCheck()`.
-- In `src/lib/autoUpdate.ts`, `startAutoUpdateCheck()` uses a process-global `startupDone` guard. Outside Tauri it returns before transport or timer setup. In Tauri it dynamically loads updater/dialog/process plugins, runs a prompted update check, catches/logs bootstrap failures, and then calls `schedulePeriodic`.
-- `schedulePeriodic` installs one `setInterval` at `6 * 60 * 60 * 1000` milliseconds. Each tick rebuilds Tauri dependencies and performs another prompted update check.
-- `src-tauri/src/lib.rs` unconditionally installs `tauri_plugin_updater` and constructs shared `reqwest` clients during bootstrap.
-- `src-tauri/src/startup.rs` currently performs database/filesystem startup and constructs clients; source inspection does not prove process-wide zero egress. Only an observer covering every transport can make that claim.
-- `src/lib/autoUpdate.test.ts` unit-tests `runUpdateCheck` outcomes, progress, errors, and single-flight behavior through injected dependencies. It does not execute `startAutoUpdateCheck`, inspect the six-hour timer, boot React/Tauri, or observe backend egress. It is not zero-network conformance evidence.
+- `src/main.tsx` renders the React tree and providers; it no longer calls updater transport or registers any periodic timer. The previous unconditional `void startAutoUpdateCheck()` and its six-hour `setInterval` were removed by the `mono-core-boundaries` child.
+- `src/plugins/updates/compatibility.ts` keeps manual Settings update checking reachable through the explicitly named `updates` compatibility owner. It delegates to `runUpdateCheck` in `src/lib/autoUpdate.ts`, which stays single-flight and never schedules.
+- `src/lib/autoUpdate.ts` still owns `runUpdateCheck` (prompted check with injected dependencies, progress, and single-flight behavior). `startAutoUpdateCheck` and `schedulePeriodic` no longer exist in non-test sources.
+- `src-tauri/src/lib.rs` still unconditionally installs `tauri_plugin_updater` and constructs shared `reqwest` clients during bootstrap; installing the plugin does not by itself initiate transport. The updater is therefore "included but never activated" in current core boot, matching the disabled-`updates` scenario semantics.
+- `src-tauri/src/startup.rs` performs database/filesystem startup and constructs clients. Source inspection alone does not prove process-wide zero egress; the `startup-network` harness in `src-tauri/src/network_egress/` now provides that evidence (see the implemented gate below).
 
-The current app therefore does not meet the planned core-only zero-network startup invariant.
-
+The production app no longer starts an update check or timer from core boot. The process-wide zero-egress gate for the core-only and updates-included-disabled scenarios is implemented and passing (see "Implemented gate" below); automatic update scheduling still belongs to the later `updates` extraction.
 ## Planned Parent Contract
 
-**Planned and unimplemented.** Automatic update transport and scheduling belong to the independently removable `updates` integration. Core may expose an adapter for an explicit Settings action, but core boot cannot call or schedule it. An automatic schedule is allowed only when `updates` is included, runtime-enabled, visibly persisted, and authorized after the required explicit user action/consent.
+**Runtime authority is planned and unimplemented.** Automatic update transport and scheduling belong to the independently removable `updates` integration. Core may expose an adapter for an explicit Settings action, but core boot cannot call or schedule it. An automatic schedule is allowed only when `updates` is included, runtime-enabled, visibly persisted, and authorized after the required explicit user action/consent.
 
 The shared target fixture is [`startup-network.json`](./fixtures/mono-v1/startup-network.json). It defines two conformance scenarios and positive controls.
 
@@ -52,7 +50,7 @@ Every declared observer has exactly one positive-control ID. IDs and observer as
 
 ## Source Examples
 
-Current: `src/main.tsx`, `src/lib/autoUpdate.ts`, `src/lib/autoUpdate.test.ts`, `src-tauri/src/lib.rs`, and `src-tauri/src/startup.rs`.
+Current: `src/main.tsx`, `src/lib/autoUpdate.ts`, `src/plugins/updates/compatibility.ts`, `src-tauri/src/lib.rs`, `src-tauri/src/startup.rs`, `src-tauri/src/network_egress/`, and `src-tauri/tests/startup_network_process.rs`.
 
 Planned authority: `.trellis/tasks/07-23-litfolio-mono/design.md`, `.trellis/tasks/07-23-mono-core-boundaries/design.md`, and `.trellis/tasks/07-23-mono-plugin-integrations/design.md`.
 
@@ -71,15 +69,20 @@ Target fixture consistency includes named negative mutations that remove an obse
 python3 .trellis/spec/cross-layer/fixtures/mono-v1/validate.py
 ```
 
-Executable target recipe for `mono-core-boundaries` and later integration gates:
+## Implemented Gate
 
+`mono-core-boundaries` implements the executable gate. `src-tauri/src/network_egress/` provides the observer (`NetworkEgressObserver`, `HostNetworkState`, `EgressAttempt`, `EgressPhase`) and the native harness (`native_harness.rs` + injected `startup_network_audit.js`); `src-tauri/src/main.rs` routes `LITFOLIO_STARTUP_NETWORK_HARNESS=1` into the harness before normal boot. The driver is `src-tauri/tests/startup_network_process.rs`, which spawns the real binary under `unshare --user --map-root-user --net` with `xvfb-run` and `strace -ff -e trace=network`, so syscall-level egress is observed in addition to all app-level observers. WebView/process resource loads use `connect_resource_load_started`, top-level navigation uses `on_navigation`, frontend primitives are injected via `js_init_script` before app import, and CSP evidence comes from a pinned `securitypolicyviolation` handler.
+
+Both fixture scenarios run and pass: `core-only-cold-boot-and-idle` (zero + positive-controls) and `updates-included-disabled-cold-boot-and-idle` (zero, with `tauri_plugin_updater` compiled into the artifact but never activated). Zero scenarios reach `library-ready` and `reader-pdf-ready`, settle the 30-second idle window, and assert zero attempts at every observer plus an empty `strace` network trace; all 17 positive controls are asserted observed in their pinned phases, including real denied `reqwest` sends to `http://203.0.113.1:9` through the api/external clients.
+
+The two process-level tests are serialized through a shared `PROCESS_GATE` mutex in the driver because parallel WebKitGTK harness instances race on shared WebKit data directories (one of the two tests fails with exit 1 whenever they run concurrently; both pass in isolation or serialized). Run the gate with the reserved recipes in the Validation section.
 ```bash
 pnpm test -- -t 'core_boot_without_plugins_has_no_network_requests'
 pnpm test -- -t 'disabled_update_plugin_has_no_timer_or_network_request'
 cargo test --manifest-path src-tauri/Cargo.toml core_boot_without_plugins_has_no_network_requests
 ```
 
-Those test names and commands are reserved target recipes. They cannot be reported as passing until the owning task adds the harness, runs both readiness/idle scenarios, and proves all positive controls.
+Those test names and commands are reserved target recipes. They now pass as part of `mono-core-boundaries`; later integration gates must keep them green as plugins, schedules, or transports are added.
 
 ## Anti-Patterns
 

@@ -100,3 +100,29 @@ Resume with todo item `编写父任务规划与研究`. Do not run `task.py star
 
 - Finish only process-wide zero-egress instrumentation: raw `reqwest`, updater transport, WebView/process/CSP, retry/schedule paths, and disabled-updates scenario.
 - Then run `trellis-check`, update specs, create an explicit task-owned commit, and archive the child.
+
+## 2026-07-29 - Native Startup Network Harness Checkpoint
+
+### Saved Native Harness Work
+
+- Added a Linux debug-only native Tauri startup-network harness in `src-tauri/src/network_egress/native_harness.rs` with browser primitive, WebView resource/navigation/CSP, updater, backend client, host adapter, and network-timer observer records.
+- Added `src-tauri/src/network_egress/startup_network_audit.js` and `src-tauri/tests/startup_network_process.rs` for core-only, disabled-updates, and positive-control scenarios.
+- Added the debug harness entry in `src-tauri/src/main.rs`; existing observer/bootstrap wiring remains in `src-tauri/src/network_egress.rs`, `src-tauri/src/startup.rs`, and `src-tauri/src/lib.rs`.
+- The harness now creates its audit window directly with `WebviewUrl::App("index.html")`. This preserves the normal Tauri asset-protocol path while allowing builder-level navigation/resource observers. Preserve unrelated dirty-worktree edits.
+
+### Verification And Open Failure
+
+- `cargo check --manifest-path src-tauri/Cargo.toml` passed with one existing dead-code warning.
+- `pnpm typecheck` passed.
+- Focused `git diff --check` passed.
+- The core-only zero-egress scenario now reaches real Library readiness, renders the seeded PDF, reaches Reader readiness, completes the 30-second idle window, and passes its zero-attempt assertions.
+- Positive controls now pass for all 17 observers. The five WebView resource controls use unique sentinel ports with initiation evidence correlated to `strace` process syscalls; navigation uses the Tauri policy callback.
+- `cargo test --manifest-path src-tauri/Cargo.toml --test startup_network_process core_boot_without_plugins_has_no_network_requests -- --exact --nocapture` passed: 1 test in 44.98 seconds.
+- `cargo test --manifest-path src-tauri/Cargo.toml --test startup_network_process disabled_update_plugin_has_no_timer_or_network_request -- --exact --nocapture` passed: 1 test in 36.31 seconds after rerunning without closing the native window.
+- Both native zero-egress scenarios and all 17 positive controls now have passing evidence.
+- Reader right-sidebar collapse was also changed to React-controlled conditional mounting with stable panel IDs/orders; `pnpm typecheck`, focused ESLint, and 14 page-smoke tests passed before the network continuation.
+- Work is intentionally paused here at the user's request. The task remains `in_progress`; `trellis-check`, spec update, commit, and archive have not been run.
+
+### Resume
+
+Run the Trellis check/spec/commit/archive finish flow only when work resumes. Do not repeat the two native tests unless relevant code changes.

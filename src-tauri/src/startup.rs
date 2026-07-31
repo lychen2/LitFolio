@@ -4,11 +4,23 @@ use std::sync::Arc;
 use crate::bibtex;
 use crate::http;
 use crate::ingest;
+use crate::network_egress::{HostNetworkState, NetworkEgressObserver};
 use crate::storage::{self, default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
 use crate::AppState;
 
 pub(crate) async fn bootstrap_state() -> Result<Arc<AppState>> {
     let root = default_library_root()?;
+    bootstrap_state_at(root).await
+}
+
+async fn bootstrap_state_at(root: impl Into<std::path::PathBuf>) -> Result<Arc<AppState>> {
+    bootstrap_state_at_with_observer(root, NetworkEgressObserver::default()).await
+}
+
+pub(crate) async fn bootstrap_state_at_with_observer(
+    root: impl Into<std::path::PathBuf>,
+    network_egress: NetworkEgressObserver,
+) -> Result<Arc<AppState>> {
     let paths = LibraryPaths::new(root);
     paths.ensure()?;
     let pool = open_pool(&paths.db_file()).await?;
@@ -24,6 +36,7 @@ pub(crate) async fn bootstrap_state() -> Result<Arc<AppState>> {
         paths,
         http,
         http_external,
+        host_network: HostNetworkState::new(network_egress),
         batch_cancel: tokio::sync::Mutex::new(None),
         sync_lock: tokio::sync::Mutex::new(()),
     }))
@@ -208,5 +221,75 @@ async fn backfill_missing_bibtex(paper_repo: &storage::PaperRepo<'_>) {
     }
     if count > 0 {
         tracing::info!(count, "backfilled BibTeX entries");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::network_egress::{EgressAttempt, EgressPhase, NetworkEgressObserver};
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn core_boot_host_adapter_observes_no_dispatch_until_called() {
+        let observer = NetworkEgressObserver::default();
+        let root =
+            std::env::temp_dir().join(format!("litera-core-boot-network-{}", ulid::Ulid::new()));
+
+        let state = bootstrap_state_at_with_observer(&root, observer.clone())
+            .await
+            .expect("core state boots");
+        assert_eq!(
+            state.host_network.observer().attempt_count(),
+            0,
+            "host adapter observed an attempt before dispatch"
+        );
+
+        let papers = storage::PaperRepo::new(&state.pool)
+            .list_recent(1)
+            .await
+            .expect("library readiness query succeeds");
+        assert!(papers.is_empty(), "temporary library starts empty");
+        assert!(storage::PaperRepo::new(&state.pool)
+            .get("reader-readiness-fixture")
+            .await
+            .expect("reader readiness query succeeds")
+            .is_none());
+        assert_eq!(
+            state.host_network.observer().attempt_count(),
+            0,
+            "readiness used the host request adapter"
+        );
+
+        tokio::time::pause();
+        tokio::time::advance(Duration::from_secs(30)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(
+            state.host_network.observer().attempt_count(),
+            0,
+            "idle used the host request adapter"
+        );
+
+        let denied = state.host_network.attempt(EgressAttempt {
+            phase: EgressPhase::Idle,
+            owner: "core-positive-control".into(),
+            transport: "fake-updater-host-adapter".into(),
+            operation: "updates.check".into(),
+            redacted_destination: "https://network.invalid/<redacted>".into(),
+            correlation_id: "core-boot-positive-control".into(),
+        });
+        assert!(denied.is_err(), "positive control must remain denied");
+        assert_eq!(
+            observer.attempt_count(),
+            1,
+            "host adapter observer missed positive control"
+        );
+        assert_eq!(
+            observer.snapshot()[0].correlation_id,
+            "core-boot-positive-control"
+        );
+
+        state.pool.close().await;
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -2549,6 +2549,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ulid",
+ "webkit2gtk",
  "zip",
 ]
 

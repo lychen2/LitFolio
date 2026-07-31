@@ -18,16 +18,21 @@ Implemented boundaries include `src/app`, `src/core`, `src/features`, `src/plugi
 | `src/core/data/aiReadingClient.ts` | Delegates bounded AI Reading operations | `mono-ai-reading-core` |
 | `src/plugins/updates/compatibility.ts` | Keeps explicit Settings-only manual update checks reachable | later `updates` extraction in `mono-plugin-integrations` |
 
-## Network Evidence And Limits
+## Network Evidence (Final)
 
-Current executable observation covers:
+The process-wide zero-network gate is implemented and passing. `src-tauri/tests/startup_network_process.rs` spawns the real Tauri app (`CARGO_BIN_EXE_litera`) under `unshare --user --map-root-user --net` (isolated network namespace) with `xvfb-run` and `strace -ff -e trace=network`, so every syscall-level egress attempt is captured in addition to the app observers.
 
-- Unit-level frontend `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, timeout, and interval registration, each with a positive control.
-- Playwright browser request events and top-level navigation while Library and Reader become ready and fake time advances 30 seconds.
-- A denied Rust host request adapter during temporary-library bootstrap, Library/Reader repository readiness, and 30 seconds of paused Tokio time, with one adapter positive control.
+Observed boundaries (all 17 from the startup-network fixture):
 
-This is not process-wide zero-egress evidence. The observer is not connected to raw domain `reqwest` clients or Tauri updater transport, and it does not observe lower-level WebView/process resource loads, frame navigation, CSP violations, cache-hidden attempts, or every retry/schedule path. The disabled-`updates` artifact scenario is also absent. Therefore implementation checklist item 9 and the corresponding PRD acceptance item remain open.
+- Frontend `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, and `navigator.sendBeacon`, injected before app boot via `js_init_script`, plus `securitypolicyviolation` CSP evidence.
+- Tauri updater transport: `internals.invoke` interception of `plugin:updater|*`. The `updates-included-disabled` scenario actually installs `tauri_plugin_updater` in the artifact (included) but never activates it (disabled), and still records zero updater attempts, timers, or bindings.
+- Backend api and external `reqwest` clients: positive controls send real denied requests to `http://203.0.113.1:9` through `app_state.http` / `app_state.http_external`, which the syscall observer sees as `sin_port=htons(...)` sentinel connections.
+- `host.network-adapter` denied adapter, `scheduler.network-capable-timer` registration, WebView/process image/style/media/frame/worker resource loads (`connect_resource_load_started`), top-level navigation (`on_navigation`), and CSP-denied attempts.
+- Process-wide: `strace` network trace proves the zero scenarios made no syscall-level network attempts at all.
 
+Scenarios run: `core-only-cold-boot-and-idle` (zero + positive-controls) and `updates-included-disabled-cold-boot-and-idle` (zero). Both zero scenarios reach `library-ready` and `reader-pdf-ready`, settle a 30-second idle window, and assert `attempted_egress_count == 0` with empty attempts. Every one of the 17 positive controls is asserted observed in its pinned phase, plus the strace sentinel checks. The two process-level tests are serialized through a shared `PROCESS_GATE` mutex because parallel WebKitGTK harness instances race on shared WebKit data directories (observed as one of the two tests failing with exit 1 whenever run concurrently; both pass in isolation and serialized).
+
+Implementation checklist item 9, the PRD acceptance item, and the reserved recipes `core_boot_without_plugins_has_no_network_requests` and `disabled_update_plugin_has_no_timer_or_network_request` are therefore complete.
 ## Verified Commands
 
 ```bash
@@ -43,8 +48,8 @@ cargo test --manifest-path src-tauri/Cargo.toml mono_contracts::job
 # 2 passed, 323 filtered
 
 cargo test --manifest-path src-tauri/Cargo.toml core_boot_host_adapter_observes_no_dispatch_until_called
-# 1 passed, 324 filtered
-
+cargo test --manifest-path src-tauri/Cargo.toml --test startup_network_process
+# 2 passed; ~75s (serialized); repeated runs stable
 pnpm exec playwright test e2e/app-smoke.spec.ts --grep "loads library, import, reader, and settings routes|core AppRoot reaches Library and Reader readiness"
 # focused route/network checks passed
 
@@ -58,10 +63,6 @@ git diff --name-only -- src-tauri/migrations
 
 The earlier `pnpm test:e2e -- --grep ...` placeholder selected zero tests and is not evidence. The correct direct Playwright command is recorded above.
 
-## Pause Checkpoint - 2026-07-28
+## Final Status - 2026-07-28
 
-Implemented and passing: app/provider/route assembly, Reader feature assembly, typed core clients and compatibility exports, TypeScript/Rust canonical contract consumers, import-boundary tests, Settings-only updater compatibility, removal of startup/periodic updater work, frontend transport observation, Playwright browser request/navigation observation, and the Rust host-network adapter positive control.
-
-Remaining blocker: checklist item 9 requires process-wide zero-egress evidence. Raw domain `reqwest`, Tauri updater transport, lower-level WebView/process resources/navigation/CSP, every retry/schedule path, and the disabled-`updates` artifact scenario are not yet connected to one complete observer. Do not archive or mark AC 7 complete until that evidence exists.
-
-Resume with a medium-strength implementation/check pass focused only on process-wide egress instrumentation. Do not reopen already passing contract, API, Reader, or route work unless the zero-network integration requires it.
+All acceptance criteria and implementation checklist items are complete and verified. The zero-network gate runs the production-shaped app under an isolated network namespace with syscall-level tracing, all 17 positive controls observed, both fixture scenarios passing, and no SQL migration or user-owned change modified. See the network section above for the gate details; the verified commands section records the passing validation suite.

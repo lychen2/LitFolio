@@ -49,6 +49,9 @@ keyring = { version = "3", features = [
     "crypto-rust",
 ] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 

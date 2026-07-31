@@ -48,6 +48,6 @@ Most structured fields are checked recursively, but these current DTO fields int
 - Do not use page-level `dangerouslySetInnerHTML`; the only intentional HTML injection is the centralized `MarkdownView` wrapper.
 - Use `type`-only imports where appropriate; `isolatedModules` and strict unused checks are active.
 
-## Planned Mono Boundary
+## Mono Boundary (partial, `mono-core-boundaries`)
 
-The current type organization is `src/lib/types` plus handwritten API schemas. Mono plugin capability types are planned cross-layer contracts, not current TypeScript modules; do not add plugin DTOs or generated Mono types until their contract is implemented and promoted.
+The current type organization is `src/lib/types` plus handwritten API schemas. The boundary child added stable value-type consumers under `src/core/contracts` (core domain IDs, `ResourceRefV1`, structured `ContractError`), `src/plugin-sdk/contracts` (canonical `PluginManifestV1` declarations), and `src/host/contracts` (job owner/state/event/cancellation/terminal value types). These consumers parse the canonical JSON fixtures in `.trellis/spec/cross-layer/fixtures/mono-v1/` and do not redefine schemas. Mono plugin capability DTOs and runtime grants are still planned cross-layer contracts; do not add plugin DTOs or generated Mono types until the host SDK contract is implemented and promoted.

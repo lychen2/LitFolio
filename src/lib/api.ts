@@ -1,10 +1,14 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { aiReaderApi } from "./apiAiReader";
+import { aiReadingClient, libraryClient, readerClient } from "@/core/data";
 import { knowledgeApi } from "./apiKnowledge";
-import { libraryApi } from "./apiLibrary";
 import type { TopicSurveyProgress } from "./types/api";
+
+/**
+ * Compatibility aggregation only. Core clients own migrated operations;
+ * `mono-plugin-integrations` removes this adapter after remaining callers move.
+ */
 
 export type {
   ArxivDraft,
@@ -52,6 +56,7 @@ export type {
   LinkedPaper,
   LitReviewResult,
   LlmConfig,
+  ObsidianConfig,
   JobDraft,
   JobRecord,
   JobStatus,
@@ -111,8 +116,9 @@ export type {
 } from "./types/api";
 
 export const api = {
-  ...libraryApi,
-  ...aiReaderApi,
+  ...libraryClient,
+  ...aiReadingClient,
+  ...readerClient,
   ...knowledgeApi,
 };
 

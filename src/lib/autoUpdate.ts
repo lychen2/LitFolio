@@ -1,11 +1,8 @@
-import { isTauri } from "@tauri-apps/api/core";
-import { dict, type Lang, type TKey } from "@/i18n/dict";
-import { formatMessage, type I18nVars } from "@/i18n/format";
+import type { TKey } from "@/i18n/dict";
+import type { I18nVars } from "@/i18n/format";
 import { errorMessage } from "./error";
 
-/// Translator scoped to update copy. The core only needs `(key, vars) => string`;
-/// React callers pass `useT()` (keyed on `TKey`) through `checkForUpdatesManually`.
-type Translator = (key: string, vars?: I18nVars) => string;
+type Translator = (key: TKey, vars?: I18nVars) => string;
 
 export type UpdateDownloadEvent =
   | { event: "Started"; data: { contentLength?: number } }
@@ -179,91 +176,4 @@ function progressPercent(
   if (!totalBytes) return undefined;
   const percent = Math.round((downloadedBytes / totalBytes) * 100);
   return Math.max(0, Math.min(100, percent));
-}
-
-// ---- Real-environment wiring (not unit-tested: needs the Tauri runtime) ----
-
-const PERIODIC_MS = 6 * 60 * 60 * 1000; // re-check every 6h for long-lived sessions
-let startupDone = false;
-let periodicTimer: ReturnType<typeof setInterval> | null = null;
-
-function storedLang(): Lang {
-  try {
-    const stored = localStorage.getItem("litfolio.lang");
-    if (stored === "en" || stored === "zh") return stored;
-  } catch {
-    /* localStorage unavailable */
-  }
-  return "zh";
-}
-
-// Startup/periodic run outside React, so they cannot use the `useT()` hook —
-// resolve the persisted locale and translate straight from the dictionary.
-const standaloneT: Translator = (key, vars) =>
-  formatMessage(
-    dict[storedLang()][key as TKey] ?? dict.zh[key as TKey] ?? key,
-    vars
-  );
-
-async function buildTauriDeps(t: Translator): Promise<UpdateDeps> {
-  const [{ check }, { confirm, message }, { relaunch }] = await Promise.all([
-    import("@tauri-apps/plugin-updater"),
-    import("@tauri-apps/plugin-dialog"),
-    import("@tauri-apps/plugin-process"),
-  ]);
-  return {
-    isTauri,
-    check: async () => {
-      const update = await check();
-      if (!update) return null;
-      return {
-        version: update.version,
-        downloadAndInstall: (onEvent) => update.downloadAndInstall(onEvent),
-      };
-    },
-    confirm: (msg, title) => confirm(msg, { title, kind: "info" }),
-    notify: async (msg, title) => {
-      await message(msg, { title, kind: "info" });
-    },
-    relaunch,
-    t,
-    log: (msg) => console.warn(msg),
-  };
-}
-
-function schedulePeriodic(t: Translator): void {
-  if (periodicTimer) return;
-  periodicTimer = setInterval(() => {
-    void buildTauriDeps(t)
-      .then((deps) => runUpdateCheck(deps, { prompt: true }))
-      .catch((error) => console.warn("periodic update check failed", error));
-  }, PERIODIC_MS);
-}
-
-export async function startAutoUpdateCheck(): Promise<void> {
-  if (startupDone) return;
-  startupDone = true;
-  if (!isTauri()) return;
-  try {
-    const deps = await buildTauriDeps(standaloneT);
-    await runUpdateCheck(deps, { prompt: true });
-  } catch (error) {
-    console.warn("auto update bootstrap failed", error);
-  }
-  schedulePeriodic(standaloneT);
-}
-
-/// Manual check entry point for the Settings page. Returns the outcome (including
-/// the failure reason) so the UI can show the user exactly what happened.
-export async function checkForUpdatesManually(
-  t: (key: TKey, vars?: I18nVars) => string,
-  onProgress?: UpdateProgressHandler
-): Promise<UpdateOutcome> {
-  if (!isTauri()) return { status: "unsupported" };
-  try {
-    const deps = await buildTauriDeps((key, vars) => t(key as TKey, vars));
-    return await runUpdateCheck(deps, { prompt: true, onProgress });
-  } catch (error) {
-    return { status: "error", message: errorMessage(error) };
-  }
 }

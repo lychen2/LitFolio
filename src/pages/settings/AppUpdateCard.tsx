@@ -4,10 +4,10 @@ import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import {
   UPDATE_STUCK_MS,
-  checkForUpdatesManually,
   type UpdateOutcome,
   type UpdateProgress,
 } from "@/lib/autoUpdate";
+import { checkForUpdatesFromSettings } from "@/plugins/updates/compatibility";
 
 type Translate = ReturnType<typeof useT>;
 type TrackedUpdateProgress = UpdateProgress & { updatedAt: number };
@@ -33,7 +33,7 @@ export function AppUpdateCard() {
     setProgress({ stage: "checking", updatedAt: startedAt });
     try {
       setOutcome(
-        await checkForUpdatesManually(t, (next) => {
+        await checkForUpdatesFromSettings(t, (next) => {
           const updatedAt = Date.now();
           setNow(updatedAt);
           setProgress({ ...next, updatedAt });

@@ -6,7 +6,7 @@ Own the single planned `target-mono-v1` contract catalog consumed by later TypeS
 
 ## Status
 
-**Planned and unimplemented.** Current product code does not implement these types, registries, authority checks, or job envelopes. JSON fixtures under [`fixtures/mono-v1/`](./fixtures/mono-v1/) are design conformance inputs, not evidence of runtime behavior.
+**Runtime authority is planned and unimplemented.** Current product code does not host plugins, issue grants, or run the job envelope. The `mono-core-boundaries` child added stable value-type consumers that parse the canonical fixtures without redefining schemas: TypeScript in `src/core/contracts`, `src/plugin-sdk/contracts`, and `src/host/contracts`; Rust in `src-tauri/src/mono_contracts/` with fixture tests `mono_contract_fixtures` and `mono_manifest_fixtures`. These consumers are conformance evidence for the value contracts below, not evidence of runtime authority.
 
 ## Current Implementation
 
@@ -246,7 +246,7 @@ Target consumers return a stable code, optional field path/correlation ID, and r
 
 ## Source Examples
 
-Current evidence: `src-tauri/migrations/0001_init.sql`, `0033_jobs.sql`, `src-tauri/src/storage/jobs.rs`, `src-tauri/src/commands/jobs.rs`, `src/lib/apiSchema.ts`, and `src/test/tauriMockCommands.ts`.
+Current evidence: `src-tauri/migrations/0001_init.sql`, `0033_jobs.sql`, `src-tauri/src/storage/jobs.rs`, `src-tauri/src/commands/jobs.rs`, `src/lib/apiSchema.ts`, `src/test/tauriMockCommands.ts`, `src/host/contracts/contracts.test.ts`, `src/plugin-sdk/contracts/index.ts`, `src/core/contracts/index.ts`, `src-tauri/src/mono_contracts/`, `src-tauri/tests/mono_contract_fixtures.rs`, and `src-tauri/tests/mono_manifest_fixtures.rs`.
 
 Planning sources: `.trellis/tasks/07-23-litfolio-mono/prd.md`, `.trellis/tasks/07-23-litfolio-mono/design.md`, `.trellis/tasks/07-23-mono-core-boundaries/design.md`, and `.trellis/tasks/07-23-mono-plugin-host-sdk/design.md`. This specification remains the sole schema and fixture owner; the task documents retain their task-specific behavioral and implementation responsibilities.
 

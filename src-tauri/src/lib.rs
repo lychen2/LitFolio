@@ -13,6 +13,8 @@ mod index;
 mod ingest;
 mod library_sync;
 mod mineru;
+pub mod mono_contracts;
+pub mod network_egress;
 mod secret;
 mod startup;
 mod storage;
@@ -39,6 +41,9 @@ pub struct AppState {
     /// defense that stops a malicious server from pivoting us into the local
     /// network or AWS metadata.
     pub http_external: reqwest::Client,
+    /// Observable, denied host request boundary. Raw domain reqwest clients are
+    /// not covered by this observer and are not claimed by its tests.
+    pub host_network: network_egress::HostNetworkState,
     /// Holds the in-flight batch's cancel token (if any). `AsyncMutex` rather
     /// than `std::sync::Mutex` because the batch command handlers hold this
     /// guard around `.await` points (sqlx writes, HTTP calls). A blocking

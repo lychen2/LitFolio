@@ -51,6 +51,17 @@ Page entrypoints use `src/pages/<PageName>Page.tsx`, for example `LibraryPage.ts
 - `src/components/Shell.tsx` owns application-wide layout and keyboard/drop behavior.
 - `src/pages/library/` and `src/pages/reader/` show the preferred feature-local organization.
 
-## Planned Mono Boundary
+## Mono Boundary (partial, `mono-core-boundaries`)
 
-Mono/plugin architecture is documented elsewhere as planned work. It is not the current frontend structure. Do not create Mono packages, plugin folders, or plugin-owned UI state unless a task explicitly promotes that architecture and updates the relevant cross-layer contracts.
+The boundary child introduced ownership directories while preserving current routes and behavior:
+
+```text
+src/app/          boot, providers, shell and route assembly (AppRoot, AppRoutes, bootstrap)
+src/core/         core domain/data contracts and typed clients (contracts/, data/)
+src/features/     core feature presentation assembled by app (reader/ReaderAssembly)
+src/plugins/      first-party plugin implementation roots (updates/compatibility)
+plugin-sdk/       public extension value types only (contracts/PluginManifestV1)
+src/host/         host job/lifecycle value contracts (contracts/)
+```
+
+Import rules are enforced by tests in `src/test/architecture/importBoundaries.test.ts`: `app` may compose core/features and stable SDK types; `core` imports only core/shared stable value modules; `features` may import public core contracts, never another domain's storage internals; `plugins` may import `plugin-sdk` and their own implementation; `plugin-sdk` cannot import React pages, Tauri internals, or core repositories. Route pages stay in `src/pages/` for now; `src/App.tsx` and `src/pages/ReaderPage.tsx` are compatibility entrypoints into `src/app` and Reader assembly with documented removal owners. Later children extract features and plugins; this structure is not yet the full Mono layout.
