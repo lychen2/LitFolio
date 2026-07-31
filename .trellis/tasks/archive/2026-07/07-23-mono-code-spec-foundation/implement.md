@@ -27,8 +27,8 @@ rg -n '^(interface|type) PluginManifestV1\b' .trellis/spec .trellis/tasks/07-23-
 PYTHONDONTWRITEBYTECODE=1 python3 .trellis/spec/cross-layer/fixtures/mono-v1/validate.py
 PYTHONDONTWRITEBYTECODE=1 python3 .trellis/spec/validate.py
 python3 ./.trellis/scripts/get_context.py --mode packages
-python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-23-mono-code-spec-foundation
-python3 ./.trellis/scripts/task.py list-context .trellis/tasks/07-23-mono-code-spec-foundation
+python3 ./.trellis/scripts/task.py validate .trellis/tasks/archive/2026-07/07-23-mono-code-spec-foundation
+python3 ./.trellis/scripts/task.py list-context .trellis/tasks/archive/2026-07/07-23-mono-code-spec-foundation
 python3 ./.trellis/scripts/task.py validate .trellis/tasks/07-23-mono-core-boundaries
 python3 ./.trellis/scripts/task.py list-context .trellis/tasks/07-23-mono-core-boundaries
 pnpm test -- src/lib/autoUpdate.test.ts

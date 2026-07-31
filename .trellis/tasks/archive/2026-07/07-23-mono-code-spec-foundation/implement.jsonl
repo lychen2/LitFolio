@@ -3,4 +3,4 @@
 {"file":".trellis/spec/frontend/index.md","reason":"Prerequisite frontend spec entrypoint after bootstrap completion"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/tauri-command-registry.md","reason":"Source-backed backend command constraints"}
 {"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Current migration and storage ownership evidence"}
-{"file":".trellis/tasks/07-23-mono-code-spec-foundation/research/source-map.md","reason":"Focused source inventory and future-contract guardrail"}
+{"file":".trellis/tasks/archive/2026-07/07-23-mono-code-spec-foundation/research/source-map.md","reason":"Focused source inventory and future-contract guardrail"}
