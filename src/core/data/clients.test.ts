@@ -22,6 +22,15 @@ describe("core data compatibility clients", () => {
     expect(api.noteSectionsGet).toBe(readerClient.noteSectionsGet);
   });
 
+  it("exposes legacy margin-note conversion and archive export operations", () => {
+    expect(typeof readerClient.pdfNoteCreate).toBe("function");
+    expect(typeof readerClient.pdfNoteUpdate).toBe("function");
+    expect(typeof readerClient.pdfNoteDelete).toBe("function");
+    expect(typeof readerClient.pdfNoteSearch).toBe("function");
+    expect(typeof readerClient.legacyReaderNotesPreview).toBe("function");
+    expect(typeof readerClient.legacyReaderNotesExport).toBe("function");
+  });
+
   it("loads clients before the compatibility module without a cycle", async () => {
     const core = await import("./index");
     const compatibility = await import("@/lib/api");

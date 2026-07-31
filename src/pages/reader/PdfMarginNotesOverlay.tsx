@@ -8,23 +8,22 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
-import { Loader2, MessageSquare, Trash2, Type } from "lucide-react";
+import { Loader2, MessageSquare, RotateCcw, Trash2, Type } from "lucide-react";
 import type { ScaledPosition } from "react-pdf-highlighter";
+
+import type { PdfAnnotationRect, PdfTextNote } from "@/core/contracts";
 import { useT } from "@/i18n/I18nProvider";
 import { PdfLinkedNoteBox } from "./PdfLinkedNoteBox";
 import {
-  createStandalonePdfNotePosition,
-  highlightNoteUpdateValue,
-  nextLinkedPdfNoteDraft,
+  createPdfTextNoteRect,
   nextPdfNoteFontSize,
-  pdfNoteFontSizeBase,
   pdfNoteFontSizePx,
+  pdfTextNoteViewportRect,
   visiblePdfNoteText,
+  type PdfPageSize,
 } from "./pdfSelectionHelpers";
 
 const MIN_NOTE_SIZE = 20;
-const DEFAULT_NOTE_WIDTH = 220;
-const DEFAULT_NOTE_HEIGHT = 120;
 
 type OverlayRect = {
   top: number;
@@ -37,7 +36,7 @@ type OverlayRect = {
 type OverlayHighlight = {
   id: string;
   note: string | null;
-  position: ScaledPosition & { noteFontSize?: number };
+  position: ScaledPosition;
 };
 
 export type NoteDragStart = {
@@ -53,37 +52,47 @@ export type ViewportDraftRect = NoteDragStart & {
   y2: number;
 };
 
+type NoteStatus = {
+  state: "saved" | "pending" | "error";
+  error: string | null;
+};
+
 type PdfMarginNotesOverlayProps = {
   activeNoteId: string | null;
   containerRef: RefObject<HTMLElement>;
   draftRect: ViewportDraftRect | null;
   hiddenLinkedNoteIds: Set<string>;
   linkedNotes: OverlayHighlight[];
-  marginNotes: OverlayHighlight[];
   noteDrawMode: boolean;
+  pageSizes: Record<number, PdfPageSize>;
+  statusById: Record<string, NoteStatus>;
+  textNotes: PdfTextNote[];
   onCancelDraft: () => void;
-  onCreate: (position: ScaledPosition & { noteFontSize?: number }) => Promise<void>;
-  onDelete: (highlightId: string) => Promise<void>;
+  onCreate: (rect: PdfAnnotationRect) => Promise<void>;
+  onDelete: (noteId: string) => Promise<void>;
   onDragStart: (start: NoteDragStart) => void;
   onDraftRect: (rect: ViewportDraftRect) => void;
   onHideLinkedNote: (id: string) => void;
-  onSave: (highlightId: string, draft: string) => Promise<void>;
+  onSaveLinkedNote: (highlightId: string, draft: string) => Promise<void>;
+  onSaveTextNote: (noteId: string, content: string) => Promise<void>;
   onSelect: (id: string | null) => void;
+  onStyleTextNote: (
+    noteId: string,
+    patch: Partial<Pick<PdfTextNote, "color" | "fontSize" | "opacity">>,
+  ) => Promise<void>;
   onToggleDrawMode: (enabled: boolean) => void;
-  onUpdatePosition: (highlightId: string, position: ScaledPosition & { noteFontSize?: number }) => Promise<void>;
-};
-
-type PageRect = {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  onUpdateRect: (noteId: string, rect: PdfAnnotationRect) => Promise<void>;
 };
 
 type NoteAdjustMode = "move" | "resize";
 
-type PositionedNote = {
+type PositionedLinkedNote = {
   note: OverlayHighlight;
+  rect: OverlayRect;
+};
+
+type PositionedTextNote = {
+  note: PdfTextNote;
   rect: OverlayRect;
 };
 
@@ -93,22 +102,26 @@ export function PdfMarginNotesOverlay({
   draftRect,
   hiddenLinkedNoteIds,
   linkedNotes,
-  marginNotes,
   noteDrawMode,
+  pageSizes,
+  statusById,
+  textNotes,
   onCancelDraft,
   onCreate,
   onDelete,
   onDragStart,
   onDraftRect,
   onHideLinkedNote,
-  onSave,
+  onSaveLinkedNote,
+  onSaveTextNote,
   onSelect,
+  onStyleTextNote,
   onToggleDrawMode,
-  onUpdatePosition,
+  onUpdateRect,
 }: PdfMarginNotesOverlayProps) {
   const t = useT();
   const [layoutVersion, setLayoutVersion] = useState(0);
-  const [pendingPositions, setPendingPositions] = useState<Record<string, ScaledPosition & { noteFontSize?: number }>>({});
+  const [pendingRects, setPendingRects] = useState<Record<string, PdfAnnotationRect>>({});
 
   useEffect(() => {
     const container = containerRef.current;
@@ -117,7 +130,6 @@ export function PdfMarginNotesOverlay({
     const observer = new ResizeObserver(bump);
     container.addEventListener("scroll", bump, true);
     window.addEventListener("resize", bump);
-    observer.observe(container);
     container.querySelectorAll<HTMLElement>(".page[data-page-number]").forEach((page) => observer.observe(page));
     bump();
     return () => {
@@ -138,7 +150,10 @@ export function PdfMarginNotesOverlay({
       if (target.closest(".litera-pdf-note-box, .litera-pdf-note-text, .litera-overlay, button, input, textarea, select, [contenteditable='true']")) return;
       const page = target.closest<HTMLElement>(".page[data-page-number]");
       if (!page || !container.contains(page)) return;
-      const start = pagePoint(event, page);
+      const pageNumber = Number(page.dataset.pageNumber);
+      const pageSize = pageSizes[pageNumber];
+      if (!pageSize) return;
+      const start = pagePoint(event, page, pageNumber, pageSize);
       if (!start) return;
       event.preventDefault();
       event.stopPropagation();
@@ -148,7 +163,7 @@ export function PdfMarginNotesOverlay({
       onDraftRect(current);
 
       const handlePointerMove = (moveEvent: PointerEvent) => {
-        const point = pagePoint(moveEvent, page);
+        const point = pagePoint(moveEvent, page, pageNumber, pageSize);
         if (!point) return;
         current = { ...start, x2: point.x, y2: point.y };
         onDraftRect(current);
@@ -161,13 +176,13 @@ export function PdfMarginNotesOverlay({
 
       const handlePointerUp = () => {
         cleanup();
-        const position = createStandalonePdfNotePosition({
-          pageNumber: current.pageNumber,
-          pageWidth: current.pageWidth,
-          pageHeight: current.pageHeight,
-          rect: noteRectFromDrag(current),
+        const rect = createPdfTextNoteRect({
+          page: start.pageNumber,
+          pageSize,
+          start,
+          end: { x: current.x2, y: current.y2 },
         });
-        void onCreate(position).catch(() => undefined);
+        void onCreate(rect).catch(() => undefined);
       };
 
       function cleanup() {
@@ -183,7 +198,7 @@ export function PdfMarginNotesOverlay({
 
     container.addEventListener("pointerdown", handlePointerDown, true);
     return () => container.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [containerRef, noteDrawMode, onCancelDraft, onCreate, onDragStart, onDraftRect]);
+  }, [containerRef, noteDrawMode, onCancelDraft, onCreate, onDragStart, onDraftRect, pageSizes]);
 
   useEffect(() => {
     if (!activeNoteId) return;
@@ -202,67 +217,64 @@ export function PdfMarginNotesOverlay({
     return linkedNotes
       .filter((note) => activeNoteId === note.id || (!!note.note && !hiddenLinkedNoteIds.has(note.id)))
       .map((note) => {
-        const rect = positionRect(containerRef.current, note.position.boundingRect, note.position.pageNumber);
+        const rect = scaledPositionRect(containerRef.current, note.position.boundingRect, note.position.pageNumber);
         return rect ? { note, rect } : null;
       })
-      .filter((item): item is PositionedNote => item !== null);
+      .filter((item): item is PositionedLinkedNote => item !== null);
   }, [activeNoteId, containerRef, hiddenLinkedNoteIds, layoutVersion, linkedNotes]);
 
-  const marginNoteBoxes = useMemo(() => {
+  const textNoteBoxes = useMemo(() => {
     void layoutVersion;
-    return marginNotes
-      .map((note) => ({ ...note, position: pendingPositions[note.id] ?? note.position }))
+    return textNotes
+      .map((note) => ({ ...note, rect: pendingRects[note.id] ?? note.rect }))
       .map((note) => {
-        const rect = positionRect(containerRef.current, note.position.boundingRect, note.position.pageNumber);
+        const pageSize = pageSizes[note.rect.page];
+        const rect = pageSize
+          ? textNoteRect(containerRef.current, note.rect, pageSize)
+          : null;
         return rect ? { note, rect } : null;
       })
-      .filter((item): item is PositionedNote => item !== null);
-  }, [containerRef, layoutVersion, marginNotes, pendingPositions]);
+      .filter((item): item is PositionedTextNote => item !== null);
+  }, [containerRef, layoutVersion, pageSizes, pendingRects, textNotes]);
 
-  const draftOverlayRect = draftRect ? draftRectToOverlayRect(containerRef.current, draftRect) : null;
+  const draftOverlayRect = draftRect
+    ? draftRectToOverlayRect(containerRef.current, draftRect)
+    : null;
 
-  function startNoteAdjustment(note: OverlayHighlight, mode: NoteAdjustMode, event: ReactPointerEvent) {
+  function startNoteAdjustment(note: PdfTextNote, mode: NoteAdjustMode, event: ReactPointerEvent) {
     if (event.button !== 0) return;
     const container = containerRef.current;
-    if (!container) return;
-    const page = pageForPosition(container, note.position.pageNumber);
+    const pageSize = pageSizes[note.rect.page];
+    if (!container || !pageSize) return;
+    const page = pageForPosition(container, note.rect.page);
     if (!page) return;
-    const start = pagePoint(event.nativeEvent, page);
+    const start = pagePoint(event.nativeEvent, page, note.rect.page, pageSize);
     if (!start) return;
-    const original = rectToPageRect(note.position.boundingRect);
-    let nextPosition: (ScaledPosition & { noteFontSize?: number }) | null = null;
+    const original = pendingRects[note.id] ?? note.rect;
+    let nextRect: PdfAnnotationRect | null = null;
     event.preventDefault();
     event.stopPropagation();
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      const point = pagePoint(moveEvent, page);
+      const point = pagePoint(moveEvent, page, note.rect.page, pageSize);
       if (!point) return;
-      const rect = mode === "move"
-        ? moveRect(original, point.x - start.x, point.y - start.y, start.pageWidth, start.pageHeight)
-        : resizeRect(original, point.x, point.y, start.pageWidth, start.pageHeight);
-      nextPosition = {
-        ...createStandalonePdfNotePosition({
-          pageNumber: start.pageNumber,
-          pageWidth: start.pageWidth,
-          pageHeight: start.pageHeight,
-          rect,
-        }),
-        noteFontSize: note.position.noteFontSize,
-      };
-      setPendingPositions((current) => ({ ...current, [note.id]: nextPosition as ScaledPosition & { noteFontSize?: number } }));
+      nextRect = mode === "move"
+        ? moveRect(original, point.x - start.x, point.y - start.y, pageSize)
+        : resizeRect(original, point.x, point.y, pageSize);
+      setPendingRects((current) => ({ ...current, [note.id]: nextRect as PdfAnnotationRect }));
     };
 
     const handlePointerCancel = () => {
       cleanup();
-      setPendingPositions((current) => omitKey(current, note.id));
+      setPendingRects((current) => omitKey(current, note.id));
     };
 
     const handlePointerUp = () => {
       cleanup();
-      if (!nextPosition) return;
-      void onUpdatePosition(note.id, nextPosition)
-        .then(() => setPendingPositions((current) => omitKey(current, note.id)))
-        .catch(() => setPendingPositions((current) => omitKey(current, note.id)));
+      if (!nextRect) return;
+      void onUpdateRect(note.id, nextRect)
+        .then(() => setPendingRects((current) => omitKey(current, note.id)))
+        .catch(() => setPendingRects((current) => omitKey(current, note.id)));
     };
 
     function cleanup() {
@@ -298,24 +310,21 @@ export function PdfMarginNotesOverlay({
           note={note.note}
           rects={[rect]}
           active={activeNoteId === note.id}
-          onSave={onSave}
+          onSave={onSaveLinkedNote}
           onClose={() => onHideLinkedNote(note.id)}
         />
       ))}
-      {marginNoteBoxes.map(({ note, rect }) => (
+      {textNoteBoxes.map(({ note, rect }) => (
         <PdfPageNoteBox
-          key={`${note.id}:margin-note`}
+          key={`${note.id}:text-note`}
           note={note}
           active={activeNoteId === note.id}
           rect={rect}
+          status={statusById[note.id] ?? { state: "saved", error: null }}
           onDelete={onDelete}
-          onSave={onSave}
+          onSave={onSaveTextNote}
           onSelect={() => onSelect(note.id)}
-          onFontSize={(highlightId, fontSize) => {
-            const nextPosition = { ...note.position, noteFontSize: fontSize };
-            setPendingPositions((current) => ({ ...current, [highlightId]: nextPosition }));
-            return onUpdatePosition(highlightId, nextPosition);
-          }}
+          onStyle={onStyleTextNote}
           onStartAdjust={startNoteAdjustment}
         />
       ))}
@@ -323,116 +332,61 @@ export function PdfMarginNotesOverlay({
   );
 }
 
-type PageNoteState = {
-  highlightId: string;
-  draft: string;
-  saved: string;
-};
-
 type PdfPageNoteBoxProps = {
-  note: OverlayHighlight;
+  note: PdfTextNote;
   active: boolean;
   rect: OverlayRect;
-  onDelete: (highlightId: string) => Promise<void>;
-  onFontSize: (highlightId: string, fontSize: number) => Promise<void>;
-  onSave: (highlightId: string, draft: string) => Promise<void>;
+  status: NoteStatus;
+  onDelete: (noteId: string) => Promise<void>;
+  onSave: (noteId: string, content: string) => Promise<void>;
   onSelect: () => void;
-  onStartAdjust: (note: OverlayHighlight, mode: NoteAdjustMode, event: ReactPointerEvent) => void;
+  onStyle: (
+    noteId: string,
+    patch: Partial<Pick<PdfTextNote, "color" | "fontSize" | "opacity">>,
+  ) => Promise<void>;
+  onStartAdjust: (note: PdfTextNote, mode: NoteAdjustMode, event: ReactPointerEvent) => void;
 };
 
-function PdfPageNoteBox({ note, active, rect, onDelete, onFontSize, onSave, onSelect, onStartAdjust }: PdfPageNoteBoxProps) {
+function PdfPageNoteBox({
+  note,
+  active,
+  rect,
+  status,
+  onDelete,
+  onSave,
+  onSelect,
+  onStyle,
+  onStartAdjust,
+}: PdfPageNoteBoxProps) {
   const t = useT();
-  const [state, setState] = useState<PageNoteState>(() => ({
-    highlightId: note.id,
-    draft: note.note ?? "",
-    saved: note.note ?? "",
-  }));
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const saveSeqRef = useRef(0);
-
-  useEffect(() => {
-    setState((current) => {
-      if (current.highlightId !== note.id) {
-        return { highlightId: note.id, draft: note.note ?? "", saved: note.note ?? "" };
-      }
-      const dirty = current.draft !== current.saved;
-      return {
-        highlightId: note.id,
-        draft: nextLinkedPdfNoteDraft({
-          currentDraft: current.draft,
-          incomingNote: note.note,
-          dirty,
-        }),
-        saved: dirty ? current.saved : note.note ?? "",
-      };
-    });
-  }, [note.id, note.note]);
 
   useEffect(() => {
     if (!active) return;
     textareaRef.current?.focus();
   }, [active, note.id]);
 
-  useEffect(() => {
-    if (state.draft === state.saved) return;
-    const draftToSave = state.draft;
-    const timeoutId = window.setTimeout(() => {
-      const saveSeq = saveSeqRef.current + 1;
-      saveSeqRef.current = saveSeq;
-      setSaving(true);
-      setSaveError(null);
-      onSave(note.id, draftToSave)
-        .then(() => {
-          const normalized = highlightNoteUpdateValue(draftToSave) ?? "";
-          setState((current) =>
-            current.highlightId === note.id
-              ? {
-                  ...current,
-                  draft: current.draft === draftToSave ? normalized : current.draft,
-                  saved: normalized,
-                }
-              : current,
-          );
-        })
-        .catch((error: unknown) => {
-          if (saveSeqRef.current !== saveSeq) return;
-          setSaveError(error instanceof Error ? error.message : String(error));
-        })
-        .finally(() => {
-          if (saveSeqRef.current === saveSeq) setSaving(false);
-        });
-    }, 800);
-    return () => window.clearTimeout(timeoutId);
-  }, [note.id, onSave, state.draft, state.saved]);
-
-  const status = saveError
-    ? `${t("reader.saveFailed")}: ${saveError}`
-    : saving
-      ? t("reader.saving")
-      : state.draft === state.saved
-        ? t("reader.saved")
-        : t("reader.unsaved");
-  const fontSize = pdfNoteFontSizeBase(note.position);
-
-  function updateFontSize(delta: number) {
-    void onFontSize(note.id, nextPdfNoteFontSize(fontSize, delta));
-  }
-
   function stopPdfEvent(event: ReactMouseEvent) {
     event.stopPropagation();
   }
 
+  function updateContent(content: string) {
+    void onSave(note.id, content).catch(() => undefined);
+  }
+
+  function updateStyle(patch: Partial<Pick<PdfTextNote, "color" | "fontSize" | "opacity">>) {
+    void onStyle(note.id, patch).catch(() => undefined);
+  }
+
   if (!active) {
-    const text = visiblePdfNoteText(state.draft);
+    const text = visiblePdfNoteText(note.content);
     if (!text) return null;
     return (
       <button
         type="button"
         className="litera-pdf-note-text"
-        style={pageNoteTextStyle(rect, fontSize)}
+        style={pageNoteTextStyle(rect, note)}
         onClick={(event) => {
           stopPdfEvent(event);
           onSelect();
@@ -444,34 +398,86 @@ function PdfPageNoteBox({ note, active, rect, onDelete, onFontSize, onSave, onSe
     );
   }
 
+  const statusLabel = status.state === "error"
+    ? `${t("reader.saveFailed")}: ${status.error ?? t("reader.unknownError")}`
+    : status.state === "pending"
+      ? t("reader.saving")
+      : t("reader.saved");
+
   return (
     <div
       className="litera-pdf-page-note-editor"
-      style={pageNoteStyle(rect, fontSize)}
+      style={pageNoteStyle(rect, note)}
       onClick={(event) => {
         stopPdfEvent(event);
         onSelect();
       }}
       onMouseDown={stopPdfEvent}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onSelect();
+      }}
     >
       <div
         className="litera-pdf-page-note-toolbar"
+        style={{ color: note.color }}
         onPointerDown={(event) => onStartAdjust(note, "move", event)}
       >
         <span className="inline-flex items-center gap-1">
-          <MessageSquare className="h-3 w-3" /> {t("reader.linkedNote")}
+          <MessageSquare className="h-3 w-3" /> {t("reader.standaloneNote")}
         </span>
-        <span className="litera-pdf-note-font-controls" onPointerDown={(event) => event.stopPropagation()}>
-          <button type="button" className="litera-pdf-note-font-button" title={t("reader.noteFontSmaller")} onClick={() => updateFontSize(-2)}>
+        <span
+          className="litera-pdf-note-font-controls"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <label className="inline-flex items-center" title={t("reader.noteColorTitle")}>
+            <input
+              type="color"
+              value={note.color}
+              aria-label={t("reader.noteColorTitle")}
+              className="h-4 w-4 cursor-pointer border-0 bg-transparent p-0"
+              onChange={(event) => updateStyle({ color: event.target.value })}
+            />
+          </label>
+          <button
+            type="button"
+            className="litera-pdf-note-font-button"
+            title={t("reader.noteFontSmaller")}
+            onClick={() => updateStyle({ fontSize: nextPdfNoteFontSize(note.fontSize, -2) })}
+          >
             <Type className="h-3 w-3" />-
           </button>
-          <button type="button" className="litera-pdf-note-font-button" title={t("reader.noteFontLarger")} onClick={() => updateFontSize(2)}>
+          <button
+            type="button"
+            className="litera-pdf-note-font-button"
+            title={t("reader.noteFontLarger")}
+            onClick={() => updateStyle({ fontSize: nextPdfNoteFontSize(note.fontSize, 2) })}
+          >
             <Type className="h-3 w-3" />+
+          </button>
+          <label className="inline-flex items-center" title={t("reader.noteOpacityTitle")}>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.1"
+              value={note.opacity}
+              aria-label={t("reader.noteOpacityTitle")}
+              className="w-12"
+              onChange={(event) => updateStyle({ opacity: Number(event.target.value) })}
+            />
+          </label>
+          <button
+            type="button"
+            className="litera-pdf-note-font-button"
+            title={t("reader.noteResetStyleTitle")}
+            onClick={() => updateStyle({ color: "#fff3a3", fontSize: 12, opacity: 0.9 })}
+          >
+            <RotateCcw className="h-3 w-3" />
           </button>
         </span>
         <button
           type="button"
-          className="text-red-700 hover:text-red-500 transition-colors"
+          className="text-litera-error transition-colors"
           title={t("common.delete")}
           disabled={deleting}
           onClick={(event) => {
@@ -485,14 +491,16 @@ function PdfPageNoteBox({ note, active, rect, onDelete, onFontSize, onSave, onSe
       </div>
       <textarea
         ref={textareaRef}
-        value={state.draft}
-        onChange={(event) => setState((current) => ({ ...current, draft: event.target.value }))}
+        value={note.content}
+        onChange={(event) => updateContent(event.target.value)}
         placeholder={t("reader.linkedNotePlaceholder")}
+        aria-label={t("reader.standaloneNote")}
         className="litera-pdf-page-note-textarea"
+        style={{ color: note.color }}
       />
-      <div className={saveError ? "litera-pdf-page-note-status text-red-400" : "litera-pdf-page-note-status"}>
-        {saving && <Loader2 className="h-3 w-3 animate-spin" />}
-        {status}
+      <div className={status.state === "error" ? "litera-pdf-page-note-status text-litera-error" : "litera-pdf-page-note-status"}>
+        {status.state === "pending" && <Loader2 className="h-3 w-3 animate-spin" />}
+        {statusLabel}
       </div>
       <button
         type="button"
@@ -504,71 +512,82 @@ function PdfPageNoteBox({ note, active, rect, onDelete, onFontSize, onSave, onSe
   );
 }
 
-function pageNoteTextStyle(rect: OverlayRect, fontSize = 12): CSSProperties {
+function pageNoteTextStyle(rect: OverlayRect, note: PdfTextNote): CSSProperties {
   return {
     top: rect.top,
     left: rect.left,
     width: rect.width,
     minHeight: rect.height,
-    fontSize: pdfNoteFontSizePx(rect.scale, fontSize),
+    fontSize: pdfNoteFontSizePx(rect.scale, note.fontSize),
+    color: note.color,
+    opacity: note.opacity,
   };
 }
 
-function pageNoteStyle(rect: OverlayRect, fontSize = 12): CSSProperties {
+function pageNoteStyle(rect: OverlayRect, note: PdfTextNote): CSSProperties {
   return {
     top: rect.top,
     left: rect.left,
     width: rect.width,
     height: rect.height,
-    fontSize: pdfNoteFontSizePx(rect.scale, fontSize),
+    fontSize: pdfNoteFontSizePx(rect.scale, note.fontSize),
+    borderColor: note.color,
+    opacity: note.opacity,
   };
 }
 
-function noteRectFromDrag(draft: ViewportDraftRect) {
-  const x1 = Math.min(draft.x, draft.x2);
-  const y1 = Math.min(draft.y, draft.y2);
-  const x2 = Math.max(draft.x, draft.x2);
-  const y2 = Math.max(draft.y, draft.y2);
-  if (x2 - x1 >= MIN_NOTE_SIZE && y2 - y1 >= MIN_NOTE_SIZE) {
-    return { x1, y1, x2, y2 };
-  }
-  return {
-    x1,
-    y1,
-    x2: Math.min(draft.pageWidth, x1 + DEFAULT_NOTE_WIDTH),
-    y2: Math.min(draft.pageHeight, y1 + DEFAULT_NOTE_HEIGHT),
-  };
-}
-
-function pagePoint(event: PointerEvent, page: HTMLElement): NoteDragStart | null {
+function pagePoint(
+  event: PointerEvent,
+  page: HTMLElement,
+  pageNumber: number,
+  pageSize: PdfPageSize,
+): NoteDragStart | null {
   const pageRect = page.getBoundingClientRect();
-  const pageNumber = Number(page.dataset.pageNumber);
-  if (!Number.isFinite(pageNumber) || pageRect.width <= 0 || pageRect.height <= 0) return null;
-  const pageWidth = page.clientWidth || pageRect.width;
-  const pageHeight = page.clientHeight || pageRect.height;
+  if (pageRect.width <= 0 || pageRect.height <= 0) return null;
   return {
     pageNumber,
-    pageWidth,
-    pageHeight,
-    x: clamp(((event.clientX - pageRect.left) / pageRect.width) * pageWidth, 0, pageWidth),
-    y: clamp(((event.clientY - pageRect.top) / pageRect.height) * pageHeight, 0, pageHeight),
+    pageWidth: pageSize.width,
+    pageHeight: pageSize.height,
+    x: clamp(((event.clientX - pageRect.left) / pageRect.width) * pageSize.width, 0, pageSize.width),
+    y: clamp(((event.clientY - pageRect.top) / pageRect.height) * pageSize.height, 0, pageSize.height),
   };
 }
 
-function draftRectToOverlayRect(container: HTMLElement | null, draft: ViewportDraftRect): OverlayRect | null {
-  return positionRect(
-    container,
-    {
-      x1: Math.min(draft.x, draft.x2),
-      y1: Math.min(draft.y, draft.y2),
-      x2: Math.max(draft.x, draft.x2),
-      y2: Math.max(draft.y, draft.y2),
-      width: draft.pageWidth,
-      height: draft.pageHeight,
-      pageNumber: draft.pageNumber,
-    },
-    draft.pageNumber,
-  );
+function draftRectToOverlayRect(
+  container: HTMLElement | null,
+  draft: ViewportDraftRect,
+): OverlayRect | null {
+  const pageSize = { width: draft.pageWidth, height: draft.pageHeight };
+  const rect = createPdfTextNoteRect({
+    page: draft.pageNumber,
+    pageSize,
+    start: draft,
+    end: { x: draft.x2, y: draft.y2 },
+  });
+  return textNoteRect(container, rect, pageSize);
+}
+
+function textNoteRect(
+  container: HTMLElement | null,
+  rect: PdfAnnotationRect,
+  pageSize: PdfPageSize,
+): OverlayRect | null {
+  if (!container) return null;
+  const page = pageForPosition(container, rect.page);
+  if (!page) return null;
+  const pageRect = page.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const scaled = pdfTextNoteViewportRect(rect, pageSize, {
+    width: pageRect.width,
+    height: pageRect.height,
+  });
+  return {
+    left: pageRect.left - containerRect.left + scaled.left,
+    top: pageRect.top - containerRect.top + scaled.top,
+    width: Math.max(2, scaled.width),
+    height: Math.max(2, scaled.height),
+    scale: scaled.scale,
+  };
 }
 
 type ScaledRectLike = {
@@ -583,32 +602,28 @@ type ScaledRectLike = {
   pageNumber?: number;
 };
 
-function rectToPageRect(rect: ScaledRectLike): PageRect {
-  const x1 = rect.x1 ?? rect.left ?? 0;
-  const y1 = rect.y1 ?? rect.top ?? 0;
-  return {
-    x1,
-    y1,
-    x2: rect.x2 ?? x1 + rect.width,
-    y2: rect.y2 ?? y1 + rect.height,
-  };
-}
-
-function positionRect(container: HTMLElement | null, rect: ScaledRectLike, fallbackPageNumber: number): OverlayRect | null {
+function scaledPositionRect(
+  container: HTMLElement | null,
+  rect: ScaledRectLike,
+  fallbackPageNumber: number,
+): OverlayRect | null {
   if (!container || rect.width <= 0 || rect.height <= 0) return null;
   const page = pageForPosition(container, rect.pageNumber ?? fallbackPageNumber);
   if (!page) return null;
   const pageRect = page.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
-  const raw = rectToPageRect(rect);
+  const x1 = rect.x1 ?? rect.left ?? 0;
+  const y1 = rect.y1 ?? rect.top ?? 0;
+  const x2 = rect.x2 ?? x1 + rect.width;
+  const y2 = rect.y2 ?? y1 + rect.height;
   const scaleX = pageRect.width / rect.width;
   const scaleY = pageRect.height / rect.height;
   return {
-    left: pageRect.left - containerRect.left + raw.x1 * scaleX,
-    top: pageRect.top - containerRect.top + raw.y1 * scaleY,
-    width: Math.max(2, (raw.x2 - raw.x1) * scaleX),
-    height: Math.max(2, (raw.y2 - raw.y1) * scaleY),
-    scale: (pageRect.width / rect.width + pageRect.height / rect.height) / 2,
+    left: pageRect.left - containerRect.left + x1 * scaleX,
+    top: pageRect.top - containerRect.top + y1 * scaleY,
+    width: Math.max(2, (x2 - x1) * scaleX),
+    height: Math.max(2, (y2 - y1) * scaleY),
+    scale: (scaleX + scaleY) / 2,
   };
 }
 
@@ -616,20 +631,33 @@ function pageForPosition(container: HTMLElement, pageNumber: number): HTMLElemen
   return container.querySelector<HTMLElement>(`.page[data-page-number="${pageNumber}"]`);
 }
 
-function moveRect(rect: PageRect, dx: number, dy: number, pageWidth: number, pageHeight: number): PageRect {
-  const width = Math.max(MIN_NOTE_SIZE, rect.x2 - rect.x1);
-  const height = Math.max(MIN_NOTE_SIZE, rect.y2 - rect.y1);
-  const x1 = clamp(rect.x1 + dx, 0, Math.max(0, pageWidth - width));
-  const y1 = clamp(rect.y1 + dy, 0, Math.max(0, pageHeight - height));
-  return { x1, y1, x2: x1 + width, y2: y1 + height };
+function moveRect(
+  rect: PdfAnnotationRect,
+  dx: number,
+  dy: number,
+  pageSize: PdfPageSize,
+): PdfAnnotationRect {
+  const width = Math.max(MIN_NOTE_SIZE, rect.width);
+  const height = Math.max(MIN_NOTE_SIZE, rect.height);
+  return {
+    ...rect,
+    x: clamp(rect.x + dx, 0, Math.max(0, pageSize.width - width)),
+    y: clamp(rect.y + dy, 0, Math.max(0, pageSize.height - height)),
+    width,
+    height,
+  };
 }
 
-function resizeRect(rect: PageRect, x2: number, y2: number, pageWidth: number, pageHeight: number): PageRect {
+function resizeRect(
+  rect: PdfAnnotationRect,
+  x2: number,
+  y2: number,
+  pageSize: PdfPageSize,
+): PdfAnnotationRect {
   return {
-    x1: rect.x1,
-    y1: rect.y1,
-    x2: clamp(Math.max(rect.x1 + MIN_NOTE_SIZE, x2), 0, pageWidth),
-    y2: clamp(Math.max(rect.y1 + MIN_NOTE_SIZE, y2), 0, pageHeight),
+    ...rect,
+    width: clamp(Math.max(MIN_NOTE_SIZE, x2 - rect.x), MIN_NOTE_SIZE, pageSize.width - rect.x),
+    height: clamp(Math.max(MIN_NOTE_SIZE, y2 - rect.y), MIN_NOTE_SIZE, pageSize.height - rect.y),
   };
 }
 

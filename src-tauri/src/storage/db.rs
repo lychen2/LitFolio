@@ -69,6 +69,8 @@ mod tests {
         assert_table(&pool, "papers_fts").await;
         assert_table(&pool, "paper_documents").await;
         assert_table(&pool, "paper_documents_fts").await;
+        assert_table(&pool, "pdf_notes").await;
+        assert_table(&pool, "pdf_notes_fts").await;
         assert_column(&pool, "paper_documents", "index_status").await;
         assert_column(&pool, "paper_documents", "index_error").await;
         assert_column(&pool, "paper_documents", "indexed_at").await;
@@ -83,6 +85,9 @@ mod tests {
         assert_trigger(&pool, "paper_documents_ai").await;
         assert_trigger(&pool, "paper_documents_au").await;
         assert_index(&pool, "idx_paper_embeddings_model").await;
+        assert_index(&pool, "idx_pdf_notes_paper_page").await;
+        assert_index(&pool, "idx_pdf_notes_updated_at").await;
+        assert_trigger(&pool, "pdf_notes_au").await;
     }
 
     #[tokio::test]

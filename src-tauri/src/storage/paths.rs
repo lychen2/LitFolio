@@ -58,6 +58,10 @@ impl LibraryPaths {
     pub fn backups_dir(&self) -> PathBuf {
         self.root.join("backups")
     }
+    /// Default destination for the legacy margin-note conversion archive.
+    pub fn legacy_note_export_dir(&self) -> PathBuf {
+        self.root.join("legacy-note-export")
+    }
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")
     }

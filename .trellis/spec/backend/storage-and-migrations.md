@@ -46,7 +46,7 @@ sha256sum src-tauri/migrations/*.sql
 
 - Editing, renaming, reordering, or deleting migrations `0001` through `0035`.
 - Constructing a managed paper path in a command and skipping `LibraryPaths` safety checks.
-- Treating `plugins/<id>/data.db` or `pdf_notes` as current storage; both are planned.
+- Treating `plugins/<id>/data.db` as current storage; it is planned. (`pdf_notes` from migration `0036` is current storage owned by `src-tauri/src/storage/pdf_notes.rs`.)
 - Using ad hoc SQL in page-facing commands when an owning repository exists.
 - Deleting a legacy file/table before backup, conversion verification, and restore behavior exist.
 

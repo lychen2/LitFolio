@@ -18,11 +18,13 @@ pub mod graph;
 pub mod highlights;
 pub mod imports;
 pub mod jobs;
+pub mod legacy_reader_notes;
 pub mod lit_review;
 pub mod llm;
 pub mod notes;
 pub mod papers;
 pub mod pdf;
+pub mod pdf_notes;
 pub mod project_manifest;
 pub mod project_writing;
 pub mod project_writing_render;
@@ -375,6 +377,13 @@ macro_rules! command_paths_reader_notes {
             commands::highlights::highlight_update_rect,
             commands::highlights::highlight_update_label,
             commands::highlights::highlight_delete,
+            commands::pdf_notes::pdf_note_create,
+            commands::pdf_notes::pdf_note_list,
+            commands::pdf_notes::pdf_note_update,
+            commands::pdf_notes::pdf_note_delete,
+            commands::pdf_notes::pdf_note_search,
+            commands::legacy_reader_notes::legacy_reader_notes_preview,
+            commands::legacy_reader_notes::legacy_reader_notes_export,
             commands::reader_terms::paper_terms_list,
             commands::reader_terms::paper_terms_generate,
             commands::reader_terms::paper_terms_generate_candidates,
@@ -449,6 +458,7 @@ macro_rules! command_paths_collections_data {
             commands::export::export_markdown_set_dir,
             commands::export::export_markdown_all,
             commands::export::export_markdown_paper,
+            commands::export::obsidian_export_all,
             commands::export::export_citations,
             commands::diagnostics_export_log,
             commands::search::search_unified,

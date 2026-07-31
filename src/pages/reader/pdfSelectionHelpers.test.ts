@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   READER_MARGIN_NOTE_LABEL,
   buildReaderSelectionQuestion,
+  createPdfTextNoteRect,
   createStandalonePdfNotePosition,
   extractPdfSelectionText,
   highlightNoteUpdateValue,
   nextPdfNoteFontSize,
   pdfNoteFontSizeBase,
   pdfNoteFontSizePx,
+  pdfTextNoteViewportRect,
   visiblePdfNoteText,
   isReaderMarginNote,
   nextLinkedPdfNoteDraft,
@@ -114,6 +116,20 @@ describe("standalone PDF notes", () => {
         rect: { x1: 420, y1: 260, x2: 180, y2: 120 },
       }).boundingRect,
     ).toEqual({ x1: 180, y1: 120, x2: 420, y2: 260, width: 612, height: 792, pageNumber: 2 });
+  });
+
+  it("keeps PDF-page placement stable across viewport zoom levels", () => {
+    const rect = createPdfTextNoteRect({
+      page: 2,
+      pageSize: { width: 612, height: 792 },
+      start: { x: 180, y: 120 },
+      end: { x: 420, y: 260 },
+    });
+    expect(rect).toEqual({ page: 2, x: 180, y: 120, width: 240, height: 140 });
+    expect(pdfTextNoteViewportRect(rect, { width: 612, height: 792 }, { width: 306, height: 396 }))
+      .toEqual({ left: 90, top: 60, width: 120, height: 70, scale: 0.5 });
+    expect(pdfTextNoteViewportRect(rect, { width: 612, height: 792 }, { width: 918, height: 1188 }))
+      .toEqual({ left: 270, top: 180, width: 360, height: 210, scale: 1.5 });
   });
 
   it("marks standalone notes so they can stay out of the highlight list", () => {

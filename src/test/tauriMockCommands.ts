@@ -1,4 +1,12 @@
-import type { AskCapabilityState, AskSession, JobRecord, LlmConfig, Paper, QuickReadResult } from "@/lib/api";
+import type {
+  AskCapabilityState,
+  AskSession,
+  JobRecord,
+  LlmConfig,
+  Paper,
+  PdfTextNote,
+  QuickReadResult,
+} from "@/lib/api";
 import type { SyncPreviewReport, SyncReport } from "@/lib/syncApi";
 
 const now = 1_779_999_999;
@@ -46,6 +54,7 @@ export const mockLlmConfig: LlmConfig = {
   },
   output_language: "Chinese",
   pdf_markdown: { engine: "local", mineru_token: "" },
+  obsidian: { vault_dir: "", folder: "Papers" },
 };
 
 export const mockAskCapabilityState: AskCapabilityState = {
@@ -67,6 +76,20 @@ export const mockAskSession: AskSession = {
   saved_artifacts: [],
   created_at: now,
   updated_at: now,
+};
+
+export const mockPdfTextNote: PdfTextNote = {
+  kind: "text-note",
+  id: "pdf-note-1",
+  paperId: mockPaper.id,
+  rect: { page: 1, x: 24, y: 48, width: 220, height: 120 },
+  content: "Browser smoke annotation",
+  color: "#fff3a3",
+  fontSize: 12,
+  opacity: 0.9,
+  revision: 0,
+  createdAt: now,
+  updatedAt: now,
 };
 
 export const mockQuickReadResult: QuickReadResult = {
@@ -144,6 +167,34 @@ const commandFixtures = new Map<string, MockResolver>([
     cached: false,
   })],
   ["highlight_update_rect", () => null],
+  ["pdf_note_create", () => mockPdfTextNote],
+  ["pdf_note_list", () => [mockPdfTextNote]],
+  ["pdf_note_update", () => ({ ...mockPdfTextNote, revision: 1 })],
+  ["pdf_note_delete", () => null],
+  ["pdf_note_search", () => [{ note: mockPdfTextNote, snippet: mockPdfTextNote.content }]],
+  ["legacy_reader_notes_preview", () => ({
+    schemaVersion: 1,
+    targetVersion: 1,
+    totalSentinelRows: 0,
+    alreadyConverted: 0,
+    convertible: 0,
+    paperIds: [],
+  })],
+  ["legacy_reader_notes_export", () => ({
+    schemaVersion: 1,
+    targetVersion: 1,
+    destination: "/tmp/legacy-note-export",
+    verifiedBackupPath: "/tmp/legacy-note-export/backup/legacy-notes-0",
+    sourceRows: 0,
+    converted: 0,
+    alreadyConverted: 0,
+    failed: 0,
+    defaultedStyles: 0,
+    markdownFiles: 0,
+    sectionFiles: 0,
+    emptyDefaultSections: 0,
+    rollbackState: "committed",
+  })],
   ["paper_supplements_list", () => []],
   ["paper_supplement_add_file", () => ({
     id: 1,

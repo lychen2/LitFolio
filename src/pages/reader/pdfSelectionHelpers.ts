@@ -1,3 +1,5 @@
+import type { PdfAnnotationRect } from "@/core/contracts";
+
 export const READER_MARGIN_NOTE_LABEL = "reader-margin-note";
 
 type LabelLike = {
@@ -64,6 +66,62 @@ export function nextPdfNoteFontSize(current: number, delta: number): number {
 
 function clampNoteFontSize(value: number): number {
   return Math.min(28, Math.max(8, Math.round(value)));
+}
+
+export type PdfPageSize = {
+  width: number;
+  height: number;
+};
+
+export function createPdfTextNoteRect({
+  page,
+  pageSize,
+  start,
+  end,
+}: {
+  page: number;
+  pageSize: PdfPageSize;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}): PdfAnnotationRect {
+  const minSize = 20;
+  const defaultWidth = 220;
+  const defaultHeight = 120;
+  const x = clamp(start.x, 0, pageSize.width);
+  const y = clamp(start.y, 0, pageSize.height);
+  const draggedWidth = Math.abs(end.x - start.x);
+  const draggedHeight = Math.abs(end.y - start.y);
+  const rawX = Math.min(start.x, end.x);
+  const rawY = Math.min(start.y, end.y);
+  const width = draggedWidth >= minSize
+    ? Math.min(draggedWidth, pageSize.width - Math.max(0, rawX))
+    : Math.min(defaultWidth, pageSize.width - x);
+  const height = draggedHeight >= minSize
+    ? Math.min(draggedHeight, pageSize.height - Math.max(0, rawY))
+    : Math.min(defaultHeight, pageSize.height - y);
+  return {
+    page,
+    x: clamp(draggedWidth >= minSize ? rawX : x, 0, Math.max(0, pageSize.width - minSize)),
+    y: clamp(draggedHeight >= minSize ? rawY : y, 0, Math.max(0, pageSize.height - minSize)),
+    width: Math.max(minSize, width),
+    height: Math.max(minSize, height),
+  };
+}
+
+export function pdfTextNoteViewportRect(
+  rect: PdfAnnotationRect,
+  pageSize: PdfPageSize,
+  viewportSize: PdfPageSize,
+): { left: number; top: number; width: number; height: number; scale: number } {
+  const scaleX = viewportSize.width / pageSize.width;
+  const scaleY = viewportSize.height / pageSize.height;
+  return {
+    left: rect.x * scaleX,
+    top: rect.y * scaleY,
+    width: rect.width * scaleX,
+    height: rect.height * scaleY,
+    scale: (scaleX + scaleY) / 2,
+  };
 }
 
 type StandalonePdfNotePositionInput = {
@@ -133,4 +191,8 @@ export function buildReaderSelectionQuestion(question: string, selection: string
 
 function clampRectCoord(value: number, max: number, min: number): number {
   return Math.min(Math.max(min, Math.round(value)), Math.max(min, Math.round(max) - min));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

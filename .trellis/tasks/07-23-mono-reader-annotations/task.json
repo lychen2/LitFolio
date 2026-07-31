@@ -3,7 +3,7 @@
   "name": "mono-reader-annotations",
   "title": "Rebuild Reader PDF Annotations",
   "description": "Replace sentinel margin notes and ineffective note panes with a dedicated PDF text-note model and reader controller.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

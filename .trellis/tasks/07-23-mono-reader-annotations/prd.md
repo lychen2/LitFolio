@@ -37,13 +37,13 @@ Replace highlight-label sentinel text boxes and ineffective default note panes w
 
 ## Acceptance Criteria
 
-- [ ] `PdfTextNote` has an independent Rust/SQLite/TypeScript type and no new write depends on the margin-note label.
-- [ ] Text notes create, edit, move, resize, style, delete, search, and survive app/Reader restart at multiple zoom levels.
-- [ ] Rapid interleaved text/geometry updates either serialize or return a structured revision conflict; stale writes never win silently.
-- [ ] Ordinary highlights and highlight-linked note text retain existing behavior and data.
-- [ ] Legacy margin-note conversion and note-section/Markdown archive export are idempotent, counted, backed up, and covered by failure-restore fixtures.
-- [ ] Reader opens and all local annotation operations work without network or an AI profile.
-- [ ] Focused frontend/Rust tests, typecheck, lint, full Vitest, relevant Cargo tests, and Reader Playwright flows pass.
+- [x] `PdfTextNote` has an independent Rust/SQLite/TypeScript type and no new write depends on the margin-note label.
+- [x] Text notes create, edit, move, resize, style, delete, search, and survive app/Reader restart at multiple zoom levels.
+- [x] Rapid interleaved text/geometry updates either serialize or return a structured revision conflict; stale writes never win silently.
+- [x] Ordinary highlights and highlight-linked note text retain existing behavior and data.
+- [x] Legacy margin-note conversion and note-section/Markdown archive export are idempotent, counted, backed up, and covered by failure-restore fixtures.
+- [x] Reader opens and all local annotation operations work without network or an AI profile.
+- [x] Focused frontend/Rust tests, typecheck, lint, full Vitest, relevant Cargo tests, and Reader Playwright flows pass.
 
 ## Source Anchors
 

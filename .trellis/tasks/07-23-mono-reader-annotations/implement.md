@@ -7,17 +7,17 @@
 
 ## Checklist
 
-1. [ ] Snapshot touched Reader/storage files and add failing domain/parser tests for `PdfHighlight | PdfTextNote`.
-2. [ ] Add the new `pdf_notes` migration, Rust model/repository, validation, indexes/search, and compare-and-swap revision tests.
-3. [ ] Add typed Tauri commands, frontend client/parsers, mocks, and command-parity entries; run cross-layer tests.
-4. [ ] Implement the per-annotation Reader controller with serialized/coalesced writes, conflict recovery, retry, and close/flush tests.
-5. [ ] Adapt the PDF overlay to explicit text-note props and page coordinates; preserve current linked-highlight note behavior.
-6. [ ] Add style controls and complete create/edit/move/resize/delete/search behavior with accessibility/component tests.
-7. [ ] Implement an idempotent targeted legacy converter for margin-note sentinel rows and deterministic note-file/section archive export.
-8. [ ] Rollback gate: run backup, injected-failure, restore, and second-run tests before disabling sentinel writes.
-9. [ ] Switch new text-note creation/updates to `pdf_notes`; keep legacy reads only for unconverted libraries until the final converter owns startup orchestration.
-10. [ ] Retain the default Markdown note pane and compatibility note commands/files until `mono-provenance-reading` delivers the revision-safe note controller, source-link workflow, close/flush parity, and migration evidence. That child, not annotation extraction, owns any default-pane replacement.
-11. [ ] Run focused and full validation, then inspect diffs for no AI/plugin/visual redesign scope creep.
+1. [x] Snapshot touched Reader/storage files and add failing domain/parser tests for `PdfHighlight | PdfTextNote`.
+2. [x] Add the new `pdf_notes` migration, Rust model/repository, validation, indexes/search, and compare-and-swap revision tests.
+3. [x] Add typed Tauri commands, frontend client/parsers, mocks, and command-parity entries; run cross-layer tests.
+4. [x] Implement the per-annotation Reader controller with serialized/coalesced writes, conflict recovery, retry, and close/flush tests.
+5. [x] Adapt the PDF overlay to explicit text-note props and page coordinates; preserve current linked-highlight note behavior.
+6. [x] Add style controls and complete create/edit/move/resize/delete/search behavior with accessibility/component tests.
+7. [x] Implement an idempotent targeted legacy converter for margin-note sentinel rows and deterministic note-file/section archive export.
+8. [x] Rollback gate: run backup, injected-failure, restore, and second-run tests before disabling sentinel writes.
+9. [x] Switch new text-note creation/updates to `pdf_notes`; keep legacy reads only for unconverted libraries until the final converter owns startup orchestration.
+10. [x] Retain the default Markdown note pane and compatibility note commands/files until `mono-provenance-reading` delivers the revision-safe note controller, source-link workflow, close/flush parity, and migration evidence. That child, not annotation extraction, owns any default-pane replacement.
+11. [x] Run focused and full validation, then inspect diffs for no AI/plugin/visual redesign scope creep.
 
 ## Validation
 

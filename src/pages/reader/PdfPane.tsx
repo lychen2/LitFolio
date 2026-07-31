@@ -12,6 +12,9 @@ import type { T_ViewportHighlight } from "react-pdf-highlighter/dist/components/
 import "react-pdf-highlighter/dist/style.css";
 import "pdfjs-dist/web/pdf_viewer.css";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { readerClient } from "@/core/data";
+import type { PdfAnnotationRect, PdfTextNote } from "@/core/contracts";
+import { ReaderAnnotationController } from "@/features/reader/annotationController";
 import { api, type Highlight as BackendHighlight } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { PdfTextHighlight } from "./PdfTextHighlight";
@@ -46,10 +49,9 @@ import {
 } from "./pdfNavigationHistory";
 import { pushPdfTextCacheAndInvalidateTranslations } from "./pdfTextCache";
 import {
-  READER_MARGIN_NOTE_LABEL,
   extractPdfSelectionText,
   highlightNoteUpdateValue,
-  isReaderMarginNote,
+  type PdfPageSize,
 } from "./pdfSelectionHelpers";
 
 type PdfPaneError = {
@@ -120,12 +122,36 @@ export const PdfPane = memo(function PdfPane({
   const [noteDrawMode, setNoteDrawMode] = useState(false);
   const [askSelection, setAskSelection] = useState<string | null>(null);
   const [noteDraftRect, setNoteDraftRect] = useState<ViewportDraftRect | null>(null);
+  const [pageSizes, setPageSizes] = useState<Record<number, PdfPageSize>>({});
+  const annotationController = useMemo(
+    () => new ReaderAnnotationController(readerClient),
+    [],
+  );
+  const [annotationSnapshot, setAnnotationSnapshot] = useState(() =>
+    annotationController.snapshot(),
+  );
   const scrollFnRef = useRef<((h: PdfHighlight) => void) | null>(null);
   const highlighterRef = useRef<PdfHighlighter<PdfHighlight> | null>(null);
   const pendingScrollIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textPushedRef = useRef<string | null>(null);
+  const pageSizesUrlRef = useRef<string | null>(null);
   const noteDragRef = useRef<NoteDragStart | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const sync = () => {
+      if (active) setAnnotationSnapshot(annotationController.snapshot());
+    };
+    const unsubscribe = annotationController.subscribe(sync);
+    void annotationController.openPaper(paperId).catch(() => undefined);
+    sync();
+    return () => {
+      active = false;
+      unsubscribe();
+      void annotationController.close().catch(() => undefined);
+    };
+  }, [annotationController, paperId]);
 
   useEffect(() => {
     try {
@@ -161,6 +187,8 @@ export const PdfPane = memo(function PdfPane({
 
   useEffect(() => {
     setNavigationStack([]);
+    setPageSizes({});
+    pageSizesUrlRef.current = null;
   }, [paperId, pdfUrl]);
 
   // Ctrl+F → open the search bar. Only fires when the PDF pane has the
@@ -270,35 +298,52 @@ export const PdfPane = memo(function PdfPane({
     [paperId, qc],
   );
 
-  const saveHighlightPosition = useCallback(
-    async (highlightId: string, position: ScaledPosition) => {
-      await api.highlightUpdateRect(highlightId, position);
-      await qc.invalidateQueries({ queryKey: ["highlights", paperId] });
+  const saveTextNote = useCallback(
+    async (noteId: string, content: string) => {
+      await annotationController.updateTextNote(noteId, { content });
     },
-    [paperId, qc],
+    [annotationController],
   );
 
-  const deleteHighlight = useCallback(
-    async (highlightId: string) => {
-      await api.highlightDelete(highlightId);
-      setActiveNoteHighlightId((current) => (current === highlightId ? null : current));
-      await qc.invalidateQueries({ queryKey: ["highlights", paperId] });
+  const saveTextNoteRect = useCallback(
+    async (noteId: string, rect: PdfAnnotationRect) => {
+      await annotationController.updateTextNote(noteId, { rect }, { debounce: false });
     },
-    [paperId, qc],
+    [annotationController],
   );
 
-  const createMarginNote = useCallback(
-    async (position: ScaledPosition) => {
-      await create.mutateAsync({
-        position,
-        content: { text: t("reader.standaloneNoteText", { page: position.pageNumber }) },
-        comment: { text: "", emoji: "" },
-        label: READER_MARGIN_NOTE_LABEL,
+  const saveTextNoteStyle = useCallback(
+    async (
+      noteId: string,
+      patch: Partial<Pick<PdfTextNote, "color" | "fontSize" | "opacity">>,
+    ) => {
+      await annotationController.updateTextNote(noteId, patch);
+    },
+    [annotationController],
+  );
+
+  const deleteTextNote = useCallback(
+    async (noteId: string) => {
+      await annotationController.deleteTextNote(noteId);
+      setActiveNoteHighlightId((current) => (current === noteId ? null : current));
+    },
+    [annotationController],
+  );
+
+  const createTextNote = useCallback(
+    async (rect: PdfAnnotationRect) => {
+      const created = await annotationController.createTextNote({
+        rect,
+        content: "",
+        color: "#fff3a3",
+        fontSize: 12,
+        opacity: 0.9,
       });
+      setActiveNoteHighlightId(created.id);
       setNoteDrawMode(false);
       setNoteDraftRect(null);
     },
-    [create, t],
+    [annotationController],
   );
 
   const createStandaloneNote = useCallback(async () => {
@@ -325,14 +370,7 @@ export const PdfPane = memo(function PdfPane({
       }),
     [highlightsQ.data],
   );
-  const highlights = useMemo(
-    () => allHighlights.filter((highlight) => !isReaderMarginNote(highlight)),
-    [allHighlights],
-  );
-  const marginNotes = useMemo(
-    () => allHighlights.filter(isReaderMarginNote),
-    [allHighlights],
-  );
+  const highlights = allHighlights;
 
   const renderManualHighlightLayers = useCallback(() => {
     const highlighter = highlighterRef.current as PdfHighlighterApi | null;
@@ -584,7 +622,7 @@ export const PdfPane = memo(function PdfPane({
         dark={dark}
         zoomLabel={zoomLabel}
         canReturn={navigationStack.length > 0}
-        notePending={create.isPending}
+        notePending={annotationSnapshot.creating}
         noteActive={noteDrawMode}
         onReturn={returnToPreviousPosition}
         onAddNote={() => void createStandaloneNote()}
@@ -615,6 +653,16 @@ export const PdfPane = memo(function PdfPane({
         }}
       >
         {(pdfDocument) => {
+          if (pageSizesUrlRef.current !== pdfUrl) {
+            pageSizesUrlRef.current = pdfUrl;
+            void loadPdfPageSizes(pdfDocument)
+              .then((sizes) => {
+                if (pageSizesUrlRef.current === pdfUrl) setPageSizes(sizes);
+              })
+              .catch((error: unknown) => {
+                console.warn("[PdfPane] load page sizes failed", error);
+              });
+          }
           // pdfjs gives us reliable body text. lopdf in the backend chokes on
           // many modern academic PDFs (CMap fonts, font subsets), so we push
           // the renderer's extraction up to the backend cache once per paper
@@ -744,14 +792,16 @@ export const PdfPane = memo(function PdfPane({
         draftRect={noteDraftRect}
         hiddenLinkedNoteIds={hiddenNoteHighlightIds}
         linkedNotes={highlights}
-        marginNotes={marginNotes}
         noteDrawMode={noteDrawMode}
+        pageSizes={pageSizes}
+        statusById={annotationSnapshot.statusById}
+        textNotes={annotationSnapshot.notes}
         onCancelDraft={() => {
           noteDragRef.current = null;
           setNoteDraftRect(null);
         }}
-        onCreate={createMarginNote}
-        onDelete={deleteHighlight}
+        onCreate={createTextNote}
+        onDelete={deleteTextNote}
         onDragStart={(start) => {
           noteDragRef.current = start;
         }}
@@ -760,10 +810,12 @@ export const PdfPane = memo(function PdfPane({
           setActiveNoteHighlightId(null);
           setHiddenNoteHighlightIds((current) => new Set(current).add(id));
         }}
-        onSave={saveLinkedNote}
+        onSaveLinkedNote={saveLinkedNote}
+        onSaveTextNote={saveTextNote}
         onSelect={setActiveNoteHighlightId}
+        onStyleTextNote={saveTextNoteStyle}
         onToggleDrawMode={setNoteDrawMode}
-        onUpdatePosition={saveHighlightPosition}
+        onUpdateRect={saveTextNoteRect}
       />
       {askSelection && (
         <PdfSelectionAskBox
@@ -789,6 +841,27 @@ export const PdfPane = memo(function PdfPane({
     </div>
   );
 });
+
+type PdfPageSizeDocument = {
+  numPages: number;
+  getPage(pageNumber: number): Promise<{
+    getViewport(input: { scale: number }): { width: number; height: number };
+  }>;
+};
+
+async function loadPdfPageSizes(
+  document: PdfPageSizeDocument,
+): Promise<Record<number, PdfPageSize>> {
+  const entries = await Promise.all(
+    Array.from({ length: document.numPages }, async (_, index) => {
+      const pageNumber = index + 1;
+      const page = await document.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1 });
+      return [pageNumber, { width: viewport.width, height: viewport.height }] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
 
 function selectedText(content: { text?: string | null }, container: HTMLElement | null): string {
   const selection = window.getSelection();

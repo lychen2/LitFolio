@@ -26,6 +26,8 @@ mod paper_supplements;
 mod paper_terms;
 mod papers;
 mod paths;
+mod legacy_reader_notes;
+mod pdf_notes;
 mod projects;
 pub mod queue;
 pub mod retrieval;
@@ -56,6 +58,14 @@ pub use paper_supplements::{NewPaperSupplement, PaperSupplement, PaperSupplement
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
 pub use paths::{default_library_root, LibraryPaths};
+pub use legacy_reader_notes::{
+    export_legacy_reader_notes, preview_legacy_reader_notes, LegacyReaderNotesError,
+    LegacyReaderNotesPreview, LegacyReaderNotesReport,
+};
+pub use pdf_notes::{
+    PdfNote, PdfNoteCreateInput, PdfNoteError, PdfNotePatch, PdfNoteRect, PdfNoteRepo,
+    PdfNoteSearchResult,
+};
 pub use projects::{ProjectDraft, ProjectRepo, ResearchProject};
 pub use queue::{QueueEntry, QueueRepo};
 pub use retrieval::{unified_search, UnifiedSearchResult};
