@@ -75,6 +75,7 @@ mod tests {
         assert_table(&pool, "source_segments").await;
         assert_table(&pool, "source_links").await;
         assert_table(&pool, "note_revisions").await;
+        assert_table(&pool, "ai_execution_records").await;
         assert_column(&pool, "paper_documents", "index_status").await;
         assert_column(&pool, "paper_documents", "index_error").await;
         assert_column(&pool, "paper_documents", "indexed_at").await;

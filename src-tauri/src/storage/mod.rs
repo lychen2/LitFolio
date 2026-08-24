@@ -3,6 +3,7 @@
 #![allow(dead_code, unused_imports)]
 
 mod ask_sessions;
+mod ai_executions;
 mod candidates;
 mod comparisons;
 pub mod concepts;
@@ -36,6 +37,7 @@ pub mod smart_collections;
 mod tags;
 pub mod topic_alerts;
 
+pub use ai_executions::{AiExecutionRepo, ExecutionRecord};
 pub use ask_sessions::{AskSession, AskSessionDraft, AskSessionRepo};
 pub use candidates::{CandidateDraft, CandidatePaper, CandidateRepo};
 pub use comparisons::{ComparisonRepo, PaperComparison};

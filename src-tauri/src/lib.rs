@@ -19,6 +19,7 @@ mod secret;
 mod startup;
 mod storage;
 
+use std::collections::HashMap;
 #[cfg(not(test))]
 use tauri::Manager;
 use tokio::sync::Mutex as AsyncMutex;
@@ -32,6 +33,9 @@ use storage::{LibraryPaths, Pool};
 pub use ingest::{fetch_scihub_pdf_url, scihub_download_pdf};
 
 pub struct AppState {
+    /// Live cancellation tokens for in-flight AI dispatches, keyed by
+    /// execution-record id. Removed once the dispatch reaches a terminal state.
+    pub ai_cancels: AsyncMutex<HashMap<String, CancellationToken>>,
     pub pool: Pool,
     pub paths: LibraryPaths,
     pub http: reqwest::Client,

@@ -32,6 +32,7 @@ pub(crate) async fn bootstrap_state_at_with_observer(
     let http_external = http::build_external_client()?;
     tracing::info!(root = %paths.root.display(), "library ready");
     Ok(Arc::new(AppState {
+        ai_cancels: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         pool,
         paths,
         http,

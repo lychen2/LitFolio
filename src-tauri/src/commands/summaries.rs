@@ -1,16 +1,24 @@
 //! Paper summary and translation IPC commands.
+//!
+//! Core AI Reading actions resolve through ONE active reading model, freeze a
+//! context envelope before dispatch, and persist exactly one redacted
+//! execution record per dispatch under a real cancellation token.
 
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
 use tauri::State;
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::{
-    active_profile_for_task, load_config, quick_read_paper_text, summarize_paper_text,
-    PaperSummaryRequest, QuickReadResult, TaskKind, TldrResult,
+    active_profile_for_task, active_reading_profile, dispatch_with_cancel,
+    freeze_reading_context, load_config, quick_read_paper_text, summarize_paper_text,
+    PaperSummaryRequest, QuickReadResult, ReadingContextEnvelope, ReadingContextRequest,
+    TaskKind, TldrResult,
 };
 use crate::ingest::PaperDraft;
-use crate::storage::{LibraryPaths, PaperRepo};
+use crate::storage::{AiExecutionRepo, ExecutionRecord, LibraryPaths, PaperRepo};
 use crate::AppState;
 
 /// Resolve body text to send to the LLM for TLDR / QuickRead. Three tiers:
@@ -48,13 +56,117 @@ pub(crate) async fn load_or_extract_pdf_body(
     Some(trimmed.to_string())
 }
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or_default()
+}
+
+/// Bounded, single-line error summary for execution records. Provider errors
+/// can embed response fragments; records never store them verbatim.
+fn redact_error(err: &str) -> String {
+    let line = err.lines().next().unwrap_or_default();
+    line.chars().take(160).collect()
+}
+
+/// Run one core AI Reading dispatch end to end:
+/// freeze envelope -> open running record -> provider I/O under cancellation
+/// token -> close record exactly once -> drop the token registration.
+/// Returns `Err("cancelled")` when cancelled; late results cannot resurface.
+async fn run_reading_dispatch<T>(
+    state: &AppState,
+    operation: &str,
+    paper_id: &str,
+    profile_name: &str,
+    model: &str,
+    envelope: &ReadingContextEnvelope,
+    io: impl Future<Output = anyhow::Result<T>>,
+) -> Result<T, String> {
+    let executions = AiExecutionRepo::new(&state.pool);
+    let exec_id = format!("exec-{}-{}-{}", operation, paper_id, now_ms());
+    let started = now_ms();
+    let _ = executions
+        .record_start(&ExecutionRecord {
+            id: exec_id.clone(),
+            operation: operation.to_string(),
+            trigger: "user-action".to_string(),
+            envelope_id: envelope.envelope_id.clone(),
+            paper_id: Some(paper_id.to_string()),
+            profile_name: profile_name.to_string(),
+            model: model.to_string(),
+            state: "running".to_string(),
+            started_at: started,
+            finished_at: None,
+            duration_ms: None,
+            error_summary: None,
+        })
+        .await;
+
+    let token = CancellationToken::new();
+    state
+        .ai_cancels
+        .lock()
+        .await
+        .insert(exec_id.clone(), token.clone());
+
+    let outcome = dispatch_with_cancel(&token, io).await;
+
+    state.ai_cancels.lock().await.remove(&exec_id);
+    match outcome {
+        Some(Ok(value)) => {
+            let _ = executions
+                .record_terminal(&exec_id, "succeeded", None, now_ms())
+                .await;
+            Ok(value)
+        }
+        Some(Err(err)) => {
+            let summary = redact_error(&err.to_string());
+            let _ = executions
+                .record_terminal(&exec_id, "failed", Some(&summary), now_ms())
+                .await;
+            Err(summary)
+        }
+        None => {
+            let _ = executions
+                .record_terminal(&exec_id, "cancelled", Some("user-cancelled"), now_ms())
+                .await;
+            Err("cancelled".to_string())
+        }
+    }
+}
+
+/// Freeze the reading context for a whole-paper action: metadata + resolved
+/// body text + active revision provenance. Pure validation happens in
+/// [`freeze_reading_context`]; storage lookups happen here, before freezing.
+async fn freeze_paper_context(
+    state: &AppState,
+    request: &ReadingContextRequest,
+    title: &str,
+    abstract_text: Option<&str>,
+    body_text: Option<&str>,
+) -> Result<ReadingContextEnvelope, String> {
+    let provenance = crate::storage::ProvenanceRepo::new(&state.pool);
+    let active_revision = provenance
+        .active_revision(&request.paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    freeze_reading_context(
+        &request.paper_id,
+        title,
+        abstract_text,
+        body_text,
+        active_revision.as_ref(),
+        request,
+    )
+    .map_err(|e| format!("{}: {}", e.category(), e))
+}
+
 #[tauri::command]
 pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<TldrResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let output_language = cfg.output_language.as_str();
-    let prof = active_profile_for_task(&cfg, TaskKind::Tldr)
-        .map_err(|e| e.to_string())?
-        .clone();
+    let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let repo = PaperRepo::new(&state.pool);
     let paper = repo
         .get(&id)
@@ -62,19 +174,46 @@ pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<T
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let body = load_or_extract_pdf_body(&state.paths, &id, paper.pdf_path.as_deref()).await;
-    let request = PaperSummaryRequest {
-        title: &paper.title,
-        authors: &paper.authors,
-        venue: paper.venue.as_deref(),
-        year: paper.year,
-        abstract_text: paper.abstract_text.as_deref(),
-        body_text: body.as_deref(),
-        extra_context: None,
-        output_language,
-    };
-    let result = summarize_paper_text(&state.http, &prof, &request)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_paper_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: id.clone(),
+            selection: None,
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+        body.as_deref(),
+    )
+    .await?;
+
+    let http = state.http.clone();
+    let result = run_reading_dispatch(
+        &state,
+        "paper_tldr",
+        &id,
+        &prof.name,
+        &prof.chat_model,
+        &envelope,
+        summarize_paper_text(
+            &http,
+            &prof,
+            &PaperSummaryRequest {
+                title: &paper.title,
+                authors: &paper.authors,
+                venue: paper.venue.as_deref(),
+                year: paper.year,
+                abstract_text: paper.abstract_text.as_deref(),
+                body_text: body.as_deref(),
+                extra_context: None,
+                output_language,
+            },
+        ),
+    )
+    .await?;
     repo.update_tldr(&id, &result.tldr, &result.key_findings)
         .await
         .map_err(|e| e.to_string())?;
@@ -88,9 +227,7 @@ pub async fn paper_quick_read(
 ) -> Result<QuickReadResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let output_language = cfg.output_language.as_str();
-    let prof = active_profile_for_task(&cfg, TaskKind::QuickRead)
-        .map_err(|e| e.to_string())?
-        .clone();
+    let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let repo = PaperRepo::new(&state.pool);
     let paper = repo
         .get(&id)
@@ -98,19 +235,46 @@ pub async fn paper_quick_read(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let body = load_or_extract_pdf_body(&state.paths, &id, paper.pdf_path.as_deref()).await;
-    let request = PaperSummaryRequest {
-        title: &paper.title,
-        authors: &paper.authors,
-        venue: paper.venue.as_deref(),
-        year: paper.year,
-        abstract_text: paper.abstract_text.as_deref(),
-        body_text: body.as_deref(),
-        extra_context: None,
-        output_language,
-    };
-    let result = quick_read_paper_text(&state.http, &prof, &request)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_paper_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: id.clone(),
+            selection: None,
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+        body.as_deref(),
+    )
+    .await?;
+
+    let http = state.http.clone();
+    let result = run_reading_dispatch(
+        &state,
+        "paper_quick_read",
+        &id,
+        &prof.name,
+        &prof.chat_model,
+        &envelope,
+        quick_read_paper_text(
+            &http,
+            &prof,
+            &PaperSummaryRequest {
+                title: &paper.title,
+                authors: &paper.authors,
+                venue: paper.venue.as_deref(),
+                year: paper.year,
+                abstract_text: paper.abstract_text.as_deref(),
+                body_text: body.as_deref(),
+                extra_context: None,
+                output_language,
+            },
+        ),
+    )
+    .await?;
     repo.update_quick_read(
         &id,
         &result.problem,
@@ -130,9 +294,7 @@ pub async fn paper_translate(
     target_lang: Option<String>,
 ) -> Result<crate::ai::TranslationResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Translate)
-        .map_err(|e| e.to_string())?
-        .clone();
+    let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let repo = PaperRepo::new(&state.pool);
     let paper = repo
         .get(&id)
@@ -140,15 +302,40 @@ pub async fn paper_translate(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
-    let result = crate::ai::translate_paper_text(
-        &state.http,
-        &prof,
+
+    let envelope = freeze_paper_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: id.clone(),
+            selection: None,
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
         &paper.title,
         paper.abstract_text.as_deref(),
-        &lang,
+        None,
     )
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
+
+    let http = state.http.clone();
+    let title = paper.title.clone();
+    let result = run_reading_dispatch(
+        &state,
+        "paper_translate",
+        &id,
+        &prof.name,
+        &prof.chat_model,
+        &envelope,
+        crate::ai::translate_paper_text(
+            &http,
+            &prof,
+            &title,
+            paper.abstract_text.as_deref(),
+            &lang,
+        ),
+    )
+    .await?;
     repo.update_translation(
         &id,
         &result.title,
@@ -166,8 +353,11 @@ pub async fn draft_translate(
     draft: PaperDraft,
     target_lang: Option<String>,
 ) -> Result<crate::ai::TranslationResult, String> {
+    // ponytail: discovery-draft translation stays on the legacy task-binding
+    // resolver until source-discovery plugin extraction owns it.
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
+    let prof =
+        active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
     crate::ai::translate_paper_text(
         &state.http,

@@ -181,6 +181,14 @@ impl LlmConfig {
     }
 }
 
+/// Resolve the single active reading model for all core Reader AI actions.
+/// Core Reader actions MUST resolve through this one entry point instead of
+/// per-feature planning chains; legacy per-task bindings stay in the config
+/// file for compatibility but no longer steer core reading actions.
+pub fn active_reading_profile(cfg: &LlmConfig) -> Result<LlmProfile> {
+    active_profile(cfg).cloned()
+}
+
 pub fn active_profile(cfg: &LlmConfig) -> Result<&LlmProfile> {
     if cfg.profiles.is_empty() {
         return Err(anyhow!("no LLM profile configured; add one in Settings"));

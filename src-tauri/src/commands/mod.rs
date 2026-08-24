@@ -313,6 +313,8 @@ macro_rules! command_paths_config_sync_ai {
             commands::llm::llm_save_config,
             commands::llm::llm_test,
             commands::llm::llm_list_models,
+            commands::llm::ai_cancel_execution,
+            commands::llm::ai_list_running_executions,
             commands::sync::sync_get_config,
             commands::sync::sync_save_config,
             commands::sync::sync_test,

@@ -247,6 +247,7 @@ mod tests {
             http: reqwest::Client::new(),
             http_external: reqwest::Client::new(),
             host_network: crate::network_egress::HostNetworkState::new(Default::default()),
+            ai_cancels: AsyncMutex::new(std::collections::HashMap::new()),
             batch_cancel: AsyncMutex::new(None::<CancellationToken>),
             sync_lock: AsyncMutex::new(()),
         };

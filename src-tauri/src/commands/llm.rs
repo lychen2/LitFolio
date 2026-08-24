@@ -69,3 +69,33 @@ pub async fn llm_list_models(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Cancel one in-flight core AI Reading dispatch by its execution-record id.
+/// Returns `true` when a live dispatch was found and the token fired. The
+/// dispatch itself records the terminal `cancelled` state; late results are
+/// suppressed and never persisted.
+#[tauri::command]
+pub async fn ai_cancel_execution(
+    state: State<'_, Arc<AppState>>,
+    execution_id: String,
+) -> Result<bool, String> {
+    let token = state.ai_cancels.lock().await.get(&execution_id).cloned();
+    match token {
+        Some(token) => {
+            token.cancel();
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+/// Redacted execution records for dispatches that are still running.
+#[tauri::command]
+pub async fn ai_list_running_executions(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<crate::storage::ExecutionRecord>, String> {
+    crate::storage::AiExecutionRepo::new(&state.pool)
+        .list_running()
+        .await
+        .map_err(|e| e.to_string())
+}

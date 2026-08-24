@@ -10,6 +10,11 @@ mod models;
 mod profile;
 pub mod prompts;
 mod query_expand;
+pub mod reading;
+
+pub use reading::{dispatch_with_cancel, freeze_reading_context, ReadingContextEnvelope,
+    ReadingContextRequest,
+};
 mod summarize;
 mod topic_survey;
 mod topic_survey_annotate;
@@ -25,8 +30,8 @@ pub use link_discover::discover_links;
 pub use lit_review::{generate_review, GroupingStrategy, LitReviewResult};
 pub use models::list_models;
 pub use profile::{
-    active_profile, active_profile_for_task, load_config, save_config, LlmConfig, LlmProfile,
-    TaskKind,
+    active_profile, active_profile_for_task, active_reading_profile, load_config, save_config,
+    LlmConfig, LlmProfile, TaskKind,
 };
 pub use query_expand::{expand_search_query, ExpandedQuery};
 pub use summarize::{

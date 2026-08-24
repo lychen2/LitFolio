@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { parseAskCapabilityState, parseAskSession, parseAskSessionMaybe, parseHighlight, parseLlmConfig } from "./apiSchema";
+import {
+  parseAiExecutionRecord,
+  type AiExecutionRecord,
+} from "./apiSchemaAi";
 import { parseNoteSaveResult, type NoteSaveResult } from "./apiSchemaProvenance";
 import { parseArray } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
@@ -167,6 +171,14 @@ export const aiReaderApi = {
     invoke<void>("paper_set_pdf_text", { paperId, text }),
   llmListModels: (profile: LlmProfile) =>
     invoke<string[]>("llm_list_models", { profile }),
+  aiListRunningExecutions: () =>
+    invokeParsed<AiExecutionRecord[]>(
+      "ai_list_running_executions",
+      undefined,
+      (value, path) => parseArray(value, path, parseAiExecutionRecord),
+    ),
+  aiCancelExecution: (executionId: string) =>
+    invoke<boolean>("ai_cancel_execution", { executionId }),
   searchExpandQuery: (raw: string) =>
     invoke<ExpandedQuery>("search_expand_query", { raw }),
   topicSurvey: (params: { topic: string; annotate?: boolean; perSubareaTopk?: number }) =>
