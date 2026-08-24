@@ -1,7 +1,0 @@
-{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Library/settings contribution boundaries"}
-{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Sidecar rows and supplement file migration"}
-{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Smart query, duplicate merge, and supplement command parity"}
-{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Papers, files, jobs, events, UI, and optional integration scopes"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"0019/0020/0021/0035 ownership"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Advanced Library versus core ownership"}
-{"file":".trellis/tasks/07-23-mono-plugin-library-plus/research/source-map.md","reason":"Current data/files and core invariant decisions"}

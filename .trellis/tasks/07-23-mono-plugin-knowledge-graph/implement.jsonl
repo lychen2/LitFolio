@@ -1,7 +1,0 @@
-{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Graph contribution isolation and renderer ownership"}
-{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Graph sidecar and legacy conversion rules"}
-{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Graph/concept/discovery DTO and command parity"}
-{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Papers, AI, network, jobs, UI, and lifecycle scopes"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"0010/0017/0024 ownership"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Graph route and Library action extraction"}
-{"file":".trellis/tasks/07-23-mono-plugin-knowledge-graph/research/source-map.md","reason":"Current renderer/data seams and citation boundary"}

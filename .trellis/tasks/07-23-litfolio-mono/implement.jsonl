@@ -1,7 +1,0 @@
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Shared boundary analysis for parent orchestration"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Current routes, composite surfaces, and target feature ownership"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"Current note persistence models and annotation migration inputs"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/tauri-command-registry.md","reason":"Compile-time command registration and backend split constraints"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Historical schema ownership and conversion matrix"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Phase-one inclusion, enablement, capability, and lifecycle limits"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Shared dirty-worktree preservation requirements"}

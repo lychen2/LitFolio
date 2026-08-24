@@ -1,8 +1,0 @@
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check parent plans for duplicated or conflicting architecture"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check cross-layer flow and contract completeness"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Verify every current feature receives a core, plugin, archive, or removal owner"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/reader-note-systems.md","reason":"Verify annotation acceptance covers every legacy note source"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/tauri-command-registry.md","reason":"Verify runtime disable and physical build pruning remain distinct"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Verify every migration 0001-0035 has a lossless target"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Verify plugin permissions, lifecycle, and failure isolation"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Verify plans do not authorize destructive shared-worktree operations"}

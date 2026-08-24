@@ -1,8 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Audit bundle/test evidence and dead-code cleanup"}
-{"file":".trellis/spec/backend/tauri-commands.md","reason":"Audit conditional registry and command parity"}
-{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit inclusion/enabled state consistency"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/plugin-runtime-constraints.md","reason":"Reject runtime hiding as build pruning"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure core-only build retains conversion descriptors"}
-{"file":".trellis/tasks/07-23-mono-build-pruning/research/source-map.md","reason":"Check host-owned matrix and shared/exclusive dependency classification"}
-{"file":".trellis/tasks/07-23-mono-plugin-host-sdk/prd.md","reason":"Verify no second manifest compiler or stale plan acceptance"}
-{"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Verify physical pruning and canonical manifest requirements"}

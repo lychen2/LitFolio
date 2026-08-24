@@ -1,6 +1,0 @@
-{"file":".trellis/spec/backend/storage-and-migrations.md","reason":"Audit project/evidence/comparison/file preservation"}
-{"file":".trellis/spec/backend/error-handling.md","reason":"Audit cancellation, missing-reference, and permission failures"}
-{"file":".trellis/spec/cross-layer/plugin-capabilities.md","reason":"Audit no core DB or Library Ask dependency"}
-{"file":".trellis/spec/cross-layer/reader-annotations.md","reason":"Audit evidence capture and deleted-highlight behavior"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/legacy-schema-map.md","reason":"Ensure all workbench data is mapped"}
-{"file":".trellis/tasks/07-23-mono-plugin-research-workbench/research/source-map.md","reason":"Check routes/onboarding/actions and filesystem outputs"}

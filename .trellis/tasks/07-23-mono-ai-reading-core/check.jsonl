@@ -1,8 +1,0 @@
-{"file":".trellis/spec/frontend/state-management.md","reason":"Check no-profile, cancellation, retry, and user-trigger semantics"}
-{"file":".trellis/spec/backend/error-handling.md","reason":"Audit structured errors and secret/log safety"}
-{"file":".trellis/spec/cross-layer/api-contracts.md","reason":"Audit every core AI action across frontend and backend"}
-{"file":".trellis/spec/cross-layer/reader-annotations.md","reason":"Ensure AI annotation integration uses the Reader controller"}
-{"file":".trellis/tasks/07-23-litfolio-mono/prd.md","reason":"Audit parent requirements for explicit context, proposal writes, execution visibility, and offline AI isolation"}
-{"file":".trellis/tasks/archive/2026-07/07-28-mono-neuink-integration-study/research/mono-plan-adversarial-review.md","reason":"Check scope freezing, terminal cancellation, and no late-result regressions against the fixed NeuInk audit"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-feature-map.md","reason":"Check plugin workflows were not retained in core"}
-{"file":".trellis/tasks/07-23-mono-ai-reading-core/research/source-map.md","reason":"Check mixed API/config fields have explicit owners and adapters"}

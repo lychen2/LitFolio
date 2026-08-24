@@ -1,5 +1,0 @@
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check duplicate or conflicting spec ownership"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check end-to-end current-state coverage"}
-{"file":".trellis/spec/frontend/index.md","reason":"Check frontend prerequisite is complete and linked"}
-{"file":".trellis/tasks/07-23-litfolio-mono/research/current-worktree-risk.md","reason":"Ensure the spec task does not touch application source"}
-{"file":".trellis/tasks/archive/2026-07/07-23-mono-code-spec-foundation/research/source-map.md","reason":"Verify every rule has current evidence and future contracts are labeled"}
