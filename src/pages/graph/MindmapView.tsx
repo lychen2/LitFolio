@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { GraphData, GraphNode } from "@/lib/api";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props {
   data: GraphData;
@@ -18,6 +19,7 @@ interface PositionedNode {
 }
 
 export function MindmapView({ data, centerConcept, onSelectNode, width, height }: Props) {
+  const t = useT();
   const navigate = useNavigate();
   const cx = width / 2;
   const cy = height / 2;
@@ -86,8 +88,8 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
 
   if (concepts.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-litera-mute">
-        No concept nodes available. Extract terms from papers first.
+      <div className="flex h-full items-center justify-center px-8 text-center text-sm text-litera-mute">
+        {t("graph.noConcepts")}
       </div>
     );
   }
@@ -99,7 +101,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
         <select
           value={activeConcept ?? ""}
           onChange={(e) => onSelectNode(e.target.value ? `concept:${e.target.value}` : null)}
-          className="rounded-md border border-litera-line bg-litera-paper px-2.5 py-1.5 text-xs shadow-sm"
+          className="litera-input text-xs shadow-sm"
         >
           {concepts.map((c) => (
             <option key={c.id} value={c.label}>
@@ -110,16 +112,6 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
       </div>
 
       <svg width={width} height={height} className="absolute inset-0">
-        <defs>
-          <linearGradient id="ring1-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#34d399" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#059669" stopOpacity="0.5" />
-          </linearGradient>
-          <linearGradient id="ring2-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#9ca3af" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#6b7280" stopOpacity="0.3" />
-          </linearGradient>
-        </defs>
         {lines.map((l, i) => (
           <line
             key={i}
@@ -127,7 +119,8 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
             y1={l.y1}
             x2={l.x2}
             y2={l.y2}
-            stroke={l.ring === 1 ? "url(#ring1-grad)" : "url(#ring2-grad)"}
+            stroke={l.ring === 1 ? "var(--litera-info)" : "var(--litera-border-strong)"}
+            strokeOpacity={l.ring === 1 ? 0.55 : 0.42}
             strokeWidth={l.ring === 1 ? 2 : 1}
             strokeDasharray={l.ring === 2 ? "5 5" : "none"}
             strokeLinecap="round"
@@ -156,9 +149,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
               // Center concept: large hexagon-ish glow
               <div className="relative flex flex-col items-center">
                 <div
-                  className="h-14 w-14 rounded-xl flex items-center justify-center text-white text-xs font-semibold
-                    bg-gradient-to-br from-emerald-400 to-emerald-600
-                    shadow-[0_0_20px_rgba(5,150,105,0.4)] transition-shadow group-hover:shadow-[0_0_28px_rgba(5,150,105,0.6)]"
+                  className="flex h-14 w-14 items-center justify-center bg-litera-info text-xs font-semibold text-litera-ink shadow-lg transition-shadow group-hover:shadow-xl"
                   style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
                 >
                   {p.node.label.slice(0, 4)}
@@ -171,9 +162,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
               // Paper node: rounded-rect document shape
               <div className="flex flex-col items-center">
                 <div
-                  className="relative h-10 w-8 rounded-md flex items-center justify-center text-white text-[10px] font-medium
-                    bg-gradient-to-br from-indigo-400 to-indigo-600
-                    shadow-md transition-all duration-150 group-hover:scale-110 group-hover:shadow-lg"
+                  className="relative flex h-10 w-8 items-center justify-center rounded bg-litera-accent text-[10px] font-medium text-litera-ink shadow-md transition-transform duration-150 group-hover:scale-105"
                 >
                   {/* Folded corner */}
                   <div
@@ -187,7 +176,7 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
                 </div>
                 <span
                   className="mt-1 text-center leading-tight text-litera-text text-[10px] max-w-[90px] truncate
-                    transition-colors group-hover:text-indigo-500"
+                    transition-colors group-hover:text-litera-accent"
                   title={p.node.label}
                 >
                   {p.node.label}
@@ -200,14 +189,12 @@ export function MindmapView({ data, centerConcept, onSelectNode, width, height }
               // Concept node (non-center): hexagon
               <div className="flex flex-col items-center">
                 <div
-                  className="h-8 w-8 flex items-center justify-center text-white text-[10px] font-medium
-                    bg-gradient-to-br from-emerald-400 to-emerald-600
-                    shadow-md transition-all duration-150 group-hover:scale-110 group-hover:shadow-lg"
+                  className="flex h-8 w-8 items-center justify-center bg-litera-info text-[10px] font-medium text-litera-ink shadow-md transition-transform duration-150 group-hover:scale-105"
                   style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
                 />
                 <span
                   className="mt-1 text-center leading-tight text-litera-text text-[10px] max-w-[90px] truncate
-                    transition-colors group-hover:text-emerald-600"
+                    transition-colors group-hover:text-litera-success"
                   title={p.node.label}
                 >
                   {p.node.label}

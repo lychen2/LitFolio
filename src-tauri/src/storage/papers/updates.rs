@@ -126,18 +126,19 @@ impl PaperRepo<'_> {
     }
 
     /// Overwrite the bibliographic metadata of an existing paper from `p`
-    /// (title, authors, year, venue, abstract, doi, bibtex). Used when the
-    /// user supplies a DOI for a paper whose metadata wasn't recognized and we
-    /// re-fetch it from CrossRef. The FTS index stays in sync via the
-    /// `papers_au` AFTER UPDATE trigger.
+    /// (title, authors, year, venue, abstract, DOI, arXiv ID, BibTeX). Used
+    /// when the user supplies a DOI for a paper whose metadata wasn't
+    /// recognized. The FTS index stays in sync via the `papers_au` AFTER
+    /// UPDATE trigger.
     pub async fn update_metadata(&self, p: &Paper) -> Result<()> {
         let authors_json = serde_json::to_string(&p.authors)?;
         let now = Utc::now().timestamp();
         let res = sqlx::query(
             "UPDATE papers
              SET title = ?1, authors_json = ?2, year = ?3, venue = ?4,
-                 abstract = ?5, doi = ?6, bibtex = ?7, updated_at = ?8
-             WHERE id = ?9",
+                 abstract = ?5, doi = ?6, arxiv_id = ?7, bibtex = ?8,
+                 updated_at = ?9
+             WHERE id = ?10",
         )
         .bind(&p.title)
         .bind(&authors_json)
@@ -145,6 +146,7 @@ impl PaperRepo<'_> {
         .bind(&p.venue)
         .bind(&p.abstract_text)
         .bind(&p.doi)
+        .bind(&p.arxiv_id)
         .bind(&p.bibtex)
         .bind(now)
         .bind(&p.id)

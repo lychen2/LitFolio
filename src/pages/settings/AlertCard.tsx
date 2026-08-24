@@ -43,7 +43,7 @@ export function AlertCard({
         <button onClick={(e) => { e.stopPropagation(); onRun(); }} disabled={running} className="litera-btn text-[10px] px-1.5 py-0.5 disabled:opacity-50" title={t("alerts.run")}>
           {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
         </button>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-litera-mute hover:text-red-400" title={t("alerts.delete")}>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-litera-mute hover:text-litera-error" title={t("alerts.delete")}>
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>

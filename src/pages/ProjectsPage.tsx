@@ -4,6 +4,7 @@ import { BookOpen, ClipboardCopy, FolderKanban, GitCompareArrows, Loader2, Messa
 import { Link, useNavigate } from "react-router-dom";
 import { api, type EvidenceItem, type Paper, type ProjectDraft, type ProjectStatus, type ResearchProject } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
 import type { TKey } from "@/i18n/dict";
 import { ProjectWeeklyReviewPanel } from "@/pages/projects/ProjectWeeklyReviewPanel";
 import { ProjectWritingPanel } from "@/pages/projects/ProjectWritingPanel";
@@ -33,16 +34,12 @@ export function ProjectsPage() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-            <FolderKanban className="h-5 w-5 text-litera-accent" />
-            {t("projects.title")}
-          </h1>
-          <p className="text-sm text-litera-mute">{t("projects.subtitle")}</p>
-        </div>
-      </header>
-      <div className="flex-1 min-h-0 grid grid-cols-[320px_minmax(0,1fr)]">
+      <PageHeader
+        icon={<FolderKanban className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("projects.title")}
+        subtitle={t("projects.subtitle")}
+      />
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(220px,280px)_minmax(0,1fr)] max-[900px]:grid-cols-1">
         <ProjectSidebar
           projects={projects.data ?? []}
           loading={projects.isLoading}
@@ -100,8 +97,8 @@ function ProjectSidebar({
   });
 
   return (
-    <aside className="border-r border-litera-line bg-litera-paper/30 min-h-0 flex flex-col">
-      <div className="p-3 border-b border-litera-line">
+    <aside className="flex min-h-0 flex-col border-r border-litera-border bg-litera-paper/35 max-[900px]:max-h-48 max-[900px]:border-b max-[900px]:border-r-0">
+      <div className="border-b border-litera-border p-3">
         <button
           onClick={() => create.mutate()}
           disabled={create.isPending}
@@ -110,9 +107,9 @@ function ProjectSidebar({
           {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           {t("projects.create")}
         </button>
-        {create.error && <div className="mt-2 text-xs text-red-400/90">{(create.error as Error).message}</div>}
-        {exportProject.error && <div className="mt-2 text-xs text-red-400/90">{(exportProject.error as Error).message}</div>}
-        {removeProject.error && <div className="mt-2 text-xs text-red-400/90">{(removeProject.error as Error).message}</div>}
+        {create.error && <div className="mt-2 text-xs text-litera-error">{(create.error as Error).message}</div>}
+        {exportProject.error && <div className="mt-2 text-xs text-litera-error">{(exportProject.error as Error).message}</div>}
+        {removeProject.error && <div className="mt-2 text-xs text-litera-error">{(removeProject.error as Error).message}</div>}
       </div>
       <div className="flex-1 overflow-auto">
         {loading ? (
@@ -123,7 +120,7 @@ function ProjectSidebar({
         ) : projects.length === 0 ? (
           <div className="p-5 text-sm text-litera-mute leading-relaxed">{t("projects.empty")}</div>
         ) : (
-          <ul className="divide-y divide-litera-line">
+          <ul className="divide-y divide-litera-border">
             {projects.map((project) => {
               const isSelected = project.id === selectedId;
               const isExporting = exportProject.isPending && exportProject.variables?.id === project.id;
@@ -133,7 +130,7 @@ function ProjectSidebar({
                   key={project.id}
                   className={
                     "group flex items-stretch transition-colors " +
-                    (isSelected ? "bg-litera-panel text-litera-text" : "hover:bg-litera-panel/50")
+                    (isSelected ? "bg-litera-accent/10 text-litera-text" : "hover:bg-litera-surface2")
                   }
                 >
                   <button
@@ -144,7 +141,7 @@ function ProjectSidebar({
                     <div className="mt-1 text-[11px] text-litera-mute flex items-center gap-2">
                       <span>{t(`projects.status.${project.status}` as TKey)}</span>
                       <span>{t("projects.paperCount", { count: project.paper_count })}</span>
-                      {copiedProjectId === project.id && <span className="text-emerald-400">{t("projects.packageCopied")}</span>}
+                      {copiedProjectId === project.id && <span className="text-litera-success">{t("projects.packageCopied")}</span>}
                     </div>
                   </button>
                   <div className="flex items-center gap-1 pr-3 opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -152,7 +149,7 @@ function ProjectSidebar({
                       type="button"
                       onClick={() => exportProject.mutate(project)}
                       disabled={isExporting}
-                      className="rounded-md p-1.5 text-litera-mute hover:bg-litera-line/70 hover:text-litera-text disabled:opacity-50"
+                      className="litera-icon-btn h-7 w-7 disabled:opacity-50"
                       title={t("projects.packageExport")}
                       aria-label={t("projects.packageExport")}
                     >
@@ -164,7 +161,7 @@ function ProjectSidebar({
                         if (window.confirm(t("projects.deleteConfirm"))) removeProject.mutate(project);
                       }}
                       disabled={isDeleting}
-                      className="rounded-md p-1.5 text-litera-mute hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                      className="litera-icon-btn h-7 w-7 hover:bg-litera-error/10 hover:text-litera-error disabled:opacity-50"
                       title={t("projects.delete")}
                       aria-label={t("projects.delete")}
                     >
@@ -194,7 +191,7 @@ function ProjectWorkspace({ project }: { project: ResearchProject | null }) {
     );
   }
   return (
-    <div className="min-h-0 overflow-auto">
+    <div className="min-h-0 overflow-auto bg-litera-bg">
       <ProjectEditor project={project} />
       <ProjectPapers project={project} />
       <ProjectWeeklyReviewPanel project={project} />
@@ -226,8 +223,8 @@ function ProjectEditor({ project }: { project: ResearchProject }) {
   });
 
   return (
-    <section className="border-b border-litera-line px-6 py-5 space-y-4">
-      <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-3">
+    <section className="space-y-4 border-b border-litera-border px-6 py-5 max-[900px]:px-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-3 max-[900px]:grid-cols-1">
         <label>
           <span className="text-[11px] uppercase tracking-wider text-litera-mute">{t("projects.name")}</span>
           <input
@@ -255,7 +252,7 @@ function ProjectEditor({ project }: { project: ResearchProject }) {
         value={draft.research_question ?? ""}
         onChange={(value) => setDraft({ ...draft, research_question: nullable(value) })}
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 max-[900px]:grid-cols-1">
         <FieldArea
           label={t("projects.description")}
           value={draft.description ?? ""}
@@ -270,10 +267,10 @@ function ProjectEditor({ project }: { project: ResearchProject }) {
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-litera-mute">
           {save.isSuccess ? t("projects.saved") : t("projects.overview")}
-          {packageCopied && <span className="ml-2 text-emerald-400">{t("projects.packageCopied")}</span>}
-          {save.error && <span className="ml-2 text-red-400/90">{(save.error as Error).message}</span>}
-          {remove.error && <span className="ml-2 text-red-400/90">{(remove.error as Error).message}</span>}
-          {exportPackage.error && <span className="ml-2 text-red-400/90">{(exportPackage.error as Error).message}</span>}
+          {packageCopied && <span className="ml-2 text-litera-success">{t("projects.packageCopied")}</span>}
+          {save.error && <span className="ml-2 text-litera-error">{(save.error as Error).message}</span>}
+          {remove.error && <span className="ml-2 text-litera-error">{(remove.error as Error).message}</span>}
+          {exportPackage.error && <span className="ml-2 text-litera-error">{(exportPackage.error as Error).message}</span>}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -359,10 +356,10 @@ function ProjectPapers({ project }: { project: ResearchProject }) {
   const linkedPapers = papers.data ?? [];
 
   return (
-    <section className="px-6 py-5 grid grid-cols-[minmax(0,1fr)_340px] gap-5">
+    <section className="grid grid-cols-[minmax(0,1fr)_320px] gap-5 px-6 py-5 max-[1024px]:grid-cols-1 max-[900px]:px-4">
       <div>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-serif text-lg">{t("projects.papers")}</h2>
+          <h2 className="text-base font-semibold text-litera-text">{t("projects.papers")}</h2>
           <div className="flex items-center gap-2">
             <Link to={`/ask?projectId=${project.id}`} className="litera-btn text-xs">
               <MessagesSquare className="h-3.5 w-3.5" />
@@ -379,7 +376,7 @@ function ProjectPapers({ project }: { project: ResearchProject }) {
             </button>
           </div>
         </div>
-        {compare.error && <div className="mb-2 text-xs text-red-400/90">{(compare.error as Error).message}</div>}
+        {compare.error && <div className="mb-2 text-xs text-litera-error">{(compare.error as Error).message}</div>}
         {papers.data && papers.data.length > 0 ? (
           <ul className="divide-y divide-litera-line border border-litera-line rounded-md overflow-hidden">
             {papers.data.map((paper) => (
@@ -420,7 +417,7 @@ function ProjectPapers({ project }: { project: ResearchProject }) {
           ))}
         </ul>
         {(add.error || remove.error) && (
-          <div className="mt-2 text-xs text-red-400/90">{((add.error ?? remove.error) as Error).message}</div>
+          <div className="mt-2 text-xs text-litera-error">{((add.error ?? remove.error) as Error).message}</div>
         )}
       </aside>
     </section>
@@ -450,7 +447,7 @@ function ProjectEvidence({ project }: { project: ResearchProject }) {
   return (
     <section className="border-t border-litera-line px-6 py-5">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-serif text-lg">{t("projects.evidence")}</h2>
+        <h2 className="text-base font-semibold text-litera-text">{t("projects.evidence")}</h2>
         <button
           onClick={() => exportMarkdown.mutate()}
           disabled={exportMarkdown.isPending || (evidence.data?.length ?? 0) === 0}
@@ -460,8 +457,8 @@ function ProjectEvidence({ project }: { project: ResearchProject }) {
           {t("projects.evidenceExport")}
         </button>
       </div>
-      {copied && <div className="mb-2 text-xs text-emerald-400">{t("projects.evidenceCopied")}</div>}
-      {exportMarkdown.error && <div className="mb-2 text-xs text-red-400/90">{(exportMarkdown.error as Error).message}</div>}
+      {copied && <div className="mb-2 text-xs text-litera-success">{t("projects.evidenceCopied")}</div>}
+      {exportMarkdown.error && <div className="mb-2 text-xs text-litera-error">{(exportMarkdown.error as Error).message}</div>}
       {evidence.data && evidence.data.length > 0 ? (
         <ul className="divide-y divide-litera-line border border-litera-line rounded-md overflow-hidden">
           {evidence.data.map((item) => (
@@ -476,7 +473,7 @@ function ProjectEvidence({ project }: { project: ResearchProject }) {
       ) : (
         <div className="text-sm text-litera-mute border border-litera-line rounded-md p-4">{t("projects.noEvidence")}</div>
       )}
-      {remove.error && <div className="mt-2 text-xs text-red-400/90">{(remove.error as Error).message}</div>}
+      {remove.error && <div className="mt-2 text-xs text-litera-error">{(remove.error as Error).message}</div>}
     </section>
   );
 }
@@ -507,7 +504,7 @@ function EvidenceRow({
         <button
           onClick={onRemove}
           disabled={removing}
-          className="text-litera-mute hover:text-red-400 disabled:opacity-50"
+          className="text-litera-mute hover:text-litera-error disabled:opacity-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

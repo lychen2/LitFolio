@@ -195,7 +195,7 @@ function draftToCandidate(draft: ArxivDraft) {
 
 function Saved() {
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+    <span className="inline-flex items-center gap-1 text-xs text-litera-success">
       <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
     </span>
   );
@@ -222,5 +222,5 @@ function AddButton({
 }
 
 function RowError({ error }: { error: Error }) {
-  return <div className="mt-1.5 text-xs text-red-400/90">✕ {error.message}</div>;
+  return <div className="mt-1.5 text-xs text-litera-error">✕ {error.message}</div>;
 }

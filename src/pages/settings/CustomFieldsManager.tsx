@@ -68,7 +68,7 @@ export function CustomFieldsManager() {
             </button>
             <button onClick={() => setShowCreate(false)} className="litera-btn text-xs">{t("smartCollections.cancel")}</button>
           </div>
-          {createMut.error && <p className="text-xs text-red-400">{(createMut.error as Error).message}</p>}
+          {createMut.error && <p className="text-xs text-litera-error">{(createMut.error as Error).message}</p>}
         </div>
       )}
       {defs.length === 0 && !showCreate ? (
@@ -81,7 +81,7 @@ export function CustomFieldsManager() {
               <span className="text-litera-mute">({def.field_type})</span>
               {def.options && <span className="text-litera-mute">[{def.options.join(", ")}]</span>}
               <div className="flex-1" />
-              <button onClick={() => deleteMut.mutate(def.id)} className="text-litera-mute hover:text-red-400" title={t("customFields.delete")}>
+              <button onClick={() => deleteMut.mutate(def.id)} className="text-litera-mute hover:text-litera-error" title={t("customFields.delete")}>
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </li>

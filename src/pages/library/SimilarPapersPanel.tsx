@@ -74,7 +74,7 @@ export function SimilarPapersPanel({
             {findMut.isPending ? t("similar.searching") : t("similar.find")}
           </button>
           {findMut.error && (
-            <p className="text-xs text-red-400 mt-2">
+            <p className="text-xs text-litera-error mt-2">
               {findMut.error instanceof Error ? findMut.error.message : String(findMut.error)}
             </p>
           )}

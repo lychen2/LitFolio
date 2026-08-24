@@ -34,7 +34,7 @@ export function ProjectWeeklyReviewPanel({ project }: { project: ResearchProject
         </button>
       </div>
       {review.error && (
-        <div className="mb-3 text-xs text-red-400/90">{(review.error as Error).message}</div>
+        <div className="mb-3 text-xs text-litera-error">{(review.error as Error).message}</div>
       )}
       {review.data ? (
         <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-5">
@@ -129,7 +129,7 @@ function CandidateRadarRow({
           </Link>
         </div>
       </div>
-      {queue.error && <div className="mt-2 text-xs text-red-400/90">{(queue.error as Error).message}</div>}
+      {queue.error && <div className="mt-2 text-xs text-litera-error">{(queue.error as Error).message}</div>}
     </li>
   );
 }
@@ -171,7 +171,7 @@ function UnreadReminderList({
       ) : (
         <EmptyPanel text={t("projects.weeklyNoUnread")} />
       )}
-      {queue.error && <div className="mt-2 text-xs text-red-400/90">{(queue.error as Error).message}</div>}
+      {queue.error && <div className="mt-2 text-xs text-litera-error">{(queue.error as Error).message}</div>}
     </aside>
   );
 }

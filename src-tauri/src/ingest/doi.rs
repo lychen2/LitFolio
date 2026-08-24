@@ -160,6 +160,12 @@ pub async fn search_doi_by_title(
 /// Fetch metadata for a DOI. Accepts either a bare DOI ("10.x/y") or a URL.
 pub async fn fetch_doi(client: &reqwest::Client, doi_or_url: &str) -> Result<PaperDraft> {
     let doi = normalize_doi(doi_or_url)?;
+    if let Some(arxiv_id) = arxiv_id_from_datacite_doi(&doi) {
+        let mut draft = super::arxiv::fetch_arxiv(client, &arxiv_id).await?;
+        draft.doi = Some(doi);
+        return Ok(draft);
+    }
+
     let url = format!("{CROSSREF_BASE}/{}", urlencode(&doi));
     let resp = client
         .get(&url)
@@ -214,6 +220,15 @@ fn normalize_doi(input: &str) -> Result<String> {
     } else {
         Err(anyhow!("not a DOI: {input}"))
     }
+}
+
+fn arxiv_id_from_datacite_doi(doi: &str) -> Option<String> {
+    const PREFIX: &str = "10.48550/arxiv.";
+    let prefix = doi.get(..PREFIX.len())?;
+    if !prefix.eq_ignore_ascii_case(PREFIX) {
+        return None;
+    }
+    super::arxiv::normalize_arxiv(&doi[PREFIX.len()..]).ok()
 }
 
 fn urlencode(s: &str) -> String {
@@ -501,6 +516,19 @@ mod tests {
             "10.1038/x"
         );
         assert!(normalize_doi("not-a-doi").is_err());
+    }
+
+    #[test]
+    fn recognizes_arxiv_datacite_dois() {
+        assert_eq!(
+            arxiv_id_from_datacite_doi("10.48550/arXiv.2511.03175").as_deref(),
+            Some("2511.03175")
+        );
+        assert_eq!(
+            arxiv_id_from_datacite_doi("10.48550/arxiv.hep-th/9901001").as_deref(),
+            Some("hep-th/9901001")
+        );
+        assert!(arxiv_id_from_datacite_doi("10.1038/nature12345").is_none());
     }
 
     #[test]

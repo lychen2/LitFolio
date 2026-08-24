@@ -5,8 +5,10 @@ import { BookMarked, Loader2, Trash2 } from "lucide-react";
 import { api, type PaperComparison, type ResearchProject } from "@/lib/api";
 import { MarkdownView } from "@/components/MarkdownView";
 import { useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
 
 export function ComparePage() {
+  const t = useT();
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const { data: comparisons, isLoading } = useQuery({
@@ -32,14 +34,11 @@ export function ComparePage() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4">
-        <h1 className="font-serif text-2xl tracking-tight">Comparisons</h1>
-        <p className="text-sm text-litera-mute">AI-generated multi-paper comparison tables</p>
-      </header>
+      <PageHeader title={t("compare.title")} subtitle={t("compare.subtitle")} />
 
-      <div className="flex-1 flex min-h-0">
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar: list of comparisons */}
-        <aside className="w-[260px] shrink-0 border-r border-litera-line overflow-auto">
+        <aside className="w-[260px] shrink-0 overflow-auto border-r border-litera-border bg-litera-paper/35 max-[900px]:w-[210px]">
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-litera-mute" />
@@ -52,12 +51,12 @@ export function ComparePage() {
               className={
                 "w-full text-left px-4 py-3 border-b border-litera-line text-sm transition-colors " +
                 (selected?.id === c.id
-                  ? "bg-litera-accent/10 text-litera-accent"
-                  : "text-litera-text hover:bg-litera-panel")
+                  ? "bg-litera-accent/12 text-litera-accent"
+                  : "text-litera-text hover:bg-litera-surface2")
               }
             >
               <div className="font-medium truncate">
-                {c.paper_ids.length} papers
+                {t("compare.papersCompared", { count: c.paper_ids.length })}
               </div>
               <div className="text-[11px] text-litera-mute">
                 {new Date(c.updated_at * 1000).toLocaleDateString()}
@@ -67,13 +66,13 @@ export function ComparePage() {
           ))}
           {comparisons?.length === 0 && !isLoading && (
             <div className="px-4 py-8 text-center text-sm text-litera-mute">
-              No comparisons yet. Select papers in the Library and click "Compare".
+              {t("compare.empty")}
             </div>
           )}
         </aside>
 
         {/* Main: comparison content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="min-w-0 flex-1 overflow-auto p-6 max-[900px]:p-4">
           {selected ? (
             <ComparisonDetail
               comparison={selected}
@@ -88,7 +87,7 @@ export function ComparePage() {
             />
           ) : (
             <div className="flex items-center justify-center h-full text-litera-mute text-sm">
-              Select a comparison from the sidebar
+              {t("compare.select")}
             </div>
           )}
         </main>
@@ -114,7 +113,7 @@ function ComparisonDetail({
   const [projectId, setProjectId] = useState<number | "">("");
   const addEvidence = useMutation({
     mutationFn: () => {
-      if (projectId === "") throw new Error("Project is required");
+      if (projectId === "") throw new Error(t("common.projectRequired"));
       return api.evidenceAdd(projectId, {
         source_type: "comparison",
         paper_id: comparison.paper_ids[0] ?? null,
@@ -132,11 +131,13 @@ function ComparisonDetail({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-medium">
-            {comparison.paper_ids.length} papers compared
+            {t("compare.papersCompared", { count: comparison.paper_ids.length })}
           </h2>
           <p className="text-xs text-litera-mute">
-            Model: {comparison.model} · Created{" "}
-            {new Date(comparison.created_at * 1000).toLocaleString()}
+            {t("compare.modelCreated", {
+              model: comparison.model,
+              date: new Date(comparison.created_at * 1000).toLocaleString(),
+            })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -152,9 +153,9 @@ function ComparisonDetail({
             }}
             className="litera-btn text-xs"
           >
-            {editing ? "Save" : "Edit"}
+            {editing ? t("compare.save") : t("compare.edit")}
           </button>
-          <button onClick={onDelete} className="litera-btn text-xs text-red-400">
+          <button onClick={onDelete} className="litera-icon-btn text-litera-error" title={t("compare.delete")} aria-label={t("compare.delete")}>
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -180,8 +181,8 @@ function ComparisonDetail({
             {addEvidence.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookMarked className="h-3.5 w-3.5" />}
             {t("compare.addEvidence")}
           </button>
-          {addEvidence.isSuccess && <span className="text-emerald-400">{t("compare.evidenceAdded")}</span>}
-          {addEvidence.error && <span className="text-red-400/90">{(addEvidence.error as Error).message}</span>}
+          {addEvidence.isSuccess && <span className="text-litera-success">{t("compare.evidenceAdded")}</span>}
+          {addEvidence.error && <span className="text-litera-error">{(addEvidence.error as Error).message}</span>}
         </div>
       )}
 
@@ -189,14 +190,14 @@ function ComparisonDetail({
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="w-full h-[60vh] px-4 py-3 text-sm font-mono bg-litera-panel border border-litera-line rounded-md text-litera-text"
+          className="litera-input h-[60vh] w-full resize-y px-4 py-3 font-mono text-sm"
         />
       ) : (
         <>
           <ComparisonDifferenceTable rows={extractComparisonDifferenceRows(comparison.content)} />
           <MarkdownView
             content={comparison.content}
-            className="prose prose-sm max-w-none dark:prose-invert"
+            className="markdown-body max-w-[74ch] text-sm"
           />
         </>
       )}

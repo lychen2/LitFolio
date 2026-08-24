@@ -67,7 +67,7 @@ export function SearchTab() {
         </p>
       </div>
       {error && (
-        <div className="text-sm text-red-400/90">
+        <div className="text-sm text-litera-error">
           ✕ {(error as Error).message}
         </div>
       )}
@@ -241,7 +241,7 @@ function SearchHitRow({ h }: { h: SearchHit }) {
             <div
               className={
                 "mt-1.5 text-xs " +
-                (msg.kind === "ok" ? "text-litera-accent" : "text-red-400/90")
+                (msg.kind === "ok" ? "text-litera-accent" : "text-litera-error")
               }
             >
               {msg.text}
@@ -329,7 +329,7 @@ function SearchHitActions({
   const t = useT();
   if (alreadyImported) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 text-xs text-litera-success whitespace-nowrap">
         <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
       </span>
     );

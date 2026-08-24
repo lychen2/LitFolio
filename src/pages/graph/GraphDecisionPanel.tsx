@@ -14,8 +14,8 @@ export function GraphDecisionPanel({ graphData, onSelectNode }: Props) {
   const signals = useMemo(() => graphSignals(graphData), [graphData]);
 
   return (
-    <aside className="w-[300px] shrink-0 border-l border-litera-line bg-litera-paper/40 overflow-auto">
-      <div className="border-b border-litera-line px-3 py-2.5">
+    <aside className="w-[290px] shrink-0 overflow-auto border-l border-litera-border bg-litera-paper/35 max-[1100px]:hidden">
+      <div className="border-b border-litera-border px-3 py-2.5">
         <h2 className="text-sm font-medium text-litera-text">{t("graph.decisions")}</h2>
         <p className="text-[11px] text-litera-mute">{t("graph.decisionsHint")}</p>
       </div>
@@ -117,7 +117,7 @@ function EvidenceChains({
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projectsList });
   const saveEvidence = useMutation({
     mutationFn: (edge: GraphEdge) => {
-      if (projectId === "") throw new Error("Project is required");
+      if (projectId === "") throw new Error(t("common.projectRequired"));
       return api.evidenceAdd(projectId, edgeToEvidenceDraft(edge, nodeById));
     },
   });
@@ -153,7 +153,7 @@ function EvidenceChains({
         </div>
       ))}
       {saveEvidence.error && (
-        <div className="text-[11px] text-red-400/90">{(saveEvidence.error as Error).message}</div>
+        <div className="text-[11px] text-litera-error">{(saveEvidence.error as Error).message}</div>
       )}
     </DecisionSection>
   );
@@ -177,7 +177,7 @@ function PaperActionRow({
   });
   const addProject = useMutation({
     mutationFn: () => {
-      if (projectId === "") throw new Error("Project is required");
+      if (projectId === "") throw new Error(t("common.projectRequired"));
       return api.projectAddPaper(projectId, item.node.id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
@@ -231,7 +231,7 @@ function PaperActionRow({
         </div>
       )}
       {(queue.error || addProject.error) && (
-        <div className="mt-1 text-[11px] text-red-400/90">{((queue.error ?? addProject.error) as Error).message}</div>
+        <div className="mt-1 text-[11px] text-litera-error">{((queue.error ?? addProject.error) as Error).message}</div>
       )}
     </div>
   );

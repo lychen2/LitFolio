@@ -78,12 +78,12 @@ export function TermsPane({ paperId }: { paperId: string }) {
       )}
 
       {generateCandidates.error && (
-        <div className="mb-3 text-xs text-red-400/90 break-all">
+        <div className="mb-3 text-xs text-litera-error break-all">
           {t("reader.termsGenerateFailed", { message: errorMessage(generateCandidates.error) })}
         </div>
       )}
       {explainTerms.error && (
-        <div className="mb-3 text-xs text-red-400/90 break-all">
+        <div className="mb-3 text-xs text-litera-error break-all">
           {t("reader.termsExplainFailed", { message: errorMessage(explainTerms.error) })}
         </div>
       )}
@@ -100,7 +100,7 @@ export function TermsPane({ paperId }: { paperId: string }) {
                 onClick={() => remove.mutate(item.term.id)}
                 disabled={remove.isPending}
                 title={t("reader.termsRemove")}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-litera-mute hover:text-red-400 disabled:opacity-50"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-litera-mute hover:text-litera-error disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

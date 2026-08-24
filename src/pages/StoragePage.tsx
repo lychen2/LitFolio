@@ -29,7 +29,7 @@ function StatCard({
     <div className="bg-litera-panel/50 border border-litera-line rounded-xl p-5 flex items-start gap-4">
       <div
         className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-        style={{ backgroundColor: `${accent}20` }}
+        style={{ backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)` }}
       >
         <Icon className="h-5 w-5" style={{ color: accent }} />
       </div>
@@ -69,13 +69,13 @@ export function StoragePage() {
         <p className="text-sm text-litera-mute mt-1">{t("storage.subtitle")}</p>
 
         {error && (
-          <div className="mt-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400/90">
+          <div className="mt-6 p-4 rounded-lg bg-litera-error/10 border border-litera-error/20 text-sm text-litera-error">
             {t("storage.loadFailed", { message: error.message })}
           </div>
         )}
 
         {isLoading && (
-          <div className="mt-6 grid grid-cols-2 gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
@@ -90,36 +90,36 @@ export function StoragePage() {
 
         {data && (
           <>
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="mt-6 grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
               <StatCard
                 icon={FileText}
                 label={t("storage.papers")}
                 bytes={data.papers_bytes}
-                accent="#60a5fa"
+                accent="var(--litera-info)"
               />
               <StatCard
                 icon={StickyNote}
                 label={t("storage.notes")}
                 bytes={data.notes_bytes}
-                accent="#fbbf24"
+                accent="var(--litera-warn)"
               />
               <StatCard
                 icon={Paperclip}
                 label={t("storage.attachments")}
                 bytes={data.attachments_bytes}
-                accent="#a78bfa"
+                accent="var(--litera-accent)"
               />
               <StatCard
                 icon={HardDrive}
                 label={t("storage.vectors")}
                 bytes={data.vectors_bytes}
-                accent="#34d399"
+                accent="var(--litera-success)"
               />
               <StatCard
                 icon={Database}
                 label={t("storage.database")}
                 bytes={data.database_bytes}
-                accent="#f472b6"
+                accent="var(--litera-accent2)"
               />
             </div>
 

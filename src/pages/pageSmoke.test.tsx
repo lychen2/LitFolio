@@ -93,7 +93,7 @@ describe("page smoke render", () => {
   });
 
   it("renders the compare shell", () => {
-    expect(renderPage(<ComparePage />, "/compare")).toContain("Comparisons");
+    expect(renderPage(<ComparePage />, "/compare")).toContain("论文比较");
   });
 
   it("renders the reader route while paper data is loading", () => {

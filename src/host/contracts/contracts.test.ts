@@ -1,21 +1,93 @@
-import domainResourceFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/domain-resource-roundtrip.json";
-import jobInvalidFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-invalid.json";
-import jobValidFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-valid.json";
-import manifestInvalidFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-invalid-cases.json";
-import manifestDependentFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-dependent.json";
-import manifestMinimalFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-minimal.json";
-import manifestPeerFixture from "../../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-peer.json";
+import jobInvalidFixture from "../../test/fixtures/mono-v1/job-lifecycle-invalid.json";
+import jobValidFixture from "../../test/fixtures/mono-v1/job-lifecycle-valid.json";
 import { describe, expect, it } from "vitest";
+
 import { ContractError, parseResourceRefV1 } from "@/core/contracts";
 import { validateJobLifecycleV1 } from "@/host/contracts";
 import { parsePluginManifestSetV1, parsePluginManifestV1 } from "@/plugin-sdk/contracts";
 
-function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
+const CONTRACT_VERSION = "target-mono-v1";
+const SHA256 = "a".repeat(64);
+
+const manifestMinimalFixture = fixture("manifest.valid.minimal.v1", manifest("fixture-minimal"));
+const manifestDependentFixture = fixture(
+  "manifest.valid.dependent.v1",
+  manifest("fixture-dependent", [{ id: "fixture-minimal", version: "^1.0.0", optional: false }]),
+);
+const manifestPeerFixture = fixture(
+  "manifest.valid.peer.v1",
+  manifest("fixture-peer", [{ id: "fixture-dependent", version: "^1.0.0", optional: true }]),
+);
+const manifestInvalidFixture = {
+  input: {
+    cases: [
+      { caseId: "invalid-id", baseManifestFixtureId: "manifest.valid.minimal.v1", patch: [{ op: "replace", path: "/id", value: "Fixture" }] },
+      { caseId: "unknown-field", baseManifestFixtureId: "manifest.valid.minimal.v1", patch: [{ op: "add", path: "/unexpected", value: true }] },
+      { caseId: "missing-dependency", baseManifestFixtureId: "manifest.valid.dependent.v1", patch: [{ op: "replace", path: "/dependencies/0/id", value: "missing-plugin" }] },
+    ],
+  },
+};
+const domainResourceFixture = {
+  input: {
+    values: [
+      resource("paper-1", null),
+      resource("source-segment-1", { kind: "number", value: "2" }, "source-segment"),
+      resource("revision-1", { kind: "sha256", value: SHA256 }, "document-revision"),
+    ],
+    invalid: [
+      { caseId: "invalid-domain", value: resource("paper-1", null, "unknown") },
+      { caseId: "invalid-revision", value: resource("paper-1", { kind: "number", value: "01" }) },
+    ],
+  },
+};
+
+function fixture(fixtureId: string, manifestValue: Record<string, unknown>) {
+  return { fixtureId, input: { manifest: manifestValue } };
+}
+
+function manifest(id: string, dependencies: Array<{ id: string; version: string; optional: boolean }> = []) {
+  return {
+    apiVersion: 1,
+    id,
+    version: "1.0.0",
+    coreApi: "^1.0.0",
+    displayName: id,
+    activation: {},
+    dependencies,
+    requestedCapabilities: [],
+    contributions: [],
+    storage: { kind: "none", schemaVersion: 0, retention: "preserve-on-disable" },
+    migrations: [],
+    build: {},
+  };
+}
+
+function resource(
+  id: string,
+  revision: { kind: string; value: string } | null,
+  domain = "paper",
+) {
+  return {
+    contractVersion: CONTRACT_VERSION,
+    resource: { contractVersion: CONTRACT_VERSION, domain, id },
+    revision,
+  };
+}
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function patch(target: unknown, operations: Array<{ op: string; path: string; value?: unknown }>): unknown {
   const result = clone(target) as Record<string, unknown>;
   for (const operation of operations) {
-    const keys = operation.path.slice(1).split("/"); let parent: Record<string, unknown> | unknown[] = result;
-    for (const key of keys.slice(0, -1)) parent = Array.isArray(parent) ? parent[Number(key)] as Record<string, unknown> : parent[key] as Record<string, unknown>;
+    const keys = operation.path.slice(1).split("/");
+    let parent: Record<string, unknown> | unknown[] = result;
+    for (const key of keys.slice(0, -1)) {
+      parent = Array.isArray(parent)
+        ? (parent[Number(key)] as Record<string, unknown>)
+        : (parent[key] as Record<string, unknown>);
+    }
     const key = keys.at(-1)!;
     if (operation.op === "remove") Array.isArray(parent) ? parent.splice(Number(key), 1) : delete parent[key];
     else if (Array.isArray(parent) && key === "-") parent.push(operation.value);
@@ -26,36 +98,30 @@ function patch(target: unknown, operations: Array<{ op: string; path: string; va
 }
 
 describe("target-mono-v1 TypeScript contract consumer", () => {
-  it.each([
-    ["manifest.valid.minimal.v1", manifestMinimalFixture.input.manifest],
-    ["manifest.valid.dependent.v1", manifestDependentFixture.input.manifest],
-    ["manifest.valid.peer.v1", manifestPeerFixture.input.manifest],
-  ])("accepts canonical manifest fixture %s", (_fixtureId, manifest) => {
-    expect(parsePluginManifestV1(manifest).id).toMatch(/^fixture-/);
+  const manifests: Record<string, unknown> = {
+    [manifestMinimalFixture.fixtureId]: manifestMinimalFixture.input.manifest,
+    [manifestDependentFixture.fixtureId]: manifestDependentFixture.input.manifest,
+    [manifestPeerFixture.fixtureId]: manifestPeerFixture.input.manifest,
+  };
+
+  it.each(Object.entries(manifests))("accepts local manifest fixture %s", (_fixtureId, value) => {
+    expect(parsePluginManifestV1(value).id).toMatch(/^fixture-/);
   });
 
-  describe("canonical malformed manifest declarations", () => {
-    const manifests: Record<string, unknown> = {
-      [manifestMinimalFixture.fixtureId]: manifestMinimalFixture.input.manifest,
-      [manifestDependentFixture.fixtureId]: manifestDependentFixture.input.manifest,
-      [manifestPeerFixture.fixtureId]: manifestPeerFixture.input.manifest,
-    };
-
-    it("accepts the complete canonical manifest set", () => {
-      expect(parsePluginManifestSetV1(Object.values(manifests))).toHaveLength(3);
-    });
-
-    it.each(manifestInvalidFixture.input.cases)("rejects $caseId", (item) => {
-      const base = manifests[item.baseManifestFixtureId];
-      expect(base, `unknown base manifest ${item.baseManifestFixtureId}`).toBeDefined();
-      const candidate = patch(base, item.patch);
-      expect(() => parsePluginManifestSetV1(Object.entries(manifests).map(([fixtureId, manifest]) =>
-        fixtureId === item.baseManifestFixtureId ? candidate : manifest,
-      ))).toThrow(ContractError);
-    });
+  it("accepts the complete local manifest set", () => {
+    expect(parsePluginManifestSetV1(Object.values(manifests))).toHaveLength(3);
   });
 
-  it.each(domainResourceFixture.input.values)("round-trips canonical resource value %#", (value) => {
+  it.each(manifestInvalidFixture.input.cases)("rejects $caseId", (item) => {
+    const base = manifests[item.baseManifestFixtureId];
+    expect(base, `unknown base manifest ${item.baseManifestFixtureId}`).toBeDefined();
+    const candidate = patch(base, item.patch);
+    expect(() => parsePluginManifestSetV1(Object.entries(manifests).map(([fixtureId, value]) => (
+      fixtureId === item.baseManifestFixtureId ? candidate : value
+    )))).toThrow(ContractError);
+  });
+
+  it.each(domainResourceFixture.input.values)("round-trips local resource value %#", (value) => {
     expect(parseResourceRefV1(value)).toEqual(value);
   });
 
@@ -63,18 +129,14 @@ describe("target-mono-v1 TypeScript contract consumer", () => {
     expect(() => parseResourceRefV1(item.value)).toThrow(ContractError);
   });
 
-  it.each(jobValidFixture.input.cases)("accepts canonical job lifecycle $caseId", (item) => {
+  it.each(jobValidFixture.input.cases)("accepts local job lifecycle $caseId", (item) => {
     expect(validateJobLifecycleV1(item.record, item.events)).toEqual(item.record);
   });
 
-  describe("canonical invalid job event streams", () => {
-    const baseCases = new Map(jobValidFixture.input.cases.map((item) => [item.caseId, item]));
-
-    it.each(jobInvalidFixture.input.cases)("rejects $caseId", (item) => {
-      const base = baseCases.get(item.baseCaseId);
-      expect(base, `unknown base job case ${item.baseCaseId}`).toBeDefined();
-      const mutated = patch(base, item.patch) as { record: unknown; events: unknown[] };
-      expect(() => validateJobLifecycleV1(mutated.record, mutated.events)).toThrow(ContractError);
-    });
+  it.each(jobInvalidFixture.input.cases)("rejects invalid job stream $caseId", (item) => {
+    const base = jobValidFixture.input.cases.find((entry) => entry.caseId === item.baseCaseId);
+    expect(base, `unknown base job case ${item.baseCaseId}`).toBeDefined();
+    const mutated = patch(base, item.patch) as { record: unknown; events: unknown[] };
+    expect(() => validateJobLifecycleV1(mutated.record, mutated.events)).toThrow(ContractError);
   });
 });

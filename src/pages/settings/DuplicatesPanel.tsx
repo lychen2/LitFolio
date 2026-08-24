@@ -44,8 +44,8 @@ export function DuplicatesPanel() {
         {scanMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
         {scanMut.isPending ? t("dedup.scanning") : t("dedup.scan")}
       </button>
-      {scanMut.error && <div className="text-sm text-red-400/90">✕ {(scanMut.error as Error).message}</div>}
-      {mergeMut.error && <div className="text-sm text-red-400/90">✕ {(mergeMut.error as Error).message}</div>}
+      {scanMut.error && <div className="text-sm text-litera-error">✕ {(scanMut.error as Error).message}</div>}
+      {mergeMut.error && <div className="text-sm text-litera-error">✕ {(mergeMut.error as Error).message}</div>}
       {visiblePairs.map((pair) => {
         const globalIdx = pairs!.indexOf(pair);
         return (

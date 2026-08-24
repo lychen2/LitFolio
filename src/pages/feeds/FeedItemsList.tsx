@@ -27,7 +27,7 @@ export function ItemsList({
   }
 
   if (error) {
-    return <div className="p-6 text-sm text-red-400/90">{t("feeds.itemsLoadFailed", { message: error.message })}</div>;
+    return <div className="p-6 text-sm text-litera-error">{t("feeds.itemsLoadFailed", { message: error.message })}</div>;
   }
   if (isLoading) return <LoadingItems />;
   if (items.length === 0) return <EmptyItems />;

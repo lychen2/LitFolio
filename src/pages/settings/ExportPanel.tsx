@@ -67,7 +67,7 @@ export function ExportPanel() {
           {t("export.exportIncremental")}
         </button>
       </div>
-      {exportAll.error && <div className="text-sm text-red-400/90">✕ {(exportAll.error as Error).message}</div>}
+      {exportAll.error && <div className="text-sm text-litera-error">✕ {(exportAll.error as Error).message}</div>}
       {result && <div className="text-sm text-litera-accent">{result}</div>}
       {!exportDir && <div className="text-xs text-litera-mute">{t("export.noDir")}</div>}
     </div>

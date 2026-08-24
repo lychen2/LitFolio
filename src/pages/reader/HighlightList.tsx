@@ -39,12 +39,12 @@ export function HighlightList({
     if (highlightsRef && list.data) {
       highlightsRef.current = visibleHighlights;
     }
-  }, [highlightsRef, visibleHighlights]);
+  }, [highlightsRef, list.data, visibleHighlights]);
 
   return (
-    <aside className="h-full flex flex-col bg-litera-paper/30 border-r border-litera-line">
-      <div className="px-3 py-2 border-b border-litera-line flex items-center gap-1.5 text-xs uppercase tracking-wider text-litera-mute">
-        <Highlighter className="h-3.5 w-3.5 text-amber-400" /> {t("reader.highlights")}
+    <aside className="h-full flex flex-col bg-litera-paper/30 border-r border-litera-border">
+      <div className="reader-panel-header">
+        <span className="flex items-center gap-1.5 litera-section-label"><Highlighter className="h-3.5 w-3.5 text-litera-warn" /> {t("reader.highlights")}</span>
         <span className="ml-auto text-litera-mute normal-case tracking-normal">
           {list.data ? `${visibleHighlights.length}` : "…"}
         </span>
@@ -52,6 +52,8 @@ export function HighlightList({
       <div className="flex-1 overflow-auto">
         {list.isLoading ? (
           <LoadingState />
+        ) : list.isError ? (
+          <div className="px-4 py-8 text-center text-xs text-litera-error">{t("common.loadFailed")}</div>
         ) : visibleHighlights.length === 0 ? (
           <EmptyState />
         ) : (

@@ -134,7 +134,7 @@ function HitBody({
         </p>
       )}
       {errorMessage(error) && (
-        <div className="mt-1.5 text-xs text-red-400/90">✕ {errorMessage(error)}</div>
+        <div className="mt-1.5 text-xs text-litera-error">✕ {errorMessage(error)}</div>
       )}
     </div>
   );
@@ -166,7 +166,7 @@ function HitAction({
   const t = useT();
   if (imported) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 text-xs text-litera-success whitespace-nowrap">
         <CheckCircle2 className="h-3.5 w-3.5" /> {t("topic.search.saved")}
       </span>
     );

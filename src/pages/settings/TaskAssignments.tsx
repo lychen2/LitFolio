@@ -145,7 +145,7 @@ function TaskRow({
         </>
       )}
       {listModels.error && (
-        <div className="basis-full text-[11px] text-red-400/90 pl-44">
+        <div className="basis-full text-[11px] text-litera-error pl-44">
           ✕ {(listModels.error as Error).message}
         </div>
       )}

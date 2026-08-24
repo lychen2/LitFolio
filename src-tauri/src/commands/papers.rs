@@ -219,8 +219,8 @@ pub async fn paper_enrich_from_doi(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Guard the UNIQUE(doi) constraint up front so we can return a friendly
-    // message instead of a raw SQLite error when the DOI belongs elsewhere.
+    // Guard unique identifiers up front so we can return a friendly message
+    // instead of a raw SQLite error when the DOI belongs elsewhere.
     let resolved_doi = draft.doi.clone().unwrap_or(doi);
     if let Some(other) = repo
         .find_by_doi(&resolved_doi)
@@ -229,6 +229,20 @@ pub async fn paper_enrich_from_doi(
     {
         if other.id != paper.id {
             return Err(format!("该 DOI 已属于库中另一篇文献:「{}」", other.title));
+        }
+    }
+    if let Some(arxiv_id) = draft.arxiv_id.as_deref() {
+        if let Some(other) = repo
+            .find_by_arxiv_id(arxiv_id)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            if other.id != paper.id {
+                return Err(format!(
+                    "该 arXiv ID 已属于库中另一篇文献:「{}」",
+                    other.title
+                ));
+            }
         }
     }
 
@@ -260,6 +274,9 @@ fn merge_draft_into_paper(paper: &mut Paper, draft: PaperDraft, resolved_doi: St
     }
     if draft.abstract_text.is_some() {
         paper.abstract_text = draft.abstract_text;
+    }
+    if draft.arxiv_id.is_some() {
+        paper.arxiv_id = draft.arxiv_id;
     }
     paper.doi = Some(resolved_doi);
 }
@@ -323,7 +340,7 @@ mod tests {
             year: Some(2020),
             venue: Some("Nature".into()),
             doi: Some("10.1/real".into()),
-            arxiv_id: None,
+            arxiv_id: Some("2511.03175v2".into()),
             abstract_text: Some("real abstract".into()),
         };
         merge_draft_into_paper(&mut paper, draft, "10.1/real".into());
@@ -333,6 +350,20 @@ mod tests {
         assert_eq!(paper.venue.as_deref(), Some("Nature"));
         assert_eq!(paper.abstract_text.as_deref(), Some("real abstract"));
         assert_eq!(paper.doi.as_deref(), Some("10.1/real"));
+        assert_eq!(paper.arxiv_id.as_deref(), Some("2511.03175v2"));
+    }
+
+    #[test]
+    fn merge_allows_user_supplied_arxiv_identity_to_replace_existing() {
+        let mut paper = paper_with_title("Existing arXiv paper");
+        paper.arxiv_id = Some("2511.03175v2".into());
+        let draft = PaperDraft {
+            arxiv_id: Some("2311.17496v5".into()),
+            ..PaperDraft::default()
+        };
+        merge_draft_into_paper(&mut paper, draft, "10.48550/arXiv.2311.17496".into());
+        assert_eq!(paper.arxiv_id.as_deref(), Some("2311.17496v5"));
+        assert_eq!(paper.doi.as_deref(), Some("10.48550/arXiv.2311.17496"));
     }
 
     #[test]

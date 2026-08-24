@@ -71,9 +71,15 @@ mod tests {
         assert_table(&pool, "paper_documents_fts").await;
         assert_table(&pool, "pdf_notes").await;
         assert_table(&pool, "pdf_notes_fts").await;
+        assert_table(&pool, "paper_document_revisions").await;
+        assert_table(&pool, "source_segments").await;
+        assert_table(&pool, "source_links").await;
+        assert_table(&pool, "note_revisions").await;
         assert_column(&pool, "paper_documents", "index_status").await;
         assert_column(&pool, "paper_documents", "index_error").await;
         assert_column(&pool, "paper_documents", "indexed_at").await;
+        assert_column(&pool, "source_links", "resolved_revision_id").await;
+        assert_column(&pool, "source_links", "resolved_segment_id").await;
         assert_table(&pool, "feed_items").await;
         assert_table(&pool, "paper_embeddings").await;
         assert_column(&pool, "feed_items", "metadata_json").await;
@@ -87,6 +93,7 @@ mod tests {
         assert_index(&pool, "idx_paper_embeddings_model").await;
         assert_index(&pool, "idx_pdf_notes_paper_page").await;
         assert_index(&pool, "idx_pdf_notes_updated_at").await;
+        assert_index(&pool, "idx_source_links_resolved_segment").await;
         assert_trigger(&pool, "pdf_notes_au").await;
     }
 

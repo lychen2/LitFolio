@@ -15,8 +15,8 @@ import { updatePaperStatusCache } from "./paperStatusCache";
 const STATUS_META: Record<ReadStatus, { labelKey: string; icon: React.ComponentType<{ className?: string }>; tone: string }> = {
   unread: { labelKey: "common.unread", icon: Circle, tone: "text-litera-mute" },
   reading: { labelKey: "common.reading", icon: CircleDot, tone: "text-litera-accent2" },
-  read: { labelKey: "common.read", icon: CircleCheck, tone: "text-emerald-400" },
-  must: { labelKey: "library.mustRead", icon: Star, tone: "text-amber-400" },
+  read: { labelKey: "common.read", icon: CircleCheck, tone: "text-litera-success" },
+  must: { labelKey: "library.mustRead", icon: Star, tone: "text-litera-warn" },
 };
 
 const STATUS_ORDER: ReadStatus[] = ["unread", "reading", "read", "must"];
@@ -36,13 +36,13 @@ export function VirtualPaperList({
   const virtualizer = useVirtualizer({
     count: papers.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 90,
+    estimateSize: () => 124,
     overscan: 5,
   });
 
   return (
     <div ref={parentRef} className="h-full overflow-auto">
-      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
+      <ul style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
         {virtualizer.getVirtualItems().map((vi) => (
           <div
             key={vi.key}
@@ -66,7 +66,7 @@ export function VirtualPaperList({
             />
           </div>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -86,7 +86,7 @@ const PaperRow = memo(function PaperRow({
   const { rowRef, tldr, translate, attachPdf, del, openMut } = actions;
 
   return (
-    <li ref={rowRef} className="px-6 py-2.5 hover:bg-litera-panel/50 transition-colors group">
+    <li ref={rowRef} className="group min-h-[118px] border-b border-litera-border/70 px-5 py-3 transition-colors hover:bg-litera-surface/70">
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -98,13 +98,13 @@ const PaperRow = memo(function PaperRow({
         <StatusToggle paper={p} />
         <FileText className="h-4 w-4 mt-1 text-litera-mute shrink-0" />
         <div className="min-w-0 flex-1">
-          <button onClick={() => onInspect(p)} className="font-medium text-litera-text leading-snug text-left hover:text-litera-accent">
+          <button onClick={() => onInspect(p)} className="line-clamp-2 max-w-full text-left font-medium leading-snug text-litera-text hover:text-litera-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-litera-focus">
             {p.title}
           </button>
           {p.title_translated && (
             <div className="text-xs text-litera-accent/90 mt-0.5 italic flex items-start gap-1.5">
               <Languages className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>{p.title_translated}</span>
+              <span className="line-clamp-1">{p.title_translated}</span>
             </div>
           )}
           <PaperMeta p={p} />
@@ -138,27 +138,28 @@ function PaperMeta({ p }: { p: Paper }) {
       )}
       {p.year && <span>· {p.year}</span>}
       {p.venue && <span className="truncate">· {p.venue}</span>}
-      {p.doi && <span className="font-mono">· {p.doi}</span>}
-      {p.arxiv_id && <span className="font-mono">· arXiv:{p.arxiv_id}</span>}
-      {!p.pdf_path && <span className="text-amber-400/80">· {t("library.noPdf")}</span>}
+      {p.doi && <span className="max-w-[220px] truncate font-mono" title={p.doi}>· {p.doi}</span>}
+      {p.arxiv_id && <span className="max-w-[180px] truncate font-mono" title={p.arxiv_id}>· arXiv:{p.arxiv_id}</span>}
+      {!p.pdf_path && <span className="text-litera-warn">· {t("library.noPdf")}</span>}
     </div>
   );
 }
 
 function TldrPreview({ text }: { text: string }) {
   return (
-    <div className="text-xs text-litera-text/80 mt-1.5 leading-relaxed flex items-start gap-1.5">
+    <div className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-litera-text/80">
       <Sparkles className="h-3.5 w-3.5 mt-0.5 text-litera-accent shrink-0" />
-      <span>{text}</span>
+      <span className="line-clamp-2">{text}</span>
     </div>
   );
 }
 
 function FindingPreview({ findings }: { findings: string[] }) {
   return (
-    <ul className="mt-1.5 text-xs text-litera-text/70 ml-5 list-disc space-y-0.5">
-      {findings.slice(0, 3).map((f, i) => <li key={i}>{f}</li>)}
-    </ul>
+    <div className="ml-5 mt-1 flex min-w-0 items-center gap-1.5 text-xs text-litera-text/70">
+      <span className="min-w-0 flex-1 truncate">{findings[0]}</span>
+      {findings.length > 1 && <span className="shrink-0 text-[10px] text-litera-mute">+{findings.length - 1}</span>}
+    </div>
   );
 }
 
@@ -173,7 +174,7 @@ function DeepReadMarker() {
 
 function RowErrors({ errors }: { errors: Array<string | false | null> }) {
   return errors.filter(Boolean).map((error) => (
-    <div key={String(error)} className="ml-7 mt-1 text-xs text-red-400/90">✕ {error}</div>
+    <div key={String(error)} className="ml-7 mt-1 text-xs text-litera-error">✕ {error}</div>
   ));
 }
 
@@ -221,8 +222,9 @@ function TagChipsRow({ paperId, tags }: { paperId: string; tags: Tag[] }) {
     },
   });
   return (
-    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-      {tags.map((tag) => <TagChip key={tag.id} tag={tag} onRemove={() => detach.mutate(tag.id)} />)}
+    <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
+      {tags.slice(0, 4).map((tag) => <TagChip key={tag.id} tag={tag} onRemove={() => detach.mutate(tag.id)} />)}
+      {tags.length > 4 && <span className="shrink-0 text-[10px] text-litera-mute">+{tags.length - 4}</span>}
       {adding ? (
         <TagInput name={name} setName={setName} create={create} onCancel={() => setAdding(false)} />
       ) : (

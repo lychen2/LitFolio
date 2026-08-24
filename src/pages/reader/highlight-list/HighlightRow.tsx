@@ -89,7 +89,7 @@ export function HighlightRow({
   });
   const addEvidence = useMutation({
     mutationFn: () => {
-      if (projectId === "") throw new Error("Project is required");
+      if (projectId === "") throw new Error(t("common.projectRequired"));
       return api.evidenceAddFromHighlight(projectId, highlight.id);
     },
     onSuccess: () => setEvidenceAdded(true),
@@ -200,7 +200,7 @@ export function HighlightRow({
       </div>
       {confirming ? (
         <div className="mt-2 flex items-center gap-1.5 text-[10px]">
-          <span className="text-red-400/90">{t("reader.confirmDelete")}</span>
+          <span className="text-litera-error">{t("reader.confirmDelete")}</span>
           <button
             onClick={() => {
               remove.mutate();

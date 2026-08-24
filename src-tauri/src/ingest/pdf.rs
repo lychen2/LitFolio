@@ -4,7 +4,7 @@
 //! 1. Compute SHA-256 of file content (for dedup).
 //! 2. Try to read `/Title`, `/Author`, `/Subject`, `/Keywords` from the PDF
 //!    info dictionary via `lopdf`.
-//! 3. Scan first-page text for DOI/title signals when the PDF info
+//! 3. Scan first-page text for DOI/arXiv/title signals when the PDF info
 //!    dictionary is incomplete.
 //! 4. Copy the file under `library/papers/{paper_id}/original.pdf`.
 
@@ -149,10 +149,16 @@ fn extract_metadata(src: &Path) -> PaperDraft {
                 }
             }
         }
-        // Try first page text → DOI
+        // Try first-page text for stable identifiers and a title fallback.
         if let Some(text) = first_page_text(&doc) {
             if let Some(doi) = find_doi(&text) {
                 draft.doi = Some(doi);
+            }
+            if let Some(arxiv_id) = find_arxiv_id(&text) {
+                if draft.doi.is_none() {
+                    draft.doi = Some(arxiv_datacite_doi(&arxiv_id));
+                }
+                draft.arxiv_id = Some(arxiv_id);
             }
             if draft.title.is_empty() {
                 if let Some(t) = guess_title(&text) {
@@ -461,6 +467,22 @@ fn clean_doi_match(raw: &str) -> String {
         .to_string()
 }
 
+fn find_arxiv_id(text: &str) -> Option<String> {
+    let re = regex::Regex::new(
+        r"(?i)\barxiv\s*:\s*((?:\d{4}\.\d{4,5}|[a-z][a-z0-9._-]*/\d{7})(?:v\d+)?)\b",
+    )
+    .ok()?;
+    re.captures(text)
+        .and_then(|captures| captures.get(1))
+        .map(|matched| matched.as_str().to_string())
+}
+
+fn arxiv_datacite_doi(arxiv_id: &str) -> String {
+    let version = regex::Regex::new(r"(?i)v\d+$").expect("valid arXiv version regex");
+    let base_id = version.replace(arxiv_id.trim(), "");
+    format!("10.48550/arXiv.{base_id}")
+}
+
 fn guess_title(text: &str) -> Option<String> {
     let line = text
         .lines()
@@ -484,6 +506,17 @@ mod tests {
             Some("10.1109/ICCV.2017.123")
         );
         assert!(find_doi("nothing here").is_none());
+    }
+
+    #[test]
+    fn arxiv_id_generates_versionless_datacite_doi() {
+        let arxiv_id = find_arxiv_id("arXiv:2511.03175v2 [physics.optics] 26 May 2026");
+        assert_eq!(arxiv_id.as_deref(), Some("2511.03175v2"));
+        assert_eq!(
+            arxiv_id.as_deref().map(arxiv_datacite_doi),
+            Some("10.48550/arXiv.2511.03175".to_string())
+        );
+        assert!(find_arxiv_id("No preprint identifier here").is_none());
     }
 
     #[test]

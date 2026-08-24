@@ -1,0 +1,25 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "manifest.invalid.v1",
+  "kind": "plugin-manifest-invalid-cases",
+  "input": {
+    "cases": [
+      { "caseId": "required-display-name-missing", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "remove", "path": "/displayName" }] },
+      { "caseId": "plugin-id-invalid", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "replace", "path": "/id", "value": "Fixture/Unsafe" }] },
+      { "caseId": "frontend-activation-without-build-entry", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "remove", "path": "/build/frontendEntry" }] },
+      { "caseId": "frontend-build-without-activation", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "remove", "path": "/activation/frontend" }] },
+      { "caseId": "activation-field-unknown", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "add", "path": "/activation/unexpected", "value": true }] },
+      { "caseId": "operation-capability-mismatch", "baseManifestFixtureId": "manifest.valid.minimal.v1", "patch": [{ "op": "replace", "path": "/apiVersion", "value": 2 }] }
+    ]
+  },
+  "expected": {
+    "cases": [
+        { "caseId": "required-display-name-missing", "errorCode": "manifest_field_required", "path": "displayName" },
+        { "caseId": "plugin-id-invalid", "errorCode": "manifest_id_invalid", "path": "id" },
+        { "caseId": "frontend-activation-without-build-entry", "errorCode": "manifest_frontend_build_missing", "path": "build.frontendEntry" },
+        { "caseId": "frontend-build-without-activation", "errorCode": "manifest_frontend_activation_missing", "path": "activation.frontend" },
+        { "caseId": "activation-field-unknown", "errorCode": "manifest_unknown_field", "path": "activation.unexpected" },
+        { "caseId": "operation-capability-mismatch", "errorCode": "manifest_api_version_unsupported", "path": "apiVersion" }
+      ]
+  }
+}

@@ -70,12 +70,12 @@ export function IdentifierPanel({
       <div className="mt-2 text-xs text-litera-mute">
         {t("import.step1.hint")}
       </div>
-      {error && <div className="mt-3 text-sm text-red-400/90">✕ {error}</div>}
+      {error && <div className="mt-3 text-sm text-litera-error">✕ {error}</div>}
       {success && (
         <div className="mt-3 text-sm text-litera-accent">{success}</div>
       )}
       {existingPaper && onOpenExisting && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-litera-success/25 bg-litera-success/10 px-3 py-2 text-sm text-litera-success">
           <span className="min-w-0 flex-1 truncate">
             {t("import.existingDoi", { title: existingPaper.title })}
           </span>
@@ -188,7 +188,7 @@ function AutoDownloadFailurePanel({
   return (
     <section className="mt-3 rounded-lg border border-litera-line/80 bg-litera-bg/60 p-3">
       <div className="flex items-start gap-2">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-litera-warn" />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold uppercase tracking-wider text-litera-text">
             {t("import.step3.sourceDecision.title")}
@@ -296,9 +296,9 @@ function sourceStatusKey(status: AutoDownloadSourceStatus): TKey {
 function sourceStatusClassName(status: AutoDownloadSourceStatus): string {
   switch (status) {
     case "failed":
-      return "border-red-400/30 bg-red-400/10 text-red-200";
+      return "border-litera-error/30 bg-litera-error/10 text-litera-error";
     case "not_found":
-      return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+      return "border-litera-warn/30 bg-litera-warn/10 text-litera-warn";
   }
 }
 

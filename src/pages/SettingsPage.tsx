@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Cpu, Download, FolderSync, Loader2, Save, Search, ShieldCheck, Workflow } from "lucide-react";
 import { api, type LlmConfig, type LlmProfile } from "@/lib/api";
-import { TabButton } from "@/components/TabButton";
+import { PageHeader } from "@/components/PageHeader";
+import { ThemePicker } from "@/components/ThemePicker";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import { CustomFieldsManager } from "./settings/CustomFieldsManager";
@@ -14,6 +15,7 @@ import { ProfilesTab } from "./settings/ProfilesTab";
 import { SyncPanel } from "./settings/SyncPanel";
 import { TaskAssignments } from "./settings/TaskAssignments";
 import { PdfMarkdownSettings } from "./settings/PdfMarkdownSettings";
+import { ObsidianSettings } from "./settings/ObsidianSettings";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
 
 type SettingsTab = "privacy" | "profiles" | "tasks" | "sync" | "export" | "tools";
@@ -39,6 +41,7 @@ export function SettingsPage() {
     active: null,
     output_language: "Chinese",
     pdf_markdown: { engine: "local", mineru_token: "" },
+    obsidian: { vault_dir: "", folder: "Papers" },
     task_assignments: {
       tldr: null,
       quick_read: null,
@@ -81,68 +84,104 @@ export function SettingsPage() {
   }
 
   const activeMissing = !!(draft.active && !draft.profiles.some((p) => p.name === draft.active));
+  const isDirty = !!data && JSON.stringify(draft) !== JSON.stringify(data);
+  const saveState = save.isPending
+    ? t("settings.saving")
+    : save.error
+      ? t("settings.saveFailed")
+      : save.isSuccess && !isDirty
+        ? t("settings.saved")
+        : isDirty
+          ? t("settings.unsaved")
+          : null;
 
   return (
-    <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight">{t("settings.title")}</h1>
-          <p className="text-sm text-litera-mute">{t("settings.subtitle")}</p>
-        </div>
-        <button
-          onClick={() => save.mutate(draft)}
-          disabled={save.isPending}
-          className="litera-btn-primary text-sm disabled:opacity-50"
-        >
-          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {t("common.save")}
-        </button>
-      </header>
+    <section className="flex h-full flex-col overflow-hidden">
+      <PageHeader
+        title={t("settings.title")}
+        subtitle={t("settings.subtitle")}
+        actions={(
+          <>
+            {saveState && (
+              <span className={`text-xs ${save.error ? "text-litera-error" : save.isSuccess && !isDirty ? "text-litera-success" : "text-litera-mute"}`} role="status">
+                {saveState}
+              </span>
+            )}
+            <button
+              onClick={() => save.mutate(draft)}
+              disabled={save.isPending || !isDirty}
+              className="litera-btn-primary text-sm disabled:opacity-50"
+            >
+              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {t("common.save")}
+            </button>
+          </>
+        )}
+      />
 
-      <div className="flex-1 overflow-auto px-6 py-5">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex gap-1 mb-6 border-b border-litera-line">
-            {TAB_DEFS.map(({ key, labelKey, icon: Icon }) => (
-              <TabButton
-                key={key}
-                active={tab === key}
-                onClick={() => setTab(key)}
-                icon={<Icon className="h-3.5 w-3.5" />}
-                label={t(labelKey)}
-              />
-            ))}
+      <div className="flex min-h-0 flex-1 overflow-hidden max-[900px]:flex-col">
+        <nav className="w-48 shrink-0 overflow-y-auto border-r border-litera-border bg-litera-paper/35 px-3 py-4 max-[900px]:w-full max-[900px]:shrink-0 max-[900px]:overflow-x-auto max-[900px]:overflow-y-hidden max-[900px]:border-r-0 max-[900px]:border-b max-[900px]:py-2" aria-label={t("settings.title")} role="tablist">
+          <div className="space-y-1 max-[900px]:flex max-[900px]:w-max max-[900px]:gap-1">
+            {TAB_DEFS.map(({ key, labelKey, icon: Icon }) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTab(key)}
+                  role="tab"
+                  aria-selected={active}
+                  className={
+                    "flex min-h-9 w-full items-center gap-2 rounded-[var(--litera-radius)] px-2.5 text-left text-sm transition-colors max-[900px]:w-auto max-[900px]:whitespace-nowrap " +
+                    (active
+                      ? "bg-litera-accent/12 text-litera-accent"
+                      : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{t(labelKey)}</span>
+                </button>
+              );
+            })}
           </div>
+        </nav>
 
-          {tab === "privacy" && (
-            <div className="space-y-5">
-              <DataPrivacyPanel />
-              <AppUpdateCard />
-            </div>
-          )}
-          {tab === "profiles" && (
-            <ProfilesTab
-              draft={draft}
-              isLoading={isLoading}
-              activeMissing={activeMissing}
-              onUpsert={upsert}
-              onRemove={remove}
-              onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
-            />
-          )}
-          {tab === "tasks" && <TaskAssignments draft={draft} onChange={setDraft} />}
-          {tab === "sync" && <SyncPanel />}
-          {tab === "export" && <ExportPanel />}
-          {tab === "tools" && (
-            <div className="space-y-8">
-              <PdfMarkdownSettings draft={draft} onChange={setDraft} />
-              <TopicAlertsPanel />
-              <DuplicatesPanel />
-              <CustomFieldsManager />
-            </div>
-          )}
+        <div className="min-w-0 flex-1 overflow-auto px-6 py-6 max-[900px]:px-4 max-[900px]:py-4">
+          <div className="mx-auto max-w-5xl space-y-5">
+            {tab === "privacy" && (
+              <div className="space-y-5">
+                <DataPrivacyPanel />
+                <AppUpdateCard />
+              </div>
+            )}
+            {tab === "profiles" && (
+              <ProfilesTab
+                draft={draft}
+                isLoading={isLoading}
+                activeMissing={activeMissing}
+                onUpsert={upsert}
+                onRemove={remove}
+                onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
+              />
+            )}
+            {tab === "tasks" && <TaskAssignments draft={draft} onChange={setDraft} />}
+            {tab === "sync" && <SyncPanel />}
+            {tab === "export" && <ExportPanel />}
+            {tab === "tools" && (
+              <div className="space-y-6">
+                <section className="border-b border-litera-border pb-6">
+                  <ThemePicker />
+                </section>
+                <PdfMarkdownSettings draft={draft} onChange={setDraft} />
+                <ObsidianSettings draft={draft} onChange={setDraft} />
+                <TopicAlertsPanel />
+                <DuplicatesPanel />
+                <CustomFieldsManager />
+              </div>
+            )}
 
-          {save.error && <div className="text-sm text-red-400/90 mt-3">✕ {(save.error as Error).message}</div>}
-          {save.isSuccess && <div className="text-sm text-litera-accent mt-3">{t("settings.saved")}</div>}
+            {save.error && <div className="text-sm text-litera-error">✕ {(save.error as Error).message}</div>}
+          </div>
         </div>
       </div>
     </section>

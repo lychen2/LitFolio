@@ -246,6 +246,7 @@ mod tests {
             paths: LibraryPaths::new(&library_root),
             http: reqwest::Client::new(),
             http_external: reqwest::Client::new(),
+            host_network: crate::network_egress::HostNetworkState::new(Default::default()),
             batch_cancel: AsyncMutex::new(None::<CancellationToken>),
             sync_lock: AsyncMutex::new(()),
         };

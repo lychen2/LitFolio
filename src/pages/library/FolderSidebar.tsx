@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { api, type FilterRule } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { SmartCollectionEditor } from "@/components/SmartCollectionEditor";
 import { EmptyState, FolderButton, FolderTree, CreateButton } from "./FolderSidebarTree";
 import { SmartCollectionList } from "./SmartCollectionList";
+import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 
 export function FolderSidebar({
-  selectedId, onSelect, selectedSmartId, onSelectSmart,
+  selectedId, onSelect, selectedSmartId, onSelectSmart, compactOpen, onClose,
 }: {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
   selectedSmartId: number | null;
   onSelectSmart: (id: number | null) => void;
+  compactOpen: boolean;
+  onClose: () => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const isCompact = useNarrowLayout(901);
   const {
     data: folders = [],
     isLoading,
@@ -63,11 +67,20 @@ export function FolderSidebar({
   });
   const [editorOpen, setEditorOpen] = useState(false);
 
+  if (isCompact && !compactOpen) return null;
+
   return (
-    <aside className="w-[230px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto flex flex-col">
-      <div className="px-3 py-3 border-b border-litera-line flex items-center justify-between gap-2">
-        <div className="text-xs uppercase tracking-wider text-litera-mute">{t("folders.title")}</div>
-        <CreateButton parentId={null} create={create} variant="header" />
+    <aside
+      className={`w-[240px] shrink-0 overflow-auto border-r border-litera-border bg-litera-paper/35 transition-transform duration-200 max-[1024px]:w-[205px] max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[260px] max-[900px]:bg-litera-paper max-[900px]:shadow-2xl ${compactOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full"}`}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-litera-border px-3 py-3">
+        <div className="litera-section-label">{t("folders.title")}</div>
+        <div className="flex items-center gap-1">
+          <CreateButton parentId={null} create={create} variant="header" />
+          <button type="button" onClick={onClose} className="litera-icon-btn hidden h-7 w-7 max-[900px]:inline-flex" aria-label={t("common.close")} title={t("common.close")}>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       <nav className="p-2 flex-1">
         <FolderButton
@@ -78,12 +91,12 @@ export function FolderSidebar({
           onClick={() => onSelect(null)}
         />
         {listError ? (
-          <div className="mt-3 px-2 py-3 rounded border border-red-400/50 bg-red-500/10 text-[11px] text-red-300 leading-relaxed">
+          <div className="mt-3 px-2 py-3 rounded border border-litera-error/50 bg-litera-error/10 text-[11px] text-litera-error leading-relaxed">
             <div className="font-medium mb-1">{t("folders.loadFailed")}</div>
-            <div className="break-words text-red-200/80">{String((listError as Error).message ?? listError)}</div>
+            <div className="break-words text-litera-error">{String((listError as Error).message ?? listError)}</div>
             <button
               onClick={() => refetch()}
-              className="mt-2 text-[11px] underline hover:text-red-100"
+              className="mt-2 text-[11px] underline hover:text-litera-error"
             >
               {t("common.retry")}
             </button>
@@ -124,8 +137,8 @@ export function FolderSidebar({
         }}
       />
 
-      {create.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(create.error)}</div>}
-      {del.error && <div className="px-3 py-2 text-xs text-red-400/90">{String(del.error)}</div>}
+      {create.error && <div className="px-3 py-2 text-xs text-litera-error">{String(create.error)}</div>}
+      {del.error && <div className="px-3 py-2 text-xs text-litera-error">{String(del.error)}</div>}
       {editorOpen && (
         <SmartCollectionEditor
           onSave={(name, rules) => {

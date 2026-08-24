@@ -31,8 +31,10 @@ export function ReaderWorkspacePane({
   }, [onSelectionSetterReady]);
 
   return (
-    <div className="h-full flex flex-col bg-litera-paper/30">
-      <div className="px-2 py-2 border-b border-litera-line flex items-center gap-1.5">
+    <div className="reader-workspace h-full flex flex-col bg-litera-paper/30">
+      <div className="reader-panel-header">
+        <span className="litera-section-label">{t("reader.workspace")}</span>
+        <div className="flex items-center gap-1.5">
         <TabButton
           active={activeTab === "notes"}
           icon={<FileText className="h-3.5 w-3.5" />}
@@ -51,6 +53,7 @@ export function ReaderWorkspacePane({
           label={t("reader.tabTerms")}
           onClick={() => onTabChange("terms")}
         />
+        </div>
       </div>
       <div className="flex-1 min-h-0 relative">
         <div className={cn("h-full", activeTab !== "notes" && "hidden")}>
@@ -82,10 +85,10 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors",
+        "inline-flex min-h-7 items-center gap-1 rounded-[var(--litera-radius)] border px-2 py-1 text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-litera-focus",
         active
-          ? "bg-litera-accent/15 text-litera-accent border border-litera-accent/30"
-          : "text-litera-mute border border-transparent hover:bg-litera-panel hover:text-litera-text",
+          ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent"
+          : "border-transparent text-litera-mute hover:bg-litera-surface2 hover:text-litera-text",
       )}
     >
       {icon}

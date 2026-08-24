@@ -56,7 +56,7 @@ export function ProjectWritingPanel({ project }: { project: ResearchProject }) {
         <ProjectWritingError error={outline.error ?? manifest.error} />
       )}
       {copied === "outline" && result && (
-        <div className="mt-3 text-xs text-emerald-400">
+        <div className="mt-3 text-xs text-litera-success">
           {t("projects.writingCopied", {
             papers: result.paper_count,
             sources: result.source_count,
@@ -65,7 +65,7 @@ export function ProjectWritingPanel({ project }: { project: ResearchProject }) {
         </div>
       )}
       {copied === "manifest" && manifest.data && (
-        <div className="mt-3 text-xs text-emerald-400">
+        <div className="mt-3 text-xs text-litera-success">
           {t("projects.sourceManifestCopied", {
             papers: manifest.data.paper_count,
             pdfs: manifest.data.pdf_count,
@@ -89,7 +89,7 @@ export function ProjectWritingPanel({ project }: { project: ResearchProject }) {
 export function ProjectWritingError({ error }: { error: unknown }) {
   const message = error instanceof Error ? error.message : String(error);
   return (
-    <div className="mt-3 text-xs text-red-400/90" role="alert">
+    <div className="mt-3 text-xs text-litera-error" role="alert">
       {message}
     </div>
   );

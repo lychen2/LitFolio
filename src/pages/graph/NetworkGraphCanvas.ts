@@ -1,16 +1,34 @@
 import type { GraphEdge, GraphNode } from "@/lib/api";
 
-const PAPER_COLOR = "#6366f1";
-const PAPER_COLOR_LIGHT = "#818cf8";
-const CONCEPT_COLOR = "#059669";
-const CONCEPT_COLOR_LIGHT = "#34d399";
+interface GraphPalette {
+  paper: string;
+  concept: string;
+  info: string;
+  warning: string;
+  text: string;
+  surface: string;
+  border: string;
+}
 
-const EDGE_COLORS: Record<string, string> = {
-  citation: "#38bdf8",
-  similar: "#a78bfa",
-  manual: "#fbbf24",
-  concept: "#6ee7b7",
-};
+let paletteCache: { theme: string; value: GraphPalette } | null = null;
+
+function graphPalette(): GraphPalette {
+  const theme = typeof document === "undefined" ? "fallback" : document.documentElement.dataset.theme ?? "violet";
+  if (paletteCache?.theme === theme) return paletteCache.value;
+  const styles = typeof document === "undefined" ? null : getComputedStyle(document.documentElement);
+  const read = (token: string, fallback: string) => styles?.getPropertyValue(token).trim() || fallback;
+  const value = {
+    paper: read("--litera-accent", "#9b87d8"),
+    concept: read("--litera-info", "#65b8c9"),
+    info: read("--litera-accent2", "#65b8c9"),
+    warning: read("--litera-warn", "#d7ad58"),
+    text: read("--litera-text", "#e6e3ec"),
+    surface: read("--litera-surface-3", "#302e39"),
+    border: read("--litera-border-strong", "#5a5668"),
+  };
+  paletteCache = { theme, value };
+  return value;
+}
 
 type PositionedNode = GraphNode & { x: number; y: number };
 type PositionedLink = GraphEdge & { source: unknown; target: unknown };
@@ -54,7 +72,13 @@ export function drawGraphLink({
 
   const geometry = linkGeometry(src, tgt);
   if (!geometry) return;
-  const color = EDGE_COLORS[link.edge_type] ?? "#9ca3af";
+  const palette = graphPalette();
+  const color = {
+    citation: palette.info,
+    similar: palette.paper,
+    manual: palette.warning,
+    concept: palette.concept,
+  }[link.edge_type] ?? palette.border;
   drawEdgePath(ctx, geometry, color, link.source_type === "ai");
   if (showArrowhead) {
     drawArrowhead(ctx, geometry, color);
@@ -63,37 +87,37 @@ export function drawGraphLink({
 
 function drawPaperNode(x: number, y: number, ctx: CanvasRenderingContext2D) {
   const box = { w: 14, h: 10, r: 2.5, lx: x - 7, ly: y - 5 };
+  const palette = graphPalette();
   ctx.save();
-  ctx.shadowColor = "rgba(99, 102, 241, 0.35)";
-  ctx.shadowBlur = 6;
-  const grad = ctx.createLinearGradient(box.lx, box.ly, box.lx + box.w, box.ly + box.h);
-  grad.addColorStop(0, PAPER_COLOR_LIGHT);
-  grad.addColorStop(1, PAPER_COLOR);
+  ctx.shadowColor = palette.paper;
+  ctx.shadowBlur = 5;
   roundedRect(ctx, box);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = palette.paper;
   ctx.fill();
   ctx.restore();
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.strokeStyle = palette.text;
+  ctx.globalAlpha = 0.28;
   ctx.lineWidth = 0.5;
   ctx.stroke();
+  ctx.globalAlpha = 1;
   drawFoldedCorner(ctx, box);
 }
 
 function drawConceptNode(x: number, y: number, ctx: CanvasRenderingContext2D) {
   const r = 7;
+  const palette = graphPalette();
   ctx.save();
-  ctx.shadowColor = "rgba(5, 150, 105, 0.35)";
-  ctx.shadowBlur = 6;
-  const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-  grad.addColorStop(0, CONCEPT_COLOR_LIGHT);
-  grad.addColorStop(1, CONCEPT_COLOR);
+  ctx.shadowColor = palette.concept;
+  ctx.shadowBlur = 5;
   hexagon(ctx, x, y, r);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = palette.concept;
   ctx.fill();
   ctx.restore();
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.strokeStyle = palette.text;
+  ctx.globalAlpha = 0.28;
   ctx.lineWidth = 0.5;
   ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function drawSelection({
@@ -105,14 +129,18 @@ function drawSelection({
   ctx: CanvasRenderingContext2D;
   isPaper: boolean;
 }) {
+  const palette = graphPalette();
+  const color = isPaper ? palette.paper : palette.concept;
   ctx.save();
-  ctx.shadowColor = isPaper ? "rgba(99,102,241,0.4)" : "rgba(5,150,105,0.4)";
+  ctx.shadowColor = color;
   ctx.shadowBlur = 14;
   ctx.beginPath();
   ctx.arc(node.x, node.y, isPaper ? 11 : 10, 0, 2 * Math.PI);
-  ctx.fillStyle = isPaper ? "rgba(99,102,241,0.15)" : "rgba(5,150,105,0.15)";
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.15;
   ctx.fill();
-  ctx.strokeStyle = isPaper ? PAPER_COLOR : CONCEPT_COLOR;
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -136,7 +164,7 @@ function drawNodeLabel({
   drawLabelPill({ ctx, x: node.x, y: labelY, width: ctx.measureText(label).width, fontSize });
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillStyle = "#f1f5f9";
+  ctx.fillStyle = graphPalette().text;
   ctx.fillText(label, node.x, labelY);
 }
 
@@ -157,7 +185,8 @@ function drawLabelPill({
   const h = fontSize + pad * 2;
   const w = width + pad * 2.5;
   ctx.save();
-  ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
+  ctx.fillStyle = graphPalette().surface;
+  ctx.globalAlpha = 0.82;
   roundedRect(ctx, { w, h, r: h / 2, lx: x - w / 2, ly: y - pad });
   ctx.fill();
   ctx.restore();
@@ -236,13 +265,16 @@ function drawFoldedCorner(
   ctx: CanvasRenderingContext2D,
   box: { w: number; h: number; lx: number; ly: number },
 ) {
+  ctx.save();
   ctx.beginPath();
   ctx.moveTo(box.lx + box.w - 3.5, box.ly);
   ctx.lineTo(box.lx + box.w, box.ly + 3.5);
   ctx.lineTo(box.lx + box.w - 3.5, box.ly + 3.5);
   ctx.closePath();
-  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillStyle = graphPalette().text;
+  ctx.globalAlpha = 0.22;
   ctx.fill();
+  ctx.restore();
 }
 
 function hexagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {

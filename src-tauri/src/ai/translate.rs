@@ -673,7 +673,10 @@ fn line_split_boundary(line: &str, max_chars: usize) -> usize {
         .last()
         .unwrap_or(line.len());
     if limit == 0 {
-        return line.char_indices().nth(1).map_or(line.len(), |(idx, _)| idx);
+        return line
+            .char_indices()
+            .nth(1)
+            .map_or(line.len(), |(idx, _)| idx);
     }
     line[..limit]
         .char_indices()
@@ -822,16 +825,11 @@ mod tests {
         let body = chat_body("partial", "length", 1, 1);
         let base_url = serve_chat_once(&body).await;
         let client = reqwest::Client::new();
-        let err = translate_markdown_text(
-            &client,
-            &profile(&base_url),
-            "A paper",
-            table,
-            "Chinese",
-        )
-        .await
-        .unwrap_err()
-        .to_string();
+        let err =
+            translate_markdown_text(&client, &profile(&base_url), "A paper", table, "Chinese")
+                .await
+                .unwrap_err()
+                .to_string();
 
         assert!(err.contains("chunk 1 exceeded model output limit"));
         assert!(err.contains("increase max_tokens"));
@@ -898,11 +896,16 @@ mod tests {
     #[tokio::test]
     async fn markdown_translation_retries_length_limited_long_line_with_smaller_chunks() {
         let markdown = "Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu.";
-        assert_eq!(split_markdown_chunks(markdown, MARKDOWN_CHUNK_CHARS).len(), 1);
+        assert_eq!(
+            split_markdown_chunks(markdown, MARKDOWN_CHUNK_CHARS).len(),
+            1
+        );
         let retry_max_chars = MARKDOWN_CHUNK_CHARS.min(markdown.len()) / 2;
         let retry_chunks = split_markdown_chunks(markdown, retry_max_chars);
         assert!(retry_chunks.len() > 1);
-        assert!(retry_chunks.iter().all(|chunk| chunk.len() <= retry_max_chars));
+        assert!(retry_chunks
+            .iter()
+            .all(|chunk| chunk.len() <= retry_max_chars));
 
         let translations = (1..=retry_chunks.len())
             .map(|idx| format!("第{idx}小段。"))
@@ -918,15 +921,10 @@ mod tests {
         let (base_url, requests) = serve_chat_sequence(bodies).await;
         let client = reqwest::Client::new();
 
-        let result = translate_markdown_text(
-            &client,
-            &profile(&base_url),
-            "A paper",
-            markdown,
-            "Chinese",
-        )
-        .await
-        .unwrap();
+        let result =
+            translate_markdown_text(&client, &profile(&base_url), "A paper", markdown, "Chinese")
+                .await
+                .unwrap();
 
         assert_eq!(result.markdown, translations.join("\n\n"));
         assert_eq!(requests.lock().await.len(), retry_chunks.len() + 1);

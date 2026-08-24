@@ -25,12 +25,13 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-1 text-xs">
-      <Languages className="h-3.5 w-3.5 text-litera-mute" />
+    <div className="flex items-center gap-1 text-xs" role="group" aria-label={t("lang.label")}>
+      <Languages className="h-3.5 w-3.5 text-litera-mute" aria-hidden="true" />
       <button
+        type="button"
         onClick={() => switchTo("zh")}
         className={
-          "px-1.5 py-0.5 rounded " +
+          "min-h-7 rounded-[var(--litera-radius)] px-2 py-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-litera-focus " +
           (lang === "zh"
             ? "bg-litera-accent/20 text-litera-accent"
             : "text-litera-text/70 hover:text-litera-text")
@@ -40,9 +41,10 @@ export function LanguageSwitcher() {
         ZH
       </button>
       <button
+        type="button"
         onClick={() => switchTo("en")}
         className={
-          "px-1.5 py-0.5 rounded " +
+          "min-h-7 rounded-[var(--litera-radius)] px-2 py-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-litera-focus " +
           (lang === "en"
             ? "bg-litera-accent/20 text-litera-accent"
             : "text-litera-text/70 hover:text-litera-text")

@@ -70,9 +70,9 @@ describe("api schema parsers", () => {
       output_language: "Chinese",
     };
 
-    expect(parseLlmConfig(config).task_assignments.tldr?.profile).toBe(
-      "default"
-    );
+    const parsed = parseLlmConfig(config);
+    expect(parsed.task_assignments.tldr?.profile).toBe("default");
+    expect(parsed.obsidian).toEqual({ vault_dir: "", folder: "Papers" });
   });
 
   it("rejects malformed graph nodes with precise paths", () => {

@@ -40,7 +40,7 @@ export function SubareaCard({ subarea, initialOpen = true, onToggleMustRead, onS
             <span>📅 {year}</span>
             <span>📚 {t("topic.survey.paperCount", { count: subarea.papers.length })}</span>
             {mustCount > 0 && (
-              <span className="text-amber-400">⭐ {t("topic.survey.mustReadCount", { count: mustCount })}</span>
+              <span className="text-litera-warn">⭐ {t("topic.survey.mustReadCount", { count: mustCount })}</span>
             )}
           </div>
         </div>

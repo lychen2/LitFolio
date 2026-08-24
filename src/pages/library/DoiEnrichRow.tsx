@@ -72,8 +72,8 @@ export function DoiEnrichRow({
         </button>
       </div>
       {enrich.isError && (
-        <div className="text-[11px] text-red-400/90">
-          ✕ {t("paper.detail.enrichFailed")}: {(enrich.error as Error).message}
+        <div className="text-[11px] text-litera-error">
+          ✕ {t("paper.detail.enrichFailed")}: {doiEnrichErrorMessage(enrich.error)}
         </div>
       )}
       {enrich.isSuccess && (
@@ -81,6 +81,12 @@ export function DoiEnrichRow({
       )}
     </dd>
   );
+}
+
+export function doiEnrichErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return String(error);
 }
 
 export function doiOfficialUrl(doi: string | null | undefined): string | null {

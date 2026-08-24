@@ -55,21 +55,21 @@ export function DropZoneOverlay({
         >
           {result.failed.length === 0 ? (
             <>
-              <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+              <CheckCircle2 className="h-7 w-7 text-litera-success" />
               <div className="text-sm text-litera-text">
                 {t("drop.done", { ok: String(result.imported.length) })}
               </div>
             </>
           ) : result.imported.length === 0 ? (
             <>
-              <XCircle className="h-7 w-7 text-red-400/80" />
-              <div className="text-sm text-red-400/90">
+              <XCircle className="h-7 w-7 text-litera-error" />
+              <div className="text-sm text-litera-error">
                 {result.failed.map((f) => f.error).join("; ")}
               </div>
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-7 w-7 text-amber-400" />
+              <CheckCircle2 className="h-7 w-7 text-litera-warn" />
               <div className="text-sm text-litera-text">
                 {t("drop.doneWithFail", {
                   ok: String(result.imported.length),

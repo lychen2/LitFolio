@@ -36,7 +36,7 @@ function DefaultFallback({ error, onReset }: { error: Error; onReset: () => void
   return (
     <div className="h-full w-full grid place-items-center px-6 py-10 text-litera-mute">
       <div className="max-w-md text-center space-y-4">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 text-red-400">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-litera-error/10 text-litera-error">
           <AlertTriangle className="h-6 w-6" />
         </div>
         <h2 className="font-serif text-xl tracking-tight text-litera-text">

@@ -27,9 +27,9 @@ export function GraphToolbar({
 }: Props) {
   const t = useT();
   return (
-    <div className="flex items-center gap-2 border-b border-litera-line px-4 py-2 bg-litera-paper/60">
+    <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-litera-border bg-litera-paper/55 px-4 py-2">
       {/* View mode toggle */}
-      <div className="flex rounded-md border border-litera-line overflow-hidden">
+      <div className="flex shrink-0 overflow-hidden rounded-[var(--litera-radius)] border border-litera-border">
         {(["network", "mindmap"] as const).map((m) => (
           <button
             key={m}
@@ -37,8 +37,8 @@ export function GraphToolbar({
             className={clsx(
               "flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors",
               viewMode === m
-                ? "bg-litera-accent text-white"
-                : "text-litera-mute hover:bg-litera-panel",
+                ? "bg-litera-accent text-litera-ink"
+                : "text-litera-mute hover:bg-litera-surface2",
             )}
           >
             {m === "network" ? <Network className="h-3.5 w-3.5" /> : <Map className="h-3.5 w-3.5" />}
@@ -47,10 +47,10 @@ export function GraphToolbar({
         ))}
       </div>
 
-      <span className="w-px h-5 bg-litera-line" />
+      <span className="h-5 w-px shrink-0 bg-litera-border" />
 
       {/* Relation filters */}
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex shrink-0 items-center gap-1">
         {RELATIONS.map((r) => (
           <button
             key={r}
@@ -67,7 +67,7 @@ export function GraphToolbar({
         ))}
       </div>
 
-      <span className="w-px h-5 bg-litera-line" />
+      <span className="h-5 w-px shrink-0 bg-litera-border" />
 
       {/* Concept toggle */}
       <label className="flex items-center gap-1.5 text-xs text-litera-mute cursor-pointer">
@@ -85,7 +85,7 @@ export function GraphToolbar({
       {/* Actions */}
       <button
         onClick={onAddLink}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-litera-line hover:bg-litera-panel text-litera-text"
+        className="litera-btn shrink-0 text-xs"
       >
         <Plus className="h-3.5 w-3.5" />
         {t("graph.addLink")}
@@ -93,7 +93,7 @@ export function GraphToolbar({
       <button
         onClick={onAiDiscover}
         disabled={aiRunning}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-litera-accent text-white disabled:opacity-50"
+        className="litera-btn-primary shrink-0 text-xs disabled:opacity-50"
       >
         {aiRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         {aiRunning ? t("graph.aiDiscovering") : t("graph.aiDiscover")}
@@ -101,7 +101,7 @@ export function GraphToolbar({
       <button
         onClick={onExtractConcepts}
         disabled={extractingConcepts}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-litera-line hover:bg-litera-panel text-litera-text disabled:opacity-50"
+        className="litera-btn shrink-0 text-xs disabled:opacity-50"
       >
         {extractingConcepts ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
         {extractingConcepts ? t("concepts.extracting") : t("concepts.extract")}

@@ -296,7 +296,7 @@ export function SyncPanel() {
             </button>
             {confirmingPull ? (
               <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-red-400/90">
+                <span className="text-litera-error">
                   {t("settings.sync.pullConfirmInline")}
                 </span>
                 <button
@@ -332,7 +332,7 @@ export function SyncPanel() {
             )}
           </div>
 
-          <div className="mt-4 rounded-[var(--litera-radius)] border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-100/85">
+          <div className="mt-4 rounded-[var(--litera-radius)] border border-litera-warn/20 bg-litera-warn/5 px-3 py-2 text-xs text-litera-warn">
             {t("settings.sync.warning")}
           </div>
 
@@ -391,7 +391,7 @@ function Field({
 }
 
 function ErrorText({ message }: { message: string }) {
-  return <div className="mt-3 text-sm text-red-400/90">✕ {message}</div>;
+  return <div className="mt-3 text-sm text-litera-error">✕ {message}</div>;
 }
 
 function InfoText({ message }: { message: string }) {
@@ -427,7 +427,7 @@ function SyncStatusSummary({
           {t("settings.sync.lastResult")}
         </div>
         {lastResult ? (
-          <div className={lastResult.status === "success" ? "mt-1 text-litera-accent" : "mt-1 text-red-400/90"}>
+          <div className={lastResult.status === "success" ? "mt-1 text-litera-accent" : "mt-1 text-litera-error"}>
             <span className="font-medium">{t(syncLastResultKindKey(lastResult.kind))}</span>
             <span className="text-litera-mute"> · {new Date(lastResult.at).toLocaleString()}</span>
             <div className="mt-0.5 break-words">{lastResult.message}</div>
@@ -484,7 +484,7 @@ function SyncPreviewPanel({
       </p>
 
       {(preview.restart_required || preview.backup_path) && (
-        <div className="mt-3 flex flex-col gap-1 rounded-[var(--litera-radius)] border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-amber-100/85">
+        <div className="mt-3 flex flex-col gap-1 rounded-[var(--litera-radius)] border border-litera-warn/20 bg-litera-warn/5 px-2.5 py-2 text-litera-warn">
           {preview.restart_required && (
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doiOfficialUrl } from "./DoiEnrichRow";
+import { doiEnrichErrorMessage, doiOfficialUrl } from "./DoiEnrichRow";
 
 describe("doiOfficialUrl", () => {
   it("builds a doi.org URL from a bare DOI", () => {
@@ -14,5 +14,15 @@ describe("doiOfficialUrl", () => {
   it("omits the official link for empty DOI values", () => {
     expect(doiOfficialUrl("   ")).toBeNull();
     expect(doiOfficialUrl(null)).toBeNull();
+  });
+});
+
+describe("doiEnrichErrorMessage", () => {
+  it("shows string errors returned by Tauri commands", () => {
+    expect(doiEnrichErrorMessage("arXiv ID 不一致")).toBe("arXiv ID 不一致");
+  });
+
+  it("shows Error messages", () => {
+    expect(doiEnrichErrorMessage(new Error("network failed"))).toBe("network failed");
   });
 });

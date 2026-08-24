@@ -48,7 +48,7 @@ export function ItemsToolbar({
         </>
       )}
       {selected?.last_error && (
-        <span className="ml-auto text-[11px] text-red-400/90 max-w-[420px] truncate" title={selected.last_error}>
+        <span className="ml-auto text-[11px] text-litera-error max-w-[420px] truncate" title={selected.last_error}>
           {t("feeds.lastError")}:{selected.last_error}
         </span>
       )}

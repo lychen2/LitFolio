@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "manifest.valid.minimal.v1",
+  "kind": "plugin-manifest",
+  "input": {
+    "manifest": {
+      "apiVersion": 1,
+      "id": "fixture-z-base",
+      "version": "1.0.0",
+      "coreApi": "^1.0.0",
+      "displayName": "Fixture Z Base",
+      "activation": { "frontend": { "export": "activate" } },
+      "dependencies": [],
+      "requestedCapabilities": [],
+      "contributions": [],
+      "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+      "migrations": [],
+      "build": { "frontendEntry": "src/plugins/fixture-z-base/index.ts" }
+    }
+  }
+}

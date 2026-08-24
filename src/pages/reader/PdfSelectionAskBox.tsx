@@ -66,7 +66,7 @@ export function PdfSelectionAskBox({ paperId, selection, onClose }: PdfSelection
           </button>
         </div>
         {ask.error && (
-          <div className="text-xs text-red-400/90">
+          <div className="text-xs text-litera-error">
             {t("reader.askSelectionFailed", { message: ask.error instanceof Error ? ask.error.message : String(ask.error) })}
           </div>
         )}

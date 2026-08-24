@@ -119,8 +119,8 @@ export function DataPrivacyPanel() {
             {syncConfigured ? t("settings.privacy.syncConfigured") : t("settings.privacy.syncNotConfigured")}
           </Fact>
         </div>
-        {openError && <div className="mt-3 text-xs text-red-400/90">✕ {openError}</div>}
-        {diagnosticsError && <div className="mt-3 text-xs text-red-400/90">✕ {diagnosticsError}</div>}
+        {openError && <div className="mt-3 text-xs text-litera-error">✕ {openError}</div>}
+        {diagnosticsError && <div className="mt-3 text-xs text-litera-error">✕ {diagnosticsError}</div>}
         {diagnosticsResult && <div className="mt-3 text-xs text-litera-accent">{diagnosticsResult}</div>}
       </section>
 

@@ -11,6 +11,7 @@ import {
   type TopicSurveyProgress,
 } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
 import { SubareaCard } from "./SubareaCard";
 import { KeyPiList } from "./KeyPiList";
 import { MustReadShortlist } from "./MustReadShortlist";
@@ -123,18 +124,16 @@ export function TopicSurveyView() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4">
-        <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2 mb-1">
-          <BookOpenText className="h-5 w-5 text-litera-accent" />
-          {t("topic.survey.heading")}
-        </h1>
-        <p className="text-sm text-litera-mute">{t("topic.survey.subtitle")}</p>
-      </header>
+      <PageHeader
+        icon={<BookOpenText className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("topic.survey.heading")}
+        subtitle={t("topic.survey.subtitle")}
+      />
 
-      <div className="px-6 py-5 border-b border-litera-line">
+      <div className="border-b border-litera-border px-5 py-5 max-[900px]:px-4">
         <div className="litera-panel p-5 max-w-4xl">
           <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.survey.label")}</label>
-          <div className="flex gap-2 mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -163,7 +162,7 @@ export function TopicSurveyView() {
             </button>
           </div>
           {run.error && (
-            <div className="mt-3 text-sm text-red-400/90 flex items-start gap-2">
+            <div className="mt-3 text-sm text-litera-error flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span className="break-words whitespace-pre-wrap">{errorMessage(run.error)}</span>
             </div>
@@ -180,7 +179,7 @@ export function TopicSurveyView() {
             onDelete={deleteSaved}
           />
           {saveNote.error && (
-            <div className="mt-2 text-xs text-red-400/90">{errorMessage(saveNote.error)}</div>
+            <div className="mt-2 text-xs text-litera-error">{errorMessage(saveNote.error)}</div>
           )}
           {savedPath && (
             <div className="mt-2 text-xs text-litera-accent">
@@ -267,7 +266,7 @@ function SavedSurveyBar({
         <button
           key={item.id}
           onClick={() => onDelete(item.id)}
-          className="p-1 text-litera-mute hover:text-red-400"
+          className="p-1 text-litera-mute hover:text-litera-error"
           title={t("topic.survey.deleteSaved", { topic: item.topic })}
         >
           <Trash2 className="h-3.5 w-3.5" />

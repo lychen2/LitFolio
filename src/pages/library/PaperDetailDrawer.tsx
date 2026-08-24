@@ -188,5 +188,5 @@ function Section({ title, body, accent }: { title: string; body: string; accent?
 function ErrorLine({ error }: { error: unknown }) {
   const t = useT();
   const message = error instanceof Error ? error.message : String(error);
-  return <div className="text-sm text-red-400/90">✕ {t("paper.detail.translateFailed")}: {message}</div>;
+  return <div className="text-sm text-litera-error">✕ {t("paper.detail.translateFailed")}: {message}</div>;
 }

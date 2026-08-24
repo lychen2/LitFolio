@@ -32,7 +32,7 @@ export function ReaderOnboarding() {
         </div>
         <div className="space-y-3 text-sm text-litera-text/90">
           <div className="flex items-start gap-2.5">
-            <FileText className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+            <FileText className="h-4 w-4 text-litera-warn mt-0.5 shrink-0" />
             <span>{t("reader.onboard.highlights")}</span>
           </div>
           <div className="flex items-start gap-2.5">

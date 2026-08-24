@@ -20,7 +20,7 @@ export function PaperActions({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="shrink-0 flex flex-col items-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+    <div className="flex shrink-0 flex-col items-end gap-1 opacity-80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
       <div className="flex items-center gap-1.5">
         {canOpenPdf ? (
           <button
@@ -53,23 +53,26 @@ export function PaperActions({
         <button
           onClick={() => translate.mutate()}
           disabled={translate.isPending}
-          className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
+          className="litera-icon-btn h-7 w-7"
           title={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
+          aria-label={p.title_translated ? t("library.retranslateTitle") : t("library.translateTitle")}
         >
           {translate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
         </button>
         <button
           onClick={() => tldr.mutate()}
           disabled={tldr.isPending}
-          className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 transition-colors"
+          className="litera-icon-btn h-7 w-7"
           title={t("library.tldrTitle")}
+          aria-label={t("library.tldrTitle")}
         >
           {tldr.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         </button>
         <button
           onClick={() => onQuickRead(p)}
-          className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel transition-colors"
+          className="litera-icon-btn h-7 w-7"
           title={t("library.deepReadTitle")}
+          aria-label={t("library.deepReadTitle")}
         >
           <BookOpen className="h-3.5 w-3.5" />
         </button>
@@ -77,8 +80,9 @@ export function PaperActions({
           <button
             onClick={() => attachPdf.mutate(undefined)}
             disabled={attachPdf.isPending}
-            className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="litera-icon-btn h-7 w-7 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
             title={t("library.attachPdfTitle")}
+            aria-label={t("library.attachPdfTitle")}
           >
             {attachPdf.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </button>
@@ -88,7 +92,7 @@ export function PaperActions({
             <button
               onClick={() => { setConfirming(false); del.mutate(); }}
               disabled={del.isPending}
-              className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+              className="px-1.5 py-0.5 rounded text-[10px] bg-litera-error/15 text-litera-error hover:bg-litera-error/25 disabled:opacity-50 inline-flex items-center gap-1"
               title={t("library.confirmDelete", { title: p.title, id: p.id })}
             >
               {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
@@ -102,8 +106,9 @@ export function PaperActions({
           <button
             onClick={() => setConfirming(true)}
             disabled={del.isPending}
-            className="p-1.5 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="litera-icon-btn h-7 w-7 opacity-0 hover:bg-litera-error/10 hover:text-litera-error group-hover:opacity-100 group-focus-within:opacity-100"
             title={t("library.deleteTitle")}
+            aria-label={t("library.deleteTitle")}
           >
             {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           </button>

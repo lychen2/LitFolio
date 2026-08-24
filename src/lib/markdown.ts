@@ -70,8 +70,8 @@ function tryRenderKatex(tex: string, displayMode: boolean): string {
     });
   } catch {
     return displayMode
-      ? `<pre class="bg-red-500/10 border border-red-400/30 rounded-md p-2 text-xs overflow-auto my-2"><code>$$ ${escapeHtml(tex)} $$</code></pre>`
-      : `<code class="text-red-400">$${escapeHtml(tex)}$</code>`;
+      ? `<pre class="bg-litera-error/10 border border-litera-error/30 rounded-md p-2 text-xs overflow-auto my-2"><code>$$ ${escapeHtml(tex)} $$</code></pre>`
+      : `<code class="text-litera-error">$${escapeHtml(tex)}$</code>`;
   }
 }
 

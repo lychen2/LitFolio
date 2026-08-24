@@ -76,7 +76,7 @@ export function TranslatedMarkdownPane({ paperId, paperTitle }: { paperId: strin
             </button>
           </div>
           {translate.error && (
-            <p className="mx-auto mt-2 max-w-4xl rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300" role="alert">
+            <p className="mx-auto mt-2 max-w-4xl rounded-md border border-litera-error/30 bg-litera-error/10 px-3 py-2 text-xs text-litera-error" role="alert">
               {errorMessage(translate.error)}
             </p>
           )}
@@ -112,12 +112,12 @@ export function TranslatedMarkdownPane({ paperId, paperTitle }: { paperId: strin
             </p>
           )}
           {cached.isError && (
-            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300" role="alert">
+            <p className="mt-3 rounded-md border border-litera-error/30 bg-litera-error/10 px-3 py-2 text-xs text-litera-error" role="alert">
               {errorMessage(cached.error)}
             </p>
           )}
           {translate.error && (
-            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300" role="alert">
+            <p className="mt-3 rounded-md border border-litera-error/30 bg-litera-error/10 px-3 py-2 text-xs text-litera-error" role="alert">
               {errorMessage(translate.error)}
             </p>
           )}

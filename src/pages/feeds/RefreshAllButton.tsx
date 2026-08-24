@@ -30,7 +30,7 @@ export function RefreshAllButton({
         </div>
       )}
       {refresh.error && (
-        <div className="text-[11px] text-red-400/90 max-w-[260px] truncate" title={refresh.error.message}>
+        <div className="text-[11px] text-litera-error max-w-[260px] truncate" title={refresh.error.message}>
           {refresh.error.message}
         </div>
       )}

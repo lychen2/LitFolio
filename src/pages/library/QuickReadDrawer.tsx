@@ -53,7 +53,7 @@ export function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () 
           {m.isPending && !result && <GeneratingQuickRead />}
           {result && <ResultBody r={result} />}
           {m.error && (
-            <div className="text-sm text-red-400/90 border border-red-400/30 rounded p-3">
+            <div className="text-sm text-litera-error border border-litera-error/30 rounded p-3">
               ✕ {errorMessageOr(m.error, t("reader.unknownError"))}
             </div>
           )}
@@ -154,7 +154,7 @@ function DeleteControl({
       <button
         onClick={() => setConfirming(true)}
         disabled={pending}
-        className="litera-btn text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50"
+        className="litera-btn text-xs text-litera-error hover:text-litera-error disabled:opacity-50"
         title={t("library.deletePaperTitle")}
       >
         <Trash2 className="h-3.5 w-3.5" />
@@ -163,11 +163,11 @@ function DeleteControl({
   }
   return (
     <>
-      <span className="text-[11px] text-red-400/90">{t("library.confirmDeletePaper")}</span>
+      <span className="text-[11px] text-litera-error">{t("library.confirmDeletePaper")}</span>
       <button
         onClick={() => { setConfirming(false); onDelete(); }}
         disabled={pending}
-        className="litera-btn text-xs bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+        className="litera-btn text-xs bg-litera-error/15 text-litera-error hover:bg-litera-error/25 disabled:opacity-50 inline-flex items-center gap-1"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
         {t("common.delete")}
@@ -226,7 +226,7 @@ function Section({
   body: string;
   tone: "accent" | "accent2" | "warn";
 }) {
-  const color = tone === "accent" ? "text-litera-accent" : tone === "accent2" ? "text-litera-accent2" : "text-amber-400";
+  const color = tone === "accent" ? "text-litera-accent" : tone === "accent2" ? "text-litera-accent2" : "text-litera-warn";
   return (
     <div>
       <div className={"flex items-center gap-1.5 text-xs uppercase tracking-wider mb-1.5 " + color}>

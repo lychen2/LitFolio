@@ -206,7 +206,7 @@ export function AskComposer({
               </span>
               <button
                 onClick={() => removePin(p.id)}
-                className="shrink-0 hover:text-red-400"
+                className="shrink-0 hover:text-litera-error"
                 aria-label={t("ask.pinRemove")}
               >
                 <X className="h-3 w-3" />
@@ -289,7 +289,7 @@ export function AskComposer({
         {t("ask.inputHint")} · {t("ask.atMentionHint")}
       </div>
       {errorMessage && (
-        <div className="mt-2 break-all text-sm text-red-400/90">✕ {errorMessage}</div>
+        <div className="mt-2 break-all text-sm text-litera-error">✕ {errorMessage}</div>
       )}
       {popoverOpen && (
         <div

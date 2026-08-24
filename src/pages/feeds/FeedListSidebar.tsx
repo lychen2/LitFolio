@@ -1,20 +1,24 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Radio, Trash2 } from "lucide-react";
+import { Loader2, Plus, Radio, Trash2, X } from "lucide-react";
 import { api, type FeedWithCounts } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 
 export function FeedListSidebar({
-  feeds, isLoading, error, selectedId, onSelect,
+  feeds, isLoading, error, selectedId, onSelect, compactOpen, onClose,
 }: {
   feeds: FeedWithCounts[];
   isLoading: boolean;
   error: Error | null;
   selectedId: number | null;
   onSelect: (id: number | null) => void;
+  compactOpen: boolean;
+  onClose: () => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const isCompact = useNarrowLayout(901);
   const [url, setUrl] = useState("");
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const add = useMutation({
@@ -38,8 +42,16 @@ export function FeedListSidebar({
     if (trimmedUrl) add.mutate(trimmedUrl);
   }
 
+  if (isCompact && !compactOpen) return null;
+
   return (
-    <aside className="w-[260px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto flex flex-col">
+    <aside
+      className={`flex w-[250px] shrink-0 flex-col overflow-auto border-r border-litera-border bg-litera-paper/35 transition-transform duration-200 max-[1024px]:w-[210px] max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[270px] max-[900px]:bg-litera-paper max-[900px]:shadow-2xl ${compactOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full"}`}
+    >
+      <div className="hidden items-center justify-between border-b border-litera-border px-3 py-2 max-[900px]:flex">
+        <span className="litera-section-label">{t("feeds.sourcesTitle")}</span>
+        <button type="button" onClick={onClose} className="litera-icon-btn h-7 w-7" aria-label={t("common.close")} title={t("common.close")}><X className="h-3.5 w-3.5" /></button>
+      </div>
       <SubscribeBox url={url} setUrl={setUrl} addPending={add.isPending} addError={add.error as Error | null} onSubmit={submit} />
       <nav className="p-2 flex-1 litera-stagger">
         <FeedItemBtn
@@ -80,8 +92,8 @@ function SubscribeBox({
 }) {
   const t = useT();
   return (
-    <div className="px-3 py-3 border-b border-litera-line">
-      <div className="text-xs uppercase tracking-wider text-litera-mute mb-2">{t("feeds.sourcesTitle")}</div>
+    <div className="border-b border-litera-border px-3 py-3">
+      <div className="litera-section-label mb-2">{t("feeds.sourcesTitle")}</div>
       <div className="flex gap-1">
         <input
           value={url}
@@ -99,7 +111,7 @@ function SubscribeBox({
           {addPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
         </button>
       </div>
-      {addError && <div className="mt-1 text-[10px] text-red-400/90 break-words">{addError.message}</div>}
+      {addError && <div className="mt-1 text-[10px] text-litera-error break-words">{addError.message}</div>}
     </div>
   );
 }
@@ -141,7 +153,7 @@ function FeedNavBody({
         <button
           onClick={() => setConfirmingId(f.id)}
           disabled={removePending}
-          className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
+          className="litera-icon-btn h-7 w-7 text-litera-mute opacity-70 hover:text-litera-error group-hover:opacity-100"
           title={t("feeds.unsubscribe")}
         >
           <Trash2 className="h-3 w-3" />
@@ -154,7 +166,7 @@ function FeedNavBody({
 function FeedError({ message }: { message: string }) {
   const t = useT();
   return (
-    <div className="mt-3 px-2 py-3 rounded border border-red-400/40 bg-red-500/10 text-[11px] text-red-300">
+    <div className="mt-3 px-2 py-3 rounded border border-litera-error/40 bg-litera-error/10 text-[11px] text-litera-error">
       {t("feeds.loadFailedColon", { message })}
     </div>
   );
@@ -196,7 +208,7 @@ function RemoveConfirm({
       <button
         onClick={onConfirm}
         disabled={pending}
-        className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:opacity-50 inline-flex items-center gap-1"
+        className="px-1.5 py-0.5 rounded text-[10px] bg-litera-error/15 text-litera-error hover:bg-litera-error/25 disabled:opacity-50 inline-flex items-center gap-1"
         title={t("feeds.removeConfirm", { name })}
       >
         {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
@@ -223,10 +235,10 @@ function FeedItemBtn({
       onClick={onClick}
       className={
         "flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-left " +
-        (active ? "bg-litera-accent/15 text-litera-accent" : "text-litera-text/75 hover:bg-litera-panel")
+        (active ? "bg-litera-accent/12 text-litera-accent" : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
       }
     >
-      <Radio className={"h-3 w-3 shrink-0 " + (error ? "text-red-400" : "")} />
+      <Radio className={"h-3 w-3 shrink-0 " + (error ? "text-litera-error" : "")} />
       <span className="truncate">{label}</span>
       {unread > 0 && (
         <span className="ml-auto text-[10px] px-1.5 rounded-full bg-litera-accent/20 text-litera-accent">

@@ -101,6 +101,24 @@ async fn update_quick_read_persists_all_four() {
 }
 
 #[tokio::test]
+async fn update_metadata_persists_arxiv_id() {
+    let (pool, dir) = temp_pool().await;
+    let repo = PaperRepo::new(&pool);
+    let mut paper = sample("META");
+    paper.arxiv_id = None;
+    repo.insert(&paper).await.unwrap();
+
+    paper.doi = Some("10.48550/arXiv.2511.03175".into());
+    paper.arxiv_id = Some("2511.03175v2".into());
+    repo.update_metadata(&paper).await.unwrap();
+
+    let updated = repo.get("META").await.unwrap().unwrap();
+    assert_eq!(updated.doi.as_deref(), Some("10.48550/arXiv.2511.03175"));
+    assert_eq!(updated.arxiv_id.as_deref(), Some("2511.03175v2"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
 async fn search_finds_inserted_paper() {
     let (pool, dir) = temp_pool().await;
     let repo = PaperRepo::new(&pool);

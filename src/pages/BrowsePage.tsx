@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Atom, Loader2, RefreshCw, Search, ChevronDown, ChevronRight,
-  ChevronsDown,
+  ChevronsDown, PanelLeft, X,
 } from "lucide-react";
 import { api, type ArxivDraft, type TranslationResult } from "@/lib/api";
 import { draftTranslationKey, setDraftTranslation } from "./browse/draftTranslations";
@@ -11,6 +11,8 @@ import { DraftDetailDrawer } from "./browse/DraftDetailDrawer";
 import { DraftRow } from "./browse/DraftRow";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
+import { PageHeader } from "@/components/PageHeader";
+import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 
 const DEFAULT_CATEGORY = "physics.optics";
 const PAGE_SIZE = 50;
@@ -20,6 +22,14 @@ export function BrowsePage() {
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [filter, setFilter] = useState("");
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(["Physics"]));
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const isCompact = useNarrowLayout(901);
+  useEffect(() => {
+    if (!categoryOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setCategoryOpen(false);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [categoryOpen]);
 
   // Cumulative list: each "加载更多" call appends PAGE_SIZE more entries via the
   // arxiv `start` offset. arXiv's API caps a single request at 200 entries, so this
@@ -86,10 +96,18 @@ export function BrowsePage() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+      {categoryOpen && <button type="button" aria-label={t("common.close")} onClick={() => setCategoryOpen(false)} className="absolute inset-0 z-20 hidden bg-litera-ink/45 max-[900px]:block" />}
       {/* sidebar: category tree */}
-      <aside className="w-[240px] shrink-0 border-r border-litera-line bg-litera-paper/40 overflow-auto">
-        <div className="px-3 py-3 border-b border-litera-line">
+      {(!isCompact || categoryOpen) && (
+      <aside
+        className={`w-[240px] shrink-0 overflow-auto border-r border-litera-border bg-litera-paper/35 transition-transform duration-200 max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[270px] max-[900px]:bg-litera-paper max-[900px]:shadow-2xl ${categoryOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full"}`}
+      >
+        <div className="hidden items-center justify-between border-b border-litera-border px-3 py-2 max-[900px]:flex">
+          <span className="litera-section-label">{t("browse.categories")}</span>
+          <button type="button" onClick={() => setCategoryOpen(false)} className="litera-icon-btn h-7 w-7" aria-label={t("common.close")} title={t("common.close")}><X className="h-3.5 w-3.5" /></button>
+        </div>
+        <div className="border-b border-litera-border px-3 py-3">
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -115,12 +133,12 @@ export function BrowsePage() {
                     {g.categories.map((c) => (
                       <li key={c.id}>
                         <button
-                          onClick={() => setCategory(c.id)}
+                          onClick={() => { setCategory(c.id); setCategoryOpen(false); }}
                           className={
                             "block w-full text-left px-2 py-1 rounded text-[12px] transition-colors " +
                             (c.id === category
-                              ? "bg-litera-accent/15 text-litera-accent"
-                              : "text-litera-text/70 hover:bg-litera-panel hover:text-litera-text")
+                              ? "bg-litera-accent/12 text-litera-accent"
+                              : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
                           }
                           title={c.id}
                         >
@@ -136,21 +154,20 @@ export function BrowsePage() {
           })}
         </nav>
       </aside>
+      )}
 
       {/* main */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="border-b border-litera-line px-6 py-3.5 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-              <Atom className="h-5 w-5 text-litera-accent" />
-              {findCategoryLabel(category)}
-              <span className="text-litera-mute font-mono text-sm">/ {category}</span>
-            </h1>
-            <p className="text-xs text-litera-mute mt-0.5">
-              {t("browse.subtitle")}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
+        <PageHeader
+          icon={<Atom className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+          title={<>{findCategoryLabel(category)} <span className="font-mono text-xs font-normal text-litera-mute">/ {category}</span></>}
+          subtitle={t("browse.subtitle")}
+          actions={(
+            <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setCategoryOpen((open) => !open)} className="litera-btn hidden text-xs max-[900px]:inline-flex" title={t("browse.categories")} aria-label={t("browse.categories")}>
+              <PanelLeft className="h-3.5 w-3.5" />
+              <span>{t("browse.categories")}</span>
+            </button>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-litera-mute" />
               <input
@@ -167,8 +184,9 @@ export function BrowsePage() {
               {loadMore.isPending && drafts.length === 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {t("common.refresh")}
             </button>
-          </div>
-        </header>
+            </div>
+          )}
+        />
 
         <div className="flex-1 overflow-auto">
           {initialLoading ? (
@@ -176,7 +194,7 @@ export function BrowsePage() {
               <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("browse.fetching", { category })}</div>
             </div>
           ) : firstLoadErr ? (
-            <div className="p-6 text-sm text-red-400/90">✕ {firstLoadErr}</div>
+            <div className="p-6 text-sm text-litera-error">✕ {firstLoadErr}</div>
           ) : filtered.length === 0 ? (
             <div className="grid place-items-center h-64 text-sm text-litera-mute">
               {filter ? t("browse.noMatchFiltered") : t("browse.noResults")}
@@ -209,7 +227,7 @@ export function BrowsePage() {
                   </button>
                 )}
                 {loadMore.error && drafts.length > 0 && (
-                  <span className="text-xs text-red-400/90">✕ {(loadMore.error as Error).message}</span>
+                  <span className="text-xs text-litera-error">✕ {(loadMore.error as Error).message}</span>
                 )}
               </div>
             </>

@@ -85,10 +85,10 @@ export function SaveStatus({
   const t = useT();
   if (error) {
     return (
-      <span className="text-[11px] text-red-400/90 inline-flex items-center gap-1.5">
+      <span className="text-[11px] text-litera-error inline-flex items-center gap-1.5">
         ✕ {t("reader.saveFailed")}: {error.message}
         {onRetry && (
-          <button type="button" onClick={onRetry} className="underline underline-offset-2 hover:text-red-300 inline-flex items-center gap-1">
+          <button type="button" onClick={onRetry} className="underline underline-offset-2 hover:text-litera-error inline-flex items-center gap-1">
             <RotateCcw className="h-3 w-3" /> {t("common.retry")}
           </button>
         )}
@@ -99,7 +99,7 @@ export function SaveStatus({
     return <span className="text-[11px] text-litera-accent2 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("reader.saving")}</span>;
   }
   if (status === "dirty") {
-    return <span className="text-[11px] text-amber-400/80">● {t("reader.unsaved")}</span>;
+    return <span className="text-[11px] text-litera-warn">● {t("reader.unsaved")}</span>;
   }
-  return <span className="text-[11px] text-litera-mute flex items-center gap-1"><Check className="h-3 w-3 text-emerald-400" /> {t("reader.saved")}</span>;
+  return <span className="text-[11px] text-litera-mute flex items-center gap-1"><Check className="h-3 w-3 text-litera-success" /> {t("reader.saved")}</span>;
 }

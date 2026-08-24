@@ -403,16 +403,13 @@ pub fn run_native_startup_network_harness() -> Result<i32> {
             app.manage(audit_for_setup.clone());
 
             let navigation_audit = audit_for_navigation.clone();
-            let webview = tauri::WebviewWindowBuilder::new(
-                app,
-                "main",
-                WebviewUrl::App("index.html".into()),
-            )
-            .title("LitFolio startup network audit")
-            .inner_size(1320.0, 860.0)
-            .visible(true)
-            .on_navigation(move |url| observe_navigation(&navigation_audit, url))
-            .build()?;
+            let webview =
+                tauri::WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("LitFolio startup network audit")
+                    .inner_size(1320.0, 860.0)
+                    .visible(true)
+                    .on_navigation(move |url| observe_navigation(&navigation_audit, url))
+                    .build()?;
 
             let resource_audit = audit_for_setup.clone();
             webview.with_webview(move |platform_webview| {

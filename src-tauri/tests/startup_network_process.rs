@@ -256,8 +256,7 @@ fn assert_zero_scenario(artifacts: &ScenarioArtifacts, included_plugins: &[&str]
         BTreeSet::from(["cold-boot", "readiness", "idle"])
     );
     assert_eq!(
-        artifacts.report.attempted_egress_count,
-        0,
+        artifacts.report.attempted_egress_count, 0,
         "startup observers recorded egress: {:#?}",
         artifacts.report.attempts
     );

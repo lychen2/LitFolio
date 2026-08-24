@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "manifest.valid.peer.v1",
+  "kind": "plugin-manifest",
+  "input": {
+    "manifest": {
+      "apiVersion": 1,
+      "id": "fixture-m-peer",
+      "version": "1.0.0",
+      "coreApi": "^1.0.0",
+      "displayName": "Fixture M Peer",
+      "activation": {},
+      "dependencies": [],
+      "requestedCapabilities": [],
+      "contributions": [],
+      "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+      "migrations": [],
+      "build": {}
+    }
+  }
+}

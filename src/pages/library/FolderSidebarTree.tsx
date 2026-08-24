@@ -79,7 +79,7 @@ export function FolderTree({
             <CreateButton parentId={folder.id} create={create} variant="row" />
             <button
               onClick={() => onDelete(folder.id)}
-              className="p-1 text-litera-mute hover:text-red-400 opacity-0 group-hover:opacity-100"
+              className="p-1 text-litera-mute hover:text-litera-error opacity-0 group-hover:opacity-100"
               title={t("folders.deleteFolder")}
             >
               <Trash2 className="h-3 w-3" />

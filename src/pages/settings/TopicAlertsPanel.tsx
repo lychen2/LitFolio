@@ -85,7 +85,7 @@ export function TopicAlertsPanel() {
             </button>
             <button onClick={() => setShowCreate(false)} className="litera-btn text-xs">{t("common.cancel")}</button>
           </div>
-          {createMut.error && <p className="text-xs text-red-400">{(createMut.error as Error).message}</p>}
+          {createMut.error && <p className="text-xs text-litera-error">{(createMut.error as Error).message}</p>}
         </div>
       )}
       {alerts.length === 0 && !showCreate ? (

@@ -20,20 +20,20 @@ export function TopicPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <nav className="px-6 pt-3 flex gap-1 border-b border-litera-line bg-litera-paper">
+      <nav className="flex gap-1 border-b border-litera-border bg-litera-paper/55 px-5 py-2" role="tablist" aria-label={t("nav.topic")}>
         <TabBtn
           active={tab === "survey"}
           onClick={() => setTab("survey")}
           icon={<BookOpenText className="h-4 w-4" />}
         >
-          📚 {t("topic.tab.survey")}
+          {t("topic.tab.survey")}
         </TabBtn>
         <TabBtn
           active={tab === "search"}
           onClick={() => setTab("search")}
           icon={<Search className="h-4 w-4" />}
         >
-          🔍 {t("topic.tab.search")}
+          {t("topic.tab.search")}
         </TabBtn>
       </nav>
       <div className="flex-1 min-h-0">
@@ -54,11 +54,13 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
+      role="tab"
+      aria-selected={active}
       className={
-        "px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 transition-colors " +
+        "flex min-h-8 items-center gap-2 rounded-[var(--litera-radius)] border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-litera-focus " +
         (active
-          ? "border-litera-accent text-litera-text"
-          : "border-transparent text-litera-mute hover:text-litera-text")
+          ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent"
+          : "border-transparent text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
       }
     >
       {icon}

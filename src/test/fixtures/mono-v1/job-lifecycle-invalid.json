@@ -1,0 +1,38 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "job.lifecycle.invalid.v1",
+  "kind": "job-lifecycle-invalid-cases",
+  "input": {
+    "patchFormat": "rfc6902-subset",
+    "cases": [
+      {
+        "caseId": "plugin-owner-generation-missing",
+        "baseCaseId": "plugin-job-cancelled",
+        "patch": [{ "op": "remove", "path": "/record/owner/generation" }]
+      },
+      {
+        "caseId": "event-sequence-duplicate",
+        "baseCaseId": "core-job-succeeds",
+        "patch": [{ "op": "replace", "path": "/events/2/seq", "value": 2 }]
+      },
+      {
+        "caseId": "terminal-record-event-mismatch",
+        "baseCaseId": "core-job-succeeds",
+        "patch": [{ "op": "replace", "path": "/record/terminal/outcome", "value": "failed" }]
+      },
+      {
+        "caseId": "event-field-unknown",
+        "baseCaseId": "core-job-succeeds",
+        "patch": [{ "op": "add", "path": "/events/0/unexpected", "value": true }]
+      }
+    ]
+  },
+  "expected": {
+    "cases": [
+      { "caseId": "plugin-owner-generation-missing", "valid": false, "errorCode": "job_owner_generation_required", "path": "record.owner.generation" },
+      { "caseId": "event-sequence-duplicate", "valid": false, "errorCode": "job_event_sequence_invalid", "path": "events[2].seq" },
+      { "caseId": "terminal-record-event-mismatch", "valid": false, "errorCode": "job_terminal_invalid", "path": "record.terminal.outcome" },
+      { "caseId": "event-field-unknown", "valid": false, "errorCode": "job_event_invalid", "path": "events[0].unexpected" }
+    ]
+  }
+}

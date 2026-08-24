@@ -38,6 +38,7 @@ function renderTaskAssignments(overrides: Partial<LlmConfig> = {}) {
     active: "proxy",
     output_language: "Chinese",
     pdf_markdown: { engine: "local", mineru_token: "" },
+    obsidian: { vault_dir: "", folder: "Papers" },
     task_assignments: {
       tldr: null,
       quick_read: null,

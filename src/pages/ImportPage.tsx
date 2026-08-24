@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Hash, Globe, Upload } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 import { TabButton } from "@/components/TabButton";
+import { PageHeader } from "@/components/PageHeader";
 import { ImportJobInbox } from "./import/ImportJobInbox";
 import { ImportSidebar } from "./import/ImportSidebar";
 import { extractIdentifier } from "@/lib/identifier";
@@ -28,17 +29,9 @@ export function ImportPage() {
 
   return (
     <section className="h-full flex flex-col">
-      <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-6">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight">
-            {t("import.title")}
-          </h1>
-          <p className="text-sm text-litera-mute">{t("import.subtitle")}</p>
-        </div>
-        <LibraryStats />
-      </header>
+      <PageHeader title={t("import.title")} subtitle={t("import.subtitle")} actions={<LibraryStats />} />
       <ImportSourceBanner source={source} />
-      <nav className="px-6 pt-4 flex gap-1">
+      <nav className="flex gap-1 border-b border-litera-border bg-litera-paper/35 px-5 py-2" aria-label={t("import.title")}>
         <TabButton
           active={tab === "arxiv_doi"}
           onClick={() => setTab("arxiv_doi")}
@@ -58,8 +51,8 @@ export function ImportPage() {
           label={t("import.tab.search")}
         />
       </nav>
-      <div className="flex-1 overflow-auto p-6">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex-1 overflow-auto p-5 max-[900px]:p-4">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_310px]">
           <div className="min-w-0 litera-fade-in" key={tab}>
             {tab === "arxiv_doi" && <ArxivDoiTab source={source} />}
             {tab === "pdf" && <PdfTab />}

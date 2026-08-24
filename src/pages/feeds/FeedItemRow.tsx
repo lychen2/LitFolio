@@ -112,7 +112,7 @@ export function FeedItemRow({
             )}
             {meta.title}
             {item.imported_paper_id && (
-              <span className="ml-2 text-[10px] text-emerald-400/90 align-middle">
+              <span className="ml-2 text-[10px] text-litera-success align-middle">
                 {t("feeds.imported")}
               </span>
             )}
@@ -143,7 +143,7 @@ export function FeedItemRow({
             </p>
           )}
           {translate.error && (
-            <div className="mt-1 text-[11px] text-red-400/90">
+            <div className="mt-1 text-[11px] text-litera-error">
               ✕{" "}
               {t("feeds.translateFailedPrefix", {
                 message: (translate.error as Error).message,
@@ -151,7 +151,7 @@ export function FeedItemRow({
             </div>
           )}
           {fetchMeta.error && (
-            <div className="mt-1 text-[11px] text-red-400/90">
+            <div className="mt-1 text-[11px] text-litera-error">
               ✕ {(fetchMeta.error as Error).message || "Failed to fetch metadata"}
             </div>
           )}
@@ -173,7 +173,7 @@ export function FeedItemRow({
         />
       </div>
       {candidate.error && (
-        <div className="ml-0 mt-1 text-[11px] text-red-400/90">
+        <div className="ml-0 mt-1 text-[11px] text-litera-error">
           ✕ {(candidate.error as Error).message}
         </div>
       )}

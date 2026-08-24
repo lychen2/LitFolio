@@ -65,7 +65,7 @@ export function ReadingQueue() {
                 )}
                 <div className="flex items-center gap-3 mt-1.5">
                   {entry.target_date != null && (
-                    <span className={`text-[10px] flex items-center gap-1 ${isOverdue ? "text-red-400" : "text-litera-mute"}`}>
+                    <span className={`text-[10px] flex items-center gap-1 ${isOverdue ? "text-litera-error" : "text-litera-mute"}`}>
                       <Calendar className="h-3 w-3" />
                       {new Date(entry.target_date * 1000).toLocaleDateString()}
                       {isOverdue && ` (${t("queue.overdue")})`}
@@ -76,7 +76,7 @@ export function ReadingQueue() {
               <button
                 onClick={() => removeMut.mutate(entry.paper_id)}
                 disabled={removeMut.isPending}
-                className="text-litera-mute hover:text-red-400 transition-colors shrink-0 mt-1"
+                className="text-litera-mute hover:text-litera-error transition-colors shrink-0 mt-1"
                 title={t("queue.remove")}
               >
                 <Trash2 className="h-3.5 w-3.5" />

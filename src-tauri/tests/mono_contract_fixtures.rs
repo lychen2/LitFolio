@@ -5,17 +5,15 @@ use litera_lib::mono_contracts::{
 use serde_json::Value;
 
 const DOMAIN_RESOURCE: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/domain-resource-roundtrip.json");
+    include_str!("../../src/test/fixtures/mono-v1/domain-resource-roundtrip.json");
 const MANIFEST_MINIMAL: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-minimal.json");
+    include_str!("../../src/test/fixtures/mono-v1/manifest-valid-minimal.json");
 const MANIFEST_INVALID: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-invalid-cases.json");
-const JOB_VALID: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-valid.json");
+    include_str!("../../src/test/fixtures/mono-v1/manifest-invalid-cases.json");
+const JOB_VALID: &str = include_str!("../../src/test/fixtures/mono-v1/job-lifecycle-valid.json");
 const JOB_INVALID: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-invalid.json");
-const AUTHORITY: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/plugin-authority.json");
+    include_str!("../../src/test/fixtures/mono-v1/job-lifecycle-invalid.json");
+const AUTHORITY: &str = include_str!("../../src/test/fixtures/mono-v1/plugin-authority.json");
 
 fn json(source: &str) -> Value {
     serde_json::from_str(source).expect("canonical fixture JSON")

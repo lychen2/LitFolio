@@ -104,7 +104,7 @@ export function LitReviewDialog({
           )}
 
           {genMut.error && (
-            <div className="p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-xs text-red-400">
+            <div className="p-3 bg-litera-error/10 border border-litera-error/20 rounded-lg text-xs text-litera-error">
               {genMut.error instanceof Error ? genMut.error.message : String(genMut.error)}
             </div>
           )}

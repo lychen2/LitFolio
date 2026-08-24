@@ -1,8 +1,66 @@
 /* PDF.js viewer pages render white (correct for PDFs) but the container background
    and gaps between pages need explicit colors so they don't blend into the dark
    app theme or stay transparent-white. */
+.reader-toolbar {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--litera-border);
+  background: var(--litera-bg);
+  padding: 0.45rem 0.75rem;
+}
+.reader-toolbar-compact {
+  min-height: 2.75rem;
+  padding: 0.3rem 0.5rem;
+}
+.reader-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.reader-panel-header {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--litera-border);
+  padding: 0.4rem 0.55rem;
+}
+.reader-resize-handle {
+  position: relative;
+  width: 0.5rem;
+  cursor: col-resize;
+  background: var(--litera-bg);
+  transition: background-color 150ms var(--ease-out-quart);
+}
+.reader-resize-handle:hover,
+.reader-resize-handle:focus-visible {
+  background: color-mix(in srgb, var(--litera-accent) 10%, var(--litera-bg));
+  outline: none;
+}
+.reader-resize-grip {
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--litera-border);
+  transition: background-color 150ms var(--ease-out-quart), width 150ms var(--ease-out-quart);
+}
+.reader-resize-handle:hover .reader-resize-grip,
+.reader-resize-handle:focus-visible .reader-resize-grip {
+  width: 2px;
+  background: var(--litera-accent);
+}
+.reader-workspace {
+  min-width: 0;
+}
 .pdfViewer {
-  background: var(--litera-panel);
+  background: var(--litera-surface-2);
 }
 .pdfViewer .page {
   background: white;
@@ -57,13 +115,13 @@
   animation: litera-fade-in 150ms var(--ease-out-quart) both;
 }
 .litera-pdf-find-hit {
-  background-color: rgba(245, 196, 24, 0.45);
+  background-color: color-mix(in srgb, var(--litera-warn) 45%, transparent);
   border-radius: 2px;
   padding: 0 1px;
 }
 .litera-pdf-find-active {
-  background-color: rgba(245, 196, 24, 0.85);
-  outline: 2px solid rgba(245, 196, 24, 0.95);
+  background-color: color-mix(in srgb, var(--litera-warn) 85%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--litera-warn) 95%, transparent);
 }
 .litera-pdf-note-draw-hint {
   position: absolute;
@@ -271,6 +329,43 @@
 .litera-pdf-dark .litera-pdf-note-box {
   background: color-mix(in srgb, var(--litera-ink) 86%, transparent);
 }
+.markdown-body {
+  max-width: 74ch;
+  margin-inline: auto;
+  padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem;
+  color: var(--litera-text);
+  font-family: Georgia, Cambria, "Times New Roman", ui-serif, serif;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  color: var(--litera-text);
+  line-height: 1.35;
+}
+.markdown-body h1 { font-size: 1.65rem; }
+.markdown-body h2 { font-size: 1.35rem; margin-top: 2rem; }
+.markdown-body h3 { font-size: 1.12rem; margin-top: 1.5rem; }
+.markdown-body a { color: var(--litera-accent2); }
+.markdown-body blockquote {
+  border-left: 3px solid var(--litera-accent);
+  color: var(--litera-mute);
+  padding-left: 1rem;
+}
+.markdown-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--litera-border);
+  padding: 0.4rem 0.6rem;
+}
+.markdown-body th { background: var(--litera-surface-2); }
 .markdown-body .katex {
   color: var(--litera-text);
   font-size: 1.05em;

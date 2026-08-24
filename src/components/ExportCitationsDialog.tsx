@@ -91,7 +91,7 @@ export function ExportCitationsDialog({
         </div>
 
         {exportMut.error && (
-          <p className="text-xs text-red-400 mb-3">
+          <p className="text-xs text-litera-error mb-3">
             {exportMut.error instanceof Error ? exportMut.error.message : String(exportMut.error)}
           </p>
         )}

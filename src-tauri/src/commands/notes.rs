@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use tauri::State;
 
-use crate::storage::{notes, NoteSection, NoteSectionRepo};
+use crate::storage::{
+    notes, NoteSaveResult, NoteSection, NoteSectionRepo, ProvenanceError, ProvenanceRepo,
+};
 use crate::AppState;
 
 #[tauri::command]
@@ -70,6 +72,9 @@ pub async fn note_save(
     state: State<'_, Arc<AppState>>,
     paper_id: String,
     content: String,
-) -> Result<(), String> {
-    notes::write(&state.paths, &paper_id, &content).map_err(|e| e.to_string())
+    expected_revision: Option<i64>,
+) -> Result<NoteSaveResult, ProvenanceError> {
+    ProvenanceRepo::new(&state.pool)
+        .note_save(&state.paths, &paper_id, &content, expected_revision)
+        .await
 }

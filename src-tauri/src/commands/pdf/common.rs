@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::ai::load_config;
+use crate::export::markdown::{configured_obsidian_dir, export_paper_md, MarkdownExportMode};
 use crate::ingest::PaperDraft;
 use crate::mineru::{MineruClient, PdfMarkdownEngine};
 use crate::storage::{LibraryPaths, Paper, PaperDocumentRepo, PaperRepo, Pool};
@@ -70,6 +71,43 @@ pub async fn generate_and_index_pdf_markdown(
     PaperDocumentRepo::new(pool)
         .upsert_markdown(paper_id, trimmed)
         .await?;
+
+    if let Ok(config) = load_config(paths) {
+        match configured_obsidian_dir(&config.obsidian.vault_dir, &config.obsidian.folder) {
+            Ok(Some(export_dir)) => {
+                let repo = PaperRepo::new(pool);
+                match repo.get(paper_id).await {
+                    Ok(Some(paper)) => {
+                        if let Err(error) = export_paper_md(
+                            pool,
+                            paths,
+                            &paper,
+                            &export_dir,
+                            MarkdownExportMode::Obsidian,
+                        )
+                        .await
+                        {
+                            tracing::warn!(
+                                paper_id,
+                                error = %error,
+                                "failed to sync converted PDF Markdown to Obsidian"
+                            );
+                        }
+                    }
+                    Ok(None) => {
+                        tracing::warn!(paper_id, "paper missing during Obsidian Markdown sync")
+                    }
+                    Err(error) => {
+                        tracing::warn!(paper_id, error = %error, "failed to load paper for Obsidian Markdown sync")
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(paper_id, error = %error, "invalid Obsidian configuration; skipping Markdown sync")
+            }
+        }
+    }
     Ok(())
 }
 

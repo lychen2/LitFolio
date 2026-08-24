@@ -114,7 +114,7 @@ function UpdateProgressPanel({
       </div>
       {detail && <div className="mt-2 font-mono text-[11px]">{detail}</div>}
       {stalled && (
-        <div className="mt-3 flex items-start gap-2 rounded-[var(--litera-radius)] border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-amber-100/85">
+        <div className="mt-3 flex items-start gap-2 rounded-[var(--litera-radius)] border border-litera-warn/20 bg-litera-warn/5 px-2.5 py-2 text-litera-warn">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{t("update.stalled")}</span>
         </div>
@@ -127,7 +127,7 @@ function OutcomeLine({ outcome }: { outcome: UpdateOutcome }) {
   const t = useT();
   if (outcome.status === "error") {
     return (
-      <div className="mt-3 text-xs text-red-400/90">
+      <div className="mt-3 text-xs text-litera-error">
         ✕ {t("update.failed", { message: outcome.message })}
       </div>
     );

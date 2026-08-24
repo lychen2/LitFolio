@@ -85,7 +85,7 @@ export function FeedItemDetailDrawer({
             />
           )}
           {translate.error && (
-            <div className="text-sm text-red-400/90">
+            <div className="text-sm text-litera-error">
               ✕{" "}
               {t("feeds.translateFailedPrefix", {
                 message: (translate.error as Error).message,
@@ -168,7 +168,7 @@ function DetailActions({
         </button>
       )}
       {item.imported_paper_id && (
-        <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+        <span className="inline-flex items-center gap-1 text-xs text-litera-success">
           {t("feeds.imported")}
         </span>
       )}

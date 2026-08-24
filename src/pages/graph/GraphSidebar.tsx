@@ -41,8 +41,8 @@ export function GraphSidebar({ node, graphData, onClose, onCenterConcept }: Prop
   const connectedNodes = graphData.nodes.filter((n) => connectedNodeIds.has(n.id));
 
   return (
-    <div className="w-[320px] shrink-0 border-l border-litera-line bg-litera-paper/60 overflow-y-auto">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-litera-line">
+    <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-litera-border bg-litera-paper/55 max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:right-0 max-[900px]:z-20 max-[900px]:shadow-2xl">
+      <div className="flex items-center justify-between border-b border-litera-border px-3 py-2.5">
         <h3 className="text-sm font-medium text-litera-text truncate flex-1">{node.label}</h3>
         <button onClick={onClose} className="text-litera-mute hover:text-litera-text ml-2">
           <X className="h-4 w-4" />
@@ -101,7 +101,7 @@ export function GraphSidebar({ node, graphData, onClose, onCenterConcept }: Prop
                           if (!window.confirm(t("graph.confirmDeleteLink"))) return;
                           deleteLink.mutate(paperLinkId);
                         }}
-                        className="text-litera-mute hover:text-red-400 disabled:opacity-50"
+                        className="text-litera-mute hover:text-litera-error disabled:opacity-50"
                         title={t("graph.deleteLink")}
                         aria-label={t("graph.deleteLink")}
                         disabled={deleteLink.isPending}
@@ -116,7 +116,7 @@ export function GraphSidebar({ node, graphData, onClose, onCenterConcept }: Prop
           </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
 

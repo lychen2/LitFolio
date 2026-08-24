@@ -7,6 +7,7 @@ import { api, type TopicReport } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { Column } from "./TopicSearchResults";
 import { loadCurrentTopicReport, saveCurrentTopicReport } from "./topicSearchStorage";
+import { PageHeader } from "@/components/PageHeader";
 
 export function TopicSearchView() {
   const t = useT();
@@ -45,20 +46,16 @@ export function TopicSearchView() {
 
   return (
     <section className="h-full flex flex-col">
-      <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-6">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-            <Compass className="h-5 w-5 text-litera-accent" />
-            {t("topic.search.heading")}
-          </h1>
-          <p className="text-sm text-litera-mute">{t("topic.search.subtitle")}</p>
-        </div>
-      </header>
+      <PageHeader
+        icon={<Compass className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("topic.search.heading")}
+        subtitle={t("topic.search.subtitle")}
+      />
 
-      <div className="px-6 py-5 border-b border-litera-line">
+      <div className="border-b border-litera-border px-5 py-5 max-[900px]:px-4">
         <div className="litera-panel p-5 max-w-4xl">
           <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.search.label")}</label>
-          <div className="flex gap-2 mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <input
               value={query}
               onChange={(e) => { setQuery(e.target.value); setExpandedTerms(null); }}
@@ -110,7 +107,7 @@ export function TopicSearchView() {
             </div>
           )}
           {expand.error && (
-            <div className="mt-2 text-xs text-red-400/90">
+            <div className="mt-2 text-xs text-litera-error">
               ✕ {t("topic.search.expandFailed", { message: (expand.error as Error).message })}
             </div>
           )}
@@ -129,7 +126,7 @@ export function TopicSearchView() {
             </div>
           )}
           {discover.error && (
-            <div className="mt-3 text-sm text-red-400/90">✕ {(discover.error as Error).message}</div>
+            <div className="mt-3 text-sm text-litera-error">✕ {(discover.error as Error).message}</div>
           )}
         </div>
       </div>

@@ -34,7 +34,7 @@ export function SurveyPaperRow({ paper, rank, onToggleMustRead }: Props) {
         <div className="shrink-0 w-12 text-right">
           <div className="font-mono text-xs tabular-nums text-litera-mute">#{rank}</div>
           {paper.must_read && (
-            <Star className="h-4 w-4 mt-1 text-amber-400 fill-amber-400 inline" aria-label={t("topic.survey.mustReadAria")} />
+            <Star className="h-4 w-4 mt-1 text-litera-warn fill-litera-warn inline" aria-label={t("topic.survey.mustReadAria")} />
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -93,7 +93,7 @@ export function SurveyPaperRow({ paper, rank, onToggleMustRead }: Props) {
             {candidate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
             {t("candidate.addShort")}
           </button>
-          {candidate.error && <div className="mt-1 text-[11px] text-red-400/90">{(candidate.error as Error).message}</div>}
+          {candidate.error && <div className="mt-1 text-[11px] text-litera-error">{(candidate.error as Error).message}</div>}
         </div>
       </div>
     </li>

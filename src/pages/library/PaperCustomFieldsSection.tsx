@@ -69,7 +69,7 @@ export function CustomFieldsSection({ paperId }: { paperId: string }) {
               {existing && !isEditing && (
                 <button
                   onClick={() => deleteMut.mutate(def.id)}
-                  className="text-litera-mute hover:text-red-400 text-[10px]"
+                  className="text-litera-mute hover:text-litera-error text-[10px]"
                 >
                   ✕
                 </button>

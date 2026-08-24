@@ -67,7 +67,7 @@ export function DraftDetailDrawer({
             翻译标题和摘要
           </button>
           {saved || alreadyImported ? (
-            <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+            <span className="inline-flex items-center gap-1 text-xs text-litera-success">
               <CheckCircle2 className="h-3.5 w-3.5" /> 已入库
             </span>
           ) : (
@@ -136,5 +136,5 @@ function Section({ title, body, accent }: { title: string; body: string; accent?
 
 function ErrorLine({ label, error }: { label: string; error: unknown }) {
   const message = error instanceof Error ? error.message : String(error);
-  return <div className="text-sm text-red-400/90">✕ {label}: {message}</div>;
+  return <div className="text-sm text-litera-error">✕ {label}: {message}</div>;
 }

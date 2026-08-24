@@ -200,10 +200,10 @@ function SectionCard({
         <span className="text-sm">{icon}</span>
         <span className="text-sm font-medium text-litera-text flex-1">{label}</span>
         {sourceBadge}
-        {dirty && <span className="text-[10px] text-amber-400">●</span>}
+        {dirty && <span className="text-[10px] text-litera-warn">●</span>}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="text-litera-mute hover:text-red-400 transition-colors"
+          className="text-litera-mute hover:text-litera-error transition-colors"
         >
           <Trash2 className="h-3 w-3" />
         </button>

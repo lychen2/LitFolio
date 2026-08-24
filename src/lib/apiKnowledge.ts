@@ -127,6 +127,7 @@ export const knowledgeApi = {
     }),
   exportMarkdownPaper: (paperId: string) =>
     invoke<string>("export_markdown_paper", { paperId }),
+  obsidianExportAll: () => invoke<ExportSummary>("obsidian_export_all"),
   searchUnified: (query: string, limit?: number) =>
     invoke<UnifiedSearchResult[]>("search_unified", {
       query,

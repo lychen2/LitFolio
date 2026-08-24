@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { parseAskCapabilityState, parseAskSession, parseAskSessionMaybe, parseHighlight, parseLlmConfig } from "./apiSchema";
+import { parseNoteSaveResult, type NoteSaveResult } from "./apiSchemaProvenance";
 import { parseArray } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
@@ -114,8 +115,12 @@ export const aiReaderApi = {
     invokeParsed("highlight_explain", { highlightId: id }, parseHighlight),
   highlightDelete: (id: string) => invoke<void>("highlight_delete", { id }),
   noteGet: (paperId: string) => invoke<string>("note_get", { paperId }),
-  noteSave: (paperId: string, content: string) =>
-    invoke<void>("note_save", { paperId, content }),
+  noteSave: (paperId: string, content: string, expectedRevision?: number | null): Promise<NoteSaveResult> =>
+    invokeParsed(
+      "note_save",
+      { paperId, content, expectedRevision: expectedRevision ?? null },
+      parseNoteSaveResult,
+    ),
   readerTranslateSelection: (paperId: string, selection: string, targetLang?: string) =>
     invoke<ReaderTranslateResult>("reader_translate_selection", {
       paperId,

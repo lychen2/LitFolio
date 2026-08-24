@@ -1,0 +1,11 @@
+{
+  "fixtureVersion": "target-mono-v1",
+  "fixtureId": "plugin.authority.v1",
+  "kind": "plugin-authority",
+  "input": {
+    "cases": [
+      { "caseId": "manifest-request-is-not-authority", "callerPluginId": "fixture-reader-tools" },
+      { "caseId": "caller-id-is-not-authority", "callerPluginId": "fixture-reader-tools" }
+    ]
+  }
+}

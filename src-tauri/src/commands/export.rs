@@ -7,7 +7,9 @@ use tauri::State;
 use crate::ai::{load_config, save_config};
 use crate::bibtex::generate_bibtex;
 use crate::export::citations::{export_bibtex, export_ris, format_citations, CitationStyle};
-use crate::export::markdown::{export_all_md, export_paper_md, ExportSummary};
+use crate::export::markdown::{
+    configured_obsidian_dir, export_all_md, export_paper_md, ExportSummary, MarkdownExportMode,
+};
 use crate::storage::PaperRepo;
 use crate::AppState;
 
@@ -56,6 +58,24 @@ pub async fn export_markdown_all(
         &state.paths,
         &export_path,
         incremental.unwrap_or(true),
+        MarkdownExportMode::Standard,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn obsidian_export_all(state: State<'_, Arc<AppState>>) -> Result<ExportSummary, String> {
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let export_path = configured_obsidian_dir(&cfg.obsidian.vault_dir, &cfg.obsidian.folder)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Obsidian vault is not configured".to_string())?;
+    export_all_md(
+        &state.pool,
+        &state.paths,
+        &export_path,
+        false,
+        MarkdownExportMode::Obsidian,
     )
     .await
     .map_err(|e| e.to_string())
@@ -77,9 +97,15 @@ pub async fn export_markdown_paper(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("paper {paper_id} not found"))?;
-    let path = export_paper_md(&state.pool, &state.paths, &paper, &export_path)
-        .await
-        .map_err(|e| e.to_string())?;
+    let path = export_paper_md(
+        &state.pool,
+        &state.paths,
+        &paper,
+        &export_path,
+        MarkdownExportMode::Standard,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     Ok(path.display().to_string())
 }
 

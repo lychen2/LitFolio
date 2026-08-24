@@ -28,6 +28,7 @@ mod papers;
 mod paths;
 mod legacy_reader_notes;
 mod pdf_notes;
+mod provenance;
 mod projects;
 pub mod queue;
 pub mod retrieval;
@@ -53,6 +54,12 @@ pub use jobs::{JobDraft, JobProgress, JobRecord, JobRepo};
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
 pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
+pub use provenance::{
+    BackfillPaperReport, BackfillReport, BacklinkRow, CandidateSegment, DocumentCandidate, DocumentRevision,
+    NoteRevision, NoteSaveResult, ProvenanceError, ProvenanceExport, ProvenanceRepo,
+    RemapReport, SourceLink, SourceSegment, PROVENANCE_SCHEMA_VERSION,
+    PROVENANCE_TARGET_VERSION,
+};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
 pub use paper_supplements::{NewPaperSupplement, PaperSupplement, PaperSupplementRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};

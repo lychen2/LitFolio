@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -25,6 +25,13 @@ export function LibraryPage() {
   const [folderId, setFolderId] = useState<number | null>(null);
   const [smartCollectionId, setSmartCollectionId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<LibraryViewMode>("papers");
+  const [folderOpen, setFolderOpen] = useState(false);
+  useEffect(() => {
+    if (!folderOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setFolderOpen(false);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [folderOpen]);
   const [filters, setFilters] = useState<LibraryFilterState>({ year: "", readStatus: "", tagId: "" });
   const trimmed = search.trim();
   const { t } = useI18n();
@@ -103,6 +110,7 @@ export function LibraryPage() {
         tagOptions={tagOptions}
         onFiltersChange={setFilters}
         onToggleViewMode={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
+        onToggleFolders={() => setFolderOpen((open) => !open)}
         onReviewCollection={() => setShowLitReview(true)}
       />
       {viewMode === "queue" ? (
@@ -110,14 +118,17 @@ export function LibraryPage() {
           <ReadingQueue />
         </div>
       ) : (
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {folderOpen && <button type="button" aria-label={t("common.close")} onClick={() => setFolderOpen(false)} className="absolute inset-0 z-20 hidden bg-litera-ink/45 max-[900px]:block" />}
         <FolderSidebar
           selectedId={folderId}
-          onSelect={(id) => { setFolderId(id); setSmartCollectionId(null); }}
+          compactOpen={folderOpen}
+          onSelect={(id) => { setFolderId(id); setSmartCollectionId(null); setFolderOpen(false); }}
           selectedSmartId={smartCollectionId}
-          onSelectSmart={setSmartCollectionId}
+          onSelectSmart={(id) => { setSmartCollectionId(id); setFolderOpen(false); }}
+          onClose={() => setFolderOpen(false)}
         />
-        <div className="flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {selected.length > 0 && (
             <SelectionToolbar
               count={selected.length}
@@ -132,24 +143,26 @@ export function LibraryPage() {
             />
           )}
           {compare.error && (
-            <div className="border-b border-red-400/20 bg-red-400/10 px-6 py-2 text-xs text-red-300">
+            <div className="shrink-0 border-b border-litera-error/20 bg-litera-error/10 px-5 py-2 text-xs text-litera-error">
               {(compare.error as Error).message}
             </div>
           )}
-          {isLoading ? (
-            <div className="overflow-auto h-full"><LibrarySkeleton /></div>
-          ) : !filteredPapers || filteredPapers.length === 0 ? (
-            trimmed ? <NoResults q={trimmed} /> : <LibraryEmptyState />
-          ) : (
-            <VirtualPaperList
-              papers={filteredPapers}
-              tagsByPaper={tagsByPaper}
-              selectedIds={selectedIds}
-              onToggleSelection={toggleSelection}
-              onInspect={setPreview}
-              onQuickRead={setReading}
-            />
-          )}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {isLoading ? (
+              <div className="h-full overflow-auto"><LibrarySkeleton /></div>
+            ) : !filteredPapers || filteredPapers.length === 0 ? (
+              trimmed ? <NoResults q={trimmed} /> : <LibraryEmptyState />
+            ) : (
+              <VirtualPaperList
+                papers={filteredPapers}
+                tagsByPaper={tagsByPaper}
+                selectedIds={selectedIds}
+                onToggleSelection={toggleSelection}
+                onInspect={setPreview}
+                onQuickRead={setReading}
+              />
+            )}
+          </div>
         </div>
       </div>
       )}
@@ -187,7 +200,7 @@ function SelectionToolbar({
 }) {
   const { t } = useI18n();
   return (
-    <div className="border-b border-litera-line bg-litera-paper px-6 py-2.5 flex items-center gap-2 text-xs">
+    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-litera-border bg-litera-paper/95 px-4 py-2 text-xs shadow-sm">
       <span className="mr-auto text-litera-mute">{t("library.selectedCount", { count: String(count) })}</span>
       <button onClick={onQueue} disabled={queueing} className="litera-btn text-xs disabled:opacity-50">
         {queueing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListPlus className="h-3.5 w-3.5" />}
@@ -209,7 +222,7 @@ function SelectionToolbar({
         {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompareArrows className="h-3.5 w-3.5" />}
         {t("compare.generate")}
       </button>
-      <button onClick={onClear} className="p-1.5 rounded text-litera-mute hover:text-litera-text hover:bg-litera-panel">
+      <button onClick={onClear} className="litera-icon-btn h-7 w-7" title={t("common.cancel")} aria-label={t("common.cancel")}>
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

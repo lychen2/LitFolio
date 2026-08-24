@@ -649,12 +649,9 @@ pub fn validate_job_stream(
 mod tests {
     use super::*;
 
-    const VALID: &str = include_str!(
-        "../../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-valid.json"
-    );
-    const INVALID: &str = include_str!(
-        "../../../.trellis/spec/cross-layer/fixtures/mono-v1/job-lifecycle-invalid.json"
-    );
+    const VALID: &str = include_str!("../../../src/test/fixtures/mono-v1/job-lifecycle-valid.json");
+    const INVALID: &str =
+        include_str!("../../../src/test/fixtures/mono-v1/job-lifecycle-invalid.json");
 
     fn apply_patch(target: &mut Value, patch: &Value) {
         let operation = patch["op"].as_str().unwrap();

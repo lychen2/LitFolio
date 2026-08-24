@@ -57,7 +57,7 @@ export function ProfilesTab({
         </ul>
       )}
       {activeMissing && (
-        <div className="mt-3 text-sm text-red-400/90">
+        <div className="mt-3 text-sm text-litera-error">
           {t("settings.activeMissing", { profile: draft.active })}
         </div>
       )}

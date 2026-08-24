@@ -68,7 +68,7 @@ pub async fn fetch_arxiv_category(
     Ok(parse_atom_entries(&body))
 }
 
-fn normalize_arxiv(s: &str) -> Result<String> {
+pub(super) fn normalize_arxiv(s: &str) -> Result<String> {
     let t = s
         .trim()
         .trim_start_matches("arXiv:")

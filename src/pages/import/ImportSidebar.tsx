@@ -209,7 +209,7 @@ function RecentPaperCard({
         <div
           className={
             "mt-2 text-[11px] " +
-            (message.kind === "ok" ? "text-litera-accent" : "text-red-400/90")
+            (message.kind === "ok" ? "text-litera-accent" : "text-litera-error")
           }
         >
           {message.text}

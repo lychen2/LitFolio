@@ -48,7 +48,7 @@ export function SelectionTranslatePane({
   }
   if (translate.error) {
     return (
-      <div className="p-4 text-sm text-red-400/90">
+      <div className="p-4 text-sm text-litera-error">
         <div className="break-all">✕ {t("reader.translateFailed")}: {errorMessage(translate.error)}</div>
         <button
           onClick={() => translate.mutate(selectionText)}

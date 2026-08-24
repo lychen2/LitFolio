@@ -10,9 +10,9 @@ export function MustReadShortlist({ papers }: Props) {
   const t = useT();
   if (papers.length === 0) return null;
   return (
-    <div className="litera-panel mb-4 px-4 py-3 bg-amber-400/5">
-      <h3 className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-2">
-        <Star className="h-4 w-4 fill-amber-400" />
+    <div className="litera-panel mb-4 px-4 py-3 bg-litera-warn/5">
+      <h3 className="flex items-center gap-2 text-sm font-medium text-litera-warn mb-2">
+        <Star className="h-4 w-4 fill-litera-warn" />
         {t("topic.survey.mustRead", { count: papers.length })}
       </h3>
       <ol className="flex flex-wrap gap-2">
@@ -21,9 +21,9 @@ export function MustReadShortlist({ papers }: Props) {
             <button
               onClick={() => scrollToRow(p.id)}
               title={p.title}
-              className="px-2 py-1 rounded border border-amber-400/30 bg-amber-400/5 text-xs text-litera-text hover:bg-amber-400/15 transition-colors text-left max-w-[280px] truncate inline-flex items-center"
+              className="px-2 py-1 rounded border border-litera-warn/30 bg-litera-warn/5 text-xs text-litera-text hover:bg-litera-warn/15 transition-colors text-left max-w-[280px] truncate inline-flex items-center"
             >
-              <span className="font-mono text-amber-400/80 mr-1.5">#{i + 1}</span>
+              <span className="font-mono text-litera-warn mr-1.5">#{i + 1}</span>
               <span className="truncate">{p.title}</span>
             </button>
           </li>
@@ -40,6 +40,6 @@ function scrollToRow(id: string) {
   const el = document.getElementById(`paper-${id}`);
   if (!el) return;
   el.scrollIntoView({ behavior: "smooth", block: "center" });
-  el.classList.add("ring-2", "ring-amber-400");
-  window.setTimeout(() => el.classList.remove("ring-2", "ring-amber-400"), 1500);
+  el.classList.add("ring-2", "ring-litera-warn");
+  window.setTimeout(() => el.classList.remove("ring-2", "ring-litera-warn"), 1500);
 }

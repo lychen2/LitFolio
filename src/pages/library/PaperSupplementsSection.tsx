@@ -150,7 +150,7 @@ function SupplementItem({ supplement, onDelete }: { supplement: PaperSupplement;
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
             {t("common.open")}
           </button>
-          <button onClick={onDelete} className="litera-btn text-[11px] px-2 py-1 text-red-300">
+          <button onClick={onDelete} className="litera-btn text-[11px] px-2 py-1 text-litera-error">
             <Trash2 className="h-3 w-3" />
           </button>
         </div>
@@ -181,5 +181,5 @@ function SupplementItem({ supplement, onDelete }: { supplement: PaperSupplement;
 }
 
 function ErrorLine({ message }: { message: string }) {
-  return <div className="break-all text-[11px] text-red-400/90">✕ {message}</div>;
+  return <div className="break-all text-[11px] text-litera-error">✕ {message}</div>;
 }

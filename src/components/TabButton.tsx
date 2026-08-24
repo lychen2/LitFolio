@@ -16,10 +16,10 @@ export function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors",
+        "flex min-h-8 items-center gap-1.5 rounded-[var(--litera-radius)] border px-2.5 py-1 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-litera-focus",
         active
-          ? "border-litera-accent/40 bg-litera-accent/10 text-litera-accent"
-          : "border-litera-line text-litera-text/80 hover:bg-litera-panel",
+          ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent"
+          : "border-litera-border bg-litera-surface text-litera-mute hover:border-litera-border-strong hover:bg-litera-surface2 hover:text-litera-text",
       )}
     >
       {icon} {label}

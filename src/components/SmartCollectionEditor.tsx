@@ -55,7 +55,7 @@ export function SmartCollectionEditor({
             <RuleEditor rule={rules} onChange={setRules} depth={0} />
           </div>
           {ruleErrors.length > 0 && (
-            <p className="mt-2 rounded-md border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300" role="alert">
+            <p className="mt-2 rounded-md border border-litera-error/30 bg-litera-error/10 px-3 py-2 text-xs text-litera-error" role="alert">
               {t(ruleErrors.includes("empty_group") ? "smartCollections.errorEmptyGroup" : "smartCollections.errorEmptyValue")}
             </p>
           )}
@@ -266,7 +266,7 @@ function ConditionRow({
       </select>
       <div className="flex-1">{valueInput()}</div>
       {canRemove && (
-        <button onClick={onRemove} className="text-litera-mute hover:text-red-400 shrink-0">
+        <button onClick={onRemove} className="text-litera-mute hover:text-litera-error shrink-0">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}

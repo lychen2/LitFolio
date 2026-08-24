@@ -145,10 +145,81 @@ export const mockJobRecord: JobRecord = {
   finished_at: null,
 };
 
+const mockProvenanceRef = {
+  contractVersion: "target-mono-v1",
+  resource: { contractVersion: "target-mono-v1", domain: "document-revision", id: "rev-paper-1-1" },
+  revision: { kind: "number", value: "1" },
+};
+const mockProvenanceSegment = {
+  segmentId: "rev-paper-1-1:1",
+  resourceRef: {
+    ...mockProvenanceRef,
+    resource: { ...mockProvenanceRef.resource, domain: "source-segment", id: "rev-paper-1-1:1" },
+  },
+  revisionId: "rev-paper-1-1",
+  paperId: "paper-1",
+  segOrder: 1,
+  kind: "paragraph",
+  markdown: "A source paragraph.",
+  page: 1,
+  rect: null,
+  quoteHash: "quote-hash",
+};
+const mockDocumentCandidate = {
+  sourceHash: "source-hash",
+  sourceKind: "markdown",
+  sourceUri: "paper://paper-1",
+  parserOwner: "core-test",
+  markdown: "# Paper",
+  segments: [{ kind: "paragraph", markdown: "A source paragraph.", page: 1, rect: null }],
+  assets: [],
+  warnings: [],
+};
+const mockDocumentRevision = {
+  revisionId: "rev-paper-1-1",
+  resourceRef: mockProvenanceRef,
+  paperId: "paper-1",
+  revision: 1,
+  sourceHash: "source-hash",
+  sourceKind: "markdown",
+  sourceUri: "paper://paper-1",
+  parserOwner: "core-test",
+  markdown: "# Paper",
+  segments: [mockProvenanceSegment],
+  acceptedAt: now,
+  active: true,
+};
+const mockSourceLink = {
+  linkId: "link-1",
+  paperId: "paper-1",
+  anchorDomain: "note",
+  anchorId: "note-paper-1",
+  segmentId: "rev-paper-1-1:1",
+  revisionId: "rev-paper-1-1",
+  snapshot: { page: 1, geometry: null, type: "paragraph", text: "A source paragraph.", markdown: "A source paragraph.", asset: null },
+  quoteHash: "quote-hash",
+  resolution: "current",
+  resolvedRevisionId: "rev-paper-1-1",
+  resolvedSegmentId: "rev-paper-1-1:1",
+  createdAt: now,
+  updatedAt: now,
+};
 type MockResolver = () => unknown;
-
 const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
+  ["document_candidate_stage", () => mockDocumentCandidate],
+  ["document_accept", () => mockDocumentRevision],
+  ["document_revisions_list", () => [mockDocumentRevision]],
+  ["source_segment_list", () => [mockProvenanceSegment]],
+  ["source_link_create", () => mockSourceLink],
+  ["source_link_resolve", () => ({ status: "current", link: mockSourceLink })],
+  ["source_link_list_for_anchor", () => [mockSourceLink]],
+  ["backlinks_list", () => []],
+  ["note_revisions_list", () => []],
+  ["note_save", () => ({ revision: 1, contentHash: "content-hash" })],
+  ["provenance_backfill", () => ({ schemaVersion: 1, papers: [], totalPapers: 0, createdRevisions: 0 })],
+  ["provenance_remap", () => ({ schemaVersion: 1, paperIds: [], linksRecomputed: 0, changed: 0 })],
+  ["provenance_export", () => ({ schemaVersion: 1, targetVersion: 1, papers: [] })],
   ["paper_get", () => mockPaper],
   ["paper_quick_read", () => mockQuickReadResult],
   ["paper_find_by_doi", () => mockPaper],

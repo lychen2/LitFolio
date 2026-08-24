@@ -154,14 +154,14 @@ export function GlobalOnboarding() {
                 key={step.id}
                 className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                   completed
-                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    ? "border-litera-success/30 bg-litera-success/5"
                     : "border-litera-border bg-litera-surface"
                 }`}
               >
                 <div
                   className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full transition-colors ${
                     completed
-                      ? "bg-emerald-500/20 text-emerald-400"
+                      ? "bg-litera-success/20 text-litera-success"
                       : "bg-litera-accent/10 text-litera-accent"
                   }`}
                 >
@@ -174,7 +174,7 @@ export function GlobalOnboarding() {
                       {step.title}
                     </h3>
                     {completed && (
-                      <span className="text-xs text-emerald-400">
+                      <span className="text-xs text-litera-success">
                         {t("onboarding.completed")}
                       </span>
                     )}

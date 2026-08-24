@@ -1,5 +1,22 @@
 export const CONTRACT_VERSION = "target-mono-v1" as const;
 
+export type {
+  PdfAnnotationRect,
+  PdfHighlight,
+  PdfTextNote,
+  PdfTextNoteCreateInput,
+  PdfTextNotePatch,
+  PdfTextNoteSearchResult,
+  ReaderAnnotation,
+} from "./readerAnnotations";
+export {
+  isPdfTextNote,
+  isValidPdfAnnotationRect,
+  isValidPdfTextNoteStyle,
+  PDF_TEXT_NOTE_MAX_COORDINATE,
+  PDF_TEXT_NOTE_STYLE,
+} from "./readerAnnotations";
+
 export type DomainNameV1 = "paper" | "annotation" | "document-revision" | "source-segment" | "note" | "job";
 export interface DomainRefV1 { contractVersion: typeof CONTRACT_VERSION; domain: DomainNameV1; id: string; }
 export interface ResourceRefV1 { contractVersion: typeof CONTRACT_VERSION; resource: DomainRefV1; revision: null | { kind: "number" | "sha256"; value: string }; }

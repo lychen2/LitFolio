@@ -15,12 +15,18 @@ export interface PdfMarkdownConfig {
   mineru_token: string;
 }
 
+export interface ObsidianConfig {
+  vault_dir: string;
+  folder: string;
+}
+
 export interface LlmConfig {
   profiles: LlmProfile[];
   active: string | null;
   task_assignments: TaskAssignments;
   output_language: string;
   pdf_markdown: PdfMarkdownConfig;
+  obsidian: ObsidianConfig;
 }
 
 export interface TaskBinding {

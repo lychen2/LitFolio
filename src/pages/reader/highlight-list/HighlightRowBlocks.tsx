@@ -52,10 +52,10 @@ export function ExplanationBlock({
   return (
     <div className="mt-2 rounded-md border border-litera-line/80 bg-litera-panel/35 px-2 py-1.5">
       <div className="flex items-center gap-1.5">
-        <Lightbulb className="h-3 w-3 shrink-0 text-amber-300/90" />
+        <Lightbulb className="h-3 w-3 shrink-0 text-litera-warn" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1 text-[10px] uppercase tracking-wider text-litera-mute">
-            <span className="text-amber-300/90">
+            <span className="text-litera-warn">
               {t("reader.explainLabel")}
             </span>
             {model ? (
@@ -162,7 +162,7 @@ function NoteSaveStatus({
   const t = useT();
   if (error) {
     return (
-      <span className="text-[11px] text-red-400/90">
+      <span className="text-[11px] text-litera-error">
         ✕ {t("reader.saveFailed")}: {error.message}
       </span>
     );
@@ -176,21 +176,21 @@ function NoteSaveStatus({
   }
   if (status === "dirty") {
     return (
-      <span className="text-[11px] text-amber-400/80">
+      <span className="text-[11px] text-litera-warn">
         ● {t("reader.unsaved")}
       </span>
     );
   }
   return (
     <span className="text-[11px] text-litera-mute flex items-center gap-1">
-      <Check className="h-3 w-3 text-emerald-400" /> {t("reader.saved")}
+      <Check className="h-3 w-3 text-litera-success" /> {t("reader.saved")}
     </span>
   );
 }
 
 export function ErrorText({ message }: { message: string }) {
   return (
-    <div className="mt-2 text-[11px] text-red-400/90 break-all">
+    <div className="mt-2 text-[11px] text-litera-error break-all">
       ✕ {message || "Unknown error"}
     </div>
   );

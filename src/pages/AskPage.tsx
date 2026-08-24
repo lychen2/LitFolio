@@ -9,6 +9,7 @@ import { api, type AskCapabilityKind, type AskCapabilityState, type AskLibraryRe
 import { type TKey } from "@/i18n/dict";
 import { useT } from "@/i18n/I18nProvider";
 import { MarkdownView } from "@/components/MarkdownView";
+import { PageHeader } from "@/components/PageHeader";
 import { WorkflowCard } from "./ask/WorkflowCard";
 import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
 
@@ -181,7 +182,7 @@ export function AskPage() {
   });
   const addEvidence = useMutation({
     mutationFn: (params: { question: string; result: AskLibraryResult; source?: AskSource }) => {
-      if (evidenceProjectId === "") throw new Error("Project is required");
+      if (evidenceProjectId === "") throw new Error(t("common.projectRequired"));
       const source = params.source ?? params.result.sources[0] ?? null;
       return api.evidenceAdd(evidenceProjectId, {
         source_type: "ask",
@@ -225,40 +226,29 @@ export function AskPage() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-5">
-        <div className="max-w-6xl flex items-center justify-between gap-4">
-          <div>
-            <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-              <MessagesSquare className="h-5 w-5 text-litera-accent" />
-              {t("ask.title")}
-            </h1>
-            <p className="mt-1 text-sm text-litera-mute">{t("ask.subtitle")}</p>
-            {scopedProject && (
-              <div className="mt-2 inline-flex rounded border border-litera-line px-2 py-1 text-xs text-litera-mute">
-                {t("ask.projectScope", { name: scopedProject.name })}
-              </div>
-            )}
-            {capability.data && (
-              <AskCapabilityBadge capability={capability.data} />
-            )}
-          </div>
-          {hasConversation && (
-            <button
-              onClick={clearConversation}
-              className="text-xs text-litera-mute hover:text-litera-text px-3 py-1.5 rounded-md border border-litera-line hover:bg-litera-panel"
-            >
-              {t("ask.clearConversation")}
-            </button>
-          )}
+      <PageHeader
+        icon={<MessagesSquare className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("ask.title")}
+        subtitle={t("ask.subtitle")}
+        actions={hasConversation ? (
+          <button onClick={clearConversation} className="litera-btn text-xs" title={t("ask.clearConversation")}>
+            {t("ask.clearConversation")}
+          </button>
+        ) : undefined}
+      />
+      {(scopedProject || capability.data) && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-litera-border bg-litera-surface/35 px-5 py-2 text-xs">
+          {scopedProject && <span className="litera-status">{t("ask.projectScope", { name: scopedProject.name })}</span>}
+          {capability.data && <AskCapabilityBadge capability={capability.data} />}
         </div>
-      </header>
+      )}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-auto px-6 py-5">
+      <div className="flex-1 overflow-auto px-5 py-5 max-[900px]:px-3">
         {!hasConversation ? (
           <EmptyState />
         ) : (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="mx-auto max-w-4xl space-y-7">
             {conversation.map((turn, index) => (
               <div key={index} className="flex gap-3">
                 <div className="shrink-0 mt-1">
@@ -267,8 +257,8 @@ export function AskPage() {
                       <User className="h-4 w-4 text-litera-accent" />
                     </div>
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-emerald-500" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-litera-info/12">
+                      <Bot className="h-4 w-4 text-litera-info" />
                     </div>
                   )}
                 </div>
@@ -276,7 +266,7 @@ export function AskPage() {
                   <div className="text-xs font-medium text-litera-mute mb-1">
                     {turn.role === "user" ? t("ask.you") : t("ask.assistant")}
                   </div>
-                  <div className="litera-panel p-4">
+                  <div className={turn.role === "user" ? "border-l-2 border-litera-accent/60 pl-4" : "border-l-2 border-litera-border pl-4"}>
                     {turn.role === "user" ? (
                       <div className="whitespace-pre-wrap text-sm leading-relaxed text-litera-text">
                         {turn.content}
@@ -316,7 +306,7 @@ export function AskPage() {
                           }}
                         />
                         {addEvidence.error && (
-                          <div className="mt-2 text-xs text-red-400/90">{(addEvidence.error as Error).message}</div>
+                          <div className="mt-2 text-xs text-litera-error">{(addEvidence.error as Error).message}</div>
                         )}
                         {turn.result.sources.length > 0 && (
                           <div className="mt-3">
@@ -340,13 +330,13 @@ export function AskPage() {
             {ask.isPending && (
               <div className="flex gap-3">
                 <div className="shrink-0 mt-1">
-                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-emerald-500" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-litera-info/12">
+                    <Bot className="h-4 w-4 text-litera-info" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-litera-mute mb-1">{t("ask.assistant")}</div>
-                  <div className="litera-panel p-4">
+                  <div className="border-l-2 border-litera-border pl-4">
                     <div className="flex items-center gap-2 text-sm text-litera-mute">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       {t("ask.searching")}
@@ -362,8 +352,8 @@ export function AskPage() {
       </div>
 
       {/* Input area */}
-      <div className="border-t border-litera-line px-6 py-4">
-        <div className="max-w-4xl mx-auto">
+      <div className="shrink-0 border-t border-litera-border bg-litera-paper/80 px-5 py-4 max-[900px]:px-3">
+        <div className="mx-auto max-w-4xl">
           <AskComposer
             onSubmit={handleSubmit}
             isPending={ask.isPending}
@@ -403,14 +393,14 @@ function latestModel(conversation: ConversationTurn[]): string | null {
 function AskCapabilityBadge({ capability }: { capability: AskCapabilityState }) {
   const t = useT();
   const stateClass = capability.state === "answer_ready"
-    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+    ? "border-litera-success/40 bg-litera-success/10 text-litera-success"
     : capability.state === "degraded"
-      ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-      : "border-litera-line bg-litera-panel/70 text-litera-mute";
+      ? "border-litera-warn/40 bg-litera-warn/10 text-litera-warn"
+      : "border-litera-border bg-litera-surface2 text-litera-mute";
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-      <span className={`rounded border px-2 py-1 ${stateClass}`}>
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className={`litera-status rounded border px-2 py-1 ${stateClass}`}>
         {t(askCapabilityKey(capability.state))}
       </span>
       <span className="text-litera-mute">
@@ -478,7 +468,7 @@ function AskEvidenceControls({
         {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookMarked className="h-3.5 w-3.5" />}
         {t("ask.addEvidence")}
       </button>
-      {saved && <span className="text-emerald-400">{t("ask.evidenceAdded")}</span>}
+      {saved && <span className="text-litera-success">{t("ask.evidenceAdded")}</span>}
     </div>
   );
 }

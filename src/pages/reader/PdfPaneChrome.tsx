@@ -152,15 +152,15 @@ export function PdfLoadError({ error, onRetry }: { error?: VisiblePdfError; onRe
     window.setTimeout(() => setCopied(false), 1600);
   }
   return (
-    <div className="h-full grid place-items-center text-sm text-red-400/90 p-6 text-center">
+    <div className="h-full grid place-items-center text-sm text-litera-error p-6 text-center">
       <div className="max-w-2xl w-full">
         <div className="font-medium mb-1">✕ {t("reader.pdfRenderFailed")}</div>
         <div className="text-xs text-litera-mute mb-3">{t("reader.pdfErrorHint")}</div>
-        <div className="text-left rounded border border-red-400/30 bg-litera-paper px-3 py-2 space-y-1">
+        <div className="text-left rounded border border-litera-error/30 bg-litera-paper px-3 py-2 space-y-1">
           {fields.map(([label, value]) => (
             <div key={label} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-xs">
               <span className="text-litera-mute">{label}</span>
-              <span className="font-mono text-red-200/90 break-all whitespace-pre-wrap">{value}</span>
+              <span className="font-mono text-litera-error break-all whitespace-pre-wrap">{value}</span>
             </div>
           ))}
         </div>
@@ -207,7 +207,7 @@ export function PdfMutationError({
   const message = errorMessage(createError) || errorMessage(termError);
   if (!message) return null;
   return (
-    <div className="absolute top-2 right-2 text-xs text-red-400/90 bg-litera-paper border border-red-400/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
+    <div className="absolute top-2 right-2 text-xs text-litera-error bg-litera-paper border border-litera-error/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
       <span>✕ {message}</span>
       <button onClick={onRetry} className="text-litera-mute hover:text-litera-text transition-colors">
         {t("common.retry")}
@@ -221,7 +221,7 @@ export function PdfStatusBadge({ highlights, terms }: { highlights: number; term
   return (
     <div className="absolute bottom-2 left-2 text-[11px] text-litera-mute bg-litera-paper/80 border border-litera-line rounded px-2 py-0.5 inline-flex items-center gap-2 pointer-events-none">
       <span className="inline-flex items-center gap-1">
-        <Highlighter className="h-3 w-3 text-amber-400" />
+        <Highlighter className="h-3 w-3 text-litera-warn" />
         {highlights} {t("reader.highlights")}
       </span>
       <span>·</span>

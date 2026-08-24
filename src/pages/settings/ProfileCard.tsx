@@ -67,12 +67,12 @@ export function ProfileCard({
           </button>
           {confirmingDelete ? (
             <div className="flex items-center gap-1.5 text-[11px]">
-              <span className="text-red-400/90">{t("settings.profile.deleteConfirm")}</span>
+              <span className="text-litera-error">{t("settings.profile.deleteConfirm")}</span>
               <button onClick={() => { onRemove(); setConfirmingDelete(false); }} className="litera-btn-primary text-[11px] px-2 py-0.5">{t("settings.profile.confirm")}</button>
               <button onClick={() => setConfirmingDelete(false)} className="litera-btn text-[11px] px-2 py-0.5">{t("common.cancel")}</button>
             </div>
           ) : (
-            <button onClick={() => setConfirmingDelete(true)} className="litera-btn text-xs text-red-400/80 hover:text-red-400">
+            <button onClick={() => setConfirmingDelete(true)} className="litera-btn text-xs text-litera-error hover:text-litera-error">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
@@ -119,7 +119,7 @@ export function ProfileCard({
               </button>
             </div>
             {listModels.error && (
-              <div className="text-[11px] text-red-400/90">✕ {(listModels.error as Error).message}</div>
+              <div className="text-[11px] text-litera-error">✕ {(listModels.error as Error).message}</div>
             )}
             {fetchedModels && (
               <div className="text-[11px] text-litera-mute">
@@ -153,7 +153,7 @@ export function ProfileCard({
         </div>
       )}
       {test.isError && (
-        <div className="mt-3 text-xs flex items-center gap-2 text-red-400/90">
+        <div className="mt-3 text-xs flex items-center gap-2 text-litera-error">
           <XCircle className="h-4 w-4" /> {(test.error as Error).message}
         </div>
       )}

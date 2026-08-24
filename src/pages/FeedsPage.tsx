@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Rss } from "lucide-react";
+import { PanelLeft, Rss } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
 import { FeedListSidebar } from "./feeds/FeedListSidebar";
 import { ItemsList } from "./feeds/FeedItemsList";
 import { ItemsToolbar } from "./feeds/ItemsToolbar";
@@ -21,6 +22,13 @@ export function FeedsPage() {
   const t = useT();
   const [selectedFeedId, setSelectedFeedId] = useState<number | null>(null);
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [feedSidebarOpen, setFeedSidebarOpen] = useState(false);
+  useEffect(() => {
+    if (!feedSidebarOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setFeedSidebarOpen(false);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [feedSidebarOpen]);
 
   const qc = useQueryClient();
   useEffect(() => {
@@ -66,25 +74,31 @@ export function FeedsPage() {
 
   return (
     <section className="h-full flex flex-col">
-      <header className="border-b border-litera-line px-6 py-4 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-            <Rss className="h-5 w-5 text-litera-accent" /> {t("feeds.title")}
-          </h1>
-          <p className="text-sm text-litera-mute">
-            {t("feeds.subtitle")}
-          </p>
-        </div>
-        <RefreshAllButton refresh={refreshAll} />
-      </header>
+      <PageHeader
+        icon={<Rss className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("feeds.title")}
+        subtitle={t("feeds.subtitle")}
+        actions={(
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setFeedSidebarOpen((open) => !open)} className="litera-btn hidden text-xs max-[900px]:inline-flex" title={t("feeds.sourcesTitle")} aria-label={t("feeds.sourcesTitle")}>
+              <PanelLeft className="h-3.5 w-3.5" />
+              <span>{t("feeds.sourcesTitle")}</span>
+            </button>
+            <RefreshAllButton refresh={refreshAll} />
+          </div>
+        )}
+      />
 
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {feedSidebarOpen && <button type="button" aria-label={t("common.close")} onClick={() => setFeedSidebarOpen(false)} className="absolute inset-0 z-20 hidden bg-litera-ink/45 max-[900px]:block" />}
         <FeedListSidebar
           feeds={feedsQ.data ?? []}
           isLoading={feedsQ.isLoading}
           error={feedsQ.error as Error | null}
           selectedId={selectedFeedId}
-          onSelect={setSelectedFeedId}
+          compactOpen={feedSidebarOpen}
+          onSelect={(id) => { setSelectedFeedId(id); setFeedSidebarOpen(false); }}
+          onClose={() => setFeedSidebarOpen(false)}
         />
         <div className="flex-1 min-w-0 overflow-auto">
           <ItemsToolbar

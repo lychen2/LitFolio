@@ -158,7 +158,7 @@ function ImportJobCard({ job }: { job: ImportJob }) {
             <p className="break-words text-litera-mute">{job.evidence}</p>
           )}
           {job.error && (
-            <p className="break-words text-red-400/90">✕ {job.error}</p>
+            <p className="break-words text-litera-error">✕ {job.error}</p>
           )}
         </div>
       )}
@@ -216,7 +216,7 @@ function PersistedJobCard({ job }: { job: JobRecord }) {
       {(job.error || canMutatePersistedJob(job)) && (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
           {job.error ? (
-            <p className="min-w-0 flex-1 break-words text-red-400/90">✕ {job.error}</p>
+            <p className="min-w-0 flex-1 break-words text-litera-error">✕ {job.error}</p>
           ) : (
             <span className="text-litera-mute" />
           )}
@@ -293,11 +293,11 @@ function persistedJobProgress(job: JobRecord): ImportJobProgress | undefined {
 function PersistedJobStatusIcon({ status }: { status: JobStatus }) {
   if (status === "succeeded") {
     return (
-      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400/90" />
+      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-litera-success" />
     );
   }
   if (status === "failed") {
-    return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400/90" />;
+    return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-litera-error" />;
   }
   if (status === "running") {
     return (
@@ -332,9 +332,9 @@ function persistedStatusKey(status: JobStatus): TKey {
 function persistedStatusClassName(status: JobStatus): string {
   switch (status) {
     case "succeeded":
-      return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+      return "border-litera-success/30 bg-litera-success/10 text-litera-success";
     case "failed":
-      return "border-red-400/30 bg-red-400/10 text-red-200";
+      return "border-litera-error/30 bg-litera-error/10 text-litera-error";
     case "running":
       return "border-litera-accent/30 bg-litera-accent/10 text-litera-accent";
     case "cancelled":
@@ -347,11 +347,11 @@ function persistedStatusClassName(status: JobStatus): string {
 function JobStatusIcon({ status }: { status: ImportJobStatus }) {
   if (status === "completed") {
     return (
-      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400/90" />
+      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-litera-success" />
     );
   }
   if (status === "failed") {
-    return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400/90" />;
+    return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-litera-error" />;
   }
   if (status === "running") {
     return (
@@ -359,7 +359,7 @@ function JobStatusIcon({ status }: { status: ImportJobStatus }) {
     );
   }
   if (status === "waiting") {
-    return <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-300/90" />;
+    return <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-litera-warn" />;
   }
   return <Radio className="mt-0.5 h-4 w-4 shrink-0 text-litera-mute" />;
 }
@@ -378,7 +378,7 @@ function JobProgress({ progress }: { progress?: ImportJobProgress }) {
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="truncate">{progress.label}</span>
         <span className="font-mono">
-          {progress.done}/{progress.total}
+          {`${progress.done}/${progress.total}`}
           {progress.failed
             ? ` · ${t("import.jobs.progressFailed", {
                 count: progress.failed,
@@ -494,13 +494,13 @@ function stepStatusKey(status: ImportJobStepStatus): TKey {
 function statusClassName(status: ImportJobStatus): string {
   switch (status) {
     case "completed":
-      return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+      return "border-litera-success/30 bg-litera-success/10 text-litera-success";
     case "failed":
-      return "border-red-400/30 bg-red-400/10 text-red-200";
+      return "border-litera-error/30 bg-litera-error/10 text-litera-error";
     case "running":
       return "border-litera-accent/30 bg-litera-accent/10 text-litera-accent";
     case "waiting":
-      return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+      return "border-litera-warn/30 bg-litera-warn/10 text-litera-warn";
     case "queued":
       return "border-litera-line bg-litera-bg/70 text-litera-mute";
   }
@@ -511,12 +511,12 @@ function stepClassName(status: ImportJobStepStatus): string {
     case "completed":
     case "ready":
     case "clear":
-      return "text-emerald-300/90";
+      return "text-litera-success";
     case "failed":
     case "missing":
-      return "text-red-300/90";
+      return "text-litera-error";
     case "duplicate":
-      return "text-amber-300/90";
+      return "text-litera-warn";
     case "running":
     case "checking":
     case "candidate":

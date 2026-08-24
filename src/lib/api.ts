@@ -11,6 +11,16 @@ import type { TopicSurveyProgress } from "./types/api";
  */
 
 export type {
+  PdfAnnotationRect,
+  PdfHighlight,
+  PdfTextNote,
+  PdfTextNoteCreateInput,
+  PdfTextNotePatch,
+  PdfTextNoteSearchResult,
+  ReaderAnnotation,
+} from "@/core/contracts";
+
+export type {
   ArxivDraft,
   AskCapabilityKind,
   AskCapabilityState,

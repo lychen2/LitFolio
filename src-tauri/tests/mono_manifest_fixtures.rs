@@ -2,14 +2,10 @@
 mod manifest;
 use manifest::validate_manifest_set;
 use serde_json::Value;
-const M: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-minimal.json");
-const D: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-dependent.json");
-const P: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-valid-peer.json");
-const I: &str =
-    include_str!("../../.trellis/spec/cross-layer/fixtures/mono-v1/manifest-invalid-cases.json");
+const M: &str = include_str!("../../src/test/fixtures/mono-v1/manifest-valid-minimal.json");
+const D: &str = include_str!("../../src/test/fixtures/mono-v1/manifest-valid-dependent.json");
+const P: &str = include_str!("../../src/test/fixtures/mono-v1/manifest-valid-peer.json");
+const I: &str = include_str!("../../src/test/fixtures/mono-v1/manifest-invalid-cases.json");
 fn j(s: &str) -> Value {
     serde_json::from_str(s).unwrap()
 }

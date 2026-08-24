@@ -43,6 +43,21 @@ fn default_pdf_markdown_engine_is_mineru_agent() {
 }
 
 #[test]
+fn obsidian_config_defaults_and_roundtrips() {
+    let (paths, dir) = tmp_paths();
+    let mut cfg = LlmConfig::default();
+    assert_eq!(cfg.obsidian.folder, "Papers");
+    cfg.obsidian.vault_dir = "/tmp/example-vault".into();
+    cfg.obsidian.folder = "Research/Papers".into();
+
+    save_config(&paths, &cfg).unwrap();
+    let loaded = load_config(&paths).unwrap();
+    assert_eq!(loaded.obsidian.vault_dir, "/tmp/example-vault");
+    assert_eq!(loaded.obsidian.folder, "Research/Papers");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn load_migrates_local_pdf_markdown_engine_to_mineru_agent() {
     let (paths, dir) = tmp_paths();
     let raw = r#"{

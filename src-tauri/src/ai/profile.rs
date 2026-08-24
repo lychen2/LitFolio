@@ -80,6 +80,27 @@ impl<'de> Deserialize<'de> for TaskBinding {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObsidianConfig {
+    #[serde(default)]
+    pub vault_dir: String,
+    #[serde(default = "default_obsidian_folder")]
+    pub folder: String,
+}
+
+impl Default for ObsidianConfig {
+    fn default() -> Self {
+        Self {
+            vault_dir: String::new(),
+            folder: default_obsidian_folder(),
+        }
+    }
+}
+
+fn default_obsidian_folder() -> String {
+    "Papers".into()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmConfig {
     #[serde(default)]
@@ -94,6 +115,8 @@ pub struct LlmConfig {
     pub export_dir: Option<String>,
     #[serde(default)]
     pub pdf_markdown: PdfMarkdownConfig,
+    #[serde(default)]
+    pub obsidian: ObsidianConfig,
 }
 
 fn default_output_language() -> String {

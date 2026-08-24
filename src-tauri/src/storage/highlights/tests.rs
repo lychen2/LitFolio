@@ -82,7 +82,6 @@ async fn insert_list_update_delete_roundtrip() {
     let moved = repo.get(&h1.id).await.unwrap().unwrap();
     assert_eq!(moved.rect, moved_rect);
 
-
     repo.update_translation(
         &h1.id,
         &HighlightTranslationUpdate {

@@ -117,7 +117,7 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
             {t("reader.doiLoading")}
           </div>
         ) : existingQ.error || draftQ.error ? (
-          <div className="break-all text-xs text-red-400/90">
+          <div className="break-all text-xs text-litera-error">
             {t("reader.doiLoadFailed", { message: ((existingQ.error ?? draftQ.error) as Error).message })}
           </div>
         ) : existingPaper ? (
@@ -183,12 +183,12 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
         </div>
         )}
         {autoDownload.error && (
-          <div className="break-all text-xs text-red-400/90">
+          <div className="break-all text-xs text-litera-error">
             {t("reader.doiAutoDownloadFailed", { message: (autoDownload.error as Error).message })}
           </div>
         )}
         {save.error && (
-          <div className="break-all text-xs text-red-400/90">
+          <div className="break-all text-xs text-litera-error">
             {t("reader.doiImportFailed", { message: (save.error as Error).message })}
           </div>
         )}

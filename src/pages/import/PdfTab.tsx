@@ -329,7 +329,7 @@ function ImportResultView({ result }: { result: ImportResult }) {
             })}
       </div>
       {result.failed.map((f, i) => (
-        <div key={i} className="text-xs text-red-400/90 font-mono">
+        <div key={i} className="text-xs text-litera-error font-mono">
           ✕ <span className="text-litera-mute">{f.path}</span> — {f.error}
         </div>
       ))}

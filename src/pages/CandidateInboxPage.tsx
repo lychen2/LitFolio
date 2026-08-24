@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { extractSourceIdentifier } from "@/lib/identifier";
 import { useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
 import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
 import {
   duplicateStatusFromError,
@@ -55,13 +56,11 @@ export function CandidateInboxPage() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <header className="border-b border-litera-line px-6 py-4">
-        <h1 className="font-serif text-2xl tracking-tight flex items-center gap-2">
-          <Archive className="h-5 w-5 text-litera-accent" />
-          {t("candidate.title")}
-        </h1>
-        <p className="text-sm text-litera-mute">{t("candidate.subtitle")}</p>
-      </header>
+      <PageHeader
+        icon={<Archive className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        title={t("candidate.title")}
+        subtitle={t("candidate.subtitle")}
+      />
       {data && data.length > 0 && (
         <CandidateBatchToolbar
           candidates={selectedCandidates}
@@ -115,7 +114,7 @@ function CandidateBatchToolbar({
   const disabled = candidates.length === 0 || batch.isPending;
 
   return (
-    <div className="border-b border-litera-line bg-litera-paper/70 px-6 py-2.5">
+    <div className="sticky top-0 z-20 border-b border-litera-border bg-litera-paper/95 px-5 py-2.5 shadow-lg">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-litera-mute">
           {t("candidate.selected", { count: candidates.length })}
@@ -166,7 +165,7 @@ function CandidateBatchToolbar({
         )}
       </div>
       {batch.error && (
-        <div className="mt-1.5 text-xs text-red-400/90">
+        <div className="mt-1.5 text-xs text-litera-error">
           ✕ {(batch.error as Error).message}
         </div>
       )}
@@ -193,7 +192,7 @@ function CandidateRow({
   const importHref = importUrl(candidate);
 
   return (
-    <li className="px-6 py-3.5 hover:bg-litera-panel/40 transition-colors">
+    <li className="border-b border-litera-border/70 px-5 py-3.5 transition-colors hover:bg-litera-surface/70">
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -229,7 +228,7 @@ function CandidateRow({
             </p>
           )}
           {status.error && (
-            <div className="mt-1.5 text-xs text-red-400/90">
+            <div className="mt-1.5 text-xs text-litera-error">
               ✕ {(status.error as Error).message}
             </div>
           )}
@@ -258,7 +257,7 @@ function CandidateRow({
           <button
             onClick={() => status.mutate("ignored")}
             disabled={status.isPending}
-            className="p-1.5 rounded text-litera-mute hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            className="p-1.5 rounded text-litera-mute hover:text-litera-error hover:bg-litera-error/10 disabled:opacity-50"
             title={t("candidate.ignore")}
           >
             {status.isPending ? (

@@ -142,7 +142,7 @@ export function PdfLinkedNoteBox({
         placeholder={t("reader.linkedNotePlaceholder")}
         className="litera-pdf-note-textarea"
       />
-      <div className={saveError ? "litera-pdf-note-status text-red-300" : "litera-pdf-note-status"}>
+      <div className={saveError ? "litera-pdf-note-status text-litera-error" : "litera-pdf-note-status"}>
         {saving && <Loader2 className="h-3 w-3 animate-spin" />}
         {status}
       </div>

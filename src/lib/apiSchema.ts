@@ -267,6 +267,7 @@ export function parseLlmConfig(value: unknown, path = "LlmConfig"): LlmConfig {
       obj.pdf_markdown ?? {},
       `${path}.pdf_markdown`
     ),
+    obsidian: parseObsidianConfig(obj.obsidian ?? {}, `${path}.obsidian`),
   };
 }
 
@@ -541,6 +542,17 @@ function parsePdfMarkdownConfig(
   return {
     engine: engine as LlmConfig["pdf_markdown"]["engine"],
     mineru_token: mineruToken,
+  };
+}
+
+function parseObsidianConfig(
+  value: unknown,
+  path: string
+): LlmConfig["obsidian"] {
+  const obj = object(value, path);
+  return {
+    vault_dir: "vault_dir" in obj ? stringField(obj, "vault_dir", path) : "",
+    folder: "folder" in obj ? stringField(obj, "folder", path) : "Papers",
   };
 }
 

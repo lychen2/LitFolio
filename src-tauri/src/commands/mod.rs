@@ -28,6 +28,7 @@ pub mod pdf_notes;
 pub mod project_manifest;
 pub mod project_writing;
 pub mod project_writing_render;
+pub mod provenance;
 pub mod projects;
 pub mod queue;
 pub mod reader_terms;
@@ -400,6 +401,19 @@ macro_rules! command_paths_reader_notes {
             commands::reader_translate::paper_translate_markdown_estimate,
             commands::notes::note_get,
             commands::notes::note_save,
+            commands::provenance::document_candidate_stage,
+            commands::provenance::document_accept,
+            commands::provenance::document_revisions_list,
+            commands::provenance::source_segment_list,
+            commands::provenance::source_link_create,
+            commands::provenance::source_link_resolve,
+            commands::provenance::source_link_list_for_anchor,
+            commands::provenance::backlinks_list,
+            commands::provenance::note_revisions_list,
+            commands::provenance::provenance_backfill,
+            commands::provenance::provenance_remap,
+            commands::provenance::provenance_export,
+            commands::provenance::note_save_provenance,
             commands::notes::note_sections_get,
             commands::notes::note_sections_save,
             commands::notes::note_sections_reorder,
