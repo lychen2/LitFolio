@@ -9,10 +9,12 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::ai::{
-    active_profile_for_task, chat_complete_for_task, estimate_markdown_translation, load_config,
-    translate_markdown_text, ChatMessage, LlmProfile, MarkdownTranslationEstimate,
-    MarkdownTranslationResult, TaskKind, MARKDOWN_CHUNK_CHARS,
+    active_reading_profile, chat_complete_for_task, estimate_markdown_translation,
+    freeze_reading_context, load_config, translate_markdown_text, ChatMessage, LlmProfile,
+    MarkdownTranslationEstimate, MarkdownTranslationResult, ReadingContextEnvelope,
+    ReadingContextRequest, SelectionContext, TaskKind, MARKDOWN_CHUNK_CHARS,
 };
+use crate::commands::ai_dispatch::run_reading_dispatch;
 use crate::storage::{
     Highlight, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate, Paper, PaperRepo,
     PaperTermRepo,
@@ -49,6 +51,31 @@ impl From<MarkdownTranslationResult> for ReaderMarkdownTranslationResult {
 const MAX_SELECTION_CHARS: usize = 2_000;
 const MIN_SUMMARY_CHARS: usize = 240;
 
+/// Freeze the reading context for a Reader action. The paper was already
+/// loaded from storage (existence + ownership verified); the active accepted
+/// revision supplies provenance when present.
+async fn freeze_reader_context(
+    state: &AppState,
+    request: &ReadingContextRequest,
+    title: &str,
+    abstract_text: Option<&str>,
+) -> Result<ReadingContextEnvelope, String> {
+    let provenance = crate::storage::ProvenanceRepo::new(&state.pool);
+    let active_revision = provenance
+        .active_revision(&request.paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    freeze_reading_context(
+        &request.paper_id,
+        title,
+        abstract_text,
+        None,
+        active_revision.as_ref(),
+        request,
+    )
+    .map_err(|e| format!("{}: {}", e.category(), e))
+}
+
 #[tauri::command]
 pub async fn reader_translate_selection(
     state: State<'_, Arc<AppState>>,
@@ -70,18 +97,47 @@ pub async fn reader_translate_selection(
         .await
         .map_err(|e| e.to_string())?;
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
+    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
-    translate_selection(TranslateSelectionInput {
-        client: &state.http,
-        profile: &profile,
-        paper: &paper,
-        selection: &clipped,
-        terms: &terms,
-        target_lang: &lang,
-    })
+
+    let envelope = freeze_reader_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: paper_id.clone(),
+            selection: Some(SelectionContext {
+                text: clipped.clone(),
+                page: None,
+            }),
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+    )
+    .await?;
+
+    run_reading_dispatch(
+        &state,
+        "reader_translate_selection",
+        &paper_id,
+        &profile.name,
+        &profile.chat_model,
+        &envelope,
+        async {
+            translate_selection(TranslateSelectionInput {
+                client: &state.http,
+                profile: &profile,
+                paper: &paper,
+                selection: &clipped,
+                terms: &terms,
+                target_lang: &lang,
+            })
+            .await
+            .map_err(anyhow::Error::from)
+        },
+    )
     .await
-    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -143,9 +199,7 @@ pub async fn paper_translate_markdown(
     target_lang: Option<String>,
 ) -> Result<ReaderMarkdownTranslationResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Translate)
-        .map_err(|e| e.to_string())?
-        .clone();
+    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?.clone();
     let lang = target_lang.unwrap_or(cfg.output_language);
     let repo = PaperRepo::new(&state.pool);
     let paper = load_paper(&repo, &paper_id)
@@ -158,9 +212,31 @@ pub async fn paper_translate_markdown(
     )
     .await
     .ok_or_else(|| "paper markdown is not available".to_string())?;
-    let result = translate_markdown_text(&state.http, &profile, &paper.title, &body, &lang)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_reader_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: paper_id.clone(),
+            selection: None,
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+    )
+    .await?;
+
+    let result = run_reading_dispatch(
+        &state,
+        "paper_translate_markdown",
+        &paper_id,
+        &profile.name,
+        &profile.chat_model,
+        &envelope,
+        translate_markdown_text(&state.http, &profile, &paper.title, &body, &lang),
+    )
+    .await?;
     state
         .paths
         .write_translated_paper_markdown(
@@ -199,18 +275,47 @@ pub async fn highlight_translate(
         .await
         .map_err(|e| e.to_string())?;
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
+    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
-    let result = translate_selection(TranslateSelectionInput {
-        client: &state.http,
-        profile: &profile,
-        paper: &paper,
-        selection: &clipped,
-        terms: &terms,
-        target_lang: &lang,
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_reader_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: highlight.paper_id.clone(),
+            selection: Some(SelectionContext {
+                text: clipped.clone(),
+                page: Some(highlight.page),
+            }),
+            highlight_id: Some(highlight_id.clone()),
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+    )
+    .await?;
+
+    let result = run_reading_dispatch(
+        &state,
+        "highlight_translate",
+        &highlight.paper_id,
+        &profile.name,
+        &profile.chat_model,
+        &envelope,
+        async {
+            translate_selection(TranslateSelectionInput {
+                client: &state.http,
+                profile: &profile,
+                paper: &paper,
+                selection: &clipped,
+                terms: &terms,
+                target_lang: &lang,
+            })
+            .await
+            .map_err(anyhow::Error::from)
+        },
+    )
+    .await?;
     if result.translation.trim().is_empty() {
         return Err("empty translation response".into());
     }
@@ -252,11 +357,40 @@ pub async fn highlight_summarize(
         .await
         .map_err(|e| e.to_string())?;
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?;
+    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let clipped = truncate(text, MAX_SELECTION_CHARS);
-    let result = summarize_highlight(&state.http, &profile, &paper, &clipped)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_reader_context(
+        &state,
+        &ReadingContextRequest {
+            paper_id: highlight.paper_id.clone(),
+            selection: Some(SelectionContext {
+                text: clipped.clone(),
+                page: Some(highlight.page),
+            }),
+            highlight_id: Some(highlight_id.clone()),
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+    )
+    .await?;
+
+    let result = run_reading_dispatch(
+        &state,
+        "highlight_summarize",
+        &highlight.paper_id,
+        &profile.name,
+        &profile.chat_model,
+        &envelope,
+        async {
+            summarize_highlight(&state.http, &profile, &paper, &clipped)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+    )
+    .await?;
     if result.summary.trim().is_empty() {
         return Err("empty summary response".into());
     }

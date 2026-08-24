@@ -1,6 +1,7 @@
 //! IPC command surface exposed to the React frontend.
 
 pub mod ask;
+pub(crate) mod ai_dispatch;
 pub mod batch;
 pub mod candidates;
 pub mod comparisons;

@@ -4,22 +4,22 @@
 //! context envelope before dispatch, and persist exactly one redacted
 //! execution record per dispatch under a real cancellation token.
 
-use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
 use tauri::State;
-use tokio_util::sync::CancellationToken;
 
 use crate::ai::{
-    active_profile_for_task, active_reading_profile, dispatch_with_cancel,
-    freeze_reading_context, load_config, quick_read_paper_text, summarize_paper_text,
-    PaperSummaryRequest, QuickReadResult, ReadingContextEnvelope, ReadingContextRequest,
-    TaskKind, TldrResult,
+    active_profile_for_task, active_reading_profile, freeze_reading_context, load_config,
+    quick_read_paper_text, summarize_paper_text, PaperSummaryRequest, QuickReadResult,
+    ReadingContextEnvelope, ReadingContextRequest, TaskKind, TldrResult,
 };
 use crate::ingest::PaperDraft;
-use crate::storage::{AiExecutionRepo, ExecutionRecord, LibraryPaths, PaperRepo};
+use crate::storage::{LibraryPaths, PaperRepo, ProvenanceRepo};
+
 use crate::AppState;
+
+pub(crate) use crate::commands::ai_dispatch::run_reading_dispatch;
 
 /// Resolve body text to send to the LLM for TLDR / QuickRead. Three tiers:
 /// 1. `document.md` cache populated by pdfjs in the reader (highest quality);
@@ -56,86 +56,6 @@ pub(crate) async fn load_or_extract_pdf_body(
     Some(trimmed.to_string())
 }
 
-fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or_default()
-}
-
-/// Bounded, single-line error summary for execution records. Provider errors
-/// can embed response fragments; records never store them verbatim.
-fn redact_error(err: &str) -> String {
-    let line = err.lines().next().unwrap_or_default();
-    line.chars().take(160).collect()
-}
-
-/// Run one core AI Reading dispatch end to end:
-/// freeze envelope -> open running record -> provider I/O under cancellation
-/// token -> close record exactly once -> drop the token registration.
-/// Returns `Err("cancelled")` when cancelled; late results cannot resurface.
-async fn run_reading_dispatch<T>(
-    state: &AppState,
-    operation: &str,
-    paper_id: &str,
-    profile_name: &str,
-    model: &str,
-    envelope: &ReadingContextEnvelope,
-    io: impl Future<Output = anyhow::Result<T>>,
-) -> Result<T, String> {
-    let executions = AiExecutionRepo::new(&state.pool);
-    let exec_id = format!("exec-{}-{}-{}", operation, paper_id, now_ms());
-    let started = now_ms();
-    let _ = executions
-        .record_start(&ExecutionRecord {
-            id: exec_id.clone(),
-            operation: operation.to_string(),
-            trigger: "user-action".to_string(),
-            envelope_id: envelope.envelope_id.clone(),
-            paper_id: Some(paper_id.to_string()),
-            profile_name: profile_name.to_string(),
-            model: model.to_string(),
-            state: "running".to_string(),
-            started_at: started,
-            finished_at: None,
-            duration_ms: None,
-            error_summary: None,
-        })
-        .await;
-
-    let token = CancellationToken::new();
-    state
-        .ai_cancels
-        .lock()
-        .await
-        .insert(exec_id.clone(), token.clone());
-
-    let outcome = dispatch_with_cancel(&token, io).await;
-
-    state.ai_cancels.lock().await.remove(&exec_id);
-    match outcome {
-        Some(Ok(value)) => {
-            let _ = executions
-                .record_terminal(&exec_id, "succeeded", None, now_ms())
-                .await;
-            Ok(value)
-        }
-        Some(Err(err)) => {
-            let summary = redact_error(&err.to_string());
-            let _ = executions
-                .record_terminal(&exec_id, "failed", Some(&summary), now_ms())
-                .await;
-            Err(summary)
-        }
-        None => {
-            let _ = executions
-                .record_terminal(&exec_id, "cancelled", Some("user-cancelled"), now_ms())
-                .await;
-            Err("cancelled".to_string())
-        }
-    }
-}
-
 /// Freeze the reading context for a whole-paper action: metadata + resolved
 /// body text + active revision provenance. Pure validation happens in
 /// [`freeze_reading_context`]; storage lookups happen here, before freezing.
@@ -146,7 +66,7 @@ async fn freeze_paper_context(
     abstract_text: Option<&str>,
     body_text: Option<&str>,
 ) -> Result<ReadingContextEnvelope, String> {
-    let provenance = crate::storage::ProvenanceRepo::new(&state.pool);
+    let provenance = ProvenanceRepo::new(&state.pool);
     let active_revision = provenance
         .active_revision(&request.paper_id)
         .await

@@ -12,8 +12,9 @@ pub mod prompts;
 mod query_expand;
 pub mod reading;
 
-pub use reading::{dispatch_with_cancel, freeze_reading_context, ReadingContextEnvelope,
-    ReadingContextRequest,
+pub use reading::{
+    dispatch_with_cancel, freeze_reading_context, ReadingContextEnvelope, ReadingContextRequest,
+    SelectionContext,
 };
 mod summarize;
 mod topic_survey;

@@ -5,8 +5,10 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::ai::{
-    active_profile_for_task, chat_complete_for_task, load_config, ChatMessage, LlmProfile, TaskKind,
+    active_reading_profile, chat_complete_for_task, freeze_reading_context, load_config,
+    ChatMessage, LlmProfile, ReadingContextRequest, SelectionContext, TaskKind,
 };
+use crate::commands::ai_dispatch::run_reading_dispatch;
 use crate::storage::{Highlight, HighlightExplanationUpdate, HighlightRepo, Paper, PaperRepo};
 use crate::AppState;
 
@@ -31,12 +33,44 @@ pub(super) async fn highlight_explain_impl(
         .await
         .map_err(|e| e.to_string())?;
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Tldr).map_err(|e| e.to_string())?;
+    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let full_body = state.paths.read_pdf_text(&highlight.paper_id);
     let body = truncate_body(&full_body, EXPLAIN_MAX_BODY_CHARS);
-    let result = explain_highlight(&state.http, &profile, &paper, text, &body)
+
+    let provenance = crate::storage::ProvenanceRepo::new(&state.pool);
+    let active_revision = provenance
+        .active_revision(&highlight.paper_id)
         .await
         .map_err(|e| e.to_string())?;
+    let envelope = freeze_reading_context(
+        &highlight.paper_id,
+        &paper.title,
+        paper.abstract_text.as_deref(),
+        Some(&body),
+        active_revision.as_ref(),
+        &ReadingContextRequest {
+            paper_id: highlight.paper_id.clone(),
+            selection: Some(SelectionContext {
+                text: text.to_string(),
+                page: Some(highlight.page),
+            }),
+            highlight_id: Some(highlight_id.clone()),
+            revision_id: None,
+            max_body_chars: None,
+        },
+    )
+    .map_err(|e| format!("{}: {}", e.category(), e))?;
+
+    let result = run_reading_dispatch(
+        &state,
+        "highlight_explain",
+        &highlight.paper_id,
+        &profile.name,
+        &profile.chat_model,
+        &envelope,
+        explain_highlight(&state.http, &profile, &paper, text, &body),
+    )
+    .await?;
     if result.explanation.trim().is_empty() {
         return Err("empty explanation response".into());
     }
