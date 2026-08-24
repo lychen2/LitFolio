@@ -2,11 +2,10 @@ import { useMutation } from "@tanstack/react-query";
 import { Loader2, Send, X } from "lucide-react";
 import { useState } from "react";
 import { MarkdownView } from "@/components/MarkdownView";
-import { api, type AskLibraryResult } from "@/lib/api";
+import { api, type ReaderAskResult } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
-import { buildReaderSelectionQuestion } from "./pdfSelectionHelpers";
 
-const READER_ASK_LIMIT = 16;
+const READER_ASK_MAX_QUESTION_CHARS = 2_000;
 
 type PdfSelectionAskBoxProps = {
   paperId: string;
@@ -17,21 +16,25 @@ type PdfSelectionAskBoxProps = {
 export function PdfSelectionAskBox({ paperId, selection, onClose }: PdfSelectionAskBoxProps) {
   const t = useT();
   const [question, setQuestion] = useState("");
-  const [result, setResult] = useState<AskLibraryResult | null>(null);
+  const [result, setResult] = useState<ReaderAskResult | null>(null);
   const ask = useMutation({
-    mutationFn: () =>
-      api.libraryAsk(
-        buildReaderSelectionQuestion(question, selection),
-        READER_ASK_LIMIT,
-        undefined,
-        [paperId],
-      ),
+    mutationFn: (input: string) =>
+      api.readerAskPaper({
+        request: {
+          paperId,
+          selection: { text: selection },
+          highlightId: null,
+          revisionId: null,
+          maxBodyChars: null,
+        },
+        question: input,
+      }),
     onSuccess: setResult,
   });
 
   function submit() {
     if (ask.isPending) return;
-    ask.mutate();
+    ask.mutate(question.slice(0, READER_ASK_MAX_QUESTION_CHARS));
   }
 
   return (

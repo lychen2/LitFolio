@@ -12,6 +12,21 @@ const executionStates = new Set(["running", "succeeded", "failed", "cancelled"])
 
 export type AiExecutionState = "running" | "succeeded" | "failed" | "cancelled";
 
+export interface ReaderAskResult {
+  answer: string;
+  model: string;
+  envelopeId: string;
+}
+
+export function parseReaderAskResult(value: unknown, path = "ReaderAskResult"): ReaderAskResult {
+  const obj: Shape = object(value, path);
+  return {
+    answer: stringField(obj, "answer", path),
+    model: stringField(obj, "model", path),
+    envelopeId: stringField(obj, "envelopeId", path),
+  };
+}
+
 /** Redacted, core-owned record of one AI dispatch. */
 export interface AiExecutionRecord {
   id: string;

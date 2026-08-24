@@ -11,6 +11,12 @@ import type { TopicSurveyProgress } from "./types/api";
  */
 
 export type {
+  AiExecutionRecord,
+  AiExecutionState,
+  ReaderAskResult,
+} from "./apiSchemaAi";
+
+export type {
   PdfAnnotationRect,
   PdfHighlight,
   PdfTextNote,

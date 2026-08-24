@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { parseAskCapabilityState, parseAskSession, parseAskSessionMaybe, parseHighlight, parseLlmConfig } from "./apiSchema";
 import {
   parseAiExecutionRecord,
+  parseReaderAskResult,
   type AiExecutionRecord,
 } from "./apiSchemaAi";
 import { parseNoteSaveResult, type NoteSaveResult } from "./apiSchemaProvenance";
@@ -32,6 +33,8 @@ import type {
 } from "./types/api";
 
 export const aiReaderApi = {
+  readerAskPaper: (input: { request: { paperId: string; selection?: { text: string } | null; highlightId?: string | null; revisionId?: string | null; maxBodyChars?: number | null }; question: string }) =>
+    invokeParsed("reader_ask_paper", { input }, parseReaderAskResult),
   llmGetConfig: () => invokeParsed("llm_get_config", undefined, parseLlmConfig),
   llmSaveConfig: (config: LlmConfig) =>
     invoke<void>("llm_save_config", { config }),

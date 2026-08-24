@@ -418,7 +418,7 @@ pub async fn highlight_explain(
     explain::highlight_explain_impl(state, highlight_id).await
 }
 
-pub(super) async fn load_paper(repo: &PaperRepo<'_>, paper_id: &str) -> Result<Paper> {
+pub(crate) async fn load_paper(repo: &PaperRepo<'_>, paper_id: &str) -> Result<Paper> {
     repo.get(paper_id)
         .await
         .map_err(|e| anyhow!(e))?

@@ -30,6 +30,7 @@ pub mod project_manifest;
 pub mod project_writing;
 pub mod project_writing_render;
 pub mod provenance;
+pub mod reader_ask;
 pub mod projects;
 pub mod queue;
 pub mod reader_terms;
@@ -399,6 +400,7 @@ macro_rules! command_paths_reader_notes {
             commands::reader_translate::highlight_translate,
             commands::reader_translate::highlight_explain,
             commands::reader_translate::reader_translate_selection,
+            commands::reader_ask::reader_ask_paper,
             commands::reader_translate::paper_translated_markdown_get,
             commands::reader_translate::paper_translate_markdown,
             commands::reader_translate::paper_translate_markdown_estimate,
