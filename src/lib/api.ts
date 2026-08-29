@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -132,11 +133,38 @@ export type {
   StorageStats,
 } from "./types/api";
 
+export interface ZoteroConfig {
+  target_id: string | null;
+  target_name: string | null;
+}
+
+export interface ZoteroTarget {
+  id: string;
+  name: string;
+  level: number;
+}
+
+export interface ZoteroPushResult {
+  pushed: number;
+  skipped: string[];
+  session_ids: string[];
+}
+
+export const zoteroApi = {
+  zoteroGetConfig: () => invoke<ZoteroConfig>("zotero_get_config"),
+  zoteroSaveConfig: (config: ZoteroConfig) => invoke<void>("zotero_save_config", { cfg: config }),
+  zoteroTest: () => invoke<void>("zotero_test"),
+  zoteroListTargets: () => invoke<ZoteroTarget[]>("zotero_list_targets"),
+  zoteroPush: (paperIds: string[], force = false) =>
+    invoke<ZoteroPushResult>("zotero_push", { paperIds, force }),
+};
+
 export const api = {
   ...libraryClient,
   ...aiReadingClient,
   ...readerClient,
   ...knowledgeApi,
+  ...zoteroApi,
   // Temporary adapter: plugin-owned AI capabilities pending plugin-host extraction.
   ...aiPluginApi,
 };

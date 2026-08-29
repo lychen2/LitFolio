@@ -51,6 +51,7 @@ pub mod survey;
 pub mod sync;
 pub mod tags;
 pub mod term_filter;
+pub mod zotero;
 pub mod topic_alerts;
 
 use std::sync::Arc;
@@ -335,6 +336,11 @@ macro_rules! command_paths_config_sync_ai {
             commands::sync::sync_preview_pull_library,
             commands::sync::sync_push_library,
             commands::sync::sync_pull_library,
+            commands::zotero::zotero_get_config,
+            commands::zotero::zotero_save_config,
+            commands::zotero::zotero_test,
+            commands::zotero::zotero_list_targets,
+            commands::zotero::zotero_push,
             commands::summaries::paper_tldr,
             commands::summaries::paper_quick_read,
             commands::summaries::paper_translate,

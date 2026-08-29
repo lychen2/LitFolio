@@ -20,6 +20,7 @@ mod plugin_host;
 mod secret;
 mod startup;
 mod storage;
+mod zotero;
 
 use std::collections::HashMap;
 #[cfg(not(test))]

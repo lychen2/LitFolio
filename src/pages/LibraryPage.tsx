@@ -95,6 +95,19 @@ export function LibraryPage() {
       queryClient.invalidateQueries({ queryKey: ["queue"] });
     },
   });
+  const zoteroPush = useMutation({
+    mutationFn: ({ ids, force }: { ids: string[]; force: boolean }) => api.zoteroPush(ids, force),
+    onSuccess: (result, variables) => {
+      if (result.skipped.length > 0 && !variables.force) {
+        if (window.confirm(t("library.zoteroRepushConfirm", { count: String(result.skipped.length) }))) {
+          zoteroPush.mutate({ ids: result.skipped, force: true });
+        }
+        return;
+      }
+      setSelectedIds(new Set());
+    },
+  });
+  const pushToZotero = () => zoteroPush.mutate({ ids: selected, force: false });
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => toggleLibrarySelection(prev, id));
   };
@@ -146,7 +159,21 @@ export function LibraryPage() {
               onCompare={() => compare.mutate()}
               onLitReview={() => setShowLitReview(true)}
               onExport={() => setShowExport(true)}
+              onZotero={pushToZotero}
+              zoteroBusy={zoteroPush.isPending}
             />
+          )}
+          {zoteroPush.error && (
+            <div className="shrink-0 border-b border-litera-error/20 bg-litera-error/10 px-5 py-2 text-xs text-litera-error">
+              {(zoteroPush.error as Error).message}
+            </div>
+          )}
+          {zoteroPush.isSuccess && (
+            <div className="shrink-0 border-b border-litera-success/20 bg-litera-success/10 px-5 py-2 text-xs text-litera-success">
+              {t("library.zoteroPushed", { count: String(zoteroPush.data.pushed) })}
+              {zoteroPush.data.skipped.length > 0 &&
+                " · " + t("library.zoteroSkipped", { count: String(zoteroPush.data.skipped.length) })}
+            </div>
           )}
           {compare.error && (
             <div className="shrink-0 border-b border-litera-error/20 bg-litera-error/10 px-5 py-2 text-xs text-litera-error">
@@ -192,7 +219,7 @@ export function LibraryPage() {
 }
 
 function SelectionToolbar({
-  count, canCompare, comparing, queueing, onClear, onQueue, onCompare, onLitReview, onExport,
+  count, canCompare, comparing, queueing, onClear, onQueue, onCompare, onLitReview, onExport, onZotero, zoteroBusy,
 }: {
   count: number;
   canCompare: boolean;
@@ -203,6 +230,8 @@ function SelectionToolbar({
   onCompare: () => void;
   onLitReview: () => void;
   onExport: () => void;
+  onZotero: () => void;
+  zoteroBusy: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -219,6 +248,10 @@ function SelectionToolbar({
       <button onClick={onExport} className="litera-btn text-xs">
         <Download className="h-3.5 w-3.5" />
         {t("citations.title")}
+      </button>
+      <button onClick={onZotero} disabled={zoteroBusy} className="litera-btn text-xs disabled:opacity-50">
+        {zoteroBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LibraryBig className="h-3.5 w-3.5" />}
+        {t("library.sendToZoteroBatch")}
       </button>
       <button
         onClick={onCompare}

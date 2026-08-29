@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  BookOpen, ClipboardCopy, Download, ExternalLink, FileText, Languages, Loader2, Quote, Sparkles, X,
+  BookOpen, ClipboardCopy, Download, ExternalLink, FileText, Languages, LibraryBig, Loader2, Quote, Sparkles, X,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
@@ -35,6 +35,15 @@ export function PaperDetailDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
       qc.invalidateQueries({ queryKey: ["paper", paper.id] });
+    },
+  });
+
+  const zoteroPush = useMutation({
+    mutationFn: (force: boolean) => api.zoteroPush([paper.id], force),
+    onSuccess: (result, force) => {
+      if (result.skipped.length > 0 && !force && window.confirm(t("library.zoteroRepushConfirm", { count: "1" }))) {
+        zoteroPush.mutate(true);
+      }
     },
   });
 
@@ -73,6 +82,15 @@ export function PaperDetailDrawer({
               <ClipboardCopy className="h-3.5 w-3.5" /> {t("reader.copyBibtex")}
             </button>
           )}
+          <button
+            onClick={() => zoteroPush.mutate(false)}
+            disabled={zoteroPush.isPending}
+            className="litera-btn text-xs disabled:opacity-50"
+            title={t("library.sendToZotero")}
+          >
+            {zoteroPush.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LibraryBig className="h-3.5 w-3.5" />}
+            {t("library.sendToZotero")}
+          </button>
           <button
             onClick={() => setShowSimilar(true)}
             className="litera-btn text-xs"
@@ -131,6 +149,8 @@ export function PaperDetailDrawer({
           {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
           <PaperSupplementsSection paperId={paper.id} />
           <CustomFieldsSection paperId={paper.id} />
+          {zoteroPush.error && <ErrorLine error={zoteroPush.error} />}
+          {zoteroPush.isSuccess && <div className="text-xs text-litera-success">{t("library.zoteroPushed", { count: "1" })}</div>}
           {translate.error && <ErrorLine error={translate.error} />}
 
         </div>

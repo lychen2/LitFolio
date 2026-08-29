@@ -15,6 +15,7 @@ import { ExportPanel } from "./settings/ExportPanel";
 import { PluginsPanel } from "./settings/PluginsPanel";
 import { ProfilesTab } from "./settings/ProfilesTab";
 import { SyncPanel } from "./settings/SyncPanel";
+import { ZoteroPanel } from "./settings/ZoteroPanel";
 import { PdfMarkdownSettings } from "./settings/PdfMarkdownSettings";
 import { ObsidianSettings } from "./settings/ObsidianSettings";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
@@ -171,7 +172,12 @@ export function SettingsPage() {
                 onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
               />
             )}
-            {tab === "sync" && <SyncPanel />}
+            {tab === "sync" && (
+              <div className="space-y-5">
+                <SyncPanel />
+                <ZoteroPanel />
+              </div>
+            )}
             {tab === "export" && <ExportPanel />}
             {tab === "tools" && (
               <div className="space-y-6">

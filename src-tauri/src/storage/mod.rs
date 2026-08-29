@@ -28,6 +28,7 @@ mod paper_terms;
 mod papers;
 mod paths;
 mod plugin_state;
+mod zotero_pushes;
 mod legacy_reader_notes;
 mod pdf_notes;
 mod provenance;
@@ -58,6 +59,7 @@ pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTe
 pub use note_sections::{NoteSection, NoteSectionRepo};
 pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use plugin_state::{PluginStateRepo, PluginStateRow};
+pub use zotero_pushes::{get_pushed_at, record_push};
 pub use provenance::{
     BackfillPaperReport, BackfillReport, BacklinkRow, CandidateSegment, DocumentCandidate, DocumentRevision,
     NoteRevision, NoteSaveResult, ProvenanceError, ProvenanceExport, ProvenanceRepo,
