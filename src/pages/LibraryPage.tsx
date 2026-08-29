@@ -6,6 +6,7 @@ import {
   Rss, X, Search, PenLine,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
+import { zoteroErrorMessage } from "@/lib/zoteroError";
 import { FolderSidebar } from "./library/FolderSidebar";
 import { PaperDetailDrawer } from "./library/PaperDetailDrawer";
 import { ReadingQueue } from "./library/ReadingQueue";
@@ -165,7 +166,7 @@ export function LibraryPage() {
           )}
           {zoteroPush.error && (
             <div className="shrink-0 border-b border-litera-error/20 bg-litera-error/10 px-5 py-2 text-xs text-litera-error">
-              {(zoteroPush.error as Error).message}
+              {zoteroErrorMessage(zoteroPush.error, t)}
             </div>
           )}
           {zoteroPush.isSuccess && (

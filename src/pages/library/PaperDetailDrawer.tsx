@@ -13,6 +13,7 @@ import { DoiEnrichRow } from "./DoiEnrichRow";
 import { CustomFieldsSection } from "./PaperCustomFieldsSection";
 import { PaperSupplementsSection } from "./PaperSupplementsSection";
 import { CopyCitationDropdown } from "./CopyCitationDropdown";
+import { zoteroErrorMessage } from "@/lib/zoteroError";
 
 export function PaperDetailDrawer({
   paper: paperProp, onClose,
@@ -149,7 +150,7 @@ export function PaperDetailDrawer({
           {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
           <PaperSupplementsSection paperId={paper.id} />
           <CustomFieldsSection paperId={paper.id} />
-          {zoteroPush.error && <ErrorLine error={zoteroPush.error} />}
+          {zoteroPush.error && <div className="text-sm text-litera-error">✕ {zoteroErrorMessage(zoteroPush.error, t)}</div>}
           {zoteroPush.isSuccess && <div className="text-xs text-litera-success">{t("library.zoteroPushed", { count: "1" })}</div>}
           {translate.error && <ErrorLine error={translate.error} />}
 
