@@ -1,0 +1,26 @@
+{
+  "apiVersion": 1,
+  "id": "discovery-feeds",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Discovery Feeds",
+  "activation": { "frontend": { "export": "activateDiscoveryFeeds" } },
+  "dependencies": [{ "id": "source-connectors", "version": "^1.0.0", "optional": true }],
+  "requestedCapabilities": [
+    {
+      "capability": "network",
+      "operations": ["network.request"],
+      "required": true,
+      "scope": { "resourceDomains": ["paper"], "contributionSlots": ["app.routes"], "jobKinds": ["manual-refresh"] },
+      "limits": { "maxUnitsPerRequest": 100, "maxUnitsPerWindow": 1000 }
+    }
+  ],
+  "contributions": [
+    { "id": "browse-route", "slot": "app.routes", "frontendExport": "renderBrowseRoute", "requiredOperations": ["network.request"], "order": 0 },
+    { "id": "feeds-route", "slot": "app.routes", "frontendExport": "renderFeedsRoute", "requiredOperations": ["network.request"], "order": 1 },
+    { "id": "topic-route", "slot": "app.routes", "frontendExport": "renderTopicRoute", "requiredOperations": ["network.request"], "order": 2 }
+  ],
+  "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+  "migrations": [],
+  "build": { "frontendEntry": "./src/plugins/discovery-feeds/index.ts" }
+}

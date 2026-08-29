@@ -207,6 +207,9 @@ const mockSourceLink = {
 type MockResolver = () => unknown;
 const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
+  ["plugin_host_list", () => []],
+  ["plugin_host_enable", () => ({ bindingId: "bind-fixture-local-1-test" })],
+  ["plugin_host_disable", () => null],
   ["document_candidate_stage", () => mockDocumentCandidate],
   ["document_accept", () => mockDocumentRevision],
   ["document_revisions_list", () => [mockDocumentRevision]],

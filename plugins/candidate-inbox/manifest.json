@@ -1,0 +1,24 @@
+{
+  "apiVersion": 1,
+  "id": "candidate-inbox",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Candidate Inbox",
+  "activation": { "frontend": { "export": "activateCandidateInbox" } },
+  "dependencies": [],
+  "requestedCapabilities": [
+    {
+      "capability": "papers",
+      "operations": ["papers.read"],
+      "required": true,
+      "scope": { "resourceDomains": ["paper"], "contributionSlots": ["app.routes"], "jobKinds": [] },
+      "limits": { "maxUnitsPerRequest": 100, "maxUnitsPerWindow": 1000 }
+    }
+  ],
+  "contributions": [
+    { "id": "candidate-route", "slot": "app.routes", "frontendExport": "renderCandidateRoute", "requiredOperations": ["papers.read"], "order": 0 }
+  ],
+  "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+  "migrations": [],
+  "build": { "frontendEntry": "./src/plugins/candidate-inbox/index.ts" }
+}

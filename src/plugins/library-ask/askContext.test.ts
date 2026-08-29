@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AskLibraryResult } from "@/lib/api";
-import { summarizeAskContext } from "../AskPage";
+import { summarizeAskContext } from "./AskPage";
 
 describe("summarizeAskContext", () => {
   it("counts unique papers, highlights and document hits", () => {

@@ -1,0 +1,14 @@
+{
+  "apiVersion": 1,
+  "id": "sync-integrations",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Sync Integrations",
+  "activation": { "frontend": { "export": "activateSyncIntegrations" } },
+  "dependencies": [],
+  "requestedCapabilities": [],
+  "contributions": [],
+  "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+  "migrations": [],
+  "build": { "frontendEntry": "./src/plugins/sync-integrations/index.ts" }
+}

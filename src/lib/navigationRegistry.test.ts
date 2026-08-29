@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAVIGATION_GROUPS, NAVIGATION_ITEMS } from "./navigationRegistry";
+import { NAVIGATION_GROUPS, NAVIGATION_ITEMS, visibleNavigation } from "./navigationRegistry";
 
 describe("navigation registry", () => {
   it("keeps all primary routes available to sidebar and command palette", () => {
@@ -26,5 +26,20 @@ describe("navigation registry", () => {
     const groupedPaths = NAVIGATION_GROUPS.flatMap((group) => group.paths);
     expect(groupedPaths).toEqual(NAVIGATION_ITEMS.map((item) => item.to));
     expect(new Set(groupedPaths).size).toBe(groupedPaths.length);
+  });
+
+  it("hides plugin routes until the host has enabled them", () => {
+    const hidden = visibleNavigation(undefined);
+    expect(hidden.items.map((item) => item.to)).toEqual(["/library", "/import", "/settings"]);
+    expect(hidden.groups.map((group) => group.id)).toEqual(["library", "system"]);
+
+    const askOnly = visibleNavigation(new Set(["library-ask"]));
+    expect(askOnly.items.map((item) => item.to)).toEqual([
+      "/library",
+      "/import",
+      "/ask",
+      "/settings",
+    ]);
+    expect(askOnly.groups.map((group) => group.id)).toEqual(["library", "research", "system"]);
   });
 });

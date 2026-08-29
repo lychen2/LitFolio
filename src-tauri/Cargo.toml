@@ -57,8 +57,21 @@ webkit2gtk = "2.0.2"
 tokio = { version = "1", features = ["full", "test-util"] }
 
 [features]
-default = ["custom-protocol"]
+default = [
+    "custom-protocol",
+    "plugin-library-ask",
+    "plugin-discovery-feeds",
+    "plugin-candidate-inbox",
+    "plugin-knowledge-graph",
+]
 custom-protocol = ["tauri/custom-protocol"]
+# Plugin-owned command slices. The packaged core profile builds with
+# `--no-default-features --features custom-protocol` so optional plugin
+# backends are physically absent, not merely hidden.
+plugin-library-ask = []
+plugin-discovery-feeds = []
+plugin-candidate-inbox = []
+plugin-knowledge-graph = []
 
 [profile.release]
 codegen-units = 1

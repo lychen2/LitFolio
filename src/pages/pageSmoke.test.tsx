@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { invokeMockCommand } from "@/test/tauriMockCommands";
-import { AskPage } from "./AskPage";
+import { AskPage } from "@/plugins/library-ask/AskPage";
 import { BrowsePage } from "./BrowsePage";
 import { CandidateInboxPage } from "./CandidateInboxPage";
 import { ComparePage } from "./ComparePage";

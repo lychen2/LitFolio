@@ -12,6 +12,8 @@ import { ReadingQueue } from "./library/ReadingQueue";
 import { QuickReadDrawer } from "./library/QuickReadDrawer";
 import { VirtualPaperList } from "./library/PaperList";
 import { LibraryFilterBar, type LibraryViewMode } from "./library/LibraryFilterBar";
+import { PluginSlot } from "@/host/PluginSlot";
+import FixtureButton from "@/plugins/fixture-local/FixtureButton";
 import { filterLibraryPapers, type LibraryFilterState } from "./library/libraryFilters";
 import { toggleLibrarySelection } from "./library/librarySelection";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
@@ -112,6 +114,10 @@ export function LibraryPage() {
         onToggleViewMode={() => setViewMode(viewMode === "papers" ? "queue" : "papers")}
         onToggleFolders={() => setFolderOpen((open) => !open)}
         onReviewCollection={() => setShowLitReview(true)}
+      />
+      <PluginSlot
+        slot="library.toolbarActions"
+        render={(c) => (c.frontendExport === "renderToolbarButton" ? <FixtureButton /> : null)}
       />
       {viewMode === "queue" ? (
         <div className="flex-1 min-h-0 overflow-hidden">

@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalOnboarding } from "@/components/GlobalOnboarding";
 import { Shell } from "@/components/Shell";
+import { PluginRouteHost } from "@/host/PluginRouteHost";
 import { useT } from "@/i18n/I18nProvider";
 
 // Route-level code splitting keeps the PDF rendering stack out of the initial
@@ -11,15 +12,7 @@ import { useT } from "@/i18n/I18nProvider";
 const LibraryPage = lazy(() => import("@/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
 const ReaderPage = lazy(() => import("@/pages/ReaderPage").then((m) => ({ default: m.ReaderPage })));
 const ImportPage = lazy(() => import("@/pages/ImportPage").then((m) => ({ default: m.ImportPage })));
-const AskPage = lazy(() => import("@/pages/AskPage").then((m) => ({ default: m.AskPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
-const TopicPage = lazy(() => import("@/pages/TopicPage").then((m) => ({ default: m.TopicPage })));
-const BrowsePage = lazy(() => import("@/pages/BrowsePage").then((m) => ({ default: m.BrowsePage })));
-const FeedsPage = lazy(() => import("@/pages/FeedsPage").then((m) => ({ default: m.FeedsPage })));
-const GraphPage = lazy(() => import("@/pages/GraphPage").then((m) => ({ default: m.GraphPage })));
-const ComparePage = lazy(() => import("@/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
-const CandidateInboxPage = lazy(() => import("@/pages/CandidateInboxPage").then((m) => ({ default: m.CandidateInboxPage })));
-const ProjectsPage = lazy(() => import("@/pages/ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
 
 export function AppRoutes() {
   return (
@@ -29,15 +22,8 @@ export function AppRoutes() {
         <Route path="/library" element={<RouteShell><LibraryPage /></RouteShell>} />
         <Route path="/reader/:paperId" element={<RouteShell><ReaderPage /></RouteShell>} />
         <Route path="/import" element={<RouteShell><ImportPage /></RouteShell>} />
-        <Route path="/topic" element={<RouteShell><TopicPage /></RouteShell>} />
-        <Route path="/browse" element={<RouteShell><BrowsePage /></RouteShell>} />
-        <Route path="/feeds" element={<RouteShell><FeedsPage /></RouteShell>} />
-        <Route path="/candidates" element={<RouteShell><CandidateInboxPage /></RouteShell>} />
-        <Route path="/projects" element={<RouteShell><ProjectsPage /></RouteShell>} />
-        <Route path="/ask" element={<RouteShell><AskPage /></RouteShell>} />
-        <Route path="/graph" element={<RouteShell><GraphPage /></RouteShell>} />
-        <Route path="/compare" element={<RouteShell><ComparePage /></RouteShell>} />
         <Route path="/settings" element={<RouteShell><SettingsPage /></RouteShell>} />
+        <Route path="*" element={<RouteShell><PluginRouteHost /></RouteShell>} />
       </Routes>
       <GlobalOnboarding />
     </Shell>

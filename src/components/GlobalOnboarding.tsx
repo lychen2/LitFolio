@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, FolderOpen, FileText, Brain, FolderKanban, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { isPluginBuilt } from "@/host/registry";
 import { useT } from "@/i18n/I18nProvider";
 
 const STORAGE_KEY = "litera.onboarding.completed";
@@ -38,7 +39,7 @@ export function GlobalOnboarding() {
   const projectsQ = useQuery({
     queryKey: ["projects"],
     queryFn: api.projectsList,
-    enabled: show,
+    enabled: show && isPluginBuilt("research-workbench"),
   });
 
   const hasPapers = (papersQ.data?.length ?? 0) > 0;
@@ -80,7 +81,7 @@ export function GlobalOnboarding() {
       actionRoute: "/projects",
       checkCompleted: () => hasProjects,
     },
-  ];
+  ].filter((step) => step.id !== "project" || isPluginBuilt("research-workbench"));
 
   const allCompleted = steps.every((step) => step.checkCompleted());
 

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { parseAskCapabilityState, parseAskSession, parseAskSessionMaybe, parseHighlight, parseLlmConfig } from "./apiSchema";
+import { parseHighlight, parseLlmConfig } from "./apiSchema";
 import {
   parseAiExecutionRecord,
   parseReaderAskResult,
@@ -11,10 +11,6 @@ import { parseArray } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
   ArxivDraft,
-  AskSessionDraft,
-  AskLibraryResult,
-  BatchSummary,
-  ExpandedQuery,
   LlmConfig,
   LlmProfile,
   LlmTestResult,
@@ -23,12 +19,7 @@ import type {
   ReaderTranslateResult,
   ReaderMarkdownTranslationEstimate,
   ReaderMarkdownTranslationResult,
-  ReadStatus,
-  SaveAskNoteInput,
-  SaveAskNoteResult,
-  SaveTopicSurveyResult,
   TldrResult,
-  TopicSurvey,
   TranslationResult,
 } from "./types/api";
 
@@ -53,40 +44,6 @@ export const aiReaderApi = {
       draft,
       targetLang: targetLang ?? "Chinese",
     }),
-  askCapabilityState: () =>
-    invokeParsed("ask_capability_state", undefined, parseAskCapabilityState),
-  askSessionLatest: (projectId?: number | null) =>
-    invokeParsed(
-      "ask_session_latest",
-      { projectId: projectId ?? null },
-      parseAskSessionMaybe
-    ),
-  askSessionSave: (draft: AskSessionDraft) =>
-    invokeParsed("ask_session_save", { draft }, parseAskSession),
-  libraryAsk: (
-    question: string,
-    limit?: number,
-    conversationHistory?: { role: string; content: string }[],
-    pinnedPaperIds?: string[],
-  ) =>
-    invoke<AskLibraryResult>("library_ask", {
-      question,
-      limit: limit ?? null,
-      conversationHistory: conversationHistory ?? null,
-      pinnedPaperIds: pinnedPaperIds && pinnedPaperIds.length > 0 ? pinnedPaperIds : null,
-    }),
-  askSaveAsNote: (input: SaveAskNoteInput) =>
-    invoke<SaveAskNoteResult>("ask_save_as_note", { input }),
-  batchTldr: (ids: string[]) => invoke<BatchSummary>("batch_tldr", { ids }),
-  batchQuickRead: (ids: string[]) => invoke<BatchSummary>("batch_quick_read", { ids }),
-  batchTranslate: (ids: string[], targetLang?: string) =>
-    invoke<BatchSummary>("batch_translate", { ids, targetLang: targetLang ?? "Chinese" }),
-  batchAttachTag: (ids: string[], tagId: number) =>
-    invoke<number>("batch_attach_tag", { ids, tagId }),
-  batchSetStatus: (ids: string[], status: ReadStatus) =>
-    invoke<number>("batch_set_status", { ids, status }),
-  batchDelete: (ids: string[]) => invoke<number>("batch_delete", { ids }),
-  batchCancel: () => invoke<boolean>("batch_cancel"),
   highlightCreate: (
     paperId: string,
     page: number,
@@ -182,14 +139,4 @@ export const aiReaderApi = {
     ),
   aiCancelExecution: (executionId: string) =>
     invoke<boolean>("ai_cancel_execution", { executionId }),
-  searchExpandQuery: (raw: string) =>
-    invoke<ExpandedQuery>("search_expand_query", { raw }),
-  topicSurvey: (params: { topic: string; annotate?: boolean; perSubareaTopk?: number }) =>
-    invoke<TopicSurvey>("topic_survey", {
-      topic: params.topic,
-      annotate: params.annotate ?? null,
-      perSubareaTopk: params.perSubareaTopk ?? null,
-    }),
-  topicSurveySaveAsNote: (survey: TopicSurvey) =>
-    invoke<SaveTopicSurveyResult>("topic_survey_save_as_note", { survey }),
 };

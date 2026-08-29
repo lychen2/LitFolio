@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AskSource } from "@/lib/api";
-import { askSourceReaderHref } from "../AskPage";
+import { askSourceReaderHref } from "./AskPage";
 
 describe("askSourceReaderHref", () => {
   it("links to a paper's reader when paper_id is set", () => {

@@ -7,6 +7,7 @@ import { AppNav, AutoHideNav } from "@/components/AppNav";
 import { useFileDrop } from "@/hooks/useFileDrop";
 import { DropZoneOverlay } from "@/components/DropZoneOverlay";
 import { CommandPalette } from "@/components/CommandPalette";
+import { useEnabledPluginIds } from "@/host/PluginSlot";
 
 const PIN_NAV_KEY = "litera-pin-nav";
 
@@ -30,9 +31,11 @@ export function Shell({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const { data: enabledPlugins } = useEnabledPluginIds();
   const { data: unseenCount = 0 } = useQuery({
     queryKey: ["topic-alert-unseen"],
     queryFn: api.topicAlertUnseenCount,
+    enabled: enabledPlugins?.has("discovery-feeds") === true,
     refetchInterval: 60_000,
   });
   const { data: appVersion } = useQuery({

@@ -1,0 +1,24 @@
+{
+  "apiVersion": 1,
+  "id": "knowledge-graph",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Knowledge Graph",
+  "activation": { "frontend": { "export": "activateKnowledgeGraph" } },
+  "dependencies": [],
+  "requestedCapabilities": [
+    {
+      "capability": "papers",
+      "operations": ["papers.read"],
+      "required": true,
+      "scope": { "resourceDomains": ["paper", "document-revision"], "contributionSlots": ["app.routes"], "jobKinds": [] },
+      "limits": { "maxUnitsPerRequest": 100, "maxUnitsPerWindow": 1000 }
+    }
+  ],
+  "contributions": [
+    { "id": "graph-route", "slot": "app.routes", "frontendExport": "renderGraphRoute", "requiredOperations": ["papers.read"], "order": 0 }
+  ],
+  "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+  "migrations": [],
+  "build": { "frontendEntry": "./src/plugins/knowledge-graph/index.ts" }
+}

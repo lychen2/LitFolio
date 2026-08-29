@@ -1,0 +1,22 @@
+{
+  "apiVersion": 1,
+  "id": "source-connectors",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Source Connectors",
+  "activation": { "frontend": { "export": "activateSourceConnectors" } },
+  "dependencies": [],
+  "requestedCapabilities": [
+    {
+      "capability": "network",
+      "operations": ["network.request"],
+      "required": true,
+      "scope": { "resourceDomains": ["paper"], "contributionSlots": ["import.sources"], "jobKinds": [] },
+      "limits": { "maxUnitsPerRequest": 10, "maxUnitsPerWindow": 100 }
+    }
+  ],
+  "contributions": [],
+  "storage": { "kind": "none", "schemaVersion": 0, "retention": "preserve-on-disable" },
+  "migrations": [],
+  "build": { "frontendEntry": "./src/plugins/source-connectors/index.ts" }
+}

@@ -3,7 +3,8 @@ import { BookOpenText, HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "lu
 import { clsx } from "clsx";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useT } from "@/i18n/I18nProvider";
-import { NAVIGATION_GROUPS, NAVIGATION_ITEMS } from "@/lib/navigationRegistry";
+import { visibleNavigation } from "@/lib/navigationRegistry";
+import { useEnabledPluginIds } from "@/host/PluginSlot";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export function AppNav({
@@ -23,7 +24,9 @@ export function AppNav({
 }) {
   const t = useT();
   const location = useLocation();
-  const items = new Map(NAVIGATION_ITEMS.map((item) => [item.to, item]));
+  const { data: enabled } = useEnabledPluginIds();
+  const { items: navItems, groups } = visibleNavigation(enabled);
+  const items = new Map(navItems.map((item) => [item.to, item]));
 
   function isItemActive(path: string): boolean {
     if (path === "/library" && location.pathname.startsWith("/reader/")) return true;
@@ -58,7 +61,7 @@ export function AppNav({
       </NavLink>
 
       <nav aria-label={t("shell.navigation")} className="min-h-0 flex-1 overflow-y-auto">
-        {NAVIGATION_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.id} className="mb-5 last:mb-0">
             <div className="nav-label litera-section-label mb-1 px-2">{t(group.labelKey)}</div>
             <div className="space-y-0.5">

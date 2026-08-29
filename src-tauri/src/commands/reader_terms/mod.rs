@@ -17,6 +17,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::commands::term_filter::{self, is_term_candidate};
+use crate::commands::{ai_dispatch::run_reading_dispatch, summaries::freeze_paper_context};
+use crate::ai::{active_reading_profile, load_config, ReadingContextRequest};
 use crate::storage::{NewPaperTerm, PaperDocumentRepo, PaperRepo, PaperTerm, PaperTermRepo};
 use crate::AppState;
 
@@ -50,7 +52,7 @@ pub async fn paper_terms_generate(
     paper_id: String,
 ) -> Result<Vec<ReaderPaperTerm>, String> {
     paper_terms_generate_candidates(state.clone(), paper_id.clone()).await?;
-    paper_terms_explain(state, paper_id).await
+    terms_explain_impl(&state, &paper_id, "paper_terms_generate").await
 }
 
 #[tauri::command]
@@ -87,16 +89,30 @@ pub async fn paper_terms_explain(
     state: State<'_, Arc<AppState>>,
     paper_id: String,
 ) -> Result<Vec<ReaderPaperTerm>, String> {
+    terms_explain_impl(&state, &paper_id, "paper_terms_explain").await
+}
+
+/// Shared explain flow for the terms group. Resolves the ONE active reading
+/// model, freezes a whole-paper context envelope, and runs the provider call
+/// under a redacted execution record + cancellation token. Definition writes
+/// happen only after the dispatch reaches a successful terminal state.
+async fn terms_explain_impl(
+    state: &State<'_, Arc<AppState>>,
+    paper_id: &str,
+    operation: &'static str,
+) -> Result<Vec<ReaderPaperTerm>, String> {
     let repo = PaperTermRepo::new(&state.pool);
     let existing = repo
-        .list_by_paper(&paper_id)
+        .list_by_paper(paper_id)
         .await
         .map_err(|e| e.to_string())?;
     if existing.is_empty() {
         return Ok(Vec::new());
     }
+    let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+    let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let paper = PaperRepo::new(&state.pool)
-        .get(&paper_id)
+        .get(paper_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "paper not found".to_string())?;
@@ -113,9 +129,33 @@ pub async fn paper_terms_explain(
             local_evidence: term.local_evidence.clone(),
         })
         .collect::<Vec<_>>();
-    let defs = explain::explain_terms(&state, &paper, &terms, &abbrev_long)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let envelope = freeze_paper_context(
+        state,
+        &ReadingContextRequest {
+            paper_id: paper_id.to_string(),
+            selection: None,
+            highlight_id: None,
+            revision_id: None,
+            max_body_chars: None,
+        },
+        &paper.title,
+        paper.abstract_text.as_deref(),
+        body.as_deref(),
+    )
+    .await?;
+
+    let defs = run_reading_dispatch(
+        state,
+        operation,
+        paper_id,
+        &prof.name,
+        &prof.chat_model,
+        &envelope,
+        explain::explain_terms(&state.http, &prof, &paper, &terms, &abbrev_long),
+    )
+    .await?;
+
     for term in &existing {
         if !is_explainable_existing_term(term) {
             repo.delete(&paper_id, term.id)
@@ -177,19 +217,44 @@ pub async fn paper_term_add(
     {
         Some(text) => text,
         None => {
+            let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
+            let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
+            let body = evidence::extract_pdf_body(&paper, &state.paths).await;
+            let envelope = freeze_paper_context(
+                &state,
+                &ReadingContextRequest {
+                    paper_id: paper_id.clone(),
+                    selection: None,
+                    highlight_id: None,
+                    revision_id: None,
+                    max_body_chars: None,
+                },
+                &paper.title,
+                paper.abstract_text.as_deref(),
+                body.as_deref(),
+            )
+            .await?;
             let candidate = candidates::CandidateTerm {
                 term: trimmed.to_string(),
                 score: 0.0,
                 local_evidence: evidence_text.clone(),
             };
-            let defs = explain::explain_terms(
+            let defs = run_reading_dispatch(
                 &state,
-                &paper,
-                std::slice::from_ref(&candidate),
-                &HashMap::new(),
+                "paper_term_add",
+                &paper_id,
+                &prof.name,
+                &prof.chat_model,
+                &envelope,
+                explain::explain_terms(
+                    &state.http,
+                    &prof,
+                    &paper,
+                    std::slice::from_ref(&candidate),
+                    &HashMap::new(),
+                ),
             )
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
             defs.get(trimmed)
                 .cloned()
                 .unwrap_or_else(|| explain::fallback_definition(&candidate))

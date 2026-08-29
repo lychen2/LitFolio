@@ -5,28 +5,25 @@
 //! boilerplate when the LLM returns nothing for a specific term.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use tauri::State;
 
 use super::candidates::CandidateTerm;
 use super::evidence;
-use crate::ai::{
-    active_profile_for_task, chat_complete_for_task, load_config, ChatMessage, TaskKind,
-};
+use crate::ai::{chat_complete_for_task, ChatMessage, LlmProfile, TaskKind};
 use crate::commands::term_filter;
 use crate::storage::Paper;
-use crate::AppState;
 
+/// Pure provider dispatch for term definitions: resolves nothing from config,
+/// reads nothing from storage. Callers freeze a context envelope and wrap this
+/// in `run_reading_dispatch`; persistence happens only after success.
 pub(super) async fn explain_terms(
-    state: &State<'_, Arc<AppState>>,
+    client: &reqwest::Client,
+    profile: &LlmProfile,
     paper: &Paper,
     terms: &[CandidateTerm],
     abbrev_long: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>> {
-    let cfg = load_config(&state.paths)?;
-    let profile = active_profile_for_task(&cfg, TaskKind::Tag)?;
     let items = terms
         .iter()
         .map(|term| {
@@ -45,8 +42,8 @@ pub(super) async fn explain_terms(
         .replace("{title}", &paper.title)
         .replace("{items}", &items);
     let resp = chat_complete_for_task(
-        &state.http,
-        &profile,
+        client,
+        profile,
         TaskKind::Tag,
         &[
             ChatMessage {

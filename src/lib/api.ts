@@ -2,6 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { aiReadingClient, libraryClient, readerClient } from "@/core/data";
+import { aiPluginApi } from "./apiAiPlugins";
 import { knowledgeApi } from "./apiKnowledge";
 import type { TopicSurveyProgress } from "./types/api";
 
@@ -136,6 +137,8 @@ export const api = {
   ...aiReadingClient,
   ...readerClient,
   ...knowledgeApi,
+  // Temporary adapter: plugin-owned AI capabilities pending plugin-host extraction.
+  ...aiPluginApi,
 };
 
 /// Subscribe to backend progress events for an in-flight `topic_survey` call.

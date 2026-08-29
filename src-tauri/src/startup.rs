@@ -40,18 +40,25 @@ pub(crate) async fn bootstrap_state_at_with_observer(
         host_network: HostNetworkState::new(network_egress),
         batch_cancel: tokio::sync::Mutex::new(None),
         sync_lock: tokio::sync::Mutex::new(()),
+        plugin_host: crate::plugin_host::PluginHostState::new(),
     }))
 }
 
 async fn run_optional_startup_tasks(pool: &Pool, paths: &LibraryPaths) {
-    repair_default_feeds(pool).await;
-    seed_default_feeds(pool).await;
+    // Default RSS seeding is discovery-feeds plugin behavior; a core-only
+    // boot stays silent and touches no feed tables' seed logic.
+    #[cfg(feature = "plugin-discovery-feeds")]
+    {
+        repair_default_feeds(pool).await;
+        seed_default_feeds(pool).await;
+    }
     seed_manual_pdfs_if_empty(pool, paths).await;
     migrate_legacy_pdf_text_cache(pool, paths).await;
     // PDF markdown rebuild stays lazy: imports, Ask backfill, and the PDF.js
     // reader generate document.md without making startup parse the whole library.
 }
 
+#[cfg(feature = "plugin-discovery-feeds")]
 async fn repair_default_feeds(pool: &Pool) {
     let feed_repo = storage::FeedRepo::new(pool);
     match feed_repo.repair_default_feed_urls().await {
@@ -63,6 +70,7 @@ async fn repair_default_feeds(pool: &Pool) {
     }
 }
 
+#[cfg(feature = "plugin-discovery-feeds")]
 async fn seed_default_feeds(pool: &Pool) {
     let feed_repo = storage::FeedRepo::new(pool);
     match feed_repo.seed_defaults_if_empty().await {

@@ -59,7 +59,7 @@ pub(crate) async fn load_or_extract_pdf_body(
 /// Freeze the reading context for a whole-paper action: metadata + resolved
 /// body text + active revision provenance. Pure validation happens in
 /// [`freeze_reading_context`]; storage lookups happen here, before freezing.
-async fn freeze_paper_context(
+pub(crate) async fn freeze_paper_context(
     state: &AppState,
     request: &ReadingContextRequest,
     title: &str,

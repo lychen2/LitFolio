@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, FileText, Download, Highlighter, BookMarked, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
-import { NAVIGATION_ITEMS } from "@/lib/navigationRegistry";
+import { visibleNavigation } from "@/lib/navigationRegistry";
+import { useEnabledPluginIds } from "@/host/PluginSlot";
 
 interface CommandItem {
   id: string;
@@ -19,6 +20,8 @@ interface CommandItem {
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
   const navigate = useNavigate();
+  const { data: enabled } = useEnabledPluginIds();
+  const { items: navItems } = visibleNavigation(enabled);
   const [query, setQuery] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +48,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   });
 
   const commands = useMemo<CommandItem[]>(() => [
-    ...NAVIGATION_ITEMS.map((item) => ({
+    ...navItems.map((item) => ({
       id: `nav:${item.to.slice(1) || "home"}`,
       label: t(item.labelKey),
       category: "navigation" as const,
@@ -54,7 +57,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       keywords: [...item.keywords],
     })),
     { id: "act:export", label: t("export.title"), category: "actions", icon: Download, action: () => navigate("/settings"), keywords: ["export", "markdown", "导出"] },
-  ], [t, navigate]);
+  ], [t, navigate, navItems]);
 
   // Paper items from recent papers.
   const paperItems = useMemo<CommandItem[]>(() => {

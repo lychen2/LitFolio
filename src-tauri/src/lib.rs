@@ -11,10 +11,12 @@ mod export;
 mod http;
 mod index;
 mod ingest;
+mod legacy_conversion;
 mod library_sync;
 mod mineru;
 pub mod mono_contracts;
 pub mod network_egress;
+mod plugin_host;
 mod secret;
 mod startup;
 mod storage;
@@ -54,6 +56,9 @@ pub struct AppState {
     /// guard there would pin a tokio worker thread.
     pub batch_cancel: AsyncMutex<Option<CancellationToken>>,
     pub sync_lock: AsyncMutex<()>,
+    /// Plugin host authority registry: live instance bindings keyed by
+    /// opaque binding id. Disable revokes here before any cleanup.
+    pub plugin_host: plugin_host::PluginHostState,
 }
 
 #[cfg(not(test))]

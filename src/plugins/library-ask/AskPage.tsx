@@ -10,8 +10,8 @@ import { type TKey } from "@/i18n/dict";
 import { useT } from "@/i18n/I18nProvider";
 import { MarkdownView } from "@/components/MarkdownView";
 import { PageHeader } from "@/components/PageHeader";
-import { WorkflowCard } from "./ask/WorkflowCard";
-import { AskComposer, type PinnedPaper } from "./ask/AskComposer";
+import { WorkflowCard } from "./WorkflowCard";
+import { AskComposer, type PinnedPaper } from "./AskComposer";
 
 export function askSourceReaderHref(source: { paper_id: string }): string | null {
   return source.paper_id ? `/reader/${source.paper_id}` : null;

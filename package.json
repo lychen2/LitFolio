@@ -5,17 +5,17 @@
   "type": "module",
   "description": "LitFolio — local-first literature management with LLM-powered summarization",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "VITE_LITFOLIO_PROFILE=all vite",
+    "build": "node scripts/generate-profile-registry.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "typecheck": "tsc --noEmit",
+    "tauri:build": "LITFOLIO_PROFILE=core tauri build --no-default-features --features custom-protocol",
+    "typecheck": "VITE_LITFOLIO_PROFILE=all node scripts/generate-profile-registry.mjs && tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:strict": "eslint src --ext .ts,.tsx --max-warnings=0",
-    "test": "vitest run",
-    "test:e2e": "node scripts/check-playwright-browsers.mjs && playwright test",
+    "test": "VITE_LITFOLIO_PROFILE=all node scripts/generate-profile-registry.mjs && vitest run",
+    "test:e2e": "VITE_LITFOLIO_PROFILE=all node scripts/generate-profile-registry.mjs && node scripts/check-playwright-browsers.mjs && playwright test",
     "bundle:report": "node scripts/bundle-report.mjs"
   },
   "dependencies": {

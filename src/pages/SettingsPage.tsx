@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Cpu, Download, FolderSync, Loader2, Save, Search, ShieldCheck, Workflow } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Cpu, Download, FolderSync, Loader2, Puzzle, Save, Search, ShieldCheck } from "lucide-react";
 import { api, type LlmConfig, type LlmProfile } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { ThemePicker } from "@/components/ThemePicker";
@@ -11,27 +12,32 @@ import { AppUpdateCard } from "./settings/AppUpdateCard";
 import { DataPrivacyPanel } from "./settings/DataPrivacyPanel";
 import { DuplicatesPanel } from "./settings/DuplicatesPanel";
 import { ExportPanel } from "./settings/ExportPanel";
+import { PluginsPanel } from "./settings/PluginsPanel";
 import { ProfilesTab } from "./settings/ProfilesTab";
 import { SyncPanel } from "./settings/SyncPanel";
-import { TaskAssignments } from "./settings/TaskAssignments";
 import { PdfMarkdownSettings } from "./settings/PdfMarkdownSettings";
 import { ObsidianSettings } from "./settings/ObsidianSettings";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
 
-type SettingsTab = "privacy" | "profiles" | "tasks" | "sync" | "export" | "tools";
+type SettingsTab = "privacy" | "plugins" | "profiles" | "sync" | "export" | "tools";
 
 const TAB_DEFS: { key: SettingsTab; labelKey: TKey; icon: typeof Cpu }[] = [
   { key: "privacy", labelKey: "settings.tab.privacy", icon: ShieldCheck },
+  { key: "plugins", labelKey: "settings.tab.plugins", icon: Puzzle },
   { key: "profiles", labelKey: "settings.tab.profiles", icon: Cpu },
-  { key: "tasks", labelKey: "settings.tab.tasks", icon: Workflow },
   { key: "sync", labelKey: "settings.tab.sync", icon: FolderSync },
   { key: "export", labelKey: "export.title", icon: Download },
   { key: "tools", labelKey: "settings.tab.tools", icon: Search },
 ];
 
+function settingsTabFrom(value: string | null): SettingsTab {
+  return TAB_DEFS.some((tab) => tab.key === value) ? (value as SettingsTab) : "privacy";
+}
+
 export function SettingsPage() {
   const t = useT();
-  const [tab, setTab] = useState<SettingsTab>("privacy");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<SettingsTab>(() => settingsTabFrom(params.get("tab")));
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["llm", "config"],
     queryFn: api.llmGetConfig,
@@ -154,6 +160,7 @@ export function SettingsPage() {
                 <AppUpdateCard />
               </div>
             )}
+            {tab === "plugins" && <PluginsPanel />}
             {tab === "profiles" && (
               <ProfilesTab
                 draft={draft}
@@ -164,7 +171,6 @@ export function SettingsPage() {
                 onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
               />
             )}
-            {tab === "tasks" && <TaskAssignments draft={draft} onChange={setDraft} />}
             {tab === "sync" && <SyncPanel />}
             {tab === "export" && <ExportPanel />}
             {tab === "tools" && (

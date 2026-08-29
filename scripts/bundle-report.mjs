@@ -1,3 +1,4 @@
+/* global process, console */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -12,6 +13,7 @@ function main() {
   printSection("Largest script chunks", scripts, TOP_COUNT);
   printSection("CSS chunks", styles, TOP_COUNT);
   printRouteSignals(scripts);
+  verifyProfile(assets);
 }
 
 function readAssets() {
@@ -45,6 +47,20 @@ function printRouteSignals(scripts) {
     const hit = scripts.find((asset) => asset.name.includes(signal));
     const size = hit ? `${formatBytes(hit.bytes)} / ${formatBytes(hit.gzipBytes)} gzip` : "missing";
     console.log(`${pad(signal, 14)} ${size}`);
+  }
+}
+
+function verifyProfile(assets) {
+  const expectedAbsent = (process.env.LITFOLIO_EXPECT_ABSENT || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const failures = expectedAbsent.filter((signal) => assets.some((asset) => asset.name.includes(signal)));
+  if (failures.length > 0) {
+    throw new Error(`Excluded profile contains assets: ${failures.join(", ")}`);
+  }
+  if (expectedAbsent.length > 0) {
+    console.log(`\nProfile exclusion checks passed: ${expectedAbsent.join(", ")}`);
   }
 }
 

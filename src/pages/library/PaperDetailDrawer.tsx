@@ -132,6 +132,7 @@ export function PaperDetailDrawer({
           <PaperSupplementsSection paperId={paper.id} />
           <CustomFieldsSection paperId={paper.id} />
           {translate.error && <ErrorLine error={translate.error} />}
+
         </div>
       </div>
     </div>
