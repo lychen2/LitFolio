@@ -134,7 +134,6 @@ pub async fn reader_translate_selection(
                 target_lang: &lang,
             })
             .await
-            .map_err(anyhow::Error::from)
         },
     )
     .await
@@ -314,7 +313,6 @@ pub async fn highlight_translate(
                 target_lang: &lang,
             })
             .await
-            .map_err(anyhow::Error::from)
         },
     )
     .await?;
@@ -386,11 +384,7 @@ pub async fn highlight_summarize(
         &profile.name,
         &profile.chat_model,
         &envelope,
-        async {
-            summarize_highlight(&state.http, &profile, &paper, &clipped)
-                .await
-                .map_err(anyhow::Error::from)
-        },
+        async { summarize_highlight(&state.http, &profile, &paper, &clipped).await },
     )
     .await?;
     if result.summary.trim().is_empty() {

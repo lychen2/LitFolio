@@ -158,7 +158,7 @@ async fn terms_explain_impl(
 
     for term in &existing {
         if !is_explainable_existing_term(term) {
-            repo.delete(&paper_id, term.id)
+            repo.delete(paper_id, term.id)
                 .await
                 .map_err(|e| e.to_string())?;
             continue;
@@ -167,15 +167,15 @@ async fn terms_explain_impl(
             .get(&term.term)
             .cloned()
             .unwrap_or_else(|| explain::fallback_definition_for(&term.term));
-        repo.update_definition(&paper_id, &term.normalized_term, &definition)
+        repo.update_definition(paper_id, &term.normalized_term, &definition)
             .await
             .map_err(|e| e.to_string())?;
     }
     let stored = repo
-        .list_by_paper(&paper_id)
+        .list_by_paper(paper_id)
         .await
         .map_err(|e| e.to_string())?;
-    enrich_terms(&repo, &paper_id, stored)
+    enrich_terms(&repo, paper_id, stored)
         .await
         .map_err(|e| e.to_string())
 }

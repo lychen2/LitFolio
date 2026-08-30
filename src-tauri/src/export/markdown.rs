@@ -318,7 +318,7 @@ fn without_leading_h1(markdown: &str) -> String {
     let mut found_content = false;
     let mut removed = false;
 
-    while let Some(line) = lines.next() {
+    for line in lines.by_ref() {
         if !found_content && line.trim().is_empty() {
             prefix.push(line);
             continue;

@@ -175,47 +175,6 @@ fn dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
     Ok(total)
 }
 
-#[cfg(test)]
-mod diagnostics_export_tests {
-    use super::*;
-    use crate::storage::LibraryPaths;
-
-    #[test]
-    fn diagnostics_export_log_copies_existing_log() {
-        let root = std::env::temp_dir().join(format!("litera-diag-export-{}", ulid::Ulid::new()));
-        let paths = LibraryPaths::new(&root);
-        paths.ensure().unwrap();
-        std::fs::write(paths.app_log_file(), "diagnostic line\n").unwrap();
-
-        let dest = root.join("exports").join("litfolio-diagnostics.log");
-        let exported = export_diagnostics_log(&paths, &dest).unwrap();
-
-        assert_eq!(exported, dest);
-        assert_eq!(
-            std::fs::read_to_string(&exported).unwrap(),
-            "diagnostic line\n"
-        );
-        std::fs::remove_dir_all(root).ok();
-    }
-
-    #[test]
-    fn diagnostics_export_log_writes_placeholder_when_missing() {
-        let root = std::env::temp_dir().join(format!("litera-diag-empty-{}", ulid::Ulid::new()));
-        let paths = LibraryPaths::new(&root);
-        paths.ensure().unwrap();
-
-        let dest = root.join("exports").join("litfolio-diagnostics.log");
-        let exported = export_diagnostics_log(&paths, &dest).unwrap();
-
-        assert_eq!(exported, dest);
-        assert_eq!(
-            std::fs::read_to_string(&exported).unwrap(),
-            "LitFolio diagnostic log has not been created yet.\n"
-        );
-        std::fs::remove_dir_all(root).ok();
-    }
-}
-
 #[allow(unused_macros)]
 macro_rules! command_paths_core {
     ([$($commands:tt)*]) => {
@@ -624,3 +583,44 @@ pub(crate) use stage_candidates;
 pub(crate) use stage_feeds;
 #[allow(unused_imports)]
 pub(crate) use stage_graph;
+
+#[cfg(test)]
+mod diagnostics_export_tests {
+    use super::*;
+    use crate::storage::LibraryPaths;
+
+    #[test]
+    fn diagnostics_export_log_copies_existing_log() {
+        let root = std::env::temp_dir().join(format!("litera-diag-export-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&root);
+        paths.ensure().unwrap();
+        std::fs::write(paths.app_log_file(), "diagnostic line\n").unwrap();
+
+        let dest = root.join("exports").join("litfolio-diagnostics.log");
+        let exported = export_diagnostics_log(&paths, &dest).unwrap();
+
+        assert_eq!(exported, dest);
+        assert_eq!(
+            std::fs::read_to_string(&exported).unwrap(),
+            "diagnostic line\n"
+        );
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn diagnostics_export_log_writes_placeholder_when_missing() {
+        let root = std::env::temp_dir().join(format!("litera-diag-empty-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&root);
+        paths.ensure().unwrap();
+
+        let dest = root.join("exports").join("litfolio-diagnostics.log");
+        let exported = export_diagnostics_log(&paths, &dest).unwrap();
+
+        assert_eq!(exported, dest);
+        assert_eq!(
+            std::fs::read_to_string(&exported).unwrap(),
+            "LitFolio diagnostic log has not been created yet.\n"
+        );
+        std::fs::remove_dir_all(root).ok();
+    }
+}

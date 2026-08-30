@@ -230,7 +230,7 @@ fn find_case_insensitive_range(haystack: &str, needle: &str) -> Option<(usize, u
             let mut buffer = [0; 4];
             let encoded = lower_ch.encode_utf8(&mut buffer);
             lower_haystack.push_str(encoded);
-            lower_to_original.extend(std::iter::repeat(original_end).take(encoded.len()));
+            lower_to_original.extend(std::iter::repeat_n(original_end, encoded.len()));
         }
     }
 

@@ -506,6 +506,7 @@ impl<'a> ProvenanceRepo<'a> {
         })
     }
 
+    #[allow(clippy::too_many_arguments)] // accept flow touches all revision data
     async fn finalize_accept(
         &self,
         paper_id: &str,
@@ -1369,7 +1370,7 @@ fn validate_geometry(rect: Option<&Value>) -> Result<(), ProvenanceError> {
             .get(*key)
             .and_then(Value::as_f64)
             .ok_or(ProvenanceError::SegmentGeometryInvalid)?;
-        if !value.is_finite() || value < 0.0 || value > MAX_COORDINATE {
+        if !value.is_finite() || !(0.0..=MAX_COORDINATE).contains(&value) {
             return Err(ProvenanceError::SegmentGeometryInvalid);
         }
         coordinates[index] = value;
@@ -1564,7 +1565,7 @@ mod tests {
         assert_eq!(accepted2.revision, 2);
         let revisions = repo.revisions_list("paper-a").await.expect("list");
         assert_eq!(revisions.len(), 2);
-        assert!(revisions[0].active == false || revisions[1].active == false);
+        assert!(!revisions[0].active || !revisions[1].active);
         assert_eq!(revisions.iter().filter(|r| r.active).count(), 1);
         assert!(revisions
             .iter()

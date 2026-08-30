@@ -570,6 +570,7 @@ async fn rollback_converted(pool: &Pool, inserted_ids: &[String]) -> Result<(), 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // report fields are all distinct data
 fn rolled_back_report(
     dest: &Path,
     verified_backup_path: &str,

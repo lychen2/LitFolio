@@ -128,6 +128,7 @@ enum MarkdownChunkAttempt {
     LengthLimited,
 }
 
+#[allow(clippy::too_many_arguments)] // retry loop mirrors chunk call signature
 async fn translate_markdown_chunk_with_retries(
     client: &reqwest::Client,
     profile: &LlmProfile,
@@ -180,6 +181,7 @@ async fn translate_markdown_chunk_with_retries(
     Ok(translated)
 }
 
+#[allow(clippy::too_many_arguments)] // per-chunk LLM call needs full context
 async fn translate_markdown_chunk(
     client: &reqwest::Client,
     profile: &LlmProfile,

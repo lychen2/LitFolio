@@ -84,7 +84,7 @@ pub enum PdfNoteError {
     #[error("invalid annotation style")]
     AnnotationInvalidStyle,
     #[error("annotation revision conflict")]
-    AnnotationRevisionConflict { current: PdfNote },
+    AnnotationRevisionConflict { current: Box<PdfNote> },
     #[error("annotation not found")]
     AnnotationNotFound,
     #[error("annotation storage error: {message}")]
@@ -165,7 +165,7 @@ impl<'a> PdfNoteRepo<'a> {
     pub async fn update(&self, id: &str, patch: &PdfNotePatch) -> Result<PdfNote, PdfNoteError> {
         if patch.expected_revision < 0 {
             return Err(PdfNoteError::AnnotationRevisionConflict {
-                current: self.current_or_not_found(id).await?,
+                current: Box::new(self.current_or_not_found(id).await?),
             });
         }
         if let Some(rect) = &patch.rect {
@@ -214,7 +214,9 @@ impl<'a> PdfNoteRepo<'a> {
         match row {
             Some(row) => row_to_note(row),
             None => match self.get(id).await? {
-                Some(current) => Err(PdfNoteError::AnnotationRevisionConflict { current }),
+                Some(current) => Err(PdfNoteError::AnnotationRevisionConflict {
+                    current: Box::new(current),
+                }),
                 None => Err(PdfNoteError::AnnotationNotFound),
             },
         }
@@ -230,7 +232,9 @@ impl<'a> PdfNoteRepo<'a> {
             return Ok(());
         }
         match self.get(id).await? {
-            Some(current) => Err(PdfNoteError::AnnotationRevisionConflict { current }),
+            Some(current) => Err(PdfNoteError::AnnotationRevisionConflict {
+                current: Box::new(current),
+            }),
             None => Err(PdfNoteError::AnnotationNotFound),
         }
     }
