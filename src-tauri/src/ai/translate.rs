@@ -268,7 +268,8 @@ pub async fn translate_paper_text(
         ],
     )
     .await?;
-    let v = parse_lenient_value(&resp.content);
+    let cleaned_content = strip_think_tags(&resp.content);
+    let v = parse_lenient_value(&cleaned_content);
     let title_tx = v
         .get("title")
         .and_then(|x| x.as_str())
@@ -694,8 +695,22 @@ fn push_chunk(chunks: &mut Vec<String>, current: &mut String) {
     current.clear();
 }
 
+pub(crate) fn strip_think_tags(text: &str) -> String {
+    let mut out = text.to_string();
+    while let Some(start) = out.find("<think>") {
+        if let Some(end) = out[start..].find("</think>") {
+            out.replace_range(start..start + end + 8, "");
+        } else {
+            out.truncate(start);
+            break;
+        }
+    }
+    out.trim().to_string()
+}
+
 fn strip_markdown_fence(raw: &str, source_chunk: &str) -> String {
-    let trimmed = raw.trim();
+    let unthought = strip_think_tags(raw);
+    let trimmed = unthought.trim();
     if is_fenced_code_block(source_chunk) {
         return trimmed.to_string();
     }
@@ -953,7 +968,7 @@ mod tests {
     async fn serve_chat_sequence(
         bodies: Vec<String>,
     ) -> (String, std::sync::Arc<tokio::sync::Mutex<Vec<String>>>) {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::io::AsyncWriteExt;
         use tokio::net::TcpListener;
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

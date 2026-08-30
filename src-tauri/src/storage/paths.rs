@@ -293,9 +293,6 @@ impl LibraryPaths {
             let markdown_path = self.paper_markdown_file(&paper_id);
             let legacy_path = self.pdf_text_file(&paper_id);
             if !legacy_path.exists() {
-                if let Some(markdown) = read_non_empty_file(markdown_path) {
-                    summary.markdown_documents.push((paper_id, markdown));
-                }
                 continue;
             }
             if !markdown_path.exists() {

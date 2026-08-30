@@ -5,16 +5,14 @@ import {
   LibraryBig,
   ListPlus,
   Loader2,
-  Plus,
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api, type Paper, type ResearchProject } from "@/lib/api";
+import { api, type Paper } from "@/lib/api";
 import { errorMessageOr } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
 import { RECENT_IMPORTS_CHANGED_EVENT } from "./recentImports";
 
-type ProjectSelection = number | "";
 type ActionMessage = { kind: "ok" | "err"; text: string } | null;
 
 export function ImportSidebar() {
@@ -22,11 +20,6 @@ export function ImportSidebar() {
   const recent = useQuery({
     queryKey: ["papers", "recent", "import-sidebar"],
     queryFn: () => api.papersRecent(6),
-  });
-  const projects = useQuery({
-    queryKey: ["projects"],
-    queryFn: api.projectsList,
-    staleTime: 30_000,
   });
   const refetchRecent = recent.refetch;
 
@@ -61,11 +54,7 @@ export function ImportSidebar() {
         ) : (
           <div className="space-y-3">
             {recent.data.map((paper) => (
-              <RecentPaperCard
-                key={paper.id}
-                paper={paper}
-                projects={projects.data ?? []}
-              />
+              <RecentPaperCard key={paper.id} paper={paper} />
             ))}
           </div>
         )}
@@ -74,17 +63,10 @@ export function ImportSidebar() {
   );
 }
 
-function RecentPaperCard({
-  paper,
-  projects,
-}: {
-  paper: Paper;
-  projects: ResearchProject[];
-}) {
+function RecentPaperCard({ paper }: { paper: Paper }) {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [projectId, setProjectId] = useState<ProjectSelection>("");
   const [message, setMessage] = useState<ActionMessage>(null);
 
   const quickRead = useMutation({
@@ -102,22 +84,6 @@ function RecentPaperCard({
     onSuccess: () => {
       setMessage({ kind: "ok", text: t("import.sidebar.queueDone") });
       qc.invalidateQueries({ queryKey: ["queue"] });
-    },
-    onError: (error) =>
-      setActionError(error, setMessage, t("import.sidebar.actionFailed")),
-  });
-  const addProject = useMutation({
-    mutationFn: () => {
-      if (projectId === "")
-        throw new Error(t("import.sidebar.projectRequired"));
-      return api.projectAddPaper(projectId, paper.id);
-    },
-    onSuccess: () => {
-      setMessage({ kind: "ok", text: t("import.sidebar.projectDone") });
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      if (projectId !== "") {
-        qc.invalidateQueries({ queryKey: ["projects", projectId, "papers"] });
-      }
     },
     onError: (error) =>
       setActionError(error, setMessage, t("import.sidebar.actionFailed")),
@@ -173,38 +139,6 @@ function RecentPaperCard({
           {t("queue.add")}
         </button>
       </div>
-      {projects.length > 0 && (
-        <div className="mt-2 flex items-center gap-1.5">
-          <select
-            value={projectId}
-            onChange={(event) =>
-              setProjectId(event.target.value ? Number(event.target.value) : "")
-            }
-            className="litera-input min-w-0 flex-1 py-1 text-[11px]"
-          >
-            <option value="">{t("import.sidebar.projectSelect")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => addProject.mutate()}
-            disabled={addProject.isPending || projectId === ""}
-            className="rounded-md p-1.5 text-litera-accent hover:bg-litera-line/70 disabled:opacity-50"
-            title={t("import.sidebar.addProject")}
-            aria-label={t("import.sidebar.addProject")}
-          >
-            {addProject.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </div>
-      )}
       {message && (
         <div
           className={

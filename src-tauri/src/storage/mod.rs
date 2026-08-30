@@ -5,13 +5,11 @@
 mod ask_sessions;
 mod ai_executions;
 mod candidates;
-mod comparisons;
 pub mod concepts;
 pub mod custom_fields;
 mod db;
 pub mod dedup;
 pub mod embeddings;
-mod evidence;
 mod feed_defaults;
 pub mod feeds;
 mod folders;
@@ -32,7 +30,6 @@ mod zotero_pushes;
 mod legacy_reader_notes;
 mod pdf_notes;
 mod provenance;
-mod projects;
 pub mod queue;
 pub mod retrieval;
 pub mod smart_collections;
@@ -42,13 +39,11 @@ pub mod topic_alerts;
 pub use ai_executions::{AiExecutionRepo, ExecutionRecord};
 pub use ask_sessions::{AskSession, AskSessionDraft, AskSessionRepo};
 pub use candidates::{CandidateDraft, CandidatePaper, CandidateRepo};
-pub use comparisons::{ComparisonRepo, PaperComparison};
 pub use concepts::{Concept, ConceptRelation, ConceptRepo, PaperConcept};
 pub use custom_fields::{CustomFieldDef, CustomFieldRepo, PaperCustomField};
 pub use db::{open_pool, run_migrations, Pool};
 pub use dedup::{find_duplicate, merge_papers, scan_all_duplicates, DuplicatePair};
 pub use embeddings::EmbeddingRepo;
-pub use evidence::{EvidenceDraft, EvidenceItem, EvidenceRepo};
 pub use feeds::{Feed, FeedItem, FeedRepo, FeedWithCounts, NewFeedItem};
 pub use folders::{FolderRepo, FolderWithCount};
 pub use highlights::{
@@ -79,7 +74,6 @@ pub use pdf_notes::{
     PdfNote, PdfNoteCreateInput, PdfNoteError, PdfNotePatch, PdfNoteRect, PdfNoteRepo,
     PdfNoteSearchResult,
 };
-pub use projects::{ProjectDraft, ProjectRepo, ResearchProject};
 pub use queue::{QueueEntry, QueueRepo};
 pub use retrieval::{unified_search, UnifiedSearchResult};
 pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};

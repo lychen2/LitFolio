@@ -15,6 +15,8 @@
 //! Per-owner data movers land with their extraction children; this module
 //! deliberately contains no owner-specific conversion logic yet.
 
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 

@@ -9,12 +9,10 @@ import { invokeMockCommand } from "@/test/tauriMockCommands";
 import { AskPage } from "@/plugins/library-ask/AskPage";
 import { BrowsePage } from "./BrowsePage";
 import { CandidateInboxPage } from "./CandidateInboxPage";
-import { ComparePage } from "./ComparePage";
 import { FeedsPage } from "./FeedsPage";
 import { GraphPage } from "./GraphPage";
 import { ImportPage } from "./ImportPage";
 import { LibraryPage } from "./LibraryPage";
-import { ProjectsPage } from "./ProjectsPage";
 import { ReaderPage } from "./ReaderPage";
 import { SettingsPage } from "./SettingsPage";
 import { TopicPage } from "./TopicPage";
@@ -64,10 +62,6 @@ describe("page smoke render", () => {
     expect(renderPage(<SettingsPage />, "/settings")).toContain("设置");
   });
 
-  it("renders the projects shell", () => {
-    expect(renderPage(<ProjectsPage />, "/projects")).toContain("研究项目");
-  });
-
   it("renders the topic shell", () => {
     expect(renderPage(<TopicPage />, "/topic")).toContain("生成综述");
   });
@@ -90,10 +84,6 @@ describe("page smoke render", () => {
 
   it("renders the graph shell", () => {
     expect(renderPage(<GraphPage />, "/graph")).toContain("知识图谱");
-  });
-
-  it("renders the compare shell", () => {
-    expect(renderPage(<ComparePage />, "/compare")).toContain("论文比较");
   });
 
   it("renders the reader route while paper data is loading", () => {

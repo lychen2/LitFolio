@@ -5,7 +5,6 @@ import fixture_local from "../../plugins/fixture-local/manifest.json";
 import knowledge_graph from "../../plugins/knowledge-graph/manifest.json";
 import library_ask from "../../plugins/library-ask/manifest.json";
 import library_plus from "../../plugins/library-plus/manifest.json";
-import research_workbench from "../../plugins/research-workbench/manifest.json";
 import source_connectors from "../../plugins/source-connectors/manifest.json";
 import sync_integrations from "../../plugins/sync-integrations/manifest.json";
 import updates from "../../plugins/updates/manifest.json";
@@ -19,7 +18,6 @@ export const selectedManifests = [candidate_inbox,
   knowledge_graph,
   library_ask,
   library_plus,
-  research_workbench,
   source_connectors,
   sync_integrations,
   updates] as const;
@@ -31,7 +29,6 @@ export const selectedPluginLoaders: Record<string, () => Promise<FrontendPluginE
   "knowledge-graph": () => import("@/plugins/knowledge-graph/index"),
   "library-ask": () => import("@/plugins/library-ask/index"),
   "library-plus": () => import("@/plugins/library-plus/index"),
-  "research-workbench": () => import("@/plugins/research-workbench/index"),
   "source-connectors": () => import("@/plugins/source-connectors/index"),
   "sync-integrations": () => import("@/plugins/sync-integrations/index"),
   "updates": () => import("@/plugins/updates/index"),

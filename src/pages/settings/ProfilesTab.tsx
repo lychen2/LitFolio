@@ -2,17 +2,24 @@ import { Plus, KeyRound } from "lucide-react";
 import { type LlmConfig, type LlmProfile } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { ProfileCard } from "./ProfileCard";
+import { TaskAssignmentsPanel } from "./TaskAssignmentsPanel";
 
 const PRESETS: { label: string; profile: Partial<LlmProfile> }[] = [
+  { label: "Ollama (MiniLM)", profile: { base_url: "http://localhost:11434/v1", chat_model: "qwen2.5:7b", embed_model: "all-minilm", api_key: "ollama" } },
   { label: "OpenAI", profile: { base_url: "https://api.openai.com/v1", chat_model: "gpt-4o-mini", embed_model: "text-embedding-3-small" } },
-  { label: "DeepSeek", profile: { base_url: "https://api.deepseek.com/v1", chat_model: "deepseek-chat", embed_model: null } },
-  { label: "Moonshot", profile: { base_url: "https://api.moonshot.cn/v1", chat_model: "moonshot-v1-8k", embed_model: null } },
+  { label: "DeepSeek", profile: { base_url: "https://api.deepseek.com/v1", chat_model: "deepseek-chat", embed_model: "all-MiniLM-L6-v2" } },
   { label: "SiliconFlow", profile: { base_url: "https://api.siliconflow.cn/v1", chat_model: "Qwen/Qwen2.5-7B-Instruct", embed_model: "BAAI/bge-large-en-v1.5" } },
-  { label: "Ollama", profile: { base_url: "http://localhost:11434/v1", chat_model: "qwen2.5:7b", embed_model: "nomic-embed-text", api_key: "ollama" } },
+  { label: "Moonshot", profile: { base_url: "https://api.moonshot.cn/v1", chat_model: "moonshot-v1-8k", embed_model: "all-MiniLM-L6-v2" } },
 ];
 
 export function ProfilesTab({
-  draft, isLoading, activeMissing, onUpsert, onRemove, onSetActive,
+  draft,
+  isLoading,
+  activeMissing,
+  onUpsert,
+  onRemove,
+  onSetActive,
+  onUpdateTaskAssignments,
 }: {
   draft: LlmConfig;
   isLoading: boolean;
@@ -20,6 +27,7 @@ export function ProfilesTab({
   onUpsert: (profile: LlmProfile, originalName?: string) => void;
   onRemove: (name: string) => void;
   onSetActive: (name: string) => void;
+  onUpdateTaskAssignments: (assignments: LlmConfig["task_assignments"]) => void;
 }) {
   const t = useT();
   return (
@@ -43,18 +51,25 @@ export function ProfilesTab({
           <p className="text-xs text-litera-mute mt-1">{t("settings.emptyHint")}</p>
         </div>
       ) : (
-        <ul className="space-y-3 litera-stagger">
-          {draft.profiles.map((profile, index) => (
-            <ProfileCard
-              key={`profile-${index}`}
-              profile={profile}
-              isActive={draft.active === profile.name}
-              onChange={(next, oldName) => onUpsert(next, oldName)}
-              onRemove={() => onRemove(profile.name)}
-              onActivate={() => onSetActive(profile.name)}
-            />
-          ))}
-        </ul>
+        <div className="space-y-6">
+          <ul className="space-y-3 litera-stagger">
+            {draft.profiles.map((profile, index) => (
+              <ProfileCard
+                key={`profile-${index}`}
+                profile={profile}
+                isActive={draft.active === profile.name}
+                onChange={(next, oldName) => onUpsert(next, oldName)}
+                onRemove={() => onRemove(profile.name)}
+                onActivate={() => onSetActive(profile.name)}
+              />
+            ))}
+          </ul>
+
+          <TaskAssignmentsPanel
+            draft={draft}
+            onChange={onUpdateTaskAssignments}
+          />
+        </div>
       )}
       {activeMissing && (
         <div className="mt-3 text-sm text-litera-error">
@@ -71,7 +86,7 @@ function blankProfile(preset?: Partial<LlmProfile>): LlmProfile {
     base_url: preset?.base_url ?? "https://api.openai.com/v1",
     api_key: preset?.api_key ?? "",
     chat_model: preset?.chat_model ?? "gpt-4o-mini",
-    embed_model: preset?.embed_model ?? null,
+    embed_model: preset?.embed_model !== undefined ? preset.embed_model : "all-MiniLM-L6-v2",
     max_tokens: 1024,
     temperature: 0.3,
   };

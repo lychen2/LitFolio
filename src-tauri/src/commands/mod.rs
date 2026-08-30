@@ -6,14 +6,12 @@ pub(crate) mod ai_dispatch;
 pub mod batch;
 #[cfg(feature = "plugin-candidate-inbox")]
 pub mod candidates;
-pub mod comparisons;
 #[cfg(feature = "plugin-knowledge-graph")]
 pub mod concepts;
 pub mod custom_fields;
 pub mod discovery;
 pub mod duplicates;
 pub(crate) mod events;
-pub mod evidence;
 pub mod export;
 #[cfg(feature = "plugin-discovery-feeds")]
 pub mod feed_metadata;
@@ -33,12 +31,8 @@ pub mod papers;
 pub mod pdf;
 pub mod pdf_notes;
 pub mod plugin_host;
-pub mod project_manifest;
-pub mod project_writing;
-pub mod project_writing_render;
 pub mod provenance;
 pub mod reader_ask;
-pub mod projects;
 pub mod queue;
 pub mod reader_terms;
 pub mod reader_translate;
@@ -324,6 +318,7 @@ macro_rules! command_paths_config_sync_ai {
             commands::llm::llm_save_config,
             commands::llm::llm_test,
             commands::llm::llm_list_models,
+            commands::llm::llm_pull_model,
             commands::llm::ai_cancel_execution,
             commands::llm::ai_list_running_executions,
             commands::plugin_host::plugin_host_list,
@@ -361,23 +356,6 @@ macro_rules! command_paths_projects_research {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_reader_notes!([
             $($commands)*
-            commands::projects::projects_list,
-            commands::projects::project_get,
-            commands::projects::project_create,
-            commands::projects::project_update,
-            commands::projects::project_delete,
-            commands::projects::project_papers_list,
-            commands::projects::project_add_paper,
-            commands::projects::project_remove_paper,
-            commands::projects::project_weekly_review,
-            commands::projects::project_export_markdown,
-            commands::project_manifest::project_source_manifest,
-            commands::project_writing::project_writing_outline,
-            commands::evidence::evidence_list,
-            commands::evidence::evidence_add,
-            commands::evidence::evidence_add_from_highlight,
-            commands::evidence::evidence_delete,
-            commands::evidence::evidence_export_markdown,
         ])
     };
 }
@@ -470,12 +448,6 @@ macro_rules! command_paths_collections_data {
             commands::export::export_citations,
             commands::diagnostics_export_log,
             commands::search::search_unified,
-            commands::comparisons::paper_comparisons_list,
-            commands::comparisons::paper_comparison_get,
-            commands::comparisons::paper_comparison_create,
-            commands::comparisons::paper_comparison_generate,
-            commands::comparisons::paper_comparison_update,
-            commands::comparisons::paper_comparison_delete,
             commands::queue::queue_list,
             commands::queue::queue_add,
             commands::queue::queue_remove,

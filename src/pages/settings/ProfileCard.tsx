@@ -27,6 +27,9 @@ export function ProfileCard({
     mutationFn: (p: LlmProfile) => api.llmListModels(p),
     onSuccess: (m) => setFetchedModels(m),
   });
+  const pullModel = useMutation({
+    mutationFn: (modelToPull: string) => api.llmPullModel(local, modelToPull),
+  });
 
   function field<K extends keyof LlmProfile>(k: K, v: LlmProfile[K]) {
     const next = { ...local, [k]: v } as LlmProfile;
@@ -131,10 +134,36 @@ export function ProfileCard({
           </div>
         </Field>
         <Field label={t("settings.profile.embedModel")}>
-          <input value={local.embed_model ?? ""}
-            onChange={(e) => field("embed_model", e.target.value || null)}
-            className="litera-input w-full font-mono text-xs"
-            placeholder="text-embedding-3-small" />
+          <div className="flex gap-2">
+            <input
+              value={local.embed_model ?? ""}
+              onChange={(e) => field("embed_model", e.target.value || null)}
+              className="litera-input w-full font-mono text-xs"
+              placeholder="all-MiniLM-L6-v2"
+            />
+            {local.embed_model && (
+              <button
+                type="button"
+                onClick={() => pullModel.mutate(local.embed_model!)}
+                disabled={pullModel.isPending}
+                className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+                title={t("settings.profile.pullModelTitle")}
+              >
+                {pullModel.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {t("settings.profile.pullModel")}
+              </button>
+            )}
+          </div>
+          {pullModel.isSuccess && (
+            <div className="text-[11px] text-litera-success flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" /> {pullModel.data}
+            </div>
+          )}
+          {pullModel.isError && (
+            <div className="text-[11px] text-litera-error">
+              ✕ {(pullModel.error as Error).message}
+            </div>
+          )}
         </Field>
         <Field label={t("settings.profile.temperature")}>
           <input type="number" step="0.1" value={local.temperature}

@@ -36,24 +36,27 @@ export function PluginsPanel() {
       {!isLoading && !error && plugins.length === 0 && (
         <p className="text-xs text-litera-mute">{t("settings.plugins.empty")}</p>
       )}
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {plugins.map((entry) => (
           <li
             key={entry.manifest.id}
-            className="flex items-center justify-between gap-3 rounded-[var(--litera-radius)] border border-litera-line px-3 py-2"
+            className="flex items-center justify-between gap-3 rounded-[var(--litera-radius)] border border-litera-border bg-litera-surface/80 p-3.5 transition-all hover:border-litera-border-strong hover:bg-litera-surface2 hover:translate-y-[-0.5px]"
           >
             <div className="min-w-0">
-              <div className="text-sm text-litera-text">{entry.manifest.displayName}</div>
-              <div className="truncate font-mono text-[11px] text-litera-mute">{entry.manifest.id}</div>
+              <div className="text-sm font-medium text-litera-text">{entry.manifest.displayName}</div>
+              <div className="truncate font-mono text-[11px] text-litera-mute mt-0.5">{entry.manifest.id}</div>
             </div>
-            <label className="flex shrink-0 items-center gap-2 text-xs text-litera-mute">
+            <label className="flex shrink-0 items-center gap-2 text-xs font-medium cursor-pointer">
               <input
                 type="checkbox"
                 checked={entry.enabled}
                 disabled={toggle.isPending}
                 onChange={() => toggle.mutate({ id: entry.manifest.id, enabled: entry.enabled })}
+                className="h-4 w-4 rounded text-litera-accent focus:ring-litera-focus/40"
               />
-              {entry.enabled ? t("settings.plugins.enabled") : t("settings.plugins.disabled")}
+              <span className={entry.enabled ? "text-litera-accent" : "text-litera-mute"}>
+                {entry.enabled ? t("settings.plugins.enabled") : t("settings.plugins.disabled")}
+              </span>
             </label>
           </li>
         ))}

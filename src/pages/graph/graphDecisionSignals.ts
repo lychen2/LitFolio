@@ -1,4 +1,4 @@
-import type { EvidenceDraft, GraphData, GraphEdge, GraphNode } from "@/lib/api";
+import type { GraphData, GraphEdge, GraphNode } from "@/lib/api";
 
 export interface PaperSignal {
   node: GraphNode;
@@ -29,23 +29,6 @@ export function graphSignals(graphData: GraphData) {
       .slice(0, 5),
     clusters: connectedClusters(paperNodes, graphData.edges).slice(0, 3),
     evidenceChains: graphData.edges.filter((edge) => edge.snippet?.trim()).slice(0, 5),
-  };
-}
-
-export function edgeToEvidenceDraft(
-  edge: GraphEdge,
-  nodeById: Map<string, GraphNode>,
-): EvidenceDraft {
-  const source = nodeById.get(edge.source);
-  const target = nodeById.get(edge.target);
-  return {
-    source_type: "graph",
-    paper_id: source?.node_type === "paper" ? source.id : target?.node_type === "paper" ? target.id : null,
-    highlight_id: null,
-    page: null,
-    label: edge.relation ?? edge.edge_type,
-    excerpt: edge.snippet ?? `${source?.label ?? edge.source} -> ${target?.label ?? edge.target}`,
-    note: `${source?.label ?? edge.source} -> ${target?.label ?? edge.target}`,
   };
 }
 

@@ -10,8 +10,6 @@ describe("navigation registry", () => {
       "/browse",
       "/feeds",
       "/topic",
-      "/projects",
-      "/compare",
       "/ask",
       "/graph",
       "/settings",
@@ -24,8 +22,8 @@ describe("navigation registry", () => {
 
   it("assigns every route to exactly one navigation group", () => {
     const groupedPaths = NAVIGATION_GROUPS.flatMap((group) => group.paths);
-    expect(groupedPaths).toEqual(NAVIGATION_ITEMS.map((item) => item.to));
     expect(new Set(groupedPaths).size).toBe(groupedPaths.length);
+    expect(groupedPaths).toEqual(NAVIGATION_ITEMS.map((item) => item.to));
   });
 
   it("hides plugin routes until the host has enabled them", () => {

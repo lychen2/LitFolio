@@ -6,6 +6,10 @@
 //! - [`binding`] — opaque instance bindings plus the reference monitor that
 //!   gates every privileged operation.
 //!
+//! Fresh installs (no persisted `plugin_state` row) enable only the hot-topic
+//! tracking + reading loop: `discovery-feeds` and `candidate-inbox`. All
+//! knowledge-base/management plugins default to disabled by design.
+//!
 //! Lifecycle rule: enable bumps the persisted generation and issues a fresh
 //! binding; disable revokes the binding BEFORE persistence/cleanup, so late
 //! results carrying the old binding are denied, never resurfaced.
@@ -13,12 +17,16 @@
 pub mod binding;
 pub mod registry;
 
-use std::collections::BTreeSet;
-
 use crate::storage::PluginStateRepo;
 use crate::AppState;
 
 pub use binding::{HostAccessError, InstanceBinding, PluginHostState};
+
+/// Plugins enabled on first run when the user has not yet made a choice.
+/// Everything else defaults to disabled; the build profile still decides
+/// physical inclusion. ponytail: hardcoded policy set, move into manifests only
+/// if we ever need per-plugin opt-in defaults beyond the reading loop.
+const DEFAULT_ENABLED: &[&str] = &["candidate-inbox", "discovery-feeds"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum PluginHostError {
@@ -91,18 +99,20 @@ pub async fn list_plugins(
     Ok(manifests
         .into_iter()
         .map(|m| {
-            let row = rows.iter().find(|r| r.plugin_id == m.id);
-            (
-                m,
-                row.map(|r| r.enabled).unwrap_or(false),
-                row.map(|r| r.generation as u64).unwrap_or(0),
-            )
+            let id = m.id.clone();
+            let row = rows.iter().find(|r| r.plugin_id == id);
+            let enabled = row
+                .map(|r| r.enabled)
+                .unwrap_or_else(|| DEFAULT_ENABLED.contains(&id.as_str()));
+            let generation = row.map(|r| r.generation as u64).unwrap_or(0);
+            (m, enabled, generation)
         })
         .collect())
 }
 
 /// Authorize one privileged operation on behalf of a plugin binding. The
 /// single funnel every plugin capability call must pass through.
+#[allow(dead_code)]
 pub async fn authorize(
     state: &AppState,
     binding: &InstanceBinding,
@@ -115,6 +125,7 @@ pub async fn authorize(
 mod tests {
     use super::*;
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use std::collections::BTreeSet;
     use std::str::FromStr;
 
     async fn test_state() -> AppState {
@@ -186,6 +197,27 @@ mod tests {
             plugins.iter().find(|(m, _, _)| m.id == "fixture-local").unwrap();
         assert!(!enabled);
         assert!(*generation >= 1, "generation survives disable");
+    }
+
+    #[tokio::test]
+    async fn fresh_install_enables_only_hot_topic_plugins() {
+        let state = test_state().await;
+        let plugins = list_plugins(&state).await.unwrap();
+        let shown: Vec<(String, bool)> = plugins
+            .into_iter()
+            .filter(|(m, _, _)| !m.id.starts_with("fixture-"))
+            .map(|(m, enabled, _)| (m.id, enabled))
+            .collect();
+        assert_eq!(shown.iter().filter(|(_, e)| *e).count(), 2);
+        assert!(shown
+            .iter()
+            .any(|(id, e)| id == "discovery-feeds" && *e));
+        assert!(shown
+            .iter()
+            .any(|(id, e)| id == "candidate-inbox" && *e));
+        assert!(shown.iter().all(|(id, e)| id == "discovery-feeds"
+            || id == "candidate-inbox"
+            || !*e));
     }
 
     #[tokio::test]

@@ -131,6 +131,8 @@ export const aiReaderApi = {
     invoke<void>("paper_set_pdf_text", { paperId, text }),
   llmListModels: (profile: LlmProfile) =>
     invoke<string[]>("llm_list_models", { profile }),
+  llmPullModel: (profile: LlmProfile, model: string) =>
+    invoke<string>("llm_pull_model", { profile, model }),
   aiListRunningExecutions: () =>
     invokeParsed<AiExecutionRecord[]>(
       "ai_list_running_executions",

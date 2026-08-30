@@ -1,7 +1,99 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#0f172a"/>
-  <path d="M14 16 L32 12 L50 16 L50 50 L32 46 L14 50 Z" stroke="#a78bfa" stroke-width="2.5" stroke-linejoin="round"/>
-  <path d="M32 12 L32 46" stroke="#a78bfa" stroke-width="2.5"/>
-  <path d="M20 24 L28 26 M20 30 L28 32 M20 36 L28 38" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M36 24 L44 26 M36 30 L44 32 M36 36 L44 38" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient: Deep Slate Violet -->
+    <linearGradient id="lf-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D182B" />
+      <stop offset="45%" stop-color="#14111E" />
+      <stop offset="100%" stop-color="#0B0912" />
+    </linearGradient>
+
+    <!-- Subtle Bevel Border -->
+    <linearGradient id="lf-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#675887" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#382E4D" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#1A1526" stop-opacity="0.8" />
+    </linearGradient>
+
+    <!-- Page Layers: Low-saturation Muted Purples -->
+    <linearGradient id="lf-page-l-back" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4B3D66" />
+      <stop offset="100%" stop-color="#261E34" />
+    </linearGradient>
+
+    <linearGradient id="lf-page-r-back" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#584876" />
+      <stop offset="100%" stop-color="#2B213D" />
+    </linearGradient>
+
+    <linearGradient id="lf-page-l-front" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8473A5" />
+      <stop offset="50%" stop-color="#60507E" />
+      <stop offset="100%" stop-color="#3B2F52" />
+    </linearGradient>
+
+    <linearGradient id="lf-page-r-front" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A595C5" />
+      <stop offset="60%" stop-color="#79699A" />
+      <stop offset="100%" stop-color="#4A3B66" />
+    </linearGradient>
+
+    <!-- Active Swirl Page (Muted Lavender to Slate Violet) -->
+    <linearGradient id="lf-active-page" x1="20%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#CEC4E4" />
+      <stop offset="45%" stop-color="#9A8AB9" />
+      <stop offset="100%" stop-color="#6A598D" />
+    </linearGradient>
+
+    <!-- Core Insight Beacon -->
+    <linearGradient id="lf-beacon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5F1FA" />
+      <stop offset="50%" stop-color="#C5B8DE" />
+      <stop offset="100%" stop-color="#7C6AA2" />
+    </linearGradient>
+
+    <!-- Lighting & Shadows -->
+    <radialGradient id="lf-radial-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#735E9C" stop-opacity="0.25" />
+      <stop offset="55%" stop-color="#554475" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="lf-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#030206" flood-opacity="0.75" />
+    </filter>
+
+    <filter id="lf-beacon-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#lf-bg)" stroke="url(#lf-border)" stroke-width="2.5" />
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#lf-radial-glow)" />
+
+  <!-- Main Symbol -->
+  <g filter="url(#lf-shadow)">
+    <!-- Back Folio Leaves -->
+    <path d="M 256 362 C 210 338 152 328 120 334 C 114 335 110 330 110 324 L 110 200 C 110 195 114 191 119 190 C 154 184 212 196 256 226 Z" fill="url(#lf-page-l-back)" opacity="0.85" />
+    <path d="M 256 362 C 302 338 360 328 392 334 C 398 335 402 330 402 324 L 402 200 C 402 195 398 191 393 190 C 358 184 300 196 256 226 Z" fill="url(#lf-page-r-back)" opacity="0.85" />
+
+    <!-- Main Front Folio Leaves -->
+    <path d="M 256 374 C 206 348 144 340 126 344 C 121 345 116 341 116 336 L 116 216 C 116 211 120 207 125 206 C 158 200 216 212 256 244 Z" fill="url(#lf-page-l-front)" />
+    <path d="M 256 374 C 306 348 368 340 386 344 C 391 345 396 341 396 336 L 396 216 C 396 211 392 207 387 206 C 354 200 296 212 256 244 Z" fill="url(#lf-page-r-front)" />
+
+    <!-- Sweeping Active Monogram / Folio Leaf -->
+    <path d="M 256 374 C 265 310 295 242 362 192 C 367 188 365 180 359 180 C 310 182 260 212 226 250 C 204 274 190 306 182 340 C 210 356 238 368 256 374 Z" fill="url(#lf-active-page)" />
+
+    <!-- Edge Highlights & Spine Contour -->
+    <path d="M 256 244 C 296 212 354 200 387 206" stroke="#DDD6EC" stroke-width="1.8" stroke-linecap="round" opacity="0.6" fill="none" />
+    <path d="M 256 374 L 256 244" stroke="#463A5E" stroke-width="2" stroke-linecap="round" opacity="0.5" fill="none" />
+    <path d="M 226 250 C 260 212 310 182 359 180" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.7" fill="none" />
+
+    <!-- Core Insight Beacon -->
+    <g filter="url(#lf-beacon-glow)">
+      <path d="M 256 142 L 270 166 L 256 190 L 242 166 Z" fill="url(#lf-beacon)" />
+      <circle cx="256" cy="166" r="3" fill="#FFFFFF" />
+    </g>
+  </g>
 </svg>

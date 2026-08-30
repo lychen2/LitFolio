@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseCandidatePaper,
-  parseEvidenceItem,
   parseGraphData,
   parseLlmConfig,
   parsePaper,
   parsePaperSupplement,
   parseSupplementConversionResult,
-  parseResearchProject,
   parseSyncPreviewReport,
   parseSyncReport,
   parseTopicAlertResult,
@@ -128,8 +126,6 @@ describe("api schema parsers", () => {
 
   it("validates priority cross-boundary DTOs", () => {
     expect(parseCandidatePaper(validCandidate()).status).toBe("new");
-    expect(parseResearchProject(validProject()).status).toBe("active");
-    expect(parseEvidenceItem(validEvidence()).source_type).toBe("highlight");
     expect(parseTopicAlertResult(validTopicAlertResult()).seen).toBe(false);
     expect(parseSyncReport(validSyncReport()).backup_path).toBeNull();
     expect(
@@ -141,12 +137,6 @@ describe("api schema parsers", () => {
     expect(() =>
       parseCandidatePaper({ ...validCandidate(), status: "bad" })
     ).toThrow("CandidatePaper.status");
-    expect(() =>
-      parseResearchProject({ ...validProject(), paper_count: "1" })
-    ).toThrow("ResearchProject.paper_count");
-    expect(() =>
-      parseEvidenceItem({ ...validEvidence(), excerpt: null })
-    ).toThrow("EvidenceItem.excerpt");
     expect(() =>
       parseTopicAlertResult({ ...validTopicAlertResult(), seen: 0 })
     ).toThrow("TopicAlertResult.seen");
@@ -253,38 +243,6 @@ function validCandidate() {
     related_project: null,
     created_at: 1,
     last_seen_at: 2,
-  };
-}
-
-function validProject() {
-  return {
-    id: 1,
-    name: "Project",
-    description: null,
-    research_question: null,
-    target_output: null,
-    status: "active",
-    due_date: null,
-    paper_count: 0,
-    created_at: 1,
-    updated_at: 2,
-  };
-}
-
-function validEvidence() {
-  return {
-    id: 1,
-    project_id: 1,
-    source_type: "highlight",
-    paper_id: "p1",
-    paper_title: "Paper",
-    highlight_id: "h1",
-    page: 2,
-    label: null,
-    excerpt: "Evidence",
-    note: null,
-    created_at: 1,
-    updated_at: 2,
   };
 }
 

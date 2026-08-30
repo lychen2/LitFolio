@@ -8,8 +8,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::ai::{
-    chat_complete_with_task_kind, list_models, load_config, save_config, ChatMessage, LlmConfig,
-    LlmProfile,
+    chat_complete_with_task_kind, list_models, load_config, pull_model, save_config, ChatMessage,
+    LlmConfig, LlmProfile,
 };
 
 use super::AppState;
@@ -66,6 +66,17 @@ pub async fn llm_list_models(
     profile: LlmProfile,
 ) -> Result<Vec<String>, String> {
     list_models(&state.http, &profile)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn llm_pull_model(
+    state: State<'_, Arc<AppState>>,
+    profile: LlmProfile,
+    model: String,
+) -> Result<String, String> {
+    pull_model(&state.http, &profile, &model)
         .await
         .map_err(|e| e.to_string())
 }

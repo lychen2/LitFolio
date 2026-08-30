@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { api, type Highlight, type ResearchProject } from "@/lib/api";
+import { useMutation } from "@tanstack/react-query";
+import { api, type Highlight } from "@/lib/api";
 import { errorMessage } from "@/lib/error";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
@@ -43,12 +43,6 @@ export function HighlightRow({
   const [draftNote, setDraftNote] = useState(highlight.note ?? "");
   const [savedNoteSnapshot, setSavedNoteSnapshot] = useState(highlight.note ?? "");
   const [confirming, setConfirming] = useState(false);
-  const [projectId, setProjectId] = useState<number | "">("");
-  const [evidenceAdded, setEvidenceAdded] = useState(false);
-  const projects = useQuery({
-    queryKey: ["projects"],
-    queryFn: api.projectsList,
-  });
   const saveNote = useMutation({
     mutationFn: (note: string) =>
       api.highlightUpdateNote(highlight.id, note || null),
@@ -86,13 +80,6 @@ export function HighlightRow({
     mutationFn: (label: string | null) =>
       api.highlightUpdateLabel(highlight.id, label),
     onSuccess: onRefresh,
-  });
-  const addEvidence = useMutation({
-    mutationFn: () => {
-      if (projectId === "") throw new Error(t("common.projectRequired"));
-      return api.evidenceAddFromHighlight(projectId, highlight.id);
-    },
-    onSuccess: () => setEvidenceAdded(true),
   });
   const canSummarize = countChars(highlight.text) >= MIN_SUMMARY_CHARS;
   const typeKey = highlightTypeKey(highlight.label);
@@ -249,14 +236,8 @@ export function HighlightRow({
       {highlight.note && !editing && <NoteBlock note={highlight.note} />}
       <HighlightMetaRow
         highlight={highlight}
-        projects={projects.data ?? []}
-        projectId={projectId}
         isTypeSaving={updateType.isPending}
-        isEvidenceSaving={addEvidence.isPending}
-        evidenceAdded={evidenceAdded}
         onTypeChange={(label) => updateType.mutate(label)}
-        onProjectChange={setProjectId}
-        onAddEvidence={() => addEvidence.mutate()}
       />
       {editing && (
         <NoteEditor
@@ -276,9 +257,6 @@ export function HighlightRow({
       {updateType.error && (
         <ErrorText message={errorMessage(updateType.error)} />
       )}
-      {addEvidence.error && (
-        <ErrorText message={errorMessage(addEvidence.error)} />
-      )}
     </li>
   );
 }
@@ -291,27 +269,14 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 function HighlightMetaRow({
   highlight,
-  projects,
-  projectId,
   isTypeSaving,
-  isEvidenceSaving,
-  evidenceAdded,
   onTypeChange,
-  onProjectChange,
-  onAddEvidence,
 }: {
   highlight: Highlight;
-  projects: ResearchProject[];
-  projectId: number | "";
   isTypeSaving: boolean;
-  isEvidenceSaving: boolean;
-  evidenceAdded: boolean;
   onTypeChange: (label: string | null) => void;
-  onProjectChange: (id: number | "") => void;
-  onAddEvidence: () => void;
 }) {
   const t = useT();
-  const hasProjects = projects.length > 0;
 
   return (
     <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] text-litera-mute">
@@ -333,43 +298,6 @@ function HighlightMetaRow({
           ))}
         </select>
       </label>
-      {hasProjects ? (
-        <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-1">
-          <label className="flex min-w-0 flex-1 items-center gap-1">
-            <span className="shrink-0 uppercase tracking-wide">
-              {t("reader.evidenceProject")}
-            </span>
-            <select
-              value={projectId}
-              onChange={(event) =>
-                onProjectChange(
-                  event.target.value ? Number(event.target.value) : ""
-                )
-              }
-              className="litera-input h-6 min-w-0 flex-1 px-1.5 py-0 text-[10px]"
-            >
-              <option value="">{t("common.none")}</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            onClick={onAddEvidence}
-            disabled={isEvidenceSaving || projectId === ""}
-            className="litera-btn h-6 shrink-0 px-1.5 py-0 text-[10px] disabled:opacity-50"
-          >
-            {t("reader.addEvidence")}
-          </button>
-        </div>
-      ) : null}
-      {evidenceAdded && hasProjects ? (
-        <span className="text-[10px] text-litera-accent2">
-          {t("reader.evidenceAdded")}
-        </span>
-      ) : null}
     </div>
   );
 }

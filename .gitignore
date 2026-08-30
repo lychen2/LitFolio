@@ -42,3 +42,10 @@ docs/manual/*
 
 # user library samples
 sample-library/
+
+# agent planning / internal docs (local only)
+.snow/
+AGENTS.md
+ROLE.md
+todo.md
+HANDOFF-*.md

@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const profile = process.env.VITE_LITFOLIO_PROFILE || "core";
+const profile = process.env.VITE_LITFOLIO_PROFILE || process.env.LITFOLIO_PROFILE || "all";
 const pluginRoot = join(root, "plugins");
 const manifests = readdirSync(pluginRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())

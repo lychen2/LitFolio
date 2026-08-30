@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { BookOpenText, HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useT } from "@/i18n/I18nProvider";
@@ -36,7 +36,11 @@ export function AppNav({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-2 mb-4">
-        <BookOpenText className="h-5 w-5 shrink-0 text-litera-accent" aria-hidden="true" />
+        <img
+          src="/litera.svg"
+          alt="LitFolio"
+          className="h-7 w-7 shrink-0 rounded-[var(--litera-radius-sm,6px)] shadow-sm object-cover"
+        />
         <span className="nav-label text-base font-semibold tracking-tight text-litera-text">LitFolio</span>
         {showPinToggle && (
           <button
@@ -53,7 +57,7 @@ export function AppNav({
 
       <NavLink
         to="/import"
-        className="mb-5 hidden min-h-9 items-center justify-center gap-2 rounded-[var(--litera-radius)] border border-litera-accent bg-litera-accent px-3 py-1.5 text-sm font-semibold text-litera-ink transition-colors hover:bg-litera-accent/90 max-[900px]:mx-auto max-[900px]:flex max-[900px]:h-9 max-[900px]:w-9 max-[900px]:p-0"
+        className="mb-5 hidden min-h-9 items-center justify-center gap-2 rounded-[var(--litera-radius)] border border-transparent bg-litera-accent px-3 py-1.5 text-sm font-semibold text-litera-accent-contrast shadow-[0_2px_10px_-1px_rgba(0,0,0,0.2)] transition-all hover:bg-litera-accent-strong hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] hover:scale-[1.01] active:scale-[0.97] max-[900px]:mx-auto max-[900px]:flex max-[900px]:h-9 max-[900px]:w-9 max-[900px]:p-0"
         title={t("nav.import")}
       >
         <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -75,19 +79,19 @@ export function AppNav({
                     key={path}
                     to={path}
                     className={clsx(
-                      "group relative flex min-h-9 items-center gap-2.5 rounded-[var(--litera-radius)] px-2.5 text-sm transition-colors duration-150 max-[900px]:mx-auto max-[900px]:h-9 max-[900px]:w-9 max-[900px]:justify-center max-[900px]:p-0",
+                      "group relative flex min-h-9 items-center gap-2.5 rounded-[var(--litera-radius)] px-2.5 text-sm transition-all duration-150 max-[900px]:mx-auto max-[900px]:h-9 max-[900px]:w-9 max-[900px]:justify-center max-[900px]:p-0",
                       path === "/import" && "max-[900px]:hidden",
                       active
-                        ? "bg-litera-accent/14 text-litera-accent"
-                        : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text",
+                        ? "bg-litera-accent/16 font-medium text-litera-accent shadow-sm ring-1 ring-litera-accent/25"
+                        : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text hover:translate-x-0.5",
                     )}
                     title={t(item.labelKey)}
                     aria-current={active ? "page" : undefined}
                   >
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <Icon className={clsx("h-4 w-4 shrink-0 transition-transform group-hover:scale-110", active && "text-litera-accent")} aria-hidden="true" />
                     <span className="nav-label min-w-0 truncate">{t(item.labelKey)}</span>
                     {path === "/topic" && unseenCount > 0 && (
-                      <span className="nav-label ml-auto rounded-full bg-litera-accent/18 px-1.5 py-0.5 text-[10px] tabular-nums text-litera-accent">
+                      <span className="nav-label ml-auto rounded-full bg-litera-accent/20 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-litera-accent ring-1 ring-litera-accent/30">
                         {unseenCount}
                       </span>
                     )}

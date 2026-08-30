@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, FolderOpen, FileText, Brain, FolderKanban, X } from "lucide-react";
+import { Check, FolderOpen, FileText, Brain, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { isPluginBuilt } from "@/host/registry";
 import { useT } from "@/i18n/I18nProvider";
 
 const STORAGE_KEY = "litera.onboarding.completed";
@@ -36,15 +35,8 @@ export function GlobalOnboarding() {
     enabled: show,
   });
 
-  const projectsQ = useQuery({
-    queryKey: ["projects"],
-    queryFn: api.projectsList,
-    enabled: show && isPluginBuilt("research-workbench"),
-  });
-
   const hasPapers = (papersQ.data?.length ?? 0) > 0;
   const hasProfiles = (llmConfigQ.data?.profiles?.length ?? 0) > 0;
-  const hasProjects = (projectsQ.data?.length ?? 0) > 0;
 
   const steps: OnboardingStep[] = [
     {
@@ -72,16 +64,7 @@ export function GlobalOnboarding() {
       actionRoute: "/settings",
       checkCompleted: () => hasProfiles,
     },
-    {
-      id: "project",
-      icon: <FolderKanban className="h-5 w-5" />,
-      title: t("onboarding.step4"),
-      description: t("onboarding.step4Desc"),
-      action: t("onboarding.goToProjects"),
-      actionRoute: "/projects",
-      checkCompleted: () => hasProjects,
-    },
-  ].filter((step) => step.id !== "project" || isPluginBuilt("research-workbench"));
+  ];
 
   const allCompleted = steps.every((step) => step.checkCompleted());
 

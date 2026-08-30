@@ -29,9 +29,21 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "system-ui", "sans-serif"],
+        sans: [
+          "Quicksand",
+          "Nunito",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          "Noto Sans SC",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: ["SFMono-Regular", "Cascadia Code", "Liberation Mono", "ui-monospace", "monospace"],
-        serif: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "system-ui", "sans-serif"],
+        serif: ["Georgia", "Cambria", "Times New Roman", "ui-serif", "serif"],
       },
       fontSize: {
         "display": ["2rem", { lineHeight: "1.2", letterSpacing: "0", fontWeight: "600" }],

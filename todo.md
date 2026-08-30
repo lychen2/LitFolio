@@ -1,5 +1,15 @@
 # Project TODO
 
+## Product positioning (2026-08 shift)
+
+LitFolio is now the **hot-topic tracking + paper-reading** layer; long-term
+knowledge storage/organization is handed to **Zotero** (push/link), not
+reimplemented. Fresh installs default-enable only `discovery-feeds` +
+`candidate-inbox` (the hot-topic loop). Knowledge-base plugins
+(`knowledge-graph`, `library-plus`, `research-workbench`,
+`document-services`) stay **default disabled**. See
+`docs/PRODUCT-REVIEW-ROADMAP-2026-05-31.md` §4.
+
 ## Mono architecture plan
 
 - [ ] Establish the smaller local-reading Mono product as the default build, with optional first-party capabilities delivered as plugins.

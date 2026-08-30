@@ -191,11 +191,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-litera-ink/50 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[560px] max-w-[90vw] bg-litera-paper border border-litera-line rounded-xl shadow-2xl overflow-hidden"
+        className="w-[580px] max-w-[90vw] bg-litera-paper/95 backdrop-blur-md border border-litera-border-strong/60 rounded-2xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] overflow-hidden ring-1 ring-white/10"
       >
         {/* Search input */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-litera-line">
-          <Search className="h-4 w-4 text-litera-mute shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-3.5 border-b border-litera-line">
+          <Search className="h-4 w-4 text-litera-accent shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -213,8 +213,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             <div className="px-4 py-6 text-center text-sm text-litera-mute">No results</div>
           )}
           {Array.from(grouped.entries()).map(([category, items]) => (
-            <div key={category}>
-              <div className="px-4 py-1.5 text-[11px] uppercase tracking-wider text-litera-mute">
+            <div key={category} className="mb-2">
+              <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-litera-mute">
                 {categoryLabels[category] ?? category}
               </div>
               {items.map((item) => {
@@ -225,15 +225,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     key={item.id}
                     data-idx={idx}
                     className={
-                      "flex items-center gap-2.5 px-4 py-2 text-sm cursor-pointer transition-colors " +
+                      "flex items-center gap-2.5 px-3.5 py-2 mx-2 rounded-lg text-sm cursor-pointer transition-all " +
                       (idx === selectedIdx
-                        ? "bg-litera-accent/10 text-litera-accent"
-                        : "text-litera-text hover:bg-litera-panel")
+                        ? "bg-litera-accent/16 font-medium text-litera-accent ring-1 ring-litera-accent/25"
+                        : "text-litera-text hover:bg-litera-surface2")
                     }
                     onClick={() => execute(item)}
                     onMouseEnter={() => setSelectedIdx(idx)}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className="h-4 w-4 shrink-0 text-litera-mute group-hover:text-litera-accent" />
                     <div className="min-w-0 flex-1">
                       <span className="truncate block">{item.label}</span>
                       {item.snippet && (

@@ -3,13 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   parseArxivDraft,
   parseCandidatePaper,
-  parseEvidenceItem,
   parseFeedItem,
   parseFeedWithCounts,
   parseGraphData,
   parsePaper,
   parsePdfImportSummary,
-  parseResearchProject,
   parseTopicAlertResult,
 } from "./apiSchema";
 import { parseArray, parseNullable } from "./apiSchemaCore";
@@ -21,7 +19,6 @@ import type {
   ConceptRelation,
   CustomFieldDef,
   DuplicatePair,
-  EvidenceDraft,
   ExportSummary,
   ExtractedConcept,
   FeedRefreshAllSummary,
@@ -31,14 +28,9 @@ import type {
   LinkBatchSummary,
   LitReviewResult,
   NoteSection,
-  PaperComparison,
   PaperConcept,
   PaperCustomField,
   PaperLink,
-  ProjectDraft,
-  ProjectSourceManifest,
-  ProjectWeeklyReview,
-  ProjectWritingOutline,
   QueueEntry,
   Recommendation,
   SmartCollection,
@@ -133,18 +125,6 @@ export const knowledgeApi = {
       query,
       limit: limit ?? 50,
     }),
-  paperComparisonsList: () =>
-    invoke<PaperComparison[]>("paper_comparisons_list"),
-  paperComparisonGet: (id: number) =>
-    invoke<PaperComparison | null>("paper_comparison_get", { id }),
-  paperComparisonCreate: (paperIds: string[], content: string, model: string) =>
-    invoke<number>("paper_comparison_create", { paperIds, content, model }),
-  paperComparisonGenerate: (paperIds: string[]) =>
-    invoke<PaperComparison>("paper_comparison_generate", { paperIds }),
-  paperComparisonUpdate: (id: number, content: string) =>
-    invoke<void>("paper_comparison_update", { id, content }),
-  paperComparisonDelete: (id: number) =>
-    invoke<void>("paper_comparison_delete", { id }),
   noteSectionsGet: (paperId: string) =>
     invoke<NoteSection[]>("note_sections_get", { paperId }),
   noteSectionsSave: (
@@ -207,50 +187,6 @@ export const knowledgeApi = {
     invokeParsed("candidate_upsert", { draft }, parseCandidatePaper),
   candidateSetStatus: (id: number, status: CandidateStatus) =>
     invoke<void>("candidate_set_status", { id, status }),
-  projectsList: () =>
-    invokeParsed("projects_list", undefined, (value, path) =>
-      parseArray(value, path, parseResearchProject)
-    ),
-  projectGet: (id: number) =>
-    invokeParsed("project_get", { id }, (value, path) =>
-      parseNullable(value, path, parseResearchProject)
-    ),
-  projectCreate: (draft: ProjectDraft) =>
-    invokeParsed("project_create", { draft }, parseResearchProject),
-  projectUpdate: (id: number, draft: ProjectDraft) =>
-    invoke<void>("project_update", { id, draft }),
-  projectDelete: (id: number) => invoke<void>("project_delete", { id }),
-  projectPapersList: (id: number) =>
-    invokeParsed("project_papers_list", { id }, (value, path) =>
-      parseArray(value, path, parsePaper)
-    ),
-  projectAddPaper: (id: number, paperId: string) =>
-    invoke<void>("project_add_paper", { id, paperId }),
-  projectRemovePaper: (id: number, paperId: string) =>
-    invoke<void>("project_remove_paper", { id, paperId }),
-  projectWeeklyReview: (id: number) =>
-    invoke<ProjectWeeklyReview>("project_weekly_review", { id }),
-  projectExportMarkdown: (id: number) =>
-    invoke<string>("project_export_markdown", { id }),
-  projectSourceManifest: (id: number) =>
-    invoke<ProjectSourceManifest>("project_source_manifest", { id }),
-  projectWritingOutline: (id: number) =>
-    invoke<ProjectWritingOutline>("project_writing_outline", { id }),
-  evidenceList: (projectId: number) =>
-    invokeParsed("evidence_list", { projectId }, (value, path) =>
-      parseArray(value, path, parseEvidenceItem)
-    ),
-  evidenceAdd: (projectId: number, draft: EvidenceDraft) =>
-    invokeParsed("evidence_add", { projectId, draft }, parseEvidenceItem),
-  evidenceAddFromHighlight: (projectId: number, highlightId: string) =>
-    invokeParsed(
-      "evidence_add_from_highlight",
-      { projectId, highlightId },
-      parseEvidenceItem
-    ),
-  evidenceDelete: (id: number) => invoke<void>("evidence_delete", { id }),
-  evidenceExportMarkdown: (projectId: number) =>
-    invoke<string>("evidence_export_markdown", { projectId }),
   generateLitReview: (paperIds: string[], grouping: string) =>
     invoke<LitReviewResult>("generate_lit_review", { paperIds, grouping }),
   smartCollectionsList: () =>

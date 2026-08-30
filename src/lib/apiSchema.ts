@@ -4,7 +4,6 @@ import type {
   ArxivDraft,
   CandidatePaper,
   CandidateStatus,
-  EvidenceItem,
   FeedItem,
   FeedWithCounts,
   GraphData,
@@ -19,9 +18,7 @@ import type {
   PdfImportSummary,
   PaperSupplement,
   SupplementConversionResult,
-  ProjectStatus,
   ReadStatus,
-  ResearchProject,
   TaskAssignments,
   TaskBinding,
   TopicAlertResult,
@@ -63,11 +60,6 @@ const CANDIDATE_STATUSES = new Set<CandidateStatus>([
   "queued",
   "ignored",
   "imported",
-]);
-const PROJECT_STATUSES = new Set<ProjectStatus>([
-  "active",
-  "paused",
-  "archived",
 ]);
 const PDF_MARKDOWN_ENGINES = new Set([
   "local",
@@ -399,46 +391,6 @@ export function parseCandidatePaper(
   };
 }
 
-export function parseResearchProject(
-  value: unknown,
-  path = "ResearchProject"
-): ResearchProject {
-  const obj = object(value, path);
-  return {
-    id: numberField(obj, "id", path),
-    name: stringField(obj, "name", path),
-    description: nullableStringField(obj, "description", path),
-    research_question: nullableStringField(obj, "research_question", path),
-    target_output: nullableStringField(obj, "target_output", path),
-    status: projectStatusField(obj, "status", path),
-    due_date: nullableNumberField(obj, "due_date", path),
-    paper_count: numberField(obj, "paper_count", path),
-    created_at: numberField(obj, "created_at", path),
-    updated_at: numberField(obj, "updated_at", path),
-  };
-}
-
-export function parseEvidenceItem(
-  value: unknown,
-  path = "EvidenceItem"
-): EvidenceItem {
-  const obj = object(value, path);
-  return {
-    id: numberField(obj, "id", path),
-    project_id: numberField(obj, "project_id", path),
-    source_type: stringField(obj, "source_type", path),
-    paper_id: nullableStringField(obj, "paper_id", path),
-    paper_title: nullableStringField(obj, "paper_title", path),
-    highlight_id: nullableStringField(obj, "highlight_id", path),
-    page: nullableNumberField(obj, "page", path),
-    label: nullableStringField(obj, "label", path),
-    excerpt: stringField(obj, "excerpt", path),
-    note: nullableStringField(obj, "note", path),
-    created_at: numberField(obj, "created_at", path),
-    updated_at: numberField(obj, "updated_at", path),
-  };
-}
-
 export function parseTopicAlertResult(
   value: unknown,
   path = "TopicAlertResult"
@@ -653,15 +605,6 @@ function candidateStatusField(
 ): CandidateStatus {
   const value = enumStringField(obj, key, path, CANDIDATE_STATUSES);
   return value as CandidateStatus;
-}
-
-function projectStatusField(
-  obj: Shape,
-  key: string,
-  path: string
-): ProjectStatus {
-  const value = enumStringField(obj, key, path, PROJECT_STATUSES);
-  return value as ProjectStatus;
 }
 
 function syncPreviewDirectionField(

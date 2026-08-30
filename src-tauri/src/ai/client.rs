@@ -52,6 +52,7 @@ pub struct ChatResponse {
     pub model: String,
 }
 
+#[allow(dead_code)]
 pub async fn chat_complete(
     client: &reqwest::Client,
     profile: &LlmProfile,
@@ -107,12 +108,14 @@ async fn chat_complete_inner(
         stream: true,
         max_tokens: request_shape.max_tokens,
         max_completion_tokens: request_shape.max_completion_tokens,
-        // Disable chain-of-thought for chat/instruction models that tend to
-        // leak reasoning into `content`. Reasoning-native models (R1, o1/o3,
-        // deepseek-reasoner) put thinking in `reasoning_content` and answer
-        // in `content` — they get `thinking: None` so their reasoning is
-        // preserved.
-        thinking: if is_reasoning_model(&profile.chat_model) {
+        // Disable chain-of-thought for translation tasks and for chat/instruction
+        // models that tend to leak reasoning into `content`. Reasoning-native models
+        // (R1, o1/o3, deepseek-reasoner) outside translation get `thinking: None`.
+        thinking: if task_kind == "translate" {
+            Some(ThinkingConfig {
+                r#type: "disabled".into(),
+            })
+        } else if is_reasoning_model(&profile.chat_model) {
             None
         } else {
             Some(ThinkingConfig {

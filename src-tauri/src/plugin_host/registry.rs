@@ -23,7 +23,6 @@ const EMBEDDED_MANIFESTS: &[(&str, &str)] = &[
     ("knowledge-graph", include_str!("../../../plugins/knowledge-graph/manifest.json")),
     ("library-ask", include_str!("../../../plugins/library-ask/manifest.json")),
     ("library-plus", include_str!("../../../plugins/library-plus/manifest.json")),
-    ("research-workbench", include_str!("../../../plugins/research-workbench/manifest.json")),
     ("source-connectors", include_str!("../../../plugins/source-connectors/manifest.json")),
     ("sync-integrations", include_str!("../../../plugins/sync-integrations/manifest.json")),
     ("updates", include_str!("../../../plugins/updates/manifest.json")),

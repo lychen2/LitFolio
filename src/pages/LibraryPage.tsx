@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-  Atom, Compass, Download, GitCompareArrows, Inbox, LibraryBig, ListPlus, Loader2,
+  Atom, Compass, Download, Inbox, LibraryBig, ListPlus, Loader2,
   Rss, X, Search, PenLine,
 } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
@@ -22,7 +22,6 @@ import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export function LibraryPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -79,14 +78,6 @@ export function LibraryPage() {
   const [showExport, setShowExport] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const selected = Array.from(selectedIds);
-  const compare = useMutation({
-    mutationFn: () => api.paperComparisonGenerate(selected),
-    onSuccess: (report) => {
-      setSelectedIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ["comparisons"] });
-      navigate(`/compare?id=${report.id}`);
-    },
-  });
   const queueSelected = useMutation({
     mutationFn: async () => {
       await Promise.all(selected.map((id) => api.queueAdd(id)));
@@ -152,12 +143,9 @@ export function LibraryPage() {
           {selected.length > 0 && (
             <SelectionToolbar
               count={selected.length}
-              canCompare={selected.length >= 2}
-              comparing={compare.isPending}
               queueing={queueSelected.isPending}
               onClear={() => setSelectedIds(new Set())}
               onQueue={() => queueSelected.mutate()}
-              onCompare={() => compare.mutate()}
               onLitReview={() => setShowLitReview(true)}
               onExport={() => setShowExport(true)}
               onZotero={pushToZotero}
@@ -174,11 +162,6 @@ export function LibraryPage() {
               {t("library.zoteroPushed", { count: String(zoteroPush.data.pushed) })}
               {zoteroPush.data.skipped.length > 0 &&
                 " · " + t("library.zoteroSkipped", { count: String(zoteroPush.data.skipped.length) })}
-            </div>
-          )}
-          {compare.error && (
-            <div className="shrink-0 border-b border-litera-error/20 bg-litera-error/10 px-5 py-2 text-xs text-litera-error">
-              {(compare.error as Error).message}
             </div>
           )}
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -220,15 +203,12 @@ export function LibraryPage() {
 }
 
 function SelectionToolbar({
-  count, canCompare, comparing, queueing, onClear, onQueue, onCompare, onLitReview, onExport, onZotero, zoteroBusy,
+  count, queueing, onClear, onQueue, onLitReview, onExport, onZotero, zoteroBusy,
 }: {
   count: number;
-  canCompare: boolean;
-  comparing: boolean;
   queueing: boolean;
   onClear: () => void;
   onQueue: () => void;
-  onCompare: () => void;
   onLitReview: () => void;
   onExport: () => void;
   onZotero: () => void;
@@ -253,14 +233,6 @@ function SelectionToolbar({
       <button onClick={onZotero} disabled={zoteroBusy} className="litera-btn text-xs disabled:opacity-50">
         {zoteroBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LibraryBig className="h-3.5 w-3.5" />}
         {t("library.sendToZoteroBatch")}
-      </button>
-      <button
-        onClick={onCompare}
-        disabled={!canCompare || comparing}
-        className="litera-btn-primary text-xs disabled:opacity-50"
-      >
-        {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompareArrows className="h-3.5 w-3.5" />}
-        {t("compare.generate")}
       </button>
       <button onClick={onClear} className="litera-icon-btn h-7 w-7" title={t("common.cancel")} aria-label={t("common.cancel")}>
         <X className="h-3.5 w-3.5" />

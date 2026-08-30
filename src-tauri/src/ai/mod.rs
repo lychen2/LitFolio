@@ -29,7 +29,7 @@ pub use library_qa::{
 };
 pub use link_discover::discover_links;
 pub use lit_review::{generate_review, GroupingStrategy, LitReviewResult};
-pub use models::list_models;
+pub use models::{list_models, pull_model};
 pub use profile::{
     active_profile, active_profile_for_task, active_reading_profile, load_config, save_config,
     LlmConfig, LlmProfile, TaskKind,

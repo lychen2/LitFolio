@@ -170,6 +170,7 @@ export function SettingsPage() {
                 onUpsert={upsert}
                 onRemove={remove}
                 onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
+                onUpdateTaskAssignments={(assignments) => setDraft((current) => ({ ...current, task_assignments: assignments }))}
               />
             )}
             {tab === "sync" && (

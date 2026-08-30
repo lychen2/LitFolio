@@ -358,13 +358,13 @@ const commandFixtures = new Map<string, MockResolver>([
   ["smart_collections_list", () => []],
   ["queue_list", () => []],
   ["queue_add", () => null],
-  ["projects_list", () => []],
-  ["project_add_paper", () => null],
   ["papers_batch_tags", () => ({})],
   ["ask_capability_state", () => mockAskCapabilityState],
   ["ask_session_latest", () => mockAskSession],
   ["ask_session_save", () => mockAskSession],
   ["llm_get_config", () => mockLlmConfig],
+  ["llm_list_models", () => []],
+  ["llm_pull_model", () => "Model pulled successfully"],
 ]);
 
 export const registeredMockCommands = [...commandFixtures.keys()].sort();

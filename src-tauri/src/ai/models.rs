@@ -42,6 +42,45 @@ pub async fn list_models(client: &reqwest::Client, profile: &LlmProfile) -> Resu
     Ok(ids)
 }
 
+/// Pulls a model via Ollama-compatible /api/pull endpoint.
+pub async fn pull_model(
+    client: &reqwest::Client,
+    profile: &LlmProfile,
+    model: &str,
+) -> Result<String> {
+    let trimmed = profile.base_url.trim_end_matches('/');
+    let host_url = if let Some(stripped) = trimmed.strip_suffix("/v1") {
+        stripped
+    } else {
+        trimmed
+    };
+    let pull_url = format!("{host_url}/api/pull");
+    let payload = serde_json::json!({
+        "name": model,
+        "stream": false
+    });
+
+    let mut req = client.post(&pull_url).json(&payload);
+    if !profile.api_key.is_empty() {
+        req = req.bearer_auth(&profile.api_key);
+    }
+    let resp = req.send().await.with_context(|| format!("POST {pull_url}"))?;
+    let status = resp.status();
+    let text = resp.text().await.unwrap_or_default();
+    if status.is_success() {
+        Ok(format!("模型 '{model}' 已下载就绪。"))
+    } else if status == reqwest::StatusCode::NOT_FOUND {
+        Err(anyhow!(
+            "该服务地址不支持 /api/pull。在线云端服务（如 OpenAI、SiliconFlow 等）直接调用，无需在本地下载权重。"
+        ))
+    } else {
+        Err(anyhow!(
+            "拉取模型失败 ({status}): {}",
+            truncate(&text, 300)
+        ))
+    }
+}
+
 fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         return s.to_string();
