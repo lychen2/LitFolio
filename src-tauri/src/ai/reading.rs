@@ -128,10 +128,9 @@ pub fn freeze_reading_context(
         .unwrap_or(DEFAULT_BODY_BUDGET_CHARS)
         .max(1);
     let (body_excerpt, body_truncated) = match body {
-        Some(body) if body.chars().count() > budget => (
-            Some(body.chars().take(budget).collect::<String>()),
-            true,
-        ),
+        Some(body) if body.chars().count() > budget => {
+            (Some(body.chars().take(budget).collect::<String>()), true)
+        }
         Some(body) => (Some(body.to_string()), false),
         None => (None, false),
     };
@@ -282,10 +281,14 @@ mod tests {
         });
         // Selection present even without body/abstract: no fallback warning.
         let env = freeze_reading_context("p1", "T", None, None, None, &req).unwrap();
-        assert!(!env.warnings.contains(&"empty-document-scope-fallback".to_string()));
+        assert!(!env
+            .warnings
+            .contains(&"empty-document-scope-fallback".to_string()));
 
         let env = freeze_reading_context("p1", "T", None, None, None, &base_request("p1")).unwrap();
-        assert!(env.warnings.contains(&"empty-document-scope-fallback".to_string()));
+        assert!(env
+            .warnings
+            .contains(&"empty-document-scope-fallback".to_string()));
     }
 
     #[tokio::test]

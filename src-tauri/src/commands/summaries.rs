@@ -276,8 +276,7 @@ pub async fn draft_translate(
     // ponytail: discovery-draft translation stays on the legacy task-binding
     // resolver until source-discovery plugin extraction owns it.
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let prof =
-        active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
+    let prof = active_profile_for_task(&cfg, TaskKind::Translate).map_err(|e| e.to_string())?;
     let lang = target_lang.unwrap_or_else(|| "Chinese".to_string());
     crate::ai::translate_paper_text(
         &state.http,

@@ -199,7 +199,9 @@ pub async fn paper_translate_markdown(
     target_lang: Option<String>,
 ) -> Result<ReaderMarkdownTranslationResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
-    let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?.clone();
+    let profile = active_reading_profile(&cfg)
+        .map_err(|e| e.to_string())?
+        .clone();
     let lang = target_lang.unwrap_or(cfg.output_language);
     let repo = PaperRepo::new(&state.pool);
     let paper = load_paper(&repo, &paper_id)

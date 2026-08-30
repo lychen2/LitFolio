@@ -16,9 +16,9 @@ use std::sync::Arc;
 
 use tauri::State;
 
+use crate::ai::{active_reading_profile, load_config, ReadingContextRequest};
 use crate::commands::term_filter::{self, is_term_candidate};
 use crate::commands::{ai_dispatch::run_reading_dispatch, summaries::freeze_paper_context};
-use crate::ai::{active_reading_profile, load_config, ReadingContextRequest};
 use crate::storage::{NewPaperTerm, PaperDocumentRepo, PaperRepo, PaperTerm, PaperTermRepo};
 use crate::AppState;
 

@@ -7,7 +7,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::State;
 
-use crate::storage::{notes, get_pushed_at, record_push, NoteSectionRepo, Paper, PaperRepo, TagRepo};
+use crate::storage::{
+    get_pushed_at, notes, record_push, NoteSectionRepo, Paper, PaperRepo, TagRepo,
+};
 use crate::zotero::{config, ZoteroClient};
 use crate::AppState;
 
@@ -44,7 +46,10 @@ pub fn zotero_save_config(cfg: config::ZoteroConfig) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn zotero_test() -> Result<(), String> {
-    ZoteroClient::default().ping().await.map_err(|e| e.to_string())
+    ZoteroClient::default()
+        .ping()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -88,10 +93,11 @@ pub async fn zotero_push(
     };
 
     for paper_id in paper_ids {
-        if !force.unwrap_or(false) && get_pushed_at(&state.pool, &paper_id)
-            .await
-            .map_err(|e| e.to_string())?
-            .is_some()
+        if !force.unwrap_or(false)
+            && get_pushed_at(&state.pool, &paper_id)
+                .await
+                .map_err(|e| e.to_string())?
+                .is_some()
         {
             result.skipped.push(paper_id);
             continue;
@@ -101,7 +107,9 @@ pub async fn zotero_push(
             .await
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("paper {paper_id} not found"))?;
-        let item = build_item(&state, &paper).await.map_err(|e| e.to_string())?;
+        let item = build_item(&state, &paper)
+            .await
+            .map_err(|e| e.to_string())?;
         let session_id = client
             .save_items(json!([item]), &target_id)
             .await
@@ -129,7 +137,9 @@ async fn build_item(state: &AppState, paper: &Paper) -> anyhow::Result<Value> {
     .flatten()
     .map(|(label, value)| format!("## {label}\n\n{value}"))
     .collect::<Vec<_>>();
-    let sections = NoteSectionRepo::new(&state.pool).list_by_paper(&paper.id).await?;
+    let sections = NoteSectionRepo::new(&state.pool)
+        .list_by_paper(&paper.id)
+        .await?;
     let structured = sections
         .into_iter()
         .filter(|section| !section.content.trim().is_empty())
@@ -182,11 +192,20 @@ async fn build_item(state: &AppState, paper: &Paper) -> anyhow::Result<Value> {
         "notes": notes_json,
     });
     let obj = item.as_object_mut().expect("item object");
-    if let Some(year) = paper.year { obj.insert("date".into(), json!(year.to_string())); }
-    if let Some(venue) = &paper.venue { obj.insert("publicationTitle".into(), json!(venue)); }
-    if let Some(doi) = &paper.doi { obj.insert("DOI".into(), json!(doi)); }
+    if let Some(year) = paper.year {
+        obj.insert("date".into(), json!(year.to_string()));
+    }
+    if let Some(venue) = &paper.venue {
+        obj.insert("publicationTitle".into(), json!(venue));
+    }
+    if let Some(doi) = &paper.doi {
+        obj.insert("DOI".into(), json!(doi));
+    }
     if let Some(arxiv) = &paper.arxiv_id {
-        obj.insert("url".into(), json!(format!("https://arxiv.org/abs/{arxiv}")));
+        obj.insert(
+            "url".into(),
+            json!(format!("https://arxiv.org/abs/{arxiv}")),
+        );
     }
     Ok(item)
 }

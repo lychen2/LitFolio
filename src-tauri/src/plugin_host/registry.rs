@@ -16,16 +16,46 @@ use crate::mono_contracts::manifest::{
 pub const CORE_API_TARGET: &str = "1.0.0";
 
 const EMBEDDED_MANIFESTS: &[(&str, &str)] = &[
-    ("candidate-inbox", include_str!("../../../plugins/candidate-inbox/manifest.json")),
-    ("discovery-feeds", include_str!("../../../plugins/discovery-feeds/manifest.json")),
-    ("document-services", include_str!("../../../plugins/document-services/manifest.json")),
-    ("fixture-local", include_str!("../../../plugins/fixture-local/manifest.json")),
-    ("knowledge-graph", include_str!("../../../plugins/knowledge-graph/manifest.json")),
-    ("library-ask", include_str!("../../../plugins/library-ask/manifest.json")),
-    ("library-plus", include_str!("../../../plugins/library-plus/manifest.json")),
-    ("source-connectors", include_str!("../../../plugins/source-connectors/manifest.json")),
-    ("sync-integrations", include_str!("../../../plugins/sync-integrations/manifest.json")),
-    ("updates", include_str!("../../../plugins/updates/manifest.json")),
+    (
+        "candidate-inbox",
+        include_str!("../../../plugins/candidate-inbox/manifest.json"),
+    ),
+    (
+        "discovery-feeds",
+        include_str!("../../../plugins/discovery-feeds/manifest.json"),
+    ),
+    (
+        "document-services",
+        include_str!("../../../plugins/document-services/manifest.json"),
+    ),
+    (
+        "fixture-local",
+        include_str!("../../../plugins/fixture-local/manifest.json"),
+    ),
+    (
+        "knowledge-graph",
+        include_str!("../../../plugins/knowledge-graph/manifest.json"),
+    ),
+    (
+        "library-ask",
+        include_str!("../../../plugins/library-ask/manifest.json"),
+    ),
+    (
+        "library-plus",
+        include_str!("../../../plugins/library-plus/manifest.json"),
+    ),
+    (
+        "source-connectors",
+        include_str!("../../../plugins/source-connectors/manifest.json"),
+    ),
+    (
+        "sync-integrations",
+        include_str!("../../../plugins/sync-integrations/manifest.json"),
+    ),
+    (
+        "updates",
+        include_str!("../../../plugins/updates/manifest.json"),
+    ),
 ];
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -37,7 +67,10 @@ pub struct RegistryError {
 
 impl From<ManifestError> for RegistryError {
     fn from(e: ManifestError) -> Self {
-        Self { code: e.code.to_string(), path: e.path }
+        Self {
+            code: e.code.to_string(),
+            path: e.path,
+        }
     }
 }
 
@@ -46,9 +79,8 @@ fn embedded_values() -> Vec<serde_json::Value> {
     EMBEDDED_MANIFESTS
         .iter()
         .map(|(id, raw)| {
-            serde_json::from_str(raw).unwrap_or_else(|e| {
-                panic!("embedded plugin manifest {id} is not valid JSON: {e}")
-            })
+            serde_json::from_str(raw)
+                .unwrap_or_else(|e| panic!("embedded plugin manifest {id} is not valid JSON: {e}"))
         })
         .collect()
 }
@@ -74,7 +106,6 @@ pub fn load_registry() -> Result<Vec<CompiledManifest>, RegistryError> {
         .filter(|manifest| selected.contains(manifest.id.as_str()))
         .collect())
 }
-
 
 pub fn manifest_ids() -> Result<Vec<String>, RegistryError> {
     Ok(load_registry()?.into_iter().map(|m| m.id).collect())

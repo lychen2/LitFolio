@@ -76,7 +76,10 @@ pub async fn enable_plugin(
     let operations = registry::granted_operations(&manifest);
     let repo = PluginStateRepo::new(&state.pool);
     let generation = repo.enable(plugin_id).await? as u64;
-    Ok(state.plugin_host.issue(plugin_id, generation, operations).await)
+    Ok(state
+        .plugin_host
+        .issue(plugin_id, generation, operations)
+        .await)
 }
 
 /// Disable a plugin: revoke live authority FIRST, then persist. Late results
@@ -172,7 +175,10 @@ mod tests {
     async fn unknown_plugin_is_rejected_before_persistence() {
         let state = test_state().await;
         assert_eq!(
-            enable_plugin(&state, "no-such-plugin").await.err().map(|e| e.code()),
+            enable_plugin(&state, "no-such-plugin")
+                .await
+                .err()
+                .map(|e| e.code()),
             Some("unknown-plugin".into())
         );
     }
@@ -193,8 +199,10 @@ mod tests {
 
         // ...and the persisted state is disabled.
         let plugins = list_plugins(&state).await.unwrap();
-        let (_, enabled, generation) =
-            plugins.iter().find(|(m, _, _)| m.id == "fixture-local").unwrap();
+        let (_, enabled, generation) = plugins
+            .iter()
+            .find(|(m, _, _)| m.id == "fixture-local")
+            .unwrap();
         assert!(!enabled);
         assert!(*generation >= 1, "generation survives disable");
     }
@@ -209,15 +217,11 @@ mod tests {
             .map(|(m, enabled, _)| (m.id, enabled))
             .collect();
         assert_eq!(shown.iter().filter(|(_, e)| *e).count(), 2);
+        assert!(shown.iter().any(|(id, e)| id == "discovery-feeds" && *e));
+        assert!(shown.iter().any(|(id, e)| id == "candidate-inbox" && *e));
         assert!(shown
             .iter()
-            .any(|(id, e)| id == "discovery-feeds" && *e));
-        assert!(shown
-            .iter()
-            .any(|(id, e)| id == "candidate-inbox" && *e));
-        assert!(shown.iter().all(|(id, e)| id == "discovery-feeds"
-            || id == "candidate-inbox"
-            || !*e));
+            .all(|(id, e)| id == "discovery-feeds" || id == "candidate-inbox" || !*e));
     }
 
     #[tokio::test]

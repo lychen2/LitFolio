@@ -59,10 +59,12 @@ impl<'a> PluginStateRepo<'a> {
     }
 
     pub async fn disable(&self, plugin_id: &str) -> Result<()> {
-        sqlx::query("UPDATE plugin_state SET enabled = 0, updated_at = unixepoch() WHERE plugin_id = ?1")
-            .bind(plugin_id)
-            .execute(self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE plugin_state SET enabled = 0, updated_at = unixepoch() WHERE plugin_id = ?1",
+        )
+        .bind(plugin_id)
+        .execute(self.pool)
+        .await?;
         Ok(())
     }
 }

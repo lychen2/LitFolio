@@ -20,7 +20,9 @@ use ulid::Ulid;
 use super::db::Pool;
 use super::note_sections::{NoteSection, NoteSectionRepo, DEFAULT_SECTIONS};
 use super::paths::LibraryPaths;
-use super::pdf_notes::{insert_note, validate_rect, PdfNote, PdfNoteError, PdfNoteKind, PdfNoteRect};
+use super::pdf_notes::{
+    insert_note, validate_rect, PdfNote, PdfNoteError, PdfNoteKind, PdfNoteRect,
+};
 
 /// Sentinel label stored on legacy margin-note pseudo-highlights.
 pub const READER_MARGIN_NOTE_LABEL: &str = "reader-margin-note";
@@ -170,9 +172,11 @@ async fn sentinel_rows(pool: &Pool) -> Result<Vec<SentinelRow>, sqlx::Error> {
 }
 
 async fn already_converted_ids(pool: &Pool) -> Result<BTreeSet<String>, sqlx::Error> {
-    let rows = sqlx::query("SELECT legacy_highlight_id FROM pdf_notes WHERE legacy_highlight_id IS NOT NULL")
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT legacy_highlight_id FROM pdf_notes WHERE legacy_highlight_id IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await?;
     let mut out = BTreeSet::new();
     for row in rows {
         if let Some(id) = row.try_get::<Option<String>, _>("legacy_highlight_id")? {
@@ -237,8 +241,9 @@ pub(crate) async fn export_legacy_reader_notes_staged(
             dest.display()
         )));
     }
-    fs::create_dir_all(&dest)
-        .map_err(|error| LegacyReaderNotesError::Export(format!("create destination {}: {error}", dest.display())))?;
+    fs::create_dir_all(&dest).map_err(|error| {
+        LegacyReaderNotesError::Export(format!("create destination {}: {error}", dest.display()))
+    })?;
 
     // Backup (timestamp appears only in the backup directory name).
     let backup_dir = dest
@@ -406,9 +411,14 @@ async fn write_backup(
                 })?,
             );
         }
-        let paper_sections = section_repo.list_by_paper(paper_id).await.map_err(|error| {
-            LegacyReaderNotesError::Export(format!("read note sections for {paper_id}: {error}"))
-        })?;
+        let paper_sections = section_repo
+            .list_by_paper(paper_id)
+            .await
+            .map_err(|error| {
+                LegacyReaderNotesError::Export(format!(
+                    "read note sections for {paper_id}: {error}"
+                ))
+            })?;
         sections.insert(paper_id.clone(), paper_sections);
     }
     let manifest = BackupManifest {
@@ -489,13 +499,20 @@ async fn write_archive(
             LegacyReaderNotesError::Export(format!("write archived note for {paper_id}: {error}"))
         })?;
 
-        let paper_sections = section_repo.list_by_paper(paper_id).await.map_err(|error| {
-            LegacyReaderNotesError::Export(format!("read note sections for {paper_id}: {error}"))
-        })?;
+        let paper_sections = section_repo
+            .list_by_paper(paper_id)
+            .await
+            .map_err(|error| {
+                LegacyReaderNotesError::Export(format!(
+                    "read note sections for {paper_id}: {error}"
+                ))
+            })?;
         section_files += 1;
         let empty_defaults = paper_sections
             .iter()
-            .filter(|section| section.content.is_empty() && default_keys.contains(section.section_key.as_str()))
+            .filter(|section| {
+                section.content.is_empty() && default_keys.contains(section.section_key.as_str())
+            })
             .count() as i64;
         empty_default_sections += empty_defaults;
         let sections_file = format!("sections/{paper_id}.json");
@@ -509,11 +526,13 @@ async fn write_archive(
             })).collect::<Vec<_>>(),
         }))
         .map_err(|error| LegacyReaderNotesError::Export(format!("serialize sections: {error}")))?;
-        fs::write(sections_dir.join(format!("{paper_id}.json")), sections_json).map_err(|error| {
-            LegacyReaderNotesError::Export(format!(
-                "write archived sections for {paper_id}: {error}"
-            ))
-        })?;
+        fs::write(sections_dir.join(format!("{paper_id}.json")), sections_json).map_err(
+            |error| {
+                LegacyReaderNotesError::Export(format!(
+                    "write archived sections for {paper_id}: {error}"
+                ))
+            },
+        )?;
 
         entries.push(ArchivePaperEntry {
             paper_id: paper_id.clone(),
@@ -536,9 +555,8 @@ async fn write_archive(
     let index_bytes = serde_json::to_vec_pretty(&index).map_err(|error| {
         LegacyReaderNotesError::Export(format!("serialize archive index: {error}"))
     })?;
-    fs::write(staging.join("index.json"), index_bytes).map_err(|error| {
-        LegacyReaderNotesError::Export(format!("write archive index: {error}"))
-    })?;
+    fs::write(staging.join("index.json"), index_bytes)
+        .map_err(|error| LegacyReaderNotesError::Export(format!("write archive index: {error}")))?;
     Ok((markdown_files, section_files, empty_default_sections))
 }
 
@@ -629,13 +647,8 @@ mod tests {
     use crate::storage::{open_pool, run_migrations, LibraryPaths};
     use std::fs;
 
-
-
-    async fn test_context(
-        name: &str,
-    ) -> (Pool, LibraryPaths, std::path::PathBuf) {
-        let root =
-            std::env::temp_dir().join(format!("litera-legacy-note-{name}-{}", Ulid::new()));
+    async fn test_context(name: &str) -> (Pool, LibraryPaths, std::path::PathBuf) {
+        let root = std::env::temp_dir().join(format!("litera-legacy-note-{name}-{}", Ulid::new()));
         fs::create_dir_all(&root).expect("create test root");
         let paths = LibraryPaths::new(&root);
         let pool = open_pool(&paths.db_file()).await.expect("open pool");
@@ -655,13 +668,7 @@ mod tests {
         .expect("seed paper");
     }
 
-    async fn seed_sentinel(
-        pool: &Pool,
-        id: &str,
-        paper_id: &str,
-        rect_json: &str,
-        note: &str,
-    ) {
+    async fn seed_sentinel(pool: &Pool, id: &str, paper_id: &str, rect_json: &str, note: &str) {
         sqlx::query(
             "INSERT INTO highlights (id, paper_id, page, rect_json, color, label, text, note, created_at)
              VALUES (?1, ?2, 1, ?3, '#facc15', 'reader-margin-note', '', ?4, 1000)",
@@ -680,14 +687,31 @@ mod tests {
         let (pool, _paths, root) = test_context("preview").await;
         seed_paper(&pool, "paper-a").await;
         seed_paper(&pool, "paper-b").await;
-        seed_sentinel(&pool, "h-1", "paper-a", r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#, "first").await;
-        seed_sentinel(&pool, "h-2", "paper-b", r#"{"x1":0.0,"y1":0.0,"x2":8.0,"y2":4.0,"pageNumber":2}"#, "second").await;
+        seed_sentinel(
+            &pool,
+            "h-1",
+            "paper-a",
+            r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#,
+            "first",
+        )
+        .await;
+        seed_sentinel(
+            &pool,
+            "h-2",
+            "paper-b",
+            r#"{"x1":0.0,"y1":0.0,"x2":8.0,"y2":4.0,"pageNumber":2}"#,
+            "second",
+        )
+        .await;
 
         let preview = preview_legacy_reader_notes(&pool).await.expect("preview");
         assert_eq!(preview.total_sentinel_rows, 2);
         assert_eq!(preview.convertible, 2);
         assert_eq!(preview.already_converted, 0);
-        assert_eq!(preview.paper_ids, vec!["paper-a".to_string(), "paper-b".to_string()]);
+        assert_eq!(
+            preview.paper_ids,
+            vec!["paper-a".to_string(), "paper-b".to_string()]
+        );
 
         let report = export_legacy_reader_notes(&pool, &_paths, None)
             .await
@@ -695,7 +719,9 @@ mod tests {
         assert_eq!(report.converted, 2);
         assert_eq!(report.rollback_state, "committed");
 
-        let preview_after = preview_legacy_reader_notes(&pool).await.expect("preview after");
+        let preview_after = preview_legacy_reader_notes(&pool)
+            .await
+            .expect("preview after");
         assert_eq!(preview_after.already_converted, 2);
         assert_eq!(preview_after.convertible, 0);
 
@@ -704,7 +730,9 @@ mod tests {
             .expect("second export");
         assert_eq!(second.converted, 0);
         assert_eq!(second.already_converted, 2);
-        assert!(Path::new(&second.verified_backup_path).join("backup.json").exists());
+        assert!(Path::new(&second.verified_backup_path)
+            .join("backup.json")
+            .exists());
 
         pool.close().await;
         let _ = fs::remove_dir_all(root);
@@ -714,7 +742,14 @@ mod tests {
     async fn export_writes_deterministic_archive_and_counts_defaults() {
         let (pool, paths, root) = test_context("archive").await;
         seed_paper(&pool, "paper-a").await;
-        seed_sentinel(&pool, "h-1", "paper-a", r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#, "hello").await;
+        seed_sentinel(
+            &pool,
+            "h-1",
+            "paper-a",
+            r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#,
+            "hello",
+        )
+        .await;
 
         let note_dir = paths.paper_dir("paper-a");
         fs::create_dir_all(&note_dir).expect("paper dir");
@@ -728,10 +763,9 @@ mod tests {
         assert_eq!(report.converted, 1);
 
         let archive = paths.legacy_note_export_dir().join("archive");
-        let index: Value = serde_json::from_str(
-            &fs::read_to_string(archive.join("index.json")).expect("index"),
-        )
-        .expect("parse index");
+        let index: Value =
+            serde_json::from_str(&fs::read_to_string(archive.join("index.json")).expect("index"))
+                .expect("parse index");
         assert_eq!(index["schemaVersion"], 1);
         assert_eq!(index["papers"][0]["paperId"], "paper-a");
         assert_eq!(
@@ -741,7 +775,10 @@ mod tests {
         assert!(archive.join("sections/paper-a.json").exists());
         // Deterministic: no wall-clock timestamp appears in archive contents.
         let serialized = fs::read_to_string(archive.join("index.json")).expect("index text");
-        assert!(!serialized.contains("timestamp"), "index must stay deterministic");
+        assert!(
+            !serialized.contains("timestamp"),
+            "index must stay deterministic"
+        );
 
         // Re-running is idempotent and identical target rows are reused.
         let second = export_legacy_reader_notes(&pool, &paths, None)
@@ -758,7 +795,14 @@ mod tests {
     async fn injected_archive_failure_restores_staged_files_and_rolls_back_rows() {
         let (pool, paths, root) = test_context("rollback").await;
         seed_paper(&pool, "paper-a").await;
-        seed_sentinel(&pool, "h-1", "paper-a", r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#, "note").await;
+        seed_sentinel(
+            &pool,
+            "h-1",
+            "paper-a",
+            r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#,
+            "note",
+        )
+        .await;
 
         let report = export_legacy_reader_notes_staged(
             &pool,
@@ -804,7 +848,14 @@ mod tests {
     async fn export_rejects_destination_that_is_a_file() {
         let (pool, paths, root) = test_context("bad-dest").await;
         seed_paper(&pool, "paper-a").await;
-        seed_sentinel(&pool, "h-1", "paper-a", r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#, "x").await;
+        seed_sentinel(
+            &pool,
+            "h-1",
+            "paper-a",
+            r#"{"x":1.0,"y":2.0,"width":10.0,"height":5.0}"#,
+            "x",
+        )
+        .await;
         let bad = root.join("not-a-dir");
         fs::write(&bad, "file").expect("write blocking file");
         let result = export_legacy_reader_notes(&pool, &paths, Some(&bad)).await;
@@ -818,7 +869,14 @@ mod tests {
     async fn invalid_geometry_rows_are_counted_failed_not_converted() {
         let (pool, paths, root) = test_context("bad-geometry").await;
         seed_paper(&pool, "paper-a").await;
-        seed_sentinel(&pool, "h-1", "paper-a", r#"{"x":-5.0,"y":0.0,"width":10.0,"height":5.0}"#, "neg").await;
+        seed_sentinel(
+            &pool,
+            "h-1",
+            "paper-a",
+            r#"{"x":-5.0,"y":0.0,"width":10.0,"height":5.0}"#,
+            "neg",
+        )
+        .await;
         seed_sentinel(&pool, "h-2", "paper-a", r#"not json at all"#, "bad").await;
 
         let report = export_legacy_reader_notes(&pool, &paths, None)

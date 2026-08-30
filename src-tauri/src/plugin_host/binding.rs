@@ -161,10 +161,14 @@ mod tests {
     #[tokio::test]
     async fn stale_generation_denied_after_reenable() {
         let host = PluginHostState::new();
-        let first = host.issue("fixture-local", 1, ops(&["papers.search"])).await;
+        let first = host
+            .issue("fixture-local", 1, ops(&["papers.search"]))
+            .await;
         host.revoke("fixture-local").await;
         // Re-enable bumps the generation; the old binding must not resurface.
-        let _second = host.issue("fixture-local", 2, ops(&["papers.search"])).await;
+        let _second = host
+            .issue("fixture-local", 2, ops(&["papers.search"]))
+            .await;
         assert_eq!(
             host.authorize(&first, "papers.search").await,
             Err(HostAccessError::StaleGeneration)
@@ -174,7 +178,9 @@ mod tests {
     #[tokio::test]
     async fn operation_outside_grant_is_denied() {
         let host = PluginHostState::new();
-        let binding = host.issue("fixture-local", 1, ops(&["papers.search"])).await;
+        let binding = host
+            .issue("fixture-local", 1, ops(&["papers.search"]))
+            .await;
         assert!(host.authorize(&binding, "papers.search").await.is_ok());
         assert_eq!(
             host.authorize(&binding, "annotations.write").await,
@@ -196,7 +202,9 @@ mod tests {
     #[tokio::test]
     async fn revoke_kills_authority_immediately() {
         let host = PluginHostState::new();
-        let binding = host.issue("fixture-local", 1, ops(&["papers.search"])).await;
+        let binding = host
+            .issue("fixture-local", 1, ops(&["papers.search"]))
+            .await;
         host.revoke("fixture-local").await;
         assert_eq!(
             host.authorize(&binding, "papers.search").await,

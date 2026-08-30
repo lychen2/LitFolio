@@ -1,8 +1,8 @@
 //! IPC command surface exposed to the React frontend.
 
+pub(crate) mod ai_dispatch;
 #[cfg(feature = "plugin-library-ask")]
 pub mod ask;
-pub(crate) mod ai_dispatch;
 pub mod batch;
 #[cfg(feature = "plugin-candidate-inbox")]
 pub mod candidates;
@@ -32,8 +32,8 @@ pub mod pdf;
 pub mod pdf_notes;
 pub mod plugin_host;
 pub mod provenance;
-pub mod reader_ask;
 pub mod queue;
+pub mod reader_ask;
 pub mod reader_terms;
 pub mod reader_translate;
 pub mod search;
@@ -45,8 +45,8 @@ pub mod survey;
 pub mod sync;
 pub mod tags;
 pub mod term_filter;
-pub mod zotero;
 pub mod topic_alerts;
+pub mod zotero;
 
 use std::sync::Arc;
 
@@ -599,14 +599,6 @@ pub(crate) use command_handlers;
 #[allow(unused_imports)]
 pub(crate) use command_paths_alerts_concepts;
 #[allow(unused_imports)]
-pub(crate) use stage_ask;
-#[allow(unused_imports)]
-pub(crate) use stage_candidates;
-#[allow(unused_imports)]
-pub(crate) use stage_feeds;
-#[allow(unused_imports)]
-pub(crate) use stage_graph;
-#[allow(unused_imports)]
 pub(crate) use command_paths_collections_data;
 #[allow(unused_imports)]
 pub(crate) use command_paths_config_sync_ai;
@@ -624,3 +616,11 @@ pub(crate) use command_paths_papers;
 pub(crate) use command_paths_projects_research;
 #[allow(unused_imports)]
 pub(crate) use command_paths_reader_notes;
+#[allow(unused_imports)]
+pub(crate) use stage_ask;
+#[allow(unused_imports)]
+pub(crate) use stage_candidates;
+#[allow(unused_imports)]
+pub(crate) use stage_feeds;
+#[allow(unused_imports)]
+pub(crate) use stage_graph;

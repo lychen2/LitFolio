@@ -2,8 +2,8 @@
 
 #![allow(dead_code, unused_imports)]
 
-mod ask_sessions;
 mod ai_executions;
+mod ask_sessions;
 mod candidates;
 pub mod concepts;
 pub mod custom_fields;
@@ -16,6 +16,7 @@ mod folders;
 mod highlights;
 pub mod jobs;
 pub mod knowledge;
+mod legacy_reader_notes;
 mod models;
 mod note_sections;
 pub mod notes;
@@ -25,16 +26,15 @@ mod paper_supplements;
 mod paper_terms;
 mod papers;
 mod paths;
-mod plugin_state;
-mod zotero_pushes;
-mod legacy_reader_notes;
 mod pdf_notes;
+mod plugin_state;
 mod provenance;
 pub mod queue;
 pub mod retrieval;
 pub mod smart_collections;
 mod tags;
 pub mod topic_alerts;
+mod zotero_pushes;
 
 pub use ai_executions::{AiExecutionRepo, ExecutionRecord};
 pub use ask_sessions::{AskSession, AskSessionDraft, AskSessionRepo};
@@ -50,32 +50,32 @@ pub use highlights::{
     HighlightExplanationUpdate, HighlightRepo, HighlightSummaryUpdate, HighlightTranslationUpdate,
 };
 pub use jobs::{JobDraft, JobProgress, JobRecord, JobRepo};
+pub use legacy_reader_notes::{
+    export_legacy_reader_notes, preview_legacy_reader_notes, LegacyReaderNotesError,
+    LegacyReaderNotesPreview, LegacyReaderNotesReport,
+};
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
 pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
-pub use plugin_state::{PluginStateRepo, PluginStateRow};
-pub use zotero_pushes::{get_pushed_at, record_push};
-pub use provenance::{
-    BackfillPaperReport, BackfillReport, BacklinkRow, CandidateSegment, DocumentCandidate, DocumentRevision,
-    NoteRevision, NoteSaveResult, ProvenanceError, ProvenanceExport, ProvenanceRepo,
-    RemapReport, SourceLink, SourceSegment, PROVENANCE_SCHEMA_VERSION,
-    PROVENANCE_TARGET_VERSION,
-};
 pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
 pub use paper_supplements::{NewPaperSupplement, PaperSupplement, PaperSupplementRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
 pub use paths::{default_library_root, LibraryPaths};
-pub use legacy_reader_notes::{
-    export_legacy_reader_notes, preview_legacy_reader_notes, LegacyReaderNotesError,
-    LegacyReaderNotesPreview, LegacyReaderNotesReport,
-};
 pub use pdf_notes::{
     PdfNote, PdfNoteCreateInput, PdfNoteError, PdfNotePatch, PdfNoteRect, PdfNoteRepo,
     PdfNoteSearchResult,
+};
+pub use plugin_state::{PluginStateRepo, PluginStateRow};
+pub use provenance::{
+    BackfillPaperReport, BackfillReport, BacklinkRow, CandidateSegment, DocumentCandidate,
+    DocumentRevision, NoteRevision, NoteSaveResult, ProvenanceError, ProvenanceExport,
+    ProvenanceRepo, RemapReport, SourceLink, SourceSegment, PROVENANCE_SCHEMA_VERSION,
+    PROVENANCE_TARGET_VERSION,
 };
 pub use queue::{QueueEntry, QueueRepo};
 pub use retrieval::{unified_search, UnifiedSearchResult};
 pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};
 pub use tags::{TagRepo, TagWithCount};
 pub use topic_alerts::{TopicAlert, TopicAlertRepo, TopicAlertResult, TopicAlertResultInsert};
+pub use zotero_pushes::{get_pushed_at, record_push};

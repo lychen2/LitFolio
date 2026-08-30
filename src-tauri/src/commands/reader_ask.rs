@@ -65,18 +65,22 @@ async fn resolve_highlight_scope(
 
 /// Build the bounded user prompt from the FROZEN envelope. Pure function of
 /// the envelope + question; nothing else is read afterwards.
-fn build_ask_messages(
-    envelope: &ReadingContextEnvelope,
-    question: &str,
-) -> Vec<ChatMessage> {
+fn build_ask_messages(envelope: &ReadingContextEnvelope, question: &str) -> Vec<ChatMessage> {
     let mut sections = Vec::new();
     sections.push(format!("# {}\n", envelope.title));
-    if let Some(abstract_text) = envelope.abstract_text.as_deref().filter(|s| !s.trim().is_empty())
+    if let Some(abstract_text) = envelope
+        .abstract_text
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
     {
         sections.push(format!("## Abstract\n{abstract_text}\n"));
     }
     if let Some(body) = envelope.body_excerpt.as_deref() {
-        let truncated = if envelope.body_truncated { " (truncated)" } else { "" };
+        let truncated = if envelope.body_truncated {
+            " (truncated)"
+        } else {
+            ""
+        };
         sections.push(format!("## Document text{truncated}\n{body}\n"));
     }
     if let Some(selection) = envelope.selection.as_ref() {
@@ -109,7 +113,10 @@ pub async fn reader_ask_paper(
     if question.is_empty() {
         return Err("empty question".into());
     }
-    let question = question.chars().take(MAX_QUESTION_CHARS).collect::<String>();
+    let question = question
+        .chars()
+        .take(MAX_QUESTION_CHARS)
+        .collect::<String>();
 
     let paper_repo = PaperRepo::new(&state.pool);
     let paper = load_paper(&paper_repo, &input.request.paper_id.clone())
@@ -154,18 +161,13 @@ pub async fn reader_ask_paper(
         &profile.chat_model,
         &envelope,
         async {
-            chat_complete_with_task_kind(
-                &state.http,
-                &profile,
-                TaskKind::Ask.as_str(),
-                &messages,
-            )
-            .await
-            .map(|resp| ReaderAskResult {
-                answer: resp.content,
-                model: resp.model,
-                envelope_id: envelope.envelope_id.clone(),
-            })
+            chat_complete_with_task_kind(&state.http, &profile, TaskKind::Ask.as_str(), &messages)
+                .await
+                .map(|resp| ReaderAskResult {
+                    answer: resp.content,
+                    model: resp.model,
+                    envelope_id: envelope.envelope_id.clone(),
+                })
         },
     )
     .await

@@ -54,9 +54,7 @@ impl ZoteroClient {
 
     /// Probe whether Zotero's connector server is reachable.
     pub async fn ping(&self) -> Result<()> {
-        let resp = self
-            .post("/connector/ping", &json!({}))
-            .await?;
+        let resp = self.post("/connector/ping", &json!({})).await?;
         if !resp.status().is_success() && resp.status().as_u16() != 404 {
             return Err(anyhow!("Zotero connector ping returned {}", resp.status()));
         }

@@ -64,7 +64,10 @@ pub async fn pull_model(
     if !profile.api_key.is_empty() {
         req = req.bearer_auth(&profile.api_key);
     }
-    let resp = req.send().await.with_context(|| format!("POST {pull_url}"))?;
+    let resp = req
+        .send()
+        .await
+        .with_context(|| format!("POST {pull_url}"))?;
     let status = resp.status();
     let text = resp.text().await.unwrap_or_default();
     if status.is_success() {
@@ -74,10 +77,7 @@ pub async fn pull_model(
             "该服务地址不支持 /api/pull。在线云端服务（如 OpenAI、SiliconFlow 等）直接调用，无需在本地下载权重。"
         ))
     } else {
-        Err(anyhow!(
-            "拉取模型失败 ({status}): {}",
-            truncate(&text, 300)
-        ))
+        Err(anyhow!("拉取模型失败 ({status}): {}", truncate(&text, 300)))
     }
 }
 
