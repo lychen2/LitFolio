@@ -54,7 +54,9 @@ impl ResolvedInclusionPlan {
     /// Parse an untrusted JSON value. Unknown fields make the plan caller-
     /// built and reject it outright (`plan_malformed`).
     pub fn parse(value: serde_json::Value) -> std::result::Result<Self, PlanError> {
-        serde_json::from_value(value).map_err(|_| PlanError { code: "plan_malformed" })
+        serde_json::from_value(value).map_err(|_| PlanError {
+            code: "plan_malformed",
+        })
     }
 
     /// Validate against this build's profile, embedded manifest set, and the
@@ -64,21 +66,30 @@ impl ResolvedInclusionPlan {
         pool: &crate::storage::Pool,
     ) -> std::result::Result<(), PlanError> {
         if self.schema_version != PLAN_SCHEMA_VERSION {
-            return Err(PlanError { code: "plan_schema_unsupported" });
+            return Err(PlanError {
+                code: "plan_schema_unsupported",
+            });
         }
         if self.profile != compiled_profile() {
-            return Err(PlanError { code: "plan_profile_mismatch" });
+            return Err(PlanError {
+                code: "plan_profile_mismatch",
+            });
         }
-        let digest = manifest_set_digest()
-            .map_err(|_| PlanError { code: "plan_manifest_unavailable" })?;
+        let digest = manifest_set_digest().map_err(|_| PlanError {
+            code: "plan_manifest_unavailable",
+        })?;
         if self.manifest_set_sha256 != digest {
-            return Err(PlanError { code: "plan_manifest_stale" });
+            return Err(PlanError {
+                code: "plan_manifest_stale",
+            });
         }
-        let source = source_schema_version(pool)
-            .await
-            .map_err(|_| PlanError { code: "plan_source_unreadable" })?;
+        let source = source_schema_version(pool).await.map_err(|_| PlanError {
+            code: "plan_source_unreadable",
+        })?;
         if self.target_core_schema != source {
-            return Err(PlanError { code: "plan_target_stale" });
+            return Err(PlanError {
+                code: "plan_target_stale",
+            });
         }
         Ok(())
     }
@@ -108,11 +119,10 @@ pub fn manifest_set_digest() -> Result<String> {
 }
 
 async fn source_schema_version(pool: &crate::storage::Pool) -> Result<u64> {
-    let row: (i64,) =
-        sqlx::query_as("SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations")
-            .fetch_one(pool)
-            .await
-            .context("read applied migration version")?;
+    let row: (i64,) = sqlx::query_as("SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations")
+        .fetch_one(pool)
+        .await
+        .context("read applied migration version")?;
     Ok(row.0 as u64)
 }
 
@@ -124,9 +134,9 @@ pub async fn preview(
     plan: &ResolvedInclusionPlan,
 ) -> std::result::Result<ConversionPreview, PlanError> {
     plan.validate(pool).await?;
-    let source = source_schema_version(pool)
-        .await
-        .map_err(|_| PlanError { code: "plan_source_unreadable" })?;
+    let source = source_schema_version(pool).await.map_err(|_| PlanError {
+        code: "plan_source_unreadable",
+    })?;
     let paper_count = scalar(pool, "SELECT COUNT(*) FROM papers").await;
     let note_count = scalar(pool, "SELECT COUNT(*) FROM note_sections").await;
     let highlight_count = scalar(pool, "SELECT COUNT(*) FROM highlights").await;
@@ -182,8 +192,7 @@ pub fn create_backup(paths: &crate::storage::LibraryPaths, token: &str) -> Resul
                 continue;
             }
             let bytes = std::fs::read(&src).with_context(|| format!("read {}", src.display()))?;
-            std::fs::write(dir.join(name), &bytes)
-                .with_context(|| format!("write {}", name))?;
+            std::fs::write(dir.join(name), &bytes).with_context(|| format!("write {}", name))?;
             files.push(BackupFile {
                 name: name.to_string(),
                 bytes: bytes.len() as u64,
@@ -193,8 +202,14 @@ pub fn create_backup(paths: &crate::storage::LibraryPaths, token: &str) -> Resul
         if !files.iter().any(|f| f.name == "library.db") {
             anyhow::bail!("no library.db found to back up");
         }
-        let inventory = BackupInventory { token: token.to_string(), files };
-        std::fs::write(dir.join("manifest.json"), serde_json::to_vec_pretty(&inventory)?)?;
+        let inventory = BackupInventory {
+            token: token.to_string(),
+            files,
+        };
+        std::fs::write(
+            dir.join("manifest.json"),
+            serde_json::to_vec_pretty(&inventory)?,
+        )?;
         Ok(())
     })();
     if let Err(error) = result {
@@ -307,8 +322,7 @@ mod tests {
     }
 
     fn temp_library() -> LibraryPaths {
-        let root =
-            std::env::temp_dir().join(format!("litera-conversion-{}", ulid::Ulid::new()));
+        let root = std::env::temp_dir().join(format!("litera-conversion-{}", ulid::Ulid::new()));
         let paths = LibraryPaths::new(root);
         paths.ensure().unwrap();
         paths
@@ -334,7 +348,10 @@ mod tests {
         let plan = valid_plan(&pool).await;
         plan.validate(&pool).await.unwrap();
 
-        assert_eq!(preview(&pool, &plan).await.unwrap(), preview(&pool, &plan).await.unwrap());
+        assert_eq!(
+            preview(&pool, &plan).await.unwrap(),
+            preview(&pool, &plan).await.unwrap()
+        );
         let first = preview(&pool, &plan).await.unwrap();
         assert_eq!(first.token.len(), 64);
         assert_eq!(first.source_core_schema, plan.target_core_schema);
@@ -347,22 +364,34 @@ mod tests {
         // Forged manifest digest (caller-built plugin list).
         let mut plan = valid_plan(&pool).await;
         plan.manifest_set_sha256 = "0".repeat(64);
-        assert_eq!(plan.validate(&pool).await.unwrap_err().code, "plan_manifest_stale");
+        assert_eq!(
+            plan.validate(&pool).await.unwrap_err().code,
+            "plan_manifest_stale"
+        );
 
         // Profile mismatch.
         let mut plan = valid_plan(&pool).await;
         plan.profile = "core-forged".into();
-        assert_eq!(plan.validate(&pool).await.unwrap_err().code, "plan_profile_mismatch");
+        assert_eq!(
+            plan.validate(&pool).await.unwrap_err().code,
+            "plan_profile_mismatch"
+        );
 
         // Stale target schema.
         let mut plan = valid_plan(&pool).await;
         plan.target_core_schema = 0;
-        assert_eq!(plan.validate(&pool).await.unwrap_err().code, "plan_target_stale");
+        assert_eq!(
+            plan.validate(&pool).await.unwrap_err().code,
+            "plan_target_stale"
+        );
 
         // Unsupported plan schema version.
         let mut plan = valid_plan(&pool).await;
         plan.schema_version = 99;
-        assert_eq!(plan.validate(&pool).await.unwrap_err().code, "plan_schema_unsupported");
+        assert_eq!(
+            plan.validate(&pool).await.unwrap_err().code,
+            "plan_schema_unsupported"
+        );
 
         // Malformed / caller-extended plan payload.
         let raw = serde_json::json!({
@@ -373,7 +402,10 @@ mod tests {
             "included": [],
             "forgedByCaller": true
         });
-        assert_eq!(ResolvedInclusionPlan::parse(raw).unwrap_err().code, "plan_malformed");
+        assert_eq!(
+            ResolvedInclusionPlan::parse(raw).unwrap_err().code,
+            "plan_malformed"
+        );
 
         // Preview refuses invalid plans too.
         let mut plan = valid_plan(&pool).await;
@@ -388,7 +420,10 @@ mod tests {
         std::fs::write(paths.db_file(), b"sqlite-bytes").unwrap();
         std::fs::write(paths.config_file(), b"{\"k\":1}").unwrap();
 
-        let token = preview(&pool, &valid_plan(&pool).await).await.unwrap().token;
+        let token = preview(&pool, &valid_plan(&pool).await)
+            .await
+            .unwrap()
+            .token;
         create_backup(&paths, &token).unwrap();
 
         let raw = std::fs::read(backup_dir(&paths, &token).join("manifest.json")).unwrap();
@@ -410,7 +445,10 @@ mod tests {
         let paths = temp_library();
         std::fs::write(paths.db_file(), b"sqlite-bytes").unwrap();
 
-        let token = preview(&pool, &valid_plan(&pool).await).await.unwrap().token;
+        let token = preview(&pool, &valid_plan(&pool).await)
+            .await
+            .unwrap()
+            .token;
         create_backup(&paths, &token).unwrap();
         assert!(!is_complete(&paths, &token));
 
