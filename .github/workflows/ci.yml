@@ -35,6 +35,9 @@ jobs:
 
       - name: Install Linux dependencies
         run: |
+          # ubuntu-24.04 runners restrict unprivileged user namespaces (AppArmor);
+          # the startup-network harness tests need `unshare --user --map-root-user`.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
