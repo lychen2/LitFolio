@@ -8,6 +8,7 @@ import type {
   QuickReadResult,
 } from "@/lib/api";
 import type { SyncPreviewReport, SyncReport } from "@/lib/syncApi";
+import { selectedManifests } from "@/host/generatedProfileRegistry";
 
 const now = 1_779_999_999;
 
@@ -207,7 +208,13 @@ const mockSourceLink = {
 type MockResolver = () => unknown;
 const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
-  ["plugin_host_list", () => []],
+  ["plugin_host_list", () =>
+    ["discovery-feeds", "candidate-inbox", "library-ask", "knowledge-graph"].map((id, i) => ({
+      manifest: selectedManifests.find((m) => m.id === id),
+      enabled: true,
+      generation: i + 1,
+    })).filter((e) => e.manifest != null),
+  ],
   ["plugin_host_enable", () => ({ bindingId: "bind-fixture-local-1-test" })],
   ["plugin_host_disable", () => null],
   ["document_candidate_stage", () => mockDocumentCandidate],

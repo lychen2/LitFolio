@@ -7,8 +7,6 @@ const routes = [
   "/feeds",
   "/candidates",
   "/topic",
-  "/projects",
-  "/compare",
   "/ask",
   "/graph",
   "/settings",
