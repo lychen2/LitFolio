@@ -1,99 +1,100 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <!-- Background Gradient: Deep Slate Violet -->
-    <linearGradient id="lf-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1D182B" />
-      <stop offset="45%" stop-color="#14111E" />
-      <stop offset="100%" stop-color="#0B0912" />
+    <linearGradient id="lf-bg" x2="0.8" y2="1">
+      <stop stop-color="#292139" />
+      <stop offset="0.5" stop-color="#191423" />
+      <stop offset="1" stop-color="#100D18" />
     </linearGradient>
-
-    <!-- Subtle Bevel Border -->
-    <linearGradient id="lf-border" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#675887" stop-opacity="0.6" />
-      <stop offset="50%" stop-color="#382E4D" stop-opacity="0.25" />
-      <stop offset="100%" stop-color="#1A1526" stop-opacity="0.8" />
+    <linearGradient id="lf-border" x2="0.8" y2="1">
+      <stop stop-color="#9C86BD" stop-opacity="0.65" />
+      <stop offset="0.5" stop-color="#67517F" stop-opacity="0.2" />
+      <stop offset="1" stop-color="#473654" stop-opacity="0.5" />
     </linearGradient>
-
-    <!-- Page Layers: Low-saturation Muted Purples -->
-    <linearGradient id="lf-page-l-back" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4B3D66" />
-      <stop offset="100%" stop-color="#261E34" />
-    </linearGradient>
-
-    <linearGradient id="lf-page-r-back" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#584876" />
-      <stop offset="100%" stop-color="#2B213D" />
-    </linearGradient>
-
-    <linearGradient id="lf-page-l-front" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8473A5" />
-      <stop offset="50%" stop-color="#60507E" />
-      <stop offset="100%" stop-color="#3B2F52" />
-    </linearGradient>
-
-    <linearGradient id="lf-page-r-front" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A595C5" />
-      <stop offset="60%" stop-color="#79699A" />
-      <stop offset="100%" stop-color="#4A3B66" />
-    </linearGradient>
-
-    <!-- Active Swirl Page (Muted Lavender to Slate Violet) -->
-    <linearGradient id="lf-active-page" x1="20%" y1="0%" x2="90%" y2="100%">
-      <stop offset="0%" stop-color="#CEC4E4" />
-      <stop offset="45%" stop-color="#9A8AB9" />
-      <stop offset="100%" stop-color="#6A598D" />
-    </linearGradient>
-
-    <!-- Core Insight Beacon -->
-    <linearGradient id="lf-beacon" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F5F1FA" />
-      <stop offset="50%" stop-color="#C5B8DE" />
-      <stop offset="100%" stop-color="#7C6AA2" />
-    </linearGradient>
-
-    <!-- Lighting & Shadows -->
-    <radialGradient id="lf-radial-glow" cx="50%" cy="45%" r="55%">
-      <stop offset="0%" stop-color="#735E9C" stop-opacity="0.25" />
-      <stop offset="55%" stop-color="#554475" stop-opacity="0.05" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    <radialGradient id="lf-halo" cx="53%" cy="39%" r="49%">
+      <stop stop-color="#B89BDD" stop-opacity="0.15" />
+      <stop offset="1" stop-color="#B89BDD" stop-opacity="0" />
     </radialGradient>
-
-    <filter id="lf-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#030206" flood-opacity="0.75" />
+    <linearGradient id="lf-cover" x2="0" y2="1">
+      <stop stop-color="#76618F" />
+      <stop offset="1" stop-color="#42324F" />
+    </linearGradient>
+    <linearGradient id="lf-left" x2="0.9" y2="1">
+      <stop stop-color="#A28BBE" />
+      <stop offset="0.55" stop-color="#806996" />
+      <stop offset="1" stop-color="#544064" />
+    </linearGradient>
+    <linearGradient id="lf-right" x2="0.6" y2="1">
+      <stop stop-color="#C3AEDC" />
+      <stop offset="0.55" stop-color="#A18ABA" />
+      <stop offset="1" stop-color="#715985" />
+    </linearGradient>
+    <linearGradient id="lf-leaf" x1="0.3" y1="0" x2="0.6" y2="1">
+      <stop stop-color="#F1E8FC" />
+      <stop offset="0.42" stop-color="#CCB9E4" />
+      <stop offset="1" stop-color="#9880B4" />
+    </linearGradient>
+    <linearGradient id="lf-fold" x2="0.6" y2="1">
+      <stop stop-color="#C2A9DD" />
+      <stop offset="1" stop-color="#806698" />
+    </linearGradient>
+    <linearGradient id="lf-ribbon" x2="0.4" y2="1">
+      <stop stop-color="#E6B8D0" />
+      <stop offset="1" stop-color="#B27FAD" />
+    </linearGradient>
+    <linearGradient id="lf-star" x2="0.7" y2="1">
+      <stop stop-color="#FFF5E9" />
+      <stop offset="0.55" stop-color="#F3DFEC" />
+      <stop offset="1" stop-color="#C4A4DA" />
+    </linearGradient>
+    <filter id="lf-shadow" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="15" flood-color="#08050F" flood-opacity="0.6" />
     </filter>
-
-    <filter id="lf-beacon-glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="6" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    <filter id="lf-glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" />
     </filter>
   </defs>
 
-  <!-- Squircle Base -->
+  <!-- The original rounded tile and violet folio remain the primary silhouette. -->
   <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#lf-bg)" stroke="url(#lf-border)" stroke-width="2.5" />
-  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#lf-radial-glow)" />
+  <rect x="22" y="22" width="468" height="468" rx="110" fill="url(#lf-halo)" />
+  <path d="M 65 101 A 94 94 0 0 1 140 34 H 271" fill="none" stroke="#E6D3F8" stroke-opacity="0.09" stroke-width="2" stroke-linecap="round" />
 
-  <!-- Main Symbol -->
+  <!-- A short, open orbit leaves generous negative space around the star. -->
+  <path d="M 166 170 C 185 130 218 112 254 111 C 289 110 322 124 344 147" fill="none" stroke="#C6AADC" stroke-opacity="0.22" stroke-width="2" stroke-linecap="round" />
+  <circle cx="166" cy="170" r="3" fill="#C6AADC" fill-opacity="0.55" />
+
   <g filter="url(#lf-shadow)">
-    <!-- Back Folio Leaves -->
-    <path d="M 256 362 C 210 338 152 328 120 334 C 114 335 110 330 110 324 L 110 200 C 110 195 114 191 119 190 C 154 184 212 196 256 226 Z" fill="url(#lf-page-l-back)" opacity="0.85" />
-    <path d="M 256 362 C 302 338 360 328 392 334 C 398 335 402 330 402 324 L 402 200 C 402 195 398 191 393 190 C 358 184 300 196 256 226 Z" fill="url(#lf-page-r-back)" opacity="0.85" />
+    <!-- Cover and a single layered page edge keep the book readable at 32px. -->
+    <path d="M 256 379 C 209 354 146 344 119 349 C 112 350 106 345 106 338 V 204 C 106 197 111 191 118 190 C 157 184 218 200 256 229 C 294 200 355 184 394 190 C 401 191 406 197 406 204 V 338 C 406 345 400 350 393 349 C 366 344 303 354 256 379 Z" fill="url(#lf-cover)" />
+    <path d="M 116 328 C 158 325 212 342 256 366 C 300 342 354 325 396 328 V 337 C 353 335 300 350 256 375 C 212 350 159 335 116 337 Z" fill="#CFBADF" fill-opacity="0.52" />
+    <path d="M 256 367 C 210 342 150 332 126 337 C 120 338 116 334 116 328 V 215 C 116 209 120 205 126 204 C 165 199 218 215 256 243 Z" fill="url(#lf-left)" />
+    <path d="M 256 367 C 302 342 362 332 386 337 C 392 338 396 334 396 328 V 215 C 396 209 392 205 386 204 C 347 199 294 215 256 243 Z" fill="url(#lf-right)" />
 
-    <!-- Main Front Folio Leaves -->
-    <path d="M 256 374 C 206 348 144 340 126 344 C 121 345 116 341 116 336 L 116 216 C 116 211 120 207 125 206 C 158 200 216 212 256 244 Z" fill="url(#lf-page-l-front)" />
-    <path d="M 256 374 C 306 348 368 340 386 344 C 391 345 396 341 396 336 L 396 216 C 396 211 392 207 387 206 C 354 200 296 212 256 244 Z" fill="url(#lf-page-r-front)" />
-
-    <!-- Sweeping Active Monogram / Folio Leaf -->
-    <path d="M 256 374 C 265 310 295 242 362 192 C 367 188 365 180 359 180 C 310 182 260 212 226 250 C 204 274 190 306 182 340 C 210 356 238 368 256 374 Z" fill="url(#lf-active-page)" />
-
-    <!-- Edge Highlights & Spine Contour -->
-    <path d="M 256 244 C 296 212 354 200 387 206" stroke="#DDD6EC" stroke-width="1.8" stroke-linecap="round" opacity="0.6" fill="none" />
-    <path d="M 256 374 L 256 244" stroke="#463A5E" stroke-width="2" stroke-linecap="round" opacity="0.5" fill="none" />
-    <path d="M 226 250 C 260 212 310 182 359 180" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.7" fill="none" />
-
-    <!-- Core Insight Beacon -->
-    <g filter="url(#lf-beacon-glow)">
-      <path d="M 256 142 L 270 166 L 256 190 L 242 166 Z" fill="url(#lf-beacon)" />
-      <circle cx="256" cy="166" r="3" fill="#FFFFFF" />
+    <!-- Sparse printed lines and a rose bookmark add a quiet storybook character. -->
+    <g fill="none" stroke="#E6D7F1" stroke-width="3" stroke-linecap="round" stroke-opacity="0.25">
+      <path d="M 142 243 C 163 244 181 249 196 255" />
+      <path d="M 142 259 C 159 260 171 263 183 267" />
+      <path d="M 337 246 C 350 242 361 240 374 240" />
+      <path d="M 326 265 C 344 259 360 256 374 256" />
     </g>
+    <path d="M 342 319 Q 354 316 364 316 V 369 L 353 362 L 342 376 Z" fill="#281A38" fill-opacity="0.18" />
+    <path d="M 337 315 Q 348 312 359 312 V 365 L 348 358 L 337 372 Z" fill="url(#lf-ribbon)" />
+    <path d="M 342 320 V 352" fill="none" stroke="#F8D8E7" stroke-width="2" stroke-opacity="0.5" stroke-linecap="round" />
+
+    <!-- A broad cel-shaded fold gives the turning page a feather-like sweep. -->
+    <path d="M 256 367 C 267 305 301 238 365 189 C 371 184 367 177 361 178 C 310 181 258 210 224 250 C 202 275 189 305 180 336 C 205 351 235 363 256 367 Z" fill="url(#lf-leaf)" />
+    <path d="M 256 367 C 267 305 301 238 365 189 C 310 220 269 272 246 333 Z" fill="url(#lf-fold)" />
+    <path d="M 183 332 C 200 273 250 207 324 185 C 337 181 350 179 361 178" fill="none" stroke="#FFF4FF" stroke-width="2.5" stroke-opacity="0.82" stroke-linecap="round" />
+    <path d="M 251 345 C 272 282 313 226 355 198" fill="none" stroke="#F5E8FF" stroke-width="2" stroke-opacity="0.43" stroke-linecap="round" />
+    <path d="M 121 211 C 151 202 185 211 208 221 M 312 220 C 344 206 369 201 389 208" fill="none" stroke="#F2E2FC" stroke-width="2" stroke-opacity="0.58" stroke-linecap="round" />
+    <path d="M 256 368 C 302 344 358 332 389 339" fill="none" stroke="#E2CDED" stroke-width="1.8" stroke-opacity="0.45" stroke-linecap="round" />
   </g>
+
+  <!-- One faceted star and two small accents provide the fantasy cue. -->
+  <path d="M 255 127 Q 261 151 279 158 Q 261 165 255 190 Q 249 165 231 158 Q 249 151 255 127 Z" fill="#DEC1F7" opacity="0.35" filter="url(#lf-glow)" />
+  <path d="M 255 127 Q 261 151 279 158 Q 261 165 255 190 Q 249 165 231 158 Q 249 151 255 127 Z" fill="url(#lf-star)" />
+  <path d="M 255 127 V 158 H 231 Q 249 151 255 127 Z" fill="#FFF9F1" />
+  <path d="M 255 158 H 279 Q 261 165 255 190 Z" fill="#AB84C4" fill-opacity="0.5" />
+  <path d="M 332 132 Q 334 141 342 144 Q 334 147 332 156 Q 330 147 322 144 Q 330 141 332 132 Z" fill="#EBCFDF" />
+  <path d="M 155 277 Q 157 285 164 288 Q 157 291 155 299 Q 153 291 146 288 Q 153 285 155 277 Z" fill="#E8D9F5" fill-opacity="0.8" />
 </svg>

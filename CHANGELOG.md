@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.4.2 (2026-09-12)
+
+### Added
+
+- Saved model controls for thinking mode, parameter format, and reasoning effort, plus an editable output token limit.
+- Provider-aware thinking parameters for known endpoints and explicit format selection for custom gateways and Qwen3 template deployments. Incompatible explicit settings produce actionable errors instead of being silently dropped.
+
+### Fixed
+
+- JSON and SSE responses now isolate final answers from reasoning fields and remove tagged thinking content across all reading AI tasks. Reasoning-only replies report an error instead of being saved as answers.
+- Removed unconditional `thinking` injection into ordinary OpenAI-compatible requests. Retained GPT-5/o-series token-limit compatibility and omitted temperature for Kimi K2.x.
+- Response decode errors no longer include raw model response bodies.
+
+### Changed
+
+- Refined the purple folio logo with faceted page lighting, restrained star accents, and a bookmark; regenerated desktop icons.
+- Redesigned the README with installation guidance, model configuration examples, thinking-parameter compatibility notes, and privacy boundaries.
+
 ## v0.4.1 (2026-08-30)
 
 ### 产品定位调整 / Product Repositioning

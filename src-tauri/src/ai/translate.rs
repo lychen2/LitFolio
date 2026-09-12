@@ -698,16 +698,7 @@ fn push_chunk(chunks: &mut Vec<String>, current: &mut String) {
 }
 
 pub(crate) fn strip_think_tags(text: &str) -> String {
-    let mut out = text.to_string();
-    while let Some(start) = out.find("<think>") {
-        if let Some(end) = out[start..].find("</think>") {
-            out.replace_range(start..start + end + 8, "");
-        } else {
-            out.truncate(start);
-            break;
-        }
-    }
-    out.trim().to_string()
+    super::client::strip_think_tags(text)
 }
 
 fn strip_markdown_fence(raw: &str, source_chunk: &str) -> String {
@@ -1067,6 +1058,9 @@ mod tests {
 
     fn profile(base_url: &str) -> LlmProfile {
         LlmProfile {
+            thinking_mode: Default::default(),
+            thinking_format: Default::default(),
+            reasoning_effort: Default::default(),
             name: "test".into(),
             base_url: base_url.into(),
             api_key: String::new(),

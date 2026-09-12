@@ -165,12 +165,52 @@ export function ProfileCard({
             </div>
           )}
         </Field>
+        <Field label={t("settings.profile.maxTokens")}>
+          <input type="number" step="1" min={1} value={local.max_tokens}
+            onChange={(e) => { const value = Number(e.target.value); if (Number.isInteger(value) && value > 0) field("max_tokens", value); }}
+            className="litera-input w-full" />
+        </Field>
         <Field label={t("settings.profile.temperature")}>
           <input type="number" step="0.1" value={local.temperature}
             onChange={(e) => field("temperature", parseFloat(e.target.value || "0"))}
             className="litera-input w-full" min={0} max={2} />
         </Field>
       </div>
+
+      <details className="mt-4 border-t border-litera-border pt-3">
+        <summary className="cursor-pointer text-xs font-medium text-litera-text">{t("settings.profile.reasoningSettings")}</summary>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label={t("settings.profile.thinkingMode")}>
+            <select aria-label={t("settings.profile.thinkingMode")} className="litera-input w-full text-xs" value={local.thinking_mode ?? "auto"}
+              onChange={(e) => field("thinking_mode", e.target.value as LlmProfile["thinking_mode"])}>
+              <option value="auto">{t("settings.profile.modeAuto")}</option>
+              <option value="disabled">{t("settings.profile.modeDisabled")}</option>
+              <option value="enabled">{t("settings.profile.modeEnabled")}</option>
+            </select>
+          </Field>
+          <Field label={t("settings.profile.thinkingFormat")}>
+            <select aria-label={t("settings.profile.thinkingFormat")} className="litera-input w-full text-xs" value={local.thinking_format ?? "auto"}
+              onChange={(e) => field("thinking_format", e.target.value as LlmProfile["thinking_format"])}>
+              <option value="auto">{t("settings.profile.formatAuto")}</option>
+              <option value="thinking">thinking.type</option>
+              <option value="enable_thinking">enable_thinking</option>
+              <option value="chat_template">chat_template_kwargs.enable_thinking</option>
+              <option value="reasoning_effort">reasoning_effort</option>
+              <option value="omit">{t("settings.profile.formatOmit")}</option>
+            </select>
+          </Field>
+          <Field label={t("settings.profile.reasoningEffort")}>
+            <select aria-label={t("settings.profile.reasoningEffort")} className="litera-input w-full text-xs" value={local.reasoning_effort ?? "auto"}
+              onChange={(e) => field("reasoning_effort", e.target.value as LlmProfile["reasoning_effort"])}>
+              <option value="auto">{t("settings.profile.effortAuto")}</option>
+              <option value="low">{t("settings.profile.effortLow")}</option>
+              <option value="medium">{t("settings.profile.effortMedium")}</option>
+              <option value="high">{t("settings.profile.effortHigh")}</option>
+            </select>
+          </Field>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-litera-mute">{t("settings.profile.reasoningHint")}</p>
+      </details>
 
       {test.isSuccess && (
         <div className="mt-3 text-xs flex items-center gap-2 text-litera-accent">

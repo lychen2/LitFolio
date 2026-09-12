@@ -6,6 +6,9 @@ export interface LlmProfile {
   embed_model: string | null;
   max_tokens: number;
   temperature: number;
+  thinking_mode?: "auto" | "disabled" | "enabled";
+  thinking_format?: "auto" | "thinking" | "enable_thinking" | "chat_template" | "reasoning_effort" | "omit";
+  reasoning_effort?: "auto" | "low" | "medium" | "high";
 }
 
 export type PdfMarkdownEngine = "local" | "mineru-agent" | "mineru-precise";

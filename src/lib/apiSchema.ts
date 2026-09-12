@@ -477,6 +477,15 @@ function parseLlmProfile(value: unknown, path: string): LlmProfile {
     embed_model: nullableStringField(obj, "embed_model", path),
     max_tokens: numberField(obj, "max_tokens", path),
     temperature: numberField(obj, "temperature", path),
+    thinking_mode: "thinking_mode" in obj
+      ? enumStringField(obj, "thinking_mode", path, new Set(["auto", "disabled", "enabled"])) as LlmProfile["thinking_mode"]
+      : "auto",
+    thinking_format: "thinking_format" in obj
+      ? enumStringField(obj, "thinking_format", path, new Set(["auto", "thinking", "enable_thinking", "chat_template", "reasoning_effort", "omit"])) as LlmProfile["thinking_format"]
+      : "auto",
+    reasoning_effort: "reasoning_effort" in obj
+      ? enumStringField(obj, "reasoning_effort", path, new Set(["auto", "low", "medium", "high"])) as LlmProfile["reasoning_effort"]
+      : "auto",
   };
 }
 

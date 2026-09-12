@@ -1,8 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 
-use super::ChatMessage;
-
 #[derive(Debug, Deserialize, Default)]
 struct ChatRawResponse {
     #[serde(default)]
@@ -14,7 +12,7 @@ struct ChatRawResponse {
 #[derive(Debug, Deserialize, Default)]
 struct Choice {
     #[serde(default)]
-    message: Option<ChatMessage>,
+    message: Option<Delta>,
     #[serde(default)]
     delta: Option<Delta>,
     #[serde(default)]
@@ -25,8 +23,6 @@ struct Choice {
 struct Delta {
     #[serde(default)]
     content: Option<String>,
-    #[serde(default)]
-    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Copy)]
@@ -46,10 +42,61 @@ pub(super) struct ParsedReply {
 
 pub(super) fn parse_response(text: &str) -> Result<ParsedReply> {
     let trimmed = text.trim_start();
-    if trimmed.starts_with("data:") || trimmed.contains("\ndata:") {
-        return parse_sse(text);
+    let mut reply = if trimmed.starts_with("data:") || trimmed.contains("\ndata:") {
+        parse_sse(text)?
+    } else {
+        parse_plain(text)?
+    };
+    reply.content = strip_think_tags(&reply.content);
+    if reply.content.is_empty() {
+        return Err(anyhow!("LLM returned no final answer (it may have returned only reasoning); increase the output token limit or adjust thinking mode and retry"));
     }
-    parse_plain(text)
+    Ok(reply)
+}
+
+/// Remove tagged reasoning after assembling SSE chunks, including truncated blocks.
+pub(crate) fn strip_think_tags(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let tags = [
+        ("<think>", true),
+        ("</think>", false),
+        ("<thinking>", true),
+        ("</thinking>", false),
+    ];
+    let mut out = String::new();
+    let mut cursor = 0;
+    let mut depth: usize = 0;
+    while let Some((start, tag, opening)) = tags
+        .iter()
+        .filter_map(|(tag, opening)| {
+            lower[cursor..]
+                .find(tag)
+                .map(|index| (cursor + index, *tag, *opening))
+        })
+        .min_by_key(|(index, _, _)| *index)
+    {
+        if depth == 0 {
+            out.push_str(&text[cursor..start]);
+        }
+        if opening {
+            depth += 1;
+        } else if depth == 0 {
+            // Some templates prefill the opening tag and return only its closing tag.
+            out.clear();
+        } else {
+            depth -= 1;
+        }
+        cursor = start + tag.len();
+    }
+    if depth == 0 {
+        let tail = &text[cursor..];
+        let partial = tail.rfind('<').filter(|index| {
+            let suffix = tail[*index..].to_ascii_lowercase();
+            tags.iter().any(|(tag, _)| tag.starts_with(&suffix))
+        });
+        out.push_str(&tail[..partial.unwrap_or(tail.len())]);
+    }
+    out.trim().to_string()
 }
 
 fn parse_plain(text: &str) -> Result<ParsedReply> {
@@ -63,9 +110,9 @@ fn parse_plain(text: &str) -> Result<ParsedReply> {
         .ok_or_else(|| anyhow!("LLM returned no choices"))?;
     let content = choice
         .message
-        .map(|m| m.content)
+        .and_then(|m| m.content)
         .or_else(|| choice.delta.as_ref().and_then(|d| d.content.clone()))
-        .ok_or_else(|| anyhow!("LLM choice missing content"))?;
+        .unwrap_or_default();
     Ok(ParsedReply {
         content,
         finish_reason: choice.finish_reason,
@@ -94,7 +141,6 @@ fn parse_sse(text: &str) -> Result<ParsedReply> {
 #[derive(Default)]
 struct SseAccumulator {
     content: String,
-    thought: String,
     finish_reason: Option<String>,
     usage: Usage,
     any_data: bool,
@@ -123,7 +169,7 @@ impl SseAccumulator {
             self.push_delta(d);
         }
         if let Some(m) = choice.message {
-            self.content.push_str(&m.content);
+            self.push_delta(m);
         }
     }
 
@@ -131,17 +177,11 @@ impl SseAccumulator {
         if let Some(c) = delta.content {
             self.content.push_str(&c);
         }
-        if let Some(r) = delta.reasoning_content {
-            self.thought.push_str(&r);
-        }
     }
 
-    fn into_reply(mut self) -> Result<ParsedReply> {
+    fn into_reply(self) -> Result<ParsedReply> {
         if !self.any_data {
             return Err(anyhow!("SSE body had no data: frames"));
-        }
-        if self.content.is_empty() && !self.thought.is_empty() {
-            self.content = self.thought;
         }
         Ok(ParsedReply {
             content: self.content,

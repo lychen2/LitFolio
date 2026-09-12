@@ -17,6 +17,9 @@ fn sample_profile(name: &str) -> LlmProfile {
         embed_model: Some("text-embedding-3-small".into()),
         max_tokens: 1024,
         temperature: 0.3,
+        thinking_mode: ThinkingMode::Enabled,
+        thinking_format: ThinkingFormat::ReasoningEffort,
+        reasoning_effort: ReasoningEffort::High,
     }
 }
 
@@ -30,7 +33,26 @@ fn roundtrip_persists_profile() {
     let loaded = load_config(&paths).unwrap();
     assert_eq!(loaded.profiles.len(), 1);
     assert_eq!(loaded.active.as_deref(), Some("default"));
+    assert_eq!(loaded.profiles[0].thinking_mode, ThinkingMode::Enabled);
+    assert_eq!(
+        loaded.profiles[0].thinking_format,
+        ThinkingFormat::ReasoningEffort
+    );
+    assert_eq!(loaded.profiles[0].reasoning_effort, ReasoningEffort::High);
     std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn legacy_profile_defaults_to_auto_thinking() {
+    let raw = r#"{"name":"legacy","base_url":"http://localhost:11434/v1","api_key":"","chat_model":"qwen3","embed_model":null}"#;
+    let profile: LlmProfile = serde_json::from_str(raw).unwrap();
+    assert_eq!(profile.thinking_mode, ThinkingMode::Auto);
+    assert_eq!(profile.thinking_format, ThinkingFormat::Auto);
+    assert_eq!(profile.reasoning_effort, ReasoningEffort::Auto);
+    assert!(serde_json::from_str::<LlmProfile>(
+        &raw.replace("\"embed_model\":null", "\"thinking_mode\":\"invalid\"")
+    )
+    .is_err());
 }
 
 #[test]

@@ -14,8 +14,9 @@ use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, Semaphore};
 
 use super::profile::{LlmProfile, TaskKind};
-use request::{is_reasoning_model, request_shape, ChatRequest, ThinkingConfig};
+use request::{reasoning_params, request_shape, ChatRequest};
 use response::parse_response;
+pub(crate) use response::strip_think_tags;
 use utils::{endpoint, header_value, llm_request_timeout, request_chars, truncate};
 
 const LLM_REQUEST_TIMEOUT_SECS: u64 = 120;
@@ -108,20 +109,7 @@ async fn chat_complete_inner(
         stream: true,
         max_tokens: request_shape.max_tokens,
         max_completion_tokens: request_shape.max_completion_tokens,
-        // Disable chain-of-thought for translation tasks and for chat/instruction
-        // models that tend to leak reasoning into `content`. Reasoning-native models
-        // (R1, o1/o3, deepseek-reasoner) outside translation get `thinking: None`.
-        thinking: if task_kind == "translate" {
-            Some(ThinkingConfig {
-                r#type: "disabled".into(),
-            })
-        } else if is_reasoning_model(&profile.chat_model) {
-            None
-        } else {
-            Some(ThinkingConfig {
-                r#type: "disabled".into(),
-            })
-        },
+        reasoning: reasoning_params(profile, task_kind)?,
     };
     let mut req = client.post(&url).json(&body);
     if !profile.api_key.is_empty() {
@@ -199,8 +187,7 @@ async fn chat_complete_inner(
                 error = %error,
                 "AI response decode failed"
             );
-            return Err(error)
-                .with_context(|| format!("decode chat response: {}", truncate(&text, 500)));
+            return Err(error).context("decode chat response");
         }
     };
     tracing::info!(

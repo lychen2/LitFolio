@@ -89,5 +89,8 @@ function blankProfile(preset?: Partial<LlmProfile>): LlmProfile {
     embed_model: preset?.embed_model !== undefined ? preset.embed_model : "all-MiniLM-L6-v2",
     max_tokens: 1024,
     temperature: 0.3,
+    thinking_mode: "auto",
+    thinking_format: "auto",
+    reasoning_effort: "auto",
   };
 }

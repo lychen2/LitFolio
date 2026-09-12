@@ -35,6 +35,43 @@ pub struct LlmProfile {
     pub max_tokens: u32,
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+    #[serde(default)]
+    pub thinking_mode: ThinkingMode,
+    #[serde(default)]
+    pub thinking_format: ThinkingFormat,
+    #[serde(default)]
+    pub reasoning_effort: ReasoningEffort,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingMode {
+    #[default]
+    Auto,
+    Disabled,
+    Enabled,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingFormat {
+    #[default]
+    Auto,
+    Thinking,
+    EnableThinking,
+    ChatTemplate,
+    ReasoningEffort,
+    Omit,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningEffort {
+    #[default]
+    Auto,
+    Low,
+    Medium,
+    High,
 }
 
 fn default_max_tokens() -> u32 {

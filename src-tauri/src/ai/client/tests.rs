@@ -74,9 +74,8 @@ data: [DONE]\n";
 #[test]
 fn parse_sse_with_only_empty_metadata_frames_errors() {
     let body = "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":0,\"total_tokens\":15}}\n\ndata: [DONE]\n";
-    let reply = parse_response(body).unwrap();
-    assert!(reply.content.is_empty());
-    assert_eq!(reply.usage.completion_tokens, 0);
+    let error = parse_response(body).unwrap_err().to_string();
+    assert!(error.contains("no final answer"));
 }
 
 #[test]
@@ -85,6 +84,136 @@ fn parse_sse_rejects_malformed_data_frame() {
     let err = parse_response(body).unwrap_err().to_string();
 
     assert!(err.contains("decode SSE data frame"));
+}
+
+#[test]
+fn reasoning_fields_never_become_answers() {
+    for body in [
+        r#"{"choices":[{"message":{"content":null,"reasoning_content":"private thought"}}]}"#,
+        r#"{"choices":[{"message":{"thinking":"private thought"}}]}"#,
+        "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"private thought\"}}]}\n\ndata: [DONE]\n",
+    ] {
+        let error = parse_response(body).unwrap_err().to_string();
+        assert!(error.contains("no final answer"));
+        assert!(!error.contains("private thought"));
+    }
+    let reply = parse_response(r#"{"choices":[{"message":{"content":"answer","reasoning_content":"private thought","reasoning":"private thought"}}]}"#).unwrap();
+    assert_eq!(reply.content, "answer");
+}
+
+#[test]
+fn tagged_reasoning_is_removed_from_plain_and_split_sse() {
+    for (content, expected) in [
+        ("<think>private thought</think>answer", "answer"),
+        ("<THINKING>private thought</THINKING>答案", "答案"),
+        (
+            "<think>outer<think>inner</think>outer</think>answer",
+            "answer",
+        ),
+        ("private thought</think>answer", "answer"),
+        ("answer<think>unfinished thought", "answer"),
+        ("answer<thi", "answer"),
+        (
+            "first<think>one</think> second<thinking>two</thinking>",
+            "first second",
+        ),
+        ("Use x < y and > z.", "Use x < y and > z."),
+    ] {
+        let plain = serde_json::json!({"choices":[{"message":{"content":content}}]}).to_string();
+        assert_eq!(parse_response(&plain).unwrap().content, expected);
+        let sse = content
+            .chars()
+            .map(|c| {
+                format!(
+                    "data: {}\n\n",
+                    serde_json::json!({"choices":[{"delta":{"content":c.to_string()}}]})
+                )
+            })
+            .collect::<String>();
+        assert_eq!(parse_response(&sse).unwrap().content, expected);
+    }
+    for content in ["<think>unfinished", "<think>only thought</think>", "   "] {
+        let body = serde_json::json!({"choices":[{"message":{"content":content}}]}).to_string();
+        assert!(parse_response(&body)
+            .unwrap_err()
+            .to_string()
+            .contains("no final answer"));
+    }
+}
+
+#[tokio::test]
+async fn configured_reasoning_reaches_http_and_reply_is_sanitized() {
+    use crate::ai::profile::{ReasoningEffort, ThinkingFormat, ThinkingMode};
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let (start, length) = loop {
+            let mut buffer = [0; 2048];
+            let read = socket.read(&mut buffer).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&buffer[..read]);
+            if let Some(start) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                let headers = String::from_utf8_lossy(&bytes[..start]);
+                let length: usize = headers
+                    .lines()
+                    .find_map(|line| {
+                        let (key, value) = line.split_once(':')?;
+                        key.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse().unwrap())
+                    })
+                    .unwrap();
+                break (start + 4, length);
+            }
+        };
+        while bytes.len() < start + length {
+            let mut buffer = [0; 2048];
+            let read = socket.read(&mut buffer).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&buffer[..read]);
+        }
+        let body: serde_json::Value =
+            serde_json::from_slice(&bytes[start..start + length]).unwrap();
+        let reply = r#"{"choices":[{"message":{"content":"<think>private thought</think>answer","reasoning_content":"private thought"}}]}"#;
+        socket
+            .write_all(http_response(200, "application/json", reply).as_bytes())
+            .await
+            .unwrap();
+        body
+    });
+    let mut p = profile(&format!("http://{addr}/v1"));
+    p.thinking_format = ThinkingFormat::ReasoningEffort;
+    p.thinking_mode = ThinkingMode::Enabled;
+    p.reasoning_effort = ReasoningEffort::High;
+    p.max_tokens = 8192;
+    let response = super::chat_complete_with_task_kind(
+        &reqwest::Client::new(),
+        &p,
+        "translate",
+        &sample_messages(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.content, "answer");
+    let body = server.await.unwrap();
+    assert_eq!(body["reasoning_effort"], "high");
+    assert_eq!(body["max_tokens"], 8192);
+    assert!(body.get("thinking").is_none());
+    assert!(body.get("extra_body").is_none());
+}
+
+#[tokio::test]
+async fn malformed_reply_does_not_echo_private_thoughts() {
+    let url = serve_once(
+        200,
+        "application/json",
+        r#"{"choices":[],"reasoning_content":"private thought" broken"#,
+    )
+    .await;
+    let error = chat_error(&url).await;
+    assert!(error.contains("decode chat response"));
+    assert!(!error.contains("private thought"));
 }
 
 #[tokio::test]
@@ -206,7 +335,132 @@ fn profile(base_url: &str) -> LlmProfile {
         embed_model: None,
         max_tokens: 128,
         temperature: 0.2,
+        thinking_mode: Default::default(),
+        thinking_format: Default::default(),
+        reasoning_effort: Default::default(),
     }
+}
+
+#[test]
+fn request_payloads_match_endpoint_protocols() {
+    use super::request::{reasoning_params, request_shape, ChatRequest};
+    use crate::ai::profile::{ReasoningEffort, ThinkingFormat, ThinkingMode};
+    for (url, model, expected) in [
+        (
+            "https://api.openai.com/v1",
+            "gpt-4o-mini",
+            serde_json::json!({}),
+        ),
+        (
+            "https://api.deepseek.com/v1",
+            "deepseek-chat",
+            serde_json::json!({"thinking":{"type":"disabled"}}),
+        ),
+        (
+            "https://api.siliconflow.cn/v1",
+            "Qwen/Qwen3-8B",
+            serde_json::json!({"enable_thinking":false}),
+        ),
+        (
+            "https://api.moonshot.cn/v1",
+            "kimi-k2.5",
+            serde_json::json!({"thinking":{"type":"disabled"}}),
+        ),
+        (
+            "http://localhost:11434/v1",
+            "qwen3:8b",
+            serde_json::json!({"reasoning_effort":"none"}),
+        ),
+        ("https://gateway.example/v1", "qwen3", serde_json::json!({})),
+        (
+            "https://api.openai.com.example/v1",
+            "gpt-5.1",
+            serde_json::json!({}),
+        ),
+        ("https://api.openai.com/v1", "o3", serde_json::json!({})),
+        ("https://api.openai.com/v1", "gpt-5", serde_json::json!({})),
+        (
+            "https://api.openai.com/v1",
+            "gpt-5.1",
+            serde_json::json!({"reasoning_effort":"none"}),
+        ),
+    ] {
+        let mut p = profile(url);
+        p.chat_model = model.into();
+        assert_eq!(
+            serde_json::to_value(reasoning_params(&p, "translate").unwrap()).unwrap(),
+            expected,
+            "{url} {model}"
+        );
+    }
+    let mut p = profile("https://gateway.example/v1");
+    p.thinking_mode = ThinkingMode::Enabled;
+    assert!(reasoning_params(&p, "translate").is_err());
+    for (format, expected) in [
+        (
+            ThinkingFormat::Thinking,
+            serde_json::json!({"thinking":{"type":"enabled"}}),
+        ),
+        (
+            ThinkingFormat::EnableThinking,
+            serde_json::json!({"enable_thinking":true}),
+        ),
+        (
+            ThinkingFormat::ChatTemplate,
+            serde_json::json!({"chat_template_kwargs":{"enable_thinking":true}}),
+        ),
+        (
+            ThinkingFormat::ReasoningEffort,
+            serde_json::json!({"reasoning_effort":"medium"}),
+        ),
+        (ThinkingFormat::Omit, serde_json::json!({})),
+    ] {
+        p.thinking_format = format;
+        let shape = request_shape(&p.chat_model, 4096, 0.3);
+        let messages = sample_messages();
+        let body = serde_json::to_value(ChatRequest {
+            model: &p.chat_model,
+            messages: &messages,
+            temperature: shape.temperature,
+            stream: true,
+            max_tokens: shape.max_tokens,
+            max_completion_tokens: shape.max_completion_tokens,
+            reasoning: reasoning_params(&p, "translate").unwrap(),
+        })
+        .unwrap();
+        for key in [
+            "thinking",
+            "enable_thinking",
+            "chat_template_kwargs",
+            "reasoning_effort",
+        ] {
+            assert_eq!(body.get(key), expected.get(key));
+        }
+        assert_eq!(body["max_tokens"], 4096);
+        assert!(body.get("extra_body").is_none());
+        assert!(body.get("max_completion_tokens").is_none());
+    }
+    p.thinking_format = ThinkingFormat::ReasoningEffort;
+    p.reasoning_effort = ReasoningEffort::High;
+    assert_eq!(
+        serde_json::to_value(reasoning_params(&p, "translate").unwrap()).unwrap(),
+        serde_json::json!({"reasoning_effort":"high"})
+    );
+    p.thinking_format = ThinkingFormat::Thinking;
+    assert!(reasoning_params(&p, "translate").is_err());
+    p.thinking_format = ThinkingFormat::ReasoningEffort;
+    p.thinking_mode = ThinkingMode::Disabled;
+    assert!(reasoning_params(&p, "translate").is_err());
+    p.reasoning_effort = ReasoningEffort::Auto;
+    p.chat_model = "o3".into();
+    assert!(reasoning_params(&p, "translate").is_err());
+    for model in ["gpt-5", "gpt-5.1", "o1", "o3", "o4-mini"] {
+        let shape = request_shape(model, 8192, 0.3);
+        assert_eq!(shape.max_completion_tokens, Some(8192));
+        assert!(shape.max_tokens.is_none());
+        assert!(shape.temperature.is_none());
+    }
+    assert!(request_shape("kimi-k2.5", 4096, 0.3).temperature.is_none());
 }
 
 fn sample_messages() -> Vec<ChatMessage> {

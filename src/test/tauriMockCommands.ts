@@ -9,6 +9,8 @@ import type {
 } from "@/lib/api";
 import type { SyncPreviewReport, SyncReport } from "@/lib/syncApi";
 import { selectedManifests } from "@/host/generatedProfileRegistry";
+import { parseLlmConfig } from "@/lib/apiSchema";
+import { field, object } from "@/lib/apiSchemaCore";
 
 const now = 1_779_999_999;
 
@@ -370,13 +372,19 @@ const commandFixtures = new Map<string, MockResolver>([
   ["ask_session_latest", () => mockAskSession],
   ["ask_session_save", () => mockAskSession],
   ["llm_get_config", () => mockLlmConfig],
+  ["llm_save_config", () => null],
+  ["llm_test", () => ({ ok: true, model: "mock-model", reply: "pong" })],
   ["llm_list_models", () => []],
   ["llm_pull_model", () => "Model pulled successfully"],
 ]);
 
 export const registeredMockCommands = [...commandFixtures.keys()].sort();
 
-export function invokeMockCommand<T = unknown>(command: string): T {
+export function invokeMockCommand<T = unknown>(command: string, args?: unknown): T {
+  if (command === "llm_save_config") {
+    const input = object(args, "llm_save_config");
+    Object.assign(mockLlmConfig, parseLlmConfig(field(input, "config", "llm_save_config")));
+  }
   const resolver = commandFixtures.get(command);
   if (!resolver) {
     throw unhandledTauriCommandError(command);

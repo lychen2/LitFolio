@@ -37,6 +37,6 @@ export function isTauri(): boolean {
   return false;
 }
 
-export async function invoke<T>(command: string, _args?: unknown): Promise<T> {
-  return invokeMockCommand<T>(command);
+export async function invoke<T>(command: string, args?: unknown): Promise<T> {
+  return invokeMockCommand<T>(command, args);
 }

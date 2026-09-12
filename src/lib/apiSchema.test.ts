@@ -71,6 +71,13 @@ describe("api schema parsers", () => {
     const parsed = parseLlmConfig(config);
     expect(parsed.task_assignments.tldr?.profile).toBe("default");
     expect(parsed.obsidian).toEqual({ vault_dir: "", folder: "Papers" });
+    expect(parsed.profiles[0]).toMatchObject({ thinking_mode: "auto", thinking_format: "auto", reasoning_effort: "auto" });
+    const explicit = { ...validProfile(), thinking_mode: "enabled", thinking_format: "reasoning_effort", reasoning_effort: "high" };
+    expect(parseLlmConfig({ ...config, profiles: [explicit] }).profiles[0]).toEqual(explicit);
+    for (const key of ["thinking_mode", "thinking_format", "reasoning_effort"]) {
+      expect(() => parseLlmConfig({ ...config, profiles: [{ ...explicit, [key]: "invalid" }] }))
+        .toThrow(`LlmConfig.profiles[0].${key}`);
+    }
   });
 
   it("rejects malformed graph nodes with precise paths", () => {
