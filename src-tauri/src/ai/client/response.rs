@@ -54,7 +54,7 @@ pub(super) fn parse_response(text: &str) -> Result<ParsedReply> {
         })
     {
         return Err(anyhow!(
-            "LLM returned no final answer (finish_reason={:?}, prompt_tokens={}, completion_tokens={}); the provider may have returned reasoning without answer text. Check the model's output budget and thinking settings",
+            "LLM returned no final answer (finish_reason={:?}, prompt_tokens={}, completion_tokens={}); check output limit and thinking mode",
             reply.finish_reason,
             reply.usage.prompt_tokens,
             reply.usage.completion_tokens,

@@ -295,10 +295,12 @@ async fn chat_complete_reports_reasoning_only_reply_with_finish_and_usage() {
     let url = serve_once(200, "application/json", body).await;
     let error = chat_error(&url).await;
 
-    assert!(error.contains("decode chat response: LLM returned no final answer"));
-    assert!(error.contains("finish_reason=Some(\"stop\")"));
-    assert!(error.contains("completion_tokens=1024"));
-    assert!(!error.contains("private thought"));
+    let summary = crate::commands::ai_dispatch::redact_error(&error);
+    assert!(summary.contains("decode chat response: LLM returned no final answer"));
+    assert!(summary.contains("finish_reason=Some(\"stop\")"));
+    assert!(summary.contains("completion_tokens=1024"));
+    assert!(summary.contains("check output limit and thinking mode"));
+    assert!(!summary.contains("private thought"));
 }
 
 #[tokio::test]
