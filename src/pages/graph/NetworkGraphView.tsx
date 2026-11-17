@@ -77,7 +77,14 @@ export function NetworkGraphView({ data, selectedNodeId, onSelectNode, width, he
   return (
     <ForceGraph2D
       ref={fgRef}
-      graphData={{ nodes: data.nodes as any, links: data.edges as any }}
+      // react-force-graph mutates the link objects in place, replacing
+      // `source`/`target` id strings with node object references. Pass copies so
+      // the shared GraphData that other panes read is never rewritten — the
+      // decision panel rendered those mutated objects and crashed.
+      graphData={{
+        nodes: data.nodes.map((node) => ({ ...node })) as any,
+        links: data.edges.map((edge) => ({ ...edge })) as any,
+      }}
       width={width}
       height={height}
       backgroundColor="rgba(0,0,0,0)"

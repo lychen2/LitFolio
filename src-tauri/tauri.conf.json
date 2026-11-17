@@ -44,7 +44,8 @@
     ],
     "resources": [
       "../docs/manual/manual.pdf",
-      "../docs/manual/manual-en.pdf"
+      "../docs/manual/manual-en.pdf",
+      "../THIRD_PARTY_NOTICES.md"
     ],
     "category": "Productivity",
     "shortDescription": "Local-first literature manager with LLM summaries",

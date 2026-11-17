@@ -42,6 +42,15 @@ export const mockPaper: Paper = {
   bibtex: null,
 };
 
+const mockReaderPaper: Paper = {
+  ...mockPaper,
+  id: "paper-reader",
+  title: "Reader Comparison Fixture",
+  doi: null,
+  abstract_text: "A fixture for the local text and PDF comparison flow.",
+  pdf_path: "/e2e/fixtures/reader.pdf",
+};
+
 export const mockLlmConfig: LlmConfig = {
   profiles: [],
   active: null,
@@ -236,6 +245,11 @@ const commandFixtures = new Map<string, MockResolver>([
   ["paper_quick_read", () => mockQuickReadResult],
   ["paper_find_by_doi", () => mockPaper],
   ["paper_translated_markdown_get", () => null],
+  ["paper_original_markdown_get", () => "# Reader Comparison Fixture\n\nThe original paragraph remains readable offline."],
+  ["paper_pdf_asset_path", () => "/e2e/fixtures/reader.pdf"],
+  ["highlight_list", () => []],
+  ["paper_terms_list", () => []],
+  ["paper_set_pdf_text", () => null],
   ["paper_translate_markdown_estimate", () => ({
     source_chars: 1200,
     cleaned_chars: 1000,
@@ -381,6 +395,10 @@ const commandFixtures = new Map<string, MockResolver>([
 export const registeredMockCommands = [...commandFixtures.keys()].sort();
 
 export function invokeMockCommand<T = unknown>(command: string, args?: unknown): T {
+  if (command === "paper_get") {
+    const input = object(args, "paper_get");
+    return (field(input, "id", "paper_get") === mockReaderPaper.id ? mockReaderPaper : mockPaper) as T;
+  }
   if (command === "llm_save_config") {
     const input = object(args, "llm_save_config");
     Object.assign(mockLlmConfig, parseLlmConfig(field(input, "config", "llm_save_config")));

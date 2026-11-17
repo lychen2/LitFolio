@@ -119,13 +119,28 @@ function EvidenceChains({
       {edges.length === 0 ? <EmptyLine text={t("graph.noEvidenceChains")} /> : edges.map((edge) => (
         <div key={edge.id} className="rounded-md border border-litera-line px-2.5 py-2">
           <div className="text-xs text-litera-text line-clamp-2">
-            {nodeById.get(edge.source)?.label ?? edge.source} {"->"} {nodeById.get(edge.target)?.label ?? edge.target}
+            {edgeEndpointLabel(edge.source, nodeById)} {"->"} {edgeEndpointLabel(edge.target, nodeById)}
           </div>
           <p className="mt-1 text-[11px] text-litera-mute line-clamp-3">{edge.snippet}</p>
         </div>
       ))}
     </DecisionSection>
   );
+}
+
+/**
+ * Graph edges normally carry node ids, but force-graph rewrites `source` and
+ * `target` into node objects while simulating. Accept both shapes so a mutated
+ * edge can never be rendered as a React child.
+ */
+function edgeEndpointLabel(endpoint: unknown, nodeById: Map<string, GraphNode>): string {
+  if (typeof endpoint === "string") return nodeById.get(endpoint)?.label ?? endpoint;
+  if (endpoint && typeof endpoint === "object") {
+    const node = endpoint as { id?: unknown; label?: unknown };
+    if (typeof node.label === "string") return node.label;
+    if (typeof node.id === "string") return nodeById.get(node.id)?.label ?? node.id;
+  }
+  return "?";
 }
 
 function PaperActionRow({

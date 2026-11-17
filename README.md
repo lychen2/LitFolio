@@ -29,7 +29,7 @@ LitFolio 把**发现论文 → 筛选收藏 → 阅读批注 → 推送 Zotero**
 | --- | --- |
 | **发现** | 浏览 arXiv 分类、订阅 RSS、跟踪主题提醒，在候补收件箱筛选论文。 |
 | **整理** | 导入本地 PDF、arXiv 或 DOI；使用文件夹、标签与阅读状态管理文献，导出 BibTeX。 |
-| **阅读** | PDF 阅读、高亮与笔记；可选 AI 速读、摘要、选段解释、术语提取与翻译。 |
+| **阅读** | 本地原文阅读、可选全文译文与 PDF 对照；PDF 高亮、笔记及选段翻译继续保存在文献库。 |
 | **衔接** | 将选中的论文推送到本机 Zotero，继续管理引用与长期收藏。 |
 
 界面提供多套配色、字体与字号设置。发现订阅、候补收件箱等能力由插件提供；可用插件取决于安装包的构建配置，在 **设置 → 插件** 中管理。包含相应插件的全新安装默认启用发现订阅与候补收件箱。
@@ -151,4 +151,4 @@ cd src-tauri && cargo test
 
 ## License
 
-[GPL-3.0-or-later](LICENSE)
+[GPL-3.0-or-later](LICENSE)。阅读交互借鉴 [EasyRead](https://github.com/Edwardxlai/easyread)；其 MIT 许可及原作者版权信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

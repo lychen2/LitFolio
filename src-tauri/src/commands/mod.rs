@@ -349,6 +349,7 @@ macro_rules! command_paths_reader_notes {
             commands::reader_translate::highlight_explain,
             commands::reader_translate::reader_translate_selection,
             commands::reader_ask::reader_ask_paper,
+            commands::reader_translate::paper_markdown_get,
             commands::reader_translate::paper_translated_markdown_get,
             commands::reader_translate::paper_translate_markdown,
             commands::reader_translate::paper_translate_markdown_estimate,

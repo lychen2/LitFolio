@@ -167,6 +167,36 @@ pub async fn paper_translated_markdown_get(
         }))
 }
 
+/// Read the paper's original Markdown body with no AI or network involvement.
+/// Tier 1 is the `document.md` cache written by the reader's PDF.js pass; tier
+/// 2 is the local lopdf extraction in
+/// [`crate::commands::summaries::load_or_extract_pdf_body`], which also caches
+/// its result. `None` means the paper has neither a cached body nor a readable
+/// stored PDF.
+#[tauri::command]
+pub async fn paper_markdown_get(
+    state: State<'_, Arc<AppState>>,
+    paper_id: String,
+) -> Result<Option<String>, String> {
+    paper_markdown_get_impl(state.inner().as_ref(), &paper_id).await
+}
+
+async fn paper_markdown_get_impl(
+    state: &AppState,
+    paper_id: &str,
+) -> Result<Option<String>, String> {
+    let repo = PaperRepo::new(&state.pool);
+    let paper = load_paper(&repo, paper_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(crate::commands::summaries::load_or_extract_pdf_body(
+        &state.paths,
+        paper_id,
+        paper.pdf_path.as_deref(),
+    )
+    .await)
+}
+
 #[tauri::command]
 pub async fn paper_translate_markdown_estimate(
     state: State<'_, Arc<AppState>>,
@@ -505,4 +535,195 @@ fn truncate(text: &str, max_chars: usize) -> String {
     let mut clipped = text.chars().take(max_chars).collect::<String>();
     clipped.push_str("...");
     clipped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::{open_pool, run_migrations, LibraryPaths, ReadStatus};
+    use tokio::sync::Mutex as AsyncMutex;
+    use tokio_util::sync::CancellationToken;
+
+    /// Cached `document.md` wins and the stored PDF path is never consulted.
+    #[tokio::test]
+    async fn paper_markdown_get_returns_cached_document_markdown() {
+        let (state, root) = test_state().await;
+        let paper_id = seed_paper(&state, Some("/nonexistent/source.pdf".to_string())).await;
+        state
+            .paths
+            .write_paper_markdown(&paper_id, "# Cached body\n\nCached paragraph.")
+            .unwrap();
+
+        let markdown = paper_markdown_get_impl(&state, &paper_id).await.unwrap();
+
+        assert_eq!(
+            markdown.as_deref(),
+            Some("# Cached body\n\nCached paragraph.")
+        );
+        state.pool.close().await;
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    /// Without a cache, extraction runs locally on the stored PDF and caches
+    /// its result back to `document.md` so the next read skips extraction.
+    #[tokio::test]
+    async fn paper_markdown_get_extracts_and_caches_stored_pdf() {
+        let (state, root) = test_state().await;
+        let paper_id = "paper-extract";
+        let pdf_path = state.paths.paper_dir(paper_id).join("source.pdf");
+        std::fs::create_dir_all(pdf_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &pdf_path,
+            minimal_pdf("Original markdown body from the extraction tier."),
+        )
+        .unwrap();
+        seed_paper(&state, Some(pdf_path.to_string_lossy().into_owned())).await;
+
+        let markdown = paper_markdown_get_impl(&state, paper_id).await.unwrap();
+
+        let markdown = markdown.expect("extraction tier should produce a body");
+        assert!(
+            markdown.contains("Original markdown body from the extraction tier."),
+            "unexpected body: {markdown}"
+        );
+        assert_eq!(
+            state.paths.read_paper_markdown(paper_id).as_deref(),
+            Some(markdown.as_str())
+        );
+        state.pool.close().await;
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    /// A paper whose PDF is missing and has no cache yields `None` rather than
+    /// an error, matching the translation cache read path.
+    #[tokio::test]
+    async fn paper_markdown_get_returns_none_without_cache_or_readable_pdf() {
+        let (state, root) = test_state().await;
+        let paper_id = seed_paper(&state, Some("/nonexistent/source.pdf".to_string())).await;
+
+        let markdown = paper_markdown_get_impl(&state, &paper_id).await.unwrap();
+
+        assert!(markdown.is_none());
+        state.pool.close().await;
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[tokio::test]
+    async fn paper_markdown_get_rejects_unknown_paper() {
+        let (state, root) = test_state().await;
+
+        let error = paper_markdown_get_impl(&state, "missing-paper")
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("paper not found"), "unexpected error: {error}");
+        state.pool.close().await;
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    async fn seed_paper(state: &AppState, pdf_path: Option<String>) -> String {
+        let paper_id = ulid::Ulid::new().to_string();
+        let now = chrono::Utc::now().timestamp();
+        let paper = Paper {
+            id: paper_id.clone(),
+            title: "Extraction Fixture".into(),
+            authors: vec!["Fixture Author".into()],
+            year: Some(2026),
+            venue: None,
+            doi: None,
+            arxiv_id: None,
+            abstract_text: None,
+            pdf_path,
+            note_path: None,
+            added_at: now,
+            updated_at: now,
+            read_status: ReadStatus::Unread,
+            tldr: None,
+            research_question: None,
+            method: None,
+            dataset: None,
+            key_findings: vec![],
+            limitations: None,
+            comparison: None,
+            title_translated: None,
+            abstract_translated: None,
+            translate_target_lang: None,
+            translated_at: None,
+            bibtex: None,
+            last_exported_at: None,
+        };
+        PaperRepo::new(&state.pool).insert(&paper).await.unwrap();
+        paper_id
+    }
+
+    async fn test_state() -> (AppState, std::path::PathBuf) {
+        let root = std::env::temp_dir().join(format!("litera-reader-md-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&root);
+        paths.ensure().unwrap();
+        let pool = open_pool(&paths.root().join("library.sqlite")).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let state = AppState {
+            pool,
+            paths,
+            http: reqwest::Client::new(),
+            http_external: reqwest::Client::new(),
+            host_network: crate::network_egress::HostNetworkState::new(Default::default()),
+            ai_cancels: AsyncMutex::new(std::collections::HashMap::new()),
+            batch_cancel: AsyncMutex::new(None::<CancellationToken>),
+            sync_lock: AsyncMutex::new(()),
+            plugin_host: crate::plugin_host::PluginHostState::new(),
+        };
+        (state, root)
+    }
+
+    /// Single-page PDF with one text run in Helvetica, built in-process so the
+    /// extraction tier has real bytes to parse without a checked-in fixture.
+    fn minimal_pdf(text: &str) -> Vec<u8> {
+        use lopdf::content::{Content, Operation};
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Helvetica",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                Operation::new("Td", vec![72.into(), 720.into()]),
+                Operation::new("Tj", vec![Object::string_literal(text)]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+        });
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+                "Resources" => resources_id,
+                "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+        bytes
+    }
 }

@@ -1,7 +1,7 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ArrowLeft, AlertTriangle, BookOpenText, ClipboardCopy, Columns2, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
+import { ArrowLeft, AlertTriangle, BookOpenText, ClipboardCopy, Columns2, FileText, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
 import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
 import { libraryClient, type Paper } from "@/core/data";
 import { useT } from "@/i18n/I18nProvider";
@@ -17,12 +17,11 @@ import { resolveHighlightJump, type ReaderMainMode } from "@/pages/reader/reader
 import { READER_COMPACT_TITLE_CLASS } from "@/pages/reader/readerLayout";
 
 /**
- * Three-pane PDF reader with optional split view.
+ * Paper-first reader with PDF comparison, annotations, and split-paper view.
  *
- *   [highlights]  ║  [pdf viewer]  ║  [notes]
+ *   [highlights]  ║  [paper text / PDF]  ║  [PDF comparison / notes]
  *
- * Panel widths are user-resizable via react-resizable-panels.
- * Split view: two independent readers side by side.
+ * Keep the existing PDF viewer for highlights and page-bound annotations.
  */
 export function ReaderAssembly() {
   const t = useT();
@@ -73,7 +72,7 @@ export function ReaderAssembly() {
     );
   }
 
-  return <ReaderSinglePane paperId={paperId} onOpenSplit={openSplit} />;
+  return <><ReaderOnboarding /><ReaderSinglePane paperId={paperId} onOpenSplit={openSplit} /></>;
 }
 
 /** A complete single-reader pane (highlights + pdf + workspace). */
@@ -89,7 +88,8 @@ function ReaderSinglePane({
   const t = useT();
   const [activeTab, setActiveTab] = useState<ReaderWorkspaceTab>("notes");
   const [showHelp, setShowHelp] = useState(false);
-  const [mainMode, setMainMode] = useState<ReaderMainMode>("pdf");
+  const [mainMode, setMainMode] = useState<ReaderMainMode>("native");
+  const [sideMode, setSideMode] = useState<"workspace" | "pdf">("workspace");
   const isNarrow = useNarrowLayout(1200);
   const effectiveCompact = compact || isNarrow;
   const paperQ = useQuery({
@@ -101,21 +101,33 @@ function ReaderSinglePane({
   const highlightsRef = useRef<Array<{ id: string }>>([]);
   const currentHighlightIdx = useRef<number>(-1);
   const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
+  const pendingSelectionText = useRef<string | null>(null);
 
-  // Collapsible side panels so the PDF can take the full width when the reader
-  // wants a bigger page. Driven imperatively via panel refs; collapse state is
-  // mirrored into React so the toolbar toggles can show the right icon.
+  // The side panel is optional so the reading column has room for long-form text.
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
   const toggleLeft = useCallback(() => {
     const panel = leftPanelRef.current;
     if (!panel) return;
     panel.isCollapsed() ? panel.expand() : panel.collapse();
   }, []);
-  const toggleRight = useCallback(() => {
-    setRightCollapsed((collapsed) => !collapsed);
+  const openWorkspace = useCallback(() => {
+    setSideMode("workspace");
+    setRightCollapsed(false);
   }, []);
+  const toggleRight = useCallback(() => {
+    if (sideMode !== "workspace" || rightCollapsed) openWorkspace();
+    else setRightCollapsed(true);
+  }, [openWorkspace, rightCollapsed, sideMode]);
+  const toggleComparison = useCallback(() => {
+    if (sideMode === "pdf" && !rightCollapsed) {
+      setRightCollapsed(true);
+    } else {
+      setSideMode("pdf");
+      setRightCollapsed(false);
+    }
+  }, [rightCollapsed, sideMode]);
 
   const handleScrollRef = useCallback((fn: (id: string) => void) => {
     scrollFn.current = fn;
@@ -130,11 +142,15 @@ function ReaderSinglePane({
     }
   }, [mainMode]);
   const handleTranslateSelection = useCallback((text: string) => {
+    pendingSelectionText.current = text;
     setSelectionTextRef.current?.(text);
     setActiveTab("translate");
-  }, []);
+    openWorkspace();
+  }, [openWorkspace]);
   const handleSelectionSetterReady = useCallback((setter: (text: string) => void) => {
     setSelectionTextRef.current = setter;
+    if (pendingSelectionText.current) setter(pendingSelectionText.current);
+    pendingSelectionText.current = null;
   }, []);
   const handleJump = useCallback((h: { id: string }) => {
     const decision = resolveHighlightJump({
@@ -158,7 +174,7 @@ function ReaderSinglePane({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      if (target.closest("button, a, [role='dialog']") || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       
       // Toggle help with ?
       if (e.key === "?") {
@@ -168,29 +184,23 @@ function ReaderSinglePane({
       }
       
       const highlights = highlightsRef.current;
-      if (highlights.length === 0) return;
-      if (e.key === "j" || e.key === "]") {
+      if (highlights.length > 0 && (e.key === "j" || e.key === "]")) {
         e.preventDefault();
         currentHighlightIdx.current = Math.min(currentHighlightIdx.current + 1, highlights.length - 1);
-        scrollFn.current?.(highlights[currentHighlightIdx.current].id);
-      } else if (e.key === "k" || e.key === "[") {
+        handleJump(highlights[currentHighlightIdx.current]);
+      } else if (highlights.length > 0 && (e.key === "k" || e.key === "[")) {
         e.preventDefault();
         currentHighlightIdx.current = Math.max(currentHighlightIdx.current - 1, 0);
-        scrollFn.current?.(highlights[currentHighlightIdx.current].id);
-      } else if (e.key === "1") {
+        handleJump(highlights[currentHighlightIdx.current]);
+      } else if (e.key === "1" || e.key === "2" || e.key === "3") {
         e.preventDefault();
-        setActiveTab("notes");
-      } else if (e.key === "2") {
-        e.preventDefault();
-        setActiveTab("translate");
-      } else if (e.key === "3") {
-        e.preventDefault();
-        setActiveTab("terms");
+        setActiveTab(e.key === "1" ? "notes" : e.key === "2" ? "translate" : "terms");
+        openWorkspace();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [handleJump, openWorkspace]);
 
   if (paperQ.isLoading) {
     return <MessageScreen title={t("common.loading")} backLink="/library" />;
@@ -218,7 +228,7 @@ function ReaderSinglePane({
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-litera-text">{paper.title}</div>
+            <h1 className="truncate font-serif text-base text-litera-text" title={paper.title}>{paper.title}</h1>
             <div className="truncate text-[11px] text-litera-mute">
               {paper.authors.slice(0, 3).join(", ")}{paper.authors.length > 3 ? " et al." : ""}
               {paper.year ? ` · ${paper.year}` : ""}
@@ -238,15 +248,24 @@ function ReaderSinglePane({
             </button>
           )}
           <button
-            onClick={() => setMainMode((mode) => (mode === "pdf" ? "native" : "pdf"))}
+            onClick={() => setMainMode("native")}
             className={`litera-btn text-xs ${mainMode === "native" ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`}
-            title={mainMode === "native" ? t("reader.showPdf") : t("reader.nativeReadTitle")}
-            aria-label={mainMode === "native" ? t("reader.showPdf") : t("reader.nativeReadTitle")}
             aria-pressed={mainMode === "native"}
           >
-            <BookOpenText className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">{mainMode === "native" ? t("reader.showPdf") : t("reader.nativeReadTitle")}</span>
+            <BookOpenText className="h-3.5 w-3.5" /> {t("reader.nativeReadTitle")}
           </button>
+          <button
+            onClick={() => setMainMode("pdf")}
+            className={`litera-btn text-xs ${mainMode === "pdf" ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`}
+            aria-pressed={mainMode === "pdf"}
+          >
+            <FileText className="h-3.5 w-3.5" /> {t("reader.showPdf")}
+          </button>
+          {mainMode === "native" && (
+            <button onClick={toggleComparison} className={`litera-btn text-xs ${sideMode === "pdf" && !rightCollapsed ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`} aria-pressed={sideMode === "pdf" && !rightCollapsed}>
+              <Columns2 className="h-3.5 w-3.5" /> {t("reader.comparePdf")}
+            </button>
+          )}
           <button
             onClick={toggleLeft}
             className={`litera-icon-btn ${leftCollapsed ? "" : "bg-litera-accent/12 text-litera-accent"}`}
@@ -258,12 +277,12 @@ function ReaderSinglePane({
           </button>
           <button
             onClick={toggleRight}
-            className={`litera-icon-btn ${rightCollapsed ? "" : "bg-litera-accent/12 text-litera-accent"}`}
+            className={`litera-icon-btn ${rightCollapsed || sideMode !== "workspace" ? "" : "bg-litera-accent/12 text-litera-accent"}`}
             title={t("reader.toggleWorkspace")}
             aria-label={t("reader.toggleWorkspace")}
-            aria-pressed={!rightCollapsed}
+            aria-pressed={!rightCollapsed && sideMode === "workspace"}
           >
-            {rightCollapsed ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
+            {rightCollapsed || sideMode !== "workspace" ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
           </button>
           {onOpenSplit && <SplitPaperPicker currentPaperId={paperId} onOpenSplit={onOpenSplit} />}
           </div>
@@ -275,7 +294,7 @@ function ReaderSinglePane({
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className={READER_COMPACT_TITLE_CLASS}>
-            <div className="truncate text-xs font-semibold text-litera-text">{paper.title}</div>
+            <h1 className="truncate font-serif text-sm text-litera-text" title={paper.title}>{paper.title}</h1>
           </div>
           {paper.bibtex && (
             <button
@@ -287,19 +306,18 @@ function ReaderSinglePane({
               <ClipboardCopy className="h-3 w-3" />
             </button>
           )}
-          <button
-            onClick={() => setMainMode((mode) => (mode === "pdf" ? "native" : "pdf"))}
-            className={`litera-icon-btn ${mainMode === "native" ? "text-litera-accent" : ""}`}
-            title={mainMode === "native" ? t("reader.showPdf") : t("reader.nativeReadTitle")}
-            aria-label={mainMode === "native" ? t("reader.showPdf") : t("reader.nativeReadTitle")}
-            aria-pressed={mainMode === "native"}
-          >
-            <BookOpenText className="h-3 w-3" />
+          <button onClick={() => setMainMode("native")} className={`litera-icon-btn ${mainMode === "native" ? "text-litera-accent" : ""}`} title={t("reader.nativeReadTitle")} aria-label={t("reader.nativeReadTitle")} aria-pressed={mainMode === "native"}>
+            <BookOpenText className="h-3.5 w-3.5" />
           </button>
+          <button onClick={() => setMainMode("pdf")} className={`litera-icon-btn ${mainMode === "pdf" ? "text-litera-accent" : ""}`} title={t("reader.showPdf")} aria-label={t("reader.showPdf")} aria-pressed={mainMode === "pdf"}>
+            <FileText className="h-3.5 w-3.5" />
+          </button>
+          {mainMode === "native" && <button onClick={toggleComparison} className={`litera-icon-btn ${sideMode === "pdf" && !rightCollapsed ? "text-litera-accent" : ""}`} title={t("reader.comparePdf")} aria-label={t("reader.comparePdf")} aria-pressed={sideMode === "pdf" && !rightCollapsed}><Columns2 className="h-3.5 w-3.5" /></button>}
+          <button onClick={toggleRight} className={`litera-icon-btn ${!rightCollapsed && sideMode === "workspace" ? "text-litera-accent" : ""}`} title={t("reader.toggleWorkspace")} aria-label={t("reader.toggleWorkspace")} aria-pressed={!rightCollapsed && sideMode === "workspace"}><PanelRightOpen className="h-3.5 w-3.5" /></button>
         </header>
       )}
       <div className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
+        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-reading-layout"}>
           {!effectiveCompact && (
             <>
               <Panel
@@ -321,14 +339,14 @@ function ReaderSinglePane({
               </PanelResizeHandle>
             </>
           )}
-          <Panel id="reader-document" order={2} defaultSize={effectiveCompact ? 65 : 52} minSize={30}>
+          <Panel id="reader-document" order={2} defaultSize={effectiveCompact ? 100 : 84} minSize={30}>
             {mainMode === "native" ? (
               <TranslatedMarkdownPane paperId={paperId} paperTitle={paper.title} />
             ) : (
               <PdfPane paperId={paperId} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
             )}
           </Panel>
-          {(effectiveCompact || !rightCollapsed) && (
+          {!rightCollapsed && (
             <>
               <PanelResizeHandle className="reader-resize-handle">
                 <div className="reader-resize-grip" />
@@ -336,20 +354,22 @@ function ReaderSinglePane({
               <Panel
                 id="reader-workspace"
                 order={3}
-                defaultSize={effectiveCompact ? 35 : 28}
-                minSize={15}
-                maxSize={45}
-                collapsible={!effectiveCompact}
-                collapsedSize={0}
+                defaultSize={effectiveCompact ? 40 : 34}
+                minSize={25}
+                maxSize={55}
                 onCollapse={() => setRightCollapsed(true)}
                 onExpand={() => setRightCollapsed(false)}
               >
-                <ReaderWorkspacePane
-                  paperId={paperId}
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
-                  onSelectionSetterReady={handleSelectionSetterReady}
-                />
+                {mainMode === "native" && sideMode === "pdf" ? (
+                  <PdfPane paperId={paperId} onTranslateSelection={handleTranslateSelection} />
+                ) : (
+                  <ReaderWorkspacePane
+                    paperId={paperId}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    onSelectionSetterReady={handleSelectionSetterReady}
+                  />
+                )}
               </Panel>
             </>
           )}
