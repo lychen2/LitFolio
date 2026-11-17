@@ -290,6 +290,18 @@ async fn chat_complete_reports_malformed_sse_body() {
 }
 
 #[tokio::test]
+async fn chat_complete_reports_reasoning_only_reply_with_finish_and_usage() {
+    let body = r#"{"choices":[{"message":{"content":null,"reasoning_content":"private thought"},"finish_reason":"stop"}],"usage":{"prompt_tokens":231,"completion_tokens":1024}}"#;
+    let url = serve_once(200, "application/json", body).await;
+    let error = chat_error(&url).await;
+
+    assert!(error.contains("decode chat response: LLM returned no final answer"));
+    assert!(error.contains("finish_reason=Some(\"stop\")"));
+    assert!(error.contains("completion_tokens=1024"));
+    assert!(!error.contains("private thought"));
+}
+
+#[tokio::test]
 async fn chat_complete_serializes_concurrent_requests() {
     let active = Arc::new(AtomicUsize::new(0));
     let max_active = Arc::new(AtomicUsize::new(0));
