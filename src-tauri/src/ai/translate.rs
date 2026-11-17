@@ -842,6 +842,43 @@ mod tests {
         assert!(err.contains("chunk 1 exceeded model output limit"));
         assert!(err.contains("increase max_tokens"));
     }
+    #[tokio::test]
+    async fn markdown_translation_retries_reasoning_only_length_reply_with_smaller_chunks() {
+        let first = "Alpha sentence about methods. ".repeat(40);
+        let second = "Beta sentence about results. ".repeat(40);
+        let markdown = format!("{first}\n\n{second}");
+        let retry_max_chars = MARKDOWN_CHUNK_CHARS.min(markdown.len()) / 2;
+        let retry_chunks = split_markdown_chunks(&markdown, retry_max_chars);
+        assert!(retry_chunks.len() > 1);
+
+        let empty_length = serde_json::json!({
+            "choices": [{"message": {"content": null, "reasoning_content": "private"}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 200, "completion_tokens": 1024}
+        }).to_string();
+        let bodies = std::iter::once(empty_length)
+            .chain(
+                retry_chunks
+                    .iter()
+                    .map(|_| chat_body("译文。", "stop", 1, 2)),
+            )
+            .collect();
+        let (base_url, requests) = serve_chat_sequence(bodies).await;
+        let result = translate_markdown_text(
+            &reqwest::Client::new(),
+            &profile(&base_url),
+            "A paper",
+            &markdown,
+            "Chinese",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            result.markdown,
+            vec!["译文。"; retry_chunks.len()].join("\n\n")
+        );
+        assert_eq!(requests.lock().await.len(), retry_chunks.len() + 1);
+    }
 
     #[tokio::test]
     async fn markdown_translation_retries_length_limited_chunk_with_smaller_chunks() {

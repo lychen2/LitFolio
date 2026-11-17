@@ -187,7 +187,8 @@ async fn chat_complete_inner(
                 error = %error,
                 "AI response decode failed"
             );
-            return Err(error).context("decode chat response");
+            let detail = error.to_string();
+            return Err(error).context(format!("decode chat response: {detail}"));
         }
     };
     tracing::info!(

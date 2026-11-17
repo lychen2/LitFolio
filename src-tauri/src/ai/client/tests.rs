@@ -79,6 +79,27 @@ fn parse_sse_with_only_empty_metadata_frames_errors() {
 }
 
 #[test]
+fn empty_length_limited_response_preserves_finish_reason_for_chunk_retry() {
+    let plain = r#"{"choices":[{"message":{"content":null,"reasoning_content":"private thought"},"finish_reason":"length"}],"usage":{"prompt_tokens":231,"completion_tokens":1024}}"#;
+    let sse = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"private thought\"},\"finish_reason\":\"length\"}]}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":231,\"completion_tokens\":1024}}\n\ndata: [DONE]\n";
+    for body in [plain, sse] {
+        let reply = parse_response(body).unwrap();
+        assert_eq!(reply.content, "");
+        assert_eq!(reply.finish_reason.as_deref(), Some("length"));
+        assert_eq!(reply.usage.completion_tokens, 1024);
+    }
+}
+
+#[test]
+fn reasoning_only_stop_reports_redacted_finish_and_usage() {
+    let body = r#"{"choices":[{"message":{"content":null,"reasoning_content":"private thought"},"finish_reason":"stop"}],"usage":{"prompt_tokens":21,"completion_tokens":1024}}"#;
+    let error = parse_response(body).unwrap_err().to_string();
+    assert!(error.contains("finish_reason=Some(\"stop\")"));
+    assert!(error.contains("completion_tokens=1024"));
+    assert!(!error.contains("private thought"));
+}
+
+#[test]
 fn parse_sse_rejects_malformed_data_frame() {
     let body = "data: {\"choices\":[{\"delta\":{\"content\":\"hel\"}}]}\n\ndata: {bad json}\n";
     let err = parse_response(body).unwrap_err().to_string();

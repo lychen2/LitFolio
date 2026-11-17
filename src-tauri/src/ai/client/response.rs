@@ -48,8 +48,17 @@ pub(super) fn parse_response(text: &str) -> Result<ParsedReply> {
         parse_plain(text)?
     };
     reply.content = strip_think_tags(&reply.content);
-    if reply.content.is_empty() {
-        return Err(anyhow!("LLM returned no final answer (it may have returned only reasoning); increase the output token limit or adjust thinking mode and retry"));
+    if reply.content.is_empty()
+        && !reply.finish_reason.as_deref().is_some_and(|reason| {
+            reason.eq_ignore_ascii_case("length") || reason.eq_ignore_ascii_case("max_tokens")
+        })
+    {
+        return Err(anyhow!(
+            "LLM returned no final answer (finish_reason={:?}, prompt_tokens={}, completion_tokens={}); the provider may have returned reasoning without answer text. Check the model's output budget and thinking settings",
+            reply.finish_reason,
+            reply.usage.prompt_tokens,
+            reply.usage.completion_tokens,
+        ));
     }
     Ok(reply)
 }
