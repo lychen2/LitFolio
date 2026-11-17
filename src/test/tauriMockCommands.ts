@@ -245,19 +245,21 @@ const commandFixtures = new Map<string, MockResolver>([
   ["paper_quick_read", () => mockQuickReadResult],
   ["paper_find_by_doi", () => mockPaper],
   ["paper_translated_markdown_get", () => null],
-  ["paper_original_markdown_get", () => "# Reader Comparison Fixture\n\nThe original paragraph remains readable offline."],
+  ["paper_markdown_get", () => "<!-- page:1 -->\n# Reader Comparison Fixture\n\n<!-- page:2 -->\nThe original paragraph remains readable offline."],
   ["paper_pdf_asset_path", () => "/e2e/fixtures/reader.pdf"],
   ["highlight_list", () => []],
   ["paper_terms_list", () => []],
   ["paper_set_pdf_text", () => null],
+  ["note_sections_get", () => []],
+  ["paper_links_for_paper", () => []],
   ["paper_translate_markdown_estimate", () => ({
     source_chars: 1200,
     cleaned_chars: 1000,
     chunk_count: 2,
   })],
   ["paper_translate_markdown", () => ({
-    markdown: "# 中文译文\n\n这是一段译文。",
-    target_lang: "Chinese",
+    markdown: "# Reader Comparison Fixture\n\nThe translated paragraph can be compared with the original.",
+    target_lang: "English",
     model: "mock-model",
     prompt_tokens: 0,
     completion_tokens: 0,
@@ -397,7 +399,18 @@ export const registeredMockCommands = [...commandFixtures.keys()].sort();
 export function invokeMockCommand<T = unknown>(command: string, args?: unknown): T {
   if (command === "paper_get") {
     const input = object(args, "paper_get");
-    return (field(input, "id", "paper_get") === mockReaderPaper.id ? mockReaderPaper : mockPaper) as T;
+    const id = field(input, "id", "paper_get");
+    if (id === "paper-cached") return { ...mockReaderPaper, id, title: "Cached Reader Fixture" } as T;
+    return (id === mockReaderPaper.id ? mockReaderPaper : mockPaper) as T;
+  }
+  if (command === "paper_translated_markdown_get") {
+    const input = object(args, "paper_translated_markdown_get");
+    if (field(input, "paperId", "paper_translated_markdown_get") === "paper-cached") {
+      return {
+        markdown: "# Cached Reader Fixture\n\nThe saved translation appears without another model call.",
+        target_lang: "English", model: "mock-model", prompt_tokens: 0, completion_tokens: 0, cached: true,
+      } as T;
+    }
   }
   if (command === "llm_save_config") {
     const input = object(args, "llm_save_config");

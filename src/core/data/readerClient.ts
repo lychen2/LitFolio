@@ -53,6 +53,7 @@ export const readerClient = {
     ),
   noteGet: aiReaderApi.noteGet,
   noteSave: aiReaderApi.noteSave,
+  paperMarkdownGet: aiReaderApi.paperMarkdownGet,
   paperTranslatedMarkdownGet: aiReaderApi.paperTranslatedMarkdownGet,
   paperTermsList: aiReaderApi.paperTermsList,
   paperTermAdd: aiReaderApi.paperTermAdd,

@@ -76,6 +76,7 @@ type PdfHighlighterApi = {
   renderHighlightLayers?: () => void;
   viewer?: {
     container?: HTMLElement;
+    scrollPageIntoView?: (input: { pageNumber: number }) => void;
   };
 };
 
@@ -97,10 +98,12 @@ export const PdfPane = memo(function PdfPane({
   paperId,
   scrollRefCb,
   onTranslateSelection,
+  pageToOpen,
 }: {
   paperId: string;
   scrollRefCb?: (fn: (id: string) => void) => void;
   onTranslateSelection?: (text: string) => void;
+  pageToOpen?: number | null;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -137,6 +140,7 @@ export const PdfPane = memo(function PdfPane({
   const textPushedRef = useRef<string | null>(null);
   const pageSizesUrlRef = useRef<string | null>(null);
   const noteDragRef = useRef<NoteDragStart | null>(null);
+  const pageToOpenRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -190,6 +194,16 @@ export const PdfPane = memo(function PdfPane({
     setPageSizes({});
     pageSizesUrlRef.current = null;
   }, [paperId, pdfUrl]);
+
+  useEffect(() => {
+    if (pageToOpen == null || !Number.isSafeInteger(pageToOpen) || pageToOpen < 1) return;
+    pageToOpenRef.current = pageToOpen;
+    const viewer = highlighterRef.current as PdfHighlighterApi | null;
+    if (viewer?.viewer?.scrollPageIntoView) {
+      viewer.viewer.scrollPageIntoView({ pageNumber: pageToOpen });
+      pageToOpenRef.current = null;
+    }
+  }, [pageToOpen, pdfUrl]);
 
   // Ctrl+F → open the search bar. Only fires when the PDF pane has the
   // intent (i.e. the keystroke happened inside our container, not while
@@ -702,6 +716,12 @@ export const PdfPane = memo(function PdfPane({
                   scrollFnRef.current = fn;
                   scheduleHighlightLayerRefresh();
                   scheduleManualHighlightLayers();
+                  const pendingPage = pageToOpenRef.current;
+                  const viewer = highlighterRef.current as PdfHighlighterApi | null;
+                  if (pendingPage && viewer?.viewer?.scrollPageIntoView) {
+                    viewer.viewer.scrollPageIntoView({ pageNumber: pendingPage });
+                    pageToOpenRef.current = null;
+                  }
                   window.requestAnimationFrame(flushPendingScroll);
                 }}
                 onSelectionFinished={(

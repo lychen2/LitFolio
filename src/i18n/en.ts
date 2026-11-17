@@ -876,6 +876,19 @@ export const en: Record<TKey, string> = {
   "reader.nativeReadEstimate": "Will send about {count} text chunks before generation.",
   "reader.nativeReadCached": "Cached {lang} translation",
   "reader.nativeReadGenerated": "Translated into {lang} by {model}",
+  "reader.docViewLabel": "Reading view",
+  "reader.docViewTranslated": "Translation",
+  "reader.docViewOriginal": "Original",
+  "reader.docViewBilingual": "Side by side",
+  "reader.docViewBilingualBlocked":
+    "The full source and translation are shown separately; PDF page markers belong to the source.",
+  "reader.docViewUnavailable": "Not available yet",
+  "reader.docOriginalTitle": "Source text",
+  "reader.docOriginalMissing":
+    "The local PDF has no extractable text. Open the PDF source to read its pages.",
+  "reader.docOriginalLoading": "Reading the local source text…",
+  "reader.docComparePdf": "Compare with PDF",
+  "reader.docOpenPdfPage": "Open page {page} in the PDF",
   "reader.showPdf": "PDF source",
   "reader.card.problem": "Problem",
   "reader.card.problemPlaceholder":
@@ -964,13 +977,13 @@ export const en: Record<TKey, string> = {
   "reader.saved": "Saved",
   "reader.onboard.title": "Reading workspace",
   "reader.onboard.highlights":
-    "The left pane shows your highlights. Click one to jump to its location in the PDF.",
+    "The left pane lists PDF highlights. Select one to return to its marked page.",
   "reader.onboard.pdf":
-    "The center pane is the PDF reader. Select text to add highlights, translate, or mark terms.",
+    "Start with the local source text; generate a translation, read bilingual text, or compare beside the PDF.",
   "reader.onboard.workspace":
-    "The right pane is your workspace with notes, translation, and terms tabs.",
+    "Open the right pane when needed for reading cards, selection translation and terms.",
   "reader.onboard.shortcuts":
-    "Shortcuts: Ctrl+F search · Alt+drag area highlight · j/k navigate highlights",
+    "Shortcuts: ? for help · 1/2/3 for the workspace · j/k for PDF highlights",
   "reader.onboard.gotIt": "Got it",
   "reader.helpTitle": "Reader shortcuts",
   "reader.helpNavigation": "Navigation",

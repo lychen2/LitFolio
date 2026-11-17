@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { pushPdfTextCacheAndInvalidateTranslations } from "./pdfTextCache";
 
 describe("pushPdfTextCacheAndInvalidateTranslations", () => {
-  it("writes extracted PDF text and invalidates translated markdown queries", async () => {
+  it("writes extracted PDF text and invalidates translated and source markdown queries", async () => {
     const calls: string[] = [];
     const api = {
       paperSetPdfText: vi.fn(async () => {
@@ -23,10 +23,13 @@ describe("pushPdfTextCacheAndInvalidateTranslations", () => {
     });
 
     expect(api.paperSetPdfText).toHaveBeenCalledWith("paper-1", "PDF body text");
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+    expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(1, {
       queryKey: ["paperTranslatedMarkdown", "paper-1"],
     });
-    expect(calls).toEqual(["set-text", "invalidate"]);
+    expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(2, {
+      queryKey: ["paperMarkdown", "paper-1"],
+    });
+    expect(calls).toEqual(["set-text", "invalidate", "invalidate"]);
   });
 
   it("skips empty extracted text", async () => {

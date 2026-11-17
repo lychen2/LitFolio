@@ -1,13 +1,4 @@
-/**
- * Block parsing for the reader's translated/source document pane.
- *
- * The PDF extractor writes Markdown interleaved with `<!-- page:N -->`
- * comments; the full-document translation deletes those comments and may
- * reflow prose. Reading the two documents side by side is only trustworthy
- * when their block skeletons still match, so this module parses both and
- * refuses alignment when the skeletons diverge instead of pairing unrelated
- * paragraphs by index.
- */
+/** Split a paper's Markdown into readable units and keep PDF extraction page markers. */
 
 export type ReadingBlockKind = "heading" | "paragraph" | "list" | "quote" | "table" | "code";
 
@@ -26,11 +17,6 @@ export interface ReadingBlock {
 export interface ReadingDocument {
   blocks: ReadingBlock[];
   hasPageMarkers: boolean;
-}
-
-export interface BilingualPair {
-  original: ReadingBlock;
-  translated: ReadingBlock;
 }
 
 const PAGE_MARKER = /^<!--\s*page\s*:\s*(\d+)\s*-->$/i;
@@ -53,7 +39,7 @@ export function parseReadingDocument(markdown: string): ReadingDocument {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
   const blocks: ReadingBlock[] = [];
   let hasPageMarkers = false;
-  let pendingPage: number | null = null;
+  let currentPage: number | null = null;
   let i = 0;
 
   const push = (kind: ReadingBlockKind, level: number, body: string) => {
@@ -63,10 +49,11 @@ export function parseReadingDocument(markdown: string): ReadingDocument {
       kind,
       level,
       markdown: trimmed,
-      page: pendingPage,
+      // A marker governs every following block until the next marker, so each
+      // block keeps the page the extractor placed its text on.
+      page: currentPage,
       artifact: kind === "paragraph" && !trimmed.includes("\n") && ARTIFACT_LINE.test(trimmed),
     });
-    pendingPage = null;
   };
 
   while (i < lines.length) {
@@ -80,7 +67,7 @@ export function parseReadingDocument(markdown: string): ReadingDocument {
     const marker = PAGE_MARKER.exec(line);
     if (marker) {
       hasPageMarkers = true;
-      pendingPage = Number(marker[1]);
+      currentPage = Number(marker[1]);
       i++;
       continue;
     }
@@ -165,48 +152,4 @@ export function parseReadingDocument(markdown: string): ReadingDocument {
   }
 
   return { blocks, hasPageMarkers };
-}
-
-/**
- * Pair source and translated blocks. Alignment succeeds only when every block
- * keeps its kind, heading depth and position. Artifact-only source paragraphs
- * (standalone page numbers and page labels that the translation is told to
- * delete) are dropped when their removal makes the skeletons match.
- */
-export function alignReadingBlocks(
-  original: ReadingDocument,
-  translated: ReadingDocument,
-): BilingualPair[] | null {
-  const direct = pairBlocks(original.blocks, translated.blocks);
-  if (direct) return direct;
-
-  const content = original.blocks.filter((block) => !block.artifact);
-  if (content.length === original.blocks.length) return null;
-  return pairBlocks(content, translated.blocks);
-}
-
-function pairBlocks(original: ReadingBlock[], translated: ReadingBlock[]): BilingualPair[] | null {
-  if (original.length === 0 || original.length !== translated.length) return null;
-
-  const pairs: BilingualPair[] = [];
-  for (let index = 0; index < original.length; index++) {
-    const source = original[index];
-    const target = translated[index];
-    if (source.kind !== target.kind || source.level !== target.level) return null;
-    if (!keepsNumericAnchors(source, target)) return null;
-    pairs.push({ original: source, translated: target });
-  }
-  return pairs;
-}
-
-/**
- * The translation contract keeps numbers, formulas and identifiers verbatim, so
- * a source block whose numbers all disappear indicates the model merged or
- * reordered prose. That is the signal that index pairing would be a lie.
- */
-function keepsNumericAnchors(source: ReadingBlock, target: ReadingBlock): boolean {
-  if (source.kind === "heading" || source.kind === "code") return true;
-  const anchors = source.markdown.match(/\d+(?:[.,]\d+)*%?/g);
-  if (!anchors || anchors.length === 0) return true;
-  return anchors.some((anchor) => target.markdown.includes(anchor));
 }

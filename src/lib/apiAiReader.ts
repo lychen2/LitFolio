@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { parseHighlight, parseLlmConfig } from "./apiSchema";
 import {
   parseAiExecutionRecord,
+  parsePaperMarkdown,
   parseReaderAskResult,
   type AiExecutionRecord,
 } from "./apiSchemaAi";
@@ -91,6 +92,8 @@ export const aiReaderApi = {
       selection,
       targetLang: targetLang ?? "Chinese",
     }),
+  paperMarkdownGet: (paperId: string) =>
+    invokeParsed("paper_markdown_get", { paperId }, parsePaperMarkdown),
   paperTranslatedMarkdownGet: (paperId: string, targetLang?: string) =>
     invoke<ReaderMarkdownTranslationResult | null>("paper_translated_markdown_get", {
       paperId,

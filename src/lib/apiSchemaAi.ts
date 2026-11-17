@@ -4,6 +4,7 @@ import {
   nullableStringField,
   numberField,
   object,
+  schemaError,
   stringField,
   type Shape,
 } from "./apiSchemaCore";
@@ -45,6 +46,19 @@ export interface AiExecutionRecord {
 
 function executionState(obj: Shape, path: string): AiExecutionState {
   return enumStringField(obj, "state", path, executionStates) as AiExecutionState;
+}
+
+/**
+ * Cached or locally extracted Markdown body of a paper, read without AI or
+ * network access. `null` means the paper has neither a cached body nor a
+ * readable stored PDF.
+ */
+export function parsePaperMarkdown(value: unknown, path = "PaperMarkdown"): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") {
+    throw schemaError(path, "string|null", value);
+  }
+  return value;
 }
 
 export function parseAiExecutionRecord(value: unknown, path = "AiExecutionRecord"): AiExecutionRecord {

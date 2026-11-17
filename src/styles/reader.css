@@ -373,3 +373,203 @@
 .markdown-body .katex-display {
   margin: 0.75em 0;
 }
+
+/* Source and translated Markdown share the app surface and typography. Page
+   markers belong to the source. Bilingual mode keeps each document intact. */
+.litera-reading-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--litera-border);
+  background: color-mix(in srgb, var(--litera-paper) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 0.6rem clamp(0.75rem, 4vw, 3rem);
+}
+.litera-reading-chrome-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 72ch;
+  margin-inline: auto;
+}
+.litera-reading-modes {
+  display: inline-flex;
+  gap: 2px;
+  width: fit-content;
+  max-width: 72ch;
+  margin-inline: auto;
+  padding: 2px;
+  border: 1px solid var(--litera-border);
+  border-radius: var(--litera-radius-full);
+  background: var(--litera-surface-1);
+}
+.litera-reading-mode {
+  border: 0;
+  border-radius: var(--litera-radius-full);
+  background: transparent;
+  color: var(--litera-mute);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-out-quart), color 140ms var(--ease-out-quart);
+}
+.litera-reading-mode:hover:not(:disabled) {
+  background: var(--litera-surface-2);
+  color: var(--litera-text);
+}
+.litera-reading-mode[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--litera-accent) 22%, var(--litera-surface-2));
+  color: var(--litera-text);
+}
+.litera-reading-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+.litera-reading-mode:focus-visible {
+  outline: 2px solid var(--litera-focus);
+  outline-offset: 1px;
+}
+.litera-reading-note,
+.litera-reading-alert {
+  max-width: 72ch;
+  width: 100%;
+  margin-inline: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--litera-mute);
+}
+.litera-reading-alert {
+  border: 1px solid color-mix(in srgb, var(--litera-error) 32%, transparent);
+  background: color-mix(in srgb, var(--litera-error) 12%, transparent);
+  color: var(--litera-error);
+  border-radius: var(--litera-radius-sm);
+  padding: 0.4rem 0.6rem;
+}
+
+.litera-reading-body.markdown-body {
+  max-width: 72ch;
+  margin-inline: auto;
+  padding: 1.75rem clamp(1rem, 4vw, 3rem) 5rem;
+  font-family: Georgia, Cambria, "Times New Roman", "Songti SC", "Source Han Serif SC",
+    "Noto Serif CJK SC", ui-serif, serif;
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  letter-spacing: 0.004em;
+  color: var(--litera-text);
+  container-type: inline-size;
+}
+.litera-reading-body p,
+.litera-reading-body li,
+.litera-reading-body blockquote {
+  font-size: inherit;
+  line-height: inherit;
+}
+.litera-reading-body p {
+  margin: 0 0 0.85em;
+}
+.litera-reading-body ul,
+.litera-reading-body ol {
+  margin: 0.35em 0 1em;
+  padding-left: 1.4rem;
+  list-style-position: outside;
+}
+.litera-reading-body li {
+  margin-bottom: 0.4em;
+}
+.litera-reading-body h3,
+.litera-reading-body h4,
+.litera-reading-body h5 {
+  margin: 1.9em 0 0.55em;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+.litera-reading-body h3 { font-size: 1.4rem; }
+.litera-reading-body h4 { font-size: 1.18rem; }
+.litera-reading-body h5 { font-size: 1.04rem; }
+.litera-reading-body > .litera-reading-block:first-child > * > h3:first-child {
+  margin-top: 0.4em;
+}
+.litera-reading-body blockquote {
+  margin: 0.6em 0 1em;
+  padding-left: 0.9rem;
+  border-left: 2px solid color-mix(in srgb, var(--litera-accent) 45%, transparent);
+  color: var(--litera-mute);
+  font-style: normal;
+}
+.litera-reading-body code {
+  font-size: 0.9em;
+}
+.litera-reading-body table {
+  margin-block: 1em;
+  font-size: 0.95em;
+}
+.litera-reading-block + .litera-reading-block > .litera-reading-page {
+  margin-top: 1.6rem;
+}
+
+.litera-reading-page {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.5rem;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--litera-border) 85%, transparent);
+  border-radius: var(--litera-radius-full);
+  background: var(--litera-surface-1);
+  color: var(--litera-text-subtle);
+  font-family: var(--litera-font-sans, system-ui, sans-serif);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+.litera-reading-page-action {
+  cursor: pointer;
+  transition: color 140ms var(--ease-out-quart), border-color 140ms var(--ease-out-quart);
+}
+.litera-reading-page-action:hover {
+  color: var(--litera-accent);
+  border-color: color-mix(in srgb, var(--litera-accent) 50%, var(--litera-border));
+}
+.litera-reading-page-action:focus-visible {
+  outline: 2px solid var(--litera-focus);
+  outline-offset: 2px;
+}
+
+.litera-reading-bilingual-documents {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+.litera-reading-bilingual-column {
+  min-width: 0;
+}
+.litera-reading-bilingual-column + .litera-reading-bilingual-column {
+  border-left: 1px solid var(--litera-border);
+}
+.litera-reading-bilingual-column .litera-reading-body.markdown-body {
+  max-width: 64ch;
+  padding-top: 0.75rem;
+  font-size: 0.98rem;
+}
+.litera-reading-bilingual-label {
+  margin: 1.5rem clamp(1rem, 4vw, 3rem) 0;
+  color: var(--litera-mute);
+  font-family: var(--litera-font-sans, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+@media (max-width: 920px) {
+  .litera-reading-bilingual-documents {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .litera-reading-bilingual-column + .litera-reading-bilingual-column {
+    border-left: 0;
+    border-top: 1px solid var(--litera-border);
+  }
+}

@@ -548,7 +548,13 @@ mod tests {
     #[tokio::test]
     async fn paper_markdown_get_returns_cached_document_markdown() {
         let (state, root) = test_state().await;
-        let paper_id = seed_paper(&state, Some("/nonexistent/source.pdf".to_string())).await;
+        let paper_id = ulid::Ulid::new().to_string();
+        seed_paper(
+            &state,
+            &paper_id,
+            Some("/nonexistent/source.pdf".to_string()),
+        )
+        .await;
         state
             .paths
             .write_paper_markdown(&paper_id, "# Cached body\n\nCached paragraph.")
@@ -577,7 +583,12 @@ mod tests {
             minimal_pdf("Original markdown body from the extraction tier."),
         )
         .unwrap();
-        seed_paper(&state, Some(pdf_path.to_string_lossy().into_owned())).await;
+        seed_paper(
+            &state,
+            paper_id,
+            Some(pdf_path.to_string_lossy().into_owned()),
+        )
+        .await;
 
         let markdown = paper_markdown_get_impl(&state, paper_id).await.unwrap();
 
@@ -599,7 +610,13 @@ mod tests {
     #[tokio::test]
     async fn paper_markdown_get_returns_none_without_cache_or_readable_pdf() {
         let (state, root) = test_state().await;
-        let paper_id = seed_paper(&state, Some("/nonexistent/source.pdf".to_string())).await;
+        let paper_id = ulid::Ulid::new().to_string();
+        seed_paper(
+            &state,
+            &paper_id,
+            Some("/nonexistent/source.pdf".to_string()),
+        )
+        .await;
 
         let markdown = paper_markdown_get_impl(&state, &paper_id).await.unwrap();
 
@@ -616,16 +633,18 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(error.contains("paper not found"), "unexpected error: {error}");
+        assert!(
+            error.contains("paper not found"),
+            "unexpected error: {error}"
+        );
         state.pool.close().await;
         std::fs::remove_dir_all(root).ok();
     }
 
-    async fn seed_paper(state: &AppState, pdf_path: Option<String>) -> String {
-        let paper_id = ulid::Ulid::new().to_string();
+    async fn seed_paper(state: &AppState, paper_id: &str, pdf_path: Option<String>) {
         let now = chrono::Utc::now().timestamp();
         let paper = Paper {
-            id: paper_id.clone(),
+            id: paper_id.to_string(),
             title: "Extraction Fixture".into(),
             authors: vec!["Fixture Author".into()],
             year: Some(2026),
@@ -653,14 +672,13 @@ mod tests {
             last_exported_at: None,
         };
         PaperRepo::new(&state.pool).insert(&paper).await.unwrap();
-        paper_id
     }
 
     async fn test_state() -> (AppState, std::path::PathBuf) {
         let root = std::env::temp_dir().join(format!("litera-reader-md-{}", ulid::Ulid::new()));
         let paths = LibraryPaths::new(&root);
         paths.ensure().unwrap();
-        let pool = open_pool(&paths.root().join("library.sqlite")).await.unwrap();
+        let pool = open_pool(&paths.db_file()).await.unwrap();
         run_migrations(&pool).await.unwrap();
         let state = AppState {
             pool,

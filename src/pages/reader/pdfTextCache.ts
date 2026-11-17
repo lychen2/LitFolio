@@ -3,7 +3,7 @@ type PdfTextCacheApi = {
 };
 
 type PdfTextCacheQueryClient = {
-  invalidateQueries: (options: { queryKey: readonly ["paperTranslatedMarkdown", string] }) => Promise<unknown> | unknown;
+  invalidateQueries: (options: { queryKey: readonly [string, string] }) => Promise<unknown> | unknown;
 };
 
 export async function pushPdfTextCacheAndInvalidateTranslations({
@@ -19,5 +19,8 @@ export async function pushPdfTextCacheAndInvalidateTranslations({
 }) {
   if (!text) return;
   await api.paperSetPdfText(paperId, text);
-  await queryClient.invalidateQueries({ queryKey: ["paperTranslatedMarkdown", paperId] });
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["paperTranslatedMarkdown", paperId] }),
+    queryClient.invalidateQueries({ queryKey: ["paperMarkdown", paperId] }),
+  ]);
 }

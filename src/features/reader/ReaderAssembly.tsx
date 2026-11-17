@@ -45,7 +45,6 @@ export function ReaderAssembly() {
   if (splitId) {
     return (
       <section className="h-full flex flex-col">
-        <ReaderOnboarding />
         <header className="reader-toolbar">
           <Link to="/library" className="litera-btn text-xs" title={t("reader.backToLibrary")}>
             <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("reader.back")}</span>
@@ -72,10 +71,10 @@ export function ReaderAssembly() {
     );
   }
 
-  return <><ReaderOnboarding /><ReaderSinglePane paperId={paperId} onOpenSplit={openSplit} /></>;
+  return <ReaderSinglePane paperId={paperId} onOpenSplit={openSplit} />;
 }
 
-/** A complete single-reader pane (highlights + pdf + workspace). */
+/** One paper's text, PDF annotations, and workspace. */
 function ReaderSinglePane({
   paperId,
   compact,
@@ -90,6 +89,7 @@ function ReaderSinglePane({
   const [showHelp, setShowHelp] = useState(false);
   const [mainMode, setMainMode] = useState<ReaderMainMode>("native");
   const [sideMode, setSideMode] = useState<"workspace" | "pdf">("workspace");
+  const [documentMode, setDocumentMode] = useState<"translated" | "original" | "bilingual">("translated");
   const isNarrow = useNarrowLayout(1200);
   const effectiveCompact = compact || isNarrow;
   const paperQ = useQuery({
@@ -102,6 +102,7 @@ function ReaderSinglePane({
   const currentHighlightIdx = useRef<number>(-1);
   const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
   const pendingSelectionText = useRef<string | null>(null);
+  const [pdfPage, setPdfPage] = useState<number | null>(null);
 
   // The side panel is optional so the reading column has room for long-form text.
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -222,6 +223,7 @@ function ReaderSinglePane({
 
   return (
     <div className="h-full flex flex-col">
+      <ReaderOnboarding />
       {!effectiveCompact && (
         <header className="reader-toolbar">
           <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
@@ -263,7 +265,7 @@ function ReaderSinglePane({
           </button>
           {mainMode === "native" && (
             <button onClick={toggleComparison} className={`litera-btn text-xs ${sideMode === "pdf" && !rightCollapsed ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`} aria-pressed={sideMode === "pdf" && !rightCollapsed}>
-              <Columns2 className="h-3.5 w-3.5" /> {t("reader.comparePdf")}
+              <Columns2 className="h-3.5 w-3.5" /> {t("reader.docComparePdf")}
             </button>
           )}
           <button
@@ -312,7 +314,7 @@ function ReaderSinglePane({
           <button onClick={() => setMainMode("pdf")} className={`litera-icon-btn ${mainMode === "pdf" ? "text-litera-accent" : ""}`} title={t("reader.showPdf")} aria-label={t("reader.showPdf")} aria-pressed={mainMode === "pdf"}>
             <FileText className="h-3.5 w-3.5" />
           </button>
-          {mainMode === "native" && <button onClick={toggleComparison} className={`litera-icon-btn ${sideMode === "pdf" && !rightCollapsed ? "text-litera-accent" : ""}`} title={t("reader.comparePdf")} aria-label={t("reader.comparePdf")} aria-pressed={sideMode === "pdf" && !rightCollapsed}><Columns2 className="h-3.5 w-3.5" /></button>}
+          {mainMode === "native" && <button onClick={toggleComparison} className={`litera-icon-btn ${sideMode === "pdf" && !rightCollapsed ? "text-litera-accent" : ""}`} title={t("reader.docComparePdf")} aria-label={t("reader.docComparePdf")} aria-pressed={sideMode === "pdf" && !rightCollapsed}><Columns2 className="h-3.5 w-3.5" /></button>}
           <button onClick={toggleRight} className={`litera-icon-btn ${!rightCollapsed && sideMode === "workspace" ? "text-litera-accent" : ""}`} title={t("reader.toggleWorkspace")} aria-label={t("reader.toggleWorkspace")} aria-pressed={!rightCollapsed && sideMode === "workspace"}><PanelRightOpen className="h-3.5 w-3.5" /></button>
         </header>
       )}
@@ -341,9 +343,21 @@ function ReaderSinglePane({
           )}
           <Panel id="reader-document" order={2} defaultSize={effectiveCompact ? 100 : 84} minSize={30}>
             {mainMode === "native" ? (
-              <TranslatedMarkdownPane paperId={paperId} paperTitle={paper.title} />
+              <TranslatedMarkdownPane
+                paperId={paperId}
+                paperTitle={paper.title}
+                mode={documentMode}
+                onModeChange={setDocumentMode}
+                pdfComparisonActive={sideMode === "pdf" && !rightCollapsed}
+                onOpenPdf={() => setMainMode("pdf")}
+                onOpenPdfPage={(page) => {
+                  setPdfPage(page);
+                  setSideMode("pdf");
+                  setRightCollapsed(false);
+                }}
+              />
             ) : (
-              <PdfPane paperId={paperId} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
+              <PdfPane paperId={paperId} pageToOpen={pdfPage} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
             )}
           </Panel>
           {!rightCollapsed && (
@@ -361,7 +375,7 @@ function ReaderSinglePane({
                 onExpand={() => setRightCollapsed(false)}
               >
                 {mainMode === "native" && sideMode === "pdf" ? (
-                  <PdfPane paperId={paperId} onTranslateSelection={handleTranslateSelection} />
+                  <PdfPane paperId={paperId} pageToOpen={pdfPage} onTranslateSelection={handleTranslateSelection} />
                 ) : (
                   <ReaderWorkspacePane
                     paperId={paperId}
