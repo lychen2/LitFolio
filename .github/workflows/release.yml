@@ -138,12 +138,14 @@ jobs:
             libfuse2t64 \
             libssl-dev
 
+      - name: Clean EasyRead build artifacts
+        run: rm -rf vendor/easyread/build vendor/easyread/easyread.egg-info
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
 
       - name: Build signed updater artifacts and publish release
-        uses: tauri-apps/tauri-action@v0.6.2
+        uses: tauri-apps/tauri-action@v0.15.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
