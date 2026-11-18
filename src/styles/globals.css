@@ -1,3 +1,5 @@
+@import "./fonts.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,103 +8,99 @@
   :root,
   [data-theme="violet"] {
     color-scheme: dark;
-    --litera-radius: 10px;
-    --litera-radius-sm: 6px;
-    --litera-radius-md: 10px;
-    --litera-radius-lg: 14px;
-    --litera-radius-xl: 18px;
-    --litera-radius-full: 9999px;
-    --litera-ink: oklch(0.14 0.022 288);
-    --litera-bg: oklch(0.17 0.026 288);
-    --litera-paper: oklch(0.20 0.030 288);
-    --litera-panel: oklch(0.24 0.032 288);
-    --litera-surface-1: oklch(0.22 0.030 288);
-    --litera-surface-2: oklch(0.26 0.034 288);
-    --litera-surface-3: oklch(0.30 0.036 288);
-    --litera-line: oklch(0.36 0.036 288);
-    --litera-border: oklch(0.33 0.034 288);
-    --litera-border-strong: oklch(0.46 0.046 288);
-    --litera-mute: oklch(0.74 0.032 282);
-    --litera-text-subtle: oklch(0.60 0.030 282);
-    --litera-text: oklch(0.95 0.016 285);
-    --litera-accent: oklch(0.78 0.135 300);
-    --litera-accent-strong: oklch(0.85 0.145 305);
-    --litera-accent-contrast: oklch(0.16 0.032 300);
-    --litera-accent2: oklch(0.82 0.100 215);
-    --litera-info: oklch(0.78 0.105 230);
-    --litera-success: oklch(0.82 0.135 145);
-    --litera-warn: oklch(0.86 0.125 85);
-    --litera-error: oklch(0.76 0.145 15);
-    --litera-focus: oklch(0.80 0.135 300);
+    --litera-ink: oklch(0.105 0.014 286);
+    --litera-bg: #1c1d21;
+    --litera-paper: #222328;
+    --litera-panel: #2c2d33;
+    --litera-surface-1: #27282e;
+    --litera-surface-2: #303138;
+    --litera-surface-3: #383942;
+    --litera-line: #41424a;
+    --litera-border: #393a42;
+    --litera-border-strong: #656671;
+    --litera-mute: oklch(0.785 0.016 284);
+    --litera-text-subtle: oklch(0.720 0.016 284);
+    --litera-text: oklch(0.955 0.011 284);
+    --litera-accent: oklch(0.775 0.128 298);
+    --litera-accent-strong: oklch(0.845 0.122 300);
+    --litera-accent-contrast: oklch(0.155 0.035 298);
+    --litera-accent2: oklch(0.820 0.095 205);
+    --litera-info: oklch(0.780 0.105 230);
+    --litera-success: oklch(0.810 0.130 150);
+    --litera-warn: oklch(0.850 0.120 85);
+    --litera-error: oklch(0.740 0.150 18);
+    --litera-focus: oklch(0.775 0.128 298);
   }
 
   [data-theme="warm"] {
     color-scheme: dark;
-    --litera-radius: 10px;
-    --litera-radius-sm: 6px;
-    --litera-radius-md: 10px;
-    --litera-radius-lg: 14px;
-    --litera-radius-xl: 18px;
-    --litera-radius-full: 9999px;
-    --litera-ink: oklch(0.14 0.022 60);
-    --litera-bg: oklch(0.17 0.026 60);
-    --litera-paper: oklch(0.20 0.029 60);
-    --litera-panel: oklch(0.24 0.033 60);
-    --litera-surface-1: oklch(0.22 0.031 60);
-    --litera-surface-2: oklch(0.26 0.036 60);
-    --litera-surface-3: oklch(0.30 0.040 60);
-    --litera-line: oklch(0.36 0.038 60);
-    --litera-border: oklch(0.33 0.036 60);
-    --litera-border-strong: oklch(0.46 0.048 60);
-    --litera-mute: oklch(0.75 0.032 68);
-    --litera-text-subtle: oklch(0.61 0.030 68);
-    --litera-text: oklch(0.95 0.022 75);
-    --litera-accent: oklch(0.80 0.138 68);
-    --litera-accent-strong: oklch(0.87 0.145 74);
-    --litera-accent-contrast: oklch(0.17 0.035 60);
-    --litera-accent2: oklch(0.82 0.095 180);
-    --litera-info: oklch(0.78 0.095 195);
-    --litera-success: oklch(0.82 0.130 142);
-    --litera-warn: oklch(0.86 0.130 80);
-    --litera-error: oklch(0.76 0.140 25);
-    --litera-focus: oklch(0.82 0.138 68);
+    --litera-ink: oklch(0.105 0.006 65);
+    --litera-bg: oklch(0.15 0.007 65);
+    --litera-paper: oklch(0.172 0.008 65);
+    --litera-panel: oklch(0.215 0.009 65);
+    --litera-surface-1: oklch(0.192 0.008 65);
+    --litera-surface-2: oklch(0.232 0.010 65);
+    --litera-surface-3: oklch(0.272 0.011 65);
+    --litera-line: oklch(0.305 0.011 65);
+    --litera-border: oklch(0.275 0.010 65);
+    --litera-border-strong: oklch(0.4 0.014 65);
+    --litera-mute: oklch(0.740 0.009 78);
+    --litera-text-subtle: oklch(0.600 0.009 78);
+    --litera-text: oklch(0.955 0.005 78);
+    --litera-accent: oklch(0.800 0.125 72);
+    --litera-accent-strong: oklch(0.865 0.120 78);
+    --litera-accent-contrast: oklch(0.170 0.030 65);
+    --litera-accent2: oklch(0.800 0.085 180);
+    --litera-info: oklch(0.780 0.090 200);
+    --litera-success: oklch(0.810 0.125 145);
+    --litera-warn: oklch(0.850 0.125 88);
+    --litera-error: oklch(0.740 0.145 25);
+    --litera-focus: oklch(0.800 0.125 72);
   }
 
   [data-theme="blueprint"] {
     color-scheme: dark;
-    --litera-radius: 10px;
-    --litera-radius-sm: 6px;
-    --litera-radius-md: 10px;
-    --litera-radius-lg: 14px;
-    --litera-radius-xl: 18px;
-    --litera-radius-full: 9999px;
-    --litera-ink: oklch(0.14 0.024 240);
-    --litera-bg: oklch(0.17 0.028 240);
-    --litera-paper: oklch(0.20 0.032 240);
-    --litera-panel: oklch(0.24 0.036 240);
-    --litera-surface-1: oklch(0.22 0.034 240);
-    --litera-surface-2: oklch(0.26 0.039 240);
-    --litera-surface-3: oklch(0.30 0.043 240);
-    --litera-line: oklch(0.36 0.042 240);
-    --litera-border: oklch(0.33 0.039 240);
-    --litera-border-strong: oklch(0.46 0.052 240);
-    --litera-mute: oklch(0.74 0.036 240);
-    --litera-text-subtle: oklch(0.60 0.032 240);
-    --litera-text: oklch(0.95 0.018 235);
-    --litera-accent: oklch(0.78 0.130 235);
-    --litera-accent-strong: oklch(0.86 0.140 230);
-    --litera-accent-contrast: oklch(0.16 0.035 240);
-    --litera-accent2: oklch(0.82 0.100 190);
-    --litera-info: oklch(0.78 0.110 220);
-    --litera-success: oklch(0.82 0.130 150);
-    --litera-warn: oklch(0.85 0.125 85);
-    --litera-error: oklch(0.75 0.140 20);
-    --litera-focus: oklch(0.80 0.130 235);
+    --litera-ink: oklch(0.105 0.019 245);
+    --litera-bg: oklch(0.15 0.022 245);
+    --litera-paper: oklch(0.172 0.024 245);
+    --litera-panel: oklch(0.215 0.028 245);
+    --litera-surface-1: oklch(0.192 0.025 245);
+    --litera-surface-2: oklch(0.232 0.030 245);
+    --litera-surface-3: oklch(0.272 0.034 245);
+    --litera-line: oklch(0.305 0.034 245);
+    --litera-border: oklch(0.275 0.031 245);
+    --litera-border-strong: oklch(0.4 0.043 245);
+    --litera-mute: oklch(0.740 0.026 240);
+    --litera-text-subtle: oklch(0.600 0.026 240);
+    --litera-text: oklch(0.955 0.014 240);
+    --litera-accent: oklch(0.775 0.125 238);
+    --litera-accent-strong: oklch(0.850 0.115 232);
+    --litera-accent-contrast: oklch(0.160 0.035 245);
+    --litera-accent2: oklch(0.820 0.100 190);
+    --litera-info: oklch(0.780 0.110 220);
+    --litera-success: oklch(0.810 0.125 152);
+    --litera-warn: oklch(0.850 0.120 85);
+    --litera-error: oklch(0.740 0.145 20);
+    --litera-focus: oklch(0.775 0.125 238);
   }
 
   :root {
+    --litera-radius: 8px;
+    --litera-radius-sm: 5px;
+    --litera-radius-md: 8px;
+    --litera-radius-lg: 12px;
+    --litera-radius-xl: 16px;
+    --litera-radius-full: 9999px;
+
     --litera-font-size: 16px;
-    --litera-font-sans: "Quicksand", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    --litera-font-cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC";
+    --litera-font-sans: "Figtree Variable", "Quicksand", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", var(--litera-font-cjk), system-ui, sans-serif;
+    /* Titles and long-form text. The stack deliberately ends in the UI sans
+       stack instead of the generic `serif`, so a machine without a good CJK
+       serif (stock Windows) shows clean sans glyphs rather than SimSun. */
+    --litera-font-serif: "Literata Variable", "Source Han Serif SC", "Source Han Serif CN", "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", "STSong", var(--litera-font-sans);
+    --litera-font-mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", "Liberation Mono", ui-monospace, monospace;
+
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -113,27 +111,31 @@
     --z-modal: 400;
     --z-toast: 500;
     --z-tooltip: 600;
+
     --litera-text-muted: var(--litera-mute);
-    --litera-shadow-sm: 0 2px 8px -1px color-mix(in srgb, var(--litera-ink) 40%, transparent);
-    --litera-shadow-md: 0 6px 18px -3px color-mix(in srgb, var(--litera-ink) 50%, transparent), 0 0 0 1px color-mix(in srgb, var(--litera-border) 40%, transparent);
-    --litera-shadow-lg: 0 18px 42px -6px color-mix(in srgb, var(--litera-ink) 65%, transparent), 0 0 0 1px color-mix(in srgb, var(--litera-border-strong) 30%, transparent);
-    --litera-shadow-glow: 0 0 18px -2px color-mix(in srgb, var(--litera-accent) 30%, transparent);
-  }
-  [data-theme="violet"], [data-theme="warm"], [data-theme="blueprint"] {
-    --litera-text-muted: var(--litera-mute);
+    /* Hairline that adapts to whatever surface it sits on. */
+    --litera-hairline: color-mix(in srgb, var(--litera-text) 9%, transparent);
+    --litera-accent-soft: color-mix(in srgb, var(--litera-accent) 13%, transparent);
+    --litera-accent-line: color-mix(in srgb, var(--litera-accent) 34%, transparent);
+    /* A 1px lit top edge: the cheapest convincing cue that a surface is raised. */
+    --litera-highlight: inset 0 1px 0 0 color-mix(in srgb, white 5%, transparent);
+    --litera-shadow-sm: 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 55%, transparent);
+    --litera-shadow-md: 0 8px 20px -6px color-mix(in srgb, var(--litera-ink) 70%, transparent), 0 2px 5px -2px color-mix(in srgb, var(--litera-ink) 60%, transparent);
+    --litera-shadow-lg: 0 28px 64px -16px color-mix(in srgb, var(--litera-ink) 88%, transparent), 0 10px 24px -10px color-mix(in srgb, var(--litera-ink) 75%, transparent);
+    --litera-shadow-glow: 0 0 0 1px var(--litera-accent-line), 0 6px 22px -6px color-mix(in srgb, var(--litera-accent) 40%, transparent);
   }
   html, body, #root { height: 100%; }
-  html { background: var(--litera-bg); }
   html {
+    background: var(--litera-bg);
     font-size: var(--litera-font-size, 16px);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
   body {
-    font-family: var(--litera-font-sans, "Quicksand", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "kern";
+    font-family: var(--litera-font-sans);
     font-kerning: normal;
+    font-optical-sizing: auto;
     line-height: 1.55;
     background: var(--litera-bg);
     color: var(--litera-text);
@@ -151,53 +153,63 @@
   .litera-document h1,
   .litera-document h2,
   .litera-document h3 {
-    font-family: Georgia, Cambria, "Times New Roman", ui-serif, serif;
+    font-family: var(--litera-font-serif);
   }
   .font-serif {
-    font-family: inherit;
+    font-family: var(--litera-font-serif);
+    font-weight: 560;
+    letter-spacing: -0.006em;
   }
-  .font-mono, code, pre {
+  .font-mono, code, pre, kbd {
+    font-family: var(--litera-font-mono);
     font-variant-ligatures: none;
     font-variant-numeric: tabular-nums;
   }
   .rounded-lg {
-    border-radius: var(--litera-radius-lg, 14px) !important;
+    border-radius: var(--litera-radius-lg, 12px) !important;
   }
   .rounded-xl {
-    border-radius: var(--litera-radius-xl, 18px) !important;
+    border-radius: var(--litera-radius-xl, 16px) !important;
   }
   .rounded-2xl {
-    border-radius: 22px !important;
+    border-radius: 20px !important;
   }
   .tracking-tight {
     letter-spacing: 0 !important;
   }
-  code, pre, .font-mono {
-    font-feature-settings: "liga" 1, "calt" 1;
+  ::selection {
+    background: color-mix(in srgb, var(--litera-accent) 38%, transparent);
+    color: var(--litera-text);
   }
-  ::selection { background: color-mix(in srgb, var(--litera-accent) 35%, transparent); }
   button, a, input, select, textarea { font: inherit; }
   button, a { -webkit-tap-highlight-color: transparent; }
+  input[type="checkbox"], input[type="radio"], input[type="range"], progress {
+    accent-color: var(--litera-accent);
+  }
 
-  /* Slim cute rounded scrollbars */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--litera-border-strong) 50%, transparent);
+    background: color-mix(in srgb, var(--litera-text) 14%, transparent);
+    background-clip: content-box;
+    border: 3px solid transparent;
     border-radius: var(--litera-radius-full, 9999px);
-    transition: background 150ms var(--ease-out-quart);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--litera-accent) 70%, transparent);
+    background: color-mix(in srgb, var(--litera-text) 30%, transparent);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--litera-border-strong) 50%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--litera-text) 16%, transparent) transparent;
   }
 
   .litera-skip-link {
@@ -261,8 +273,8 @@
     to { opacity: 1; transform: translateX(0); }
   }
   @keyframes litera-scale-in {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from { opacity: 0; transform: scale(0.97) translateY(6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
   }
   @keyframes litera-shimmer {
     0% { background-position: -200% 0; }
@@ -275,122 +287,304 @@
 }
 
 @layer components {
+  /* ---- Surfaces ---------------------------------------------------- */
   .litera-panel {
-    @apply bg-litera-surface border border-litera-border rounded-[var(--litera-radius)];
-    box-shadow: var(--litera-shadow-sm);
+    border: 1px solid var(--litera-border);
+    border-radius: var(--litera-radius-lg);
+    background-color: var(--litera-surface-1);
+    box-shadow: var(--litera-highlight), var(--litera-shadow-sm);
   }
   .litera-overlay {
-    @apply litera-panel;
-    background: var(--litera-surface-3);
-    box-shadow: var(--litera-shadow-lg);
-    border-color: var(--litera-border-strong);
+    border: 1px solid var(--litera-border-strong);
+    border-radius: var(--litera-radius-lg);
+    background-color: var(--litera-surface-2);
+    box-shadow: var(--litera-highlight), var(--litera-shadow-lg);
   }
+  .litera-card {
+    @apply litera-panel p-4;
+    transition: border-color 160ms var(--ease-out-quart),
+                background-color 160ms var(--ease-out-quart),
+                box-shadow 160ms var(--ease-out-quart);
+  }
+  .litera-card:hover {
+    border-color: color-mix(in srgb, var(--litera-accent) 30%, var(--litera-border-strong));
+    background-color: color-mix(in srgb, var(--litera-surface-2) 55%, var(--litera-surface-1));
+    box-shadow: var(--litera-highlight), var(--litera-shadow-md);
+  }
+
+  /* ---- Buttons -----------------------------------------------------
+     Depth comes from box-shadow only: these classes are routinely combined
+     with `bg-*` utilities, which a background-image gradient would hide. */
   .litera-btn {
-    @apply inline-flex min-h-8 items-center justify-center gap-1.5 px-3 py-1 rounded-[var(--litera-radius)] text-sm
-           border border-litera-border bg-litera-surface hover:bg-litera-surface2
-           text-litera-text font-medium;
+    @apply inline-flex min-h-8 items-center justify-center gap-1.5 px-3 py-1 text-sm font-medium text-litera-text;
+    border: 1px solid var(--litera-border);
+    border-radius: var(--litera-radius);
+    background-color: var(--litera-surface-2);
+    box-shadow: var(--litera-highlight), var(--litera-shadow-sm);
     cursor: pointer;
-    transition: background-color 150ms var(--ease-out-quart),
-                border-color 150ms var(--ease-out-quart),
-                color 150ms var(--ease-out-quart),
-                transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 150ms var(--ease-out-quart);
+    user-select: none;
+    transition: background-color 140ms var(--ease-out-quart),
+                border-color 140ms var(--ease-out-quart),
+                color 140ms var(--ease-out-quart),
+                box-shadow 140ms var(--ease-out-quart),
+                transform 90ms var(--ease-out-quart);
   }
   .litera-btn:hover {
-    border-color: color-mix(in srgb, var(--litera-accent) 40%, var(--litera-border-strong));
-    transform: translateY(-1px);
+    border-color: var(--litera-border-strong);
+    background-color: var(--litera-surface-3);
   }
   .litera-btn:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
     box-shadow: none;
   }
   .litera-btn-primary {
-    @apply litera-btn border-transparent;
-    background: var(--litera-accent);
+    @apply inline-flex min-h-8 items-center justify-center gap-1.5 px-3 py-1 text-sm;
+    border: 1px solid transparent;
+    border-radius: var(--litera-radius);
+    background-color: var(--litera-accent);
     color: var(--litera-accent-contrast);
-    font-weight: 600;
-    box-shadow: 0 2px 10px -1px color-mix(in srgb, var(--litera-accent) 35%, transparent);
+    font-weight: 620;
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, white 32%, transparent),
+                inset 0 -1px 0 0 color-mix(in srgb, var(--litera-accent-contrast) 22%, transparent),
+                0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
+                0 6px 16px -6px color-mix(in srgb, var(--litera-accent) 55%, transparent);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 140ms var(--ease-out-quart),
+                box-shadow 140ms var(--ease-out-quart),
+                transform 90ms var(--ease-out-quart);
   }
   .litera-btn-primary:hover {
-    background: var(--litera-accent-strong);
-    border-color: transparent;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px 0 color-mix(in srgb, var(--litera-accent) 45%, transparent);
+    background-color: var(--litera-accent-strong);
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, white 38%, transparent),
+                inset 0 -1px 0 0 color-mix(in srgb, var(--litera-accent-contrast) 22%, transparent),
+                0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
+                0 8px 22px -6px color-mix(in srgb, var(--litera-accent) 70%, transparent);
   }
   .litera-btn-primary:active {
-    transform: scale(0.96);
-    box-shadow: 0 1px 4px 0 color-mix(in srgb, var(--litera-accent) 30%, transparent);
+    transform: scale(0.98);
+    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-accent-contrast) 30%, transparent);
   }
   .litera-btn:disabled,
-  .litera-btn-primary:disabled {
+  .litera-btn-primary:disabled,
+  .litera-btn[aria-disabled="true"],
+  .litera-btn-primary[aria-disabled="true"] {
     cursor: not-allowed;
-    opacity: 0.5;
+    opacity: 0.45;
     transform: none;
     box-shadow: none;
   }
+  .litera-icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center text-litera-mute;
+    border-radius: var(--litera-radius);
+    cursor: pointer;
+    transition: background-color 140ms var(--ease-out-quart),
+                color 140ms var(--ease-out-quart),
+                transform 90ms var(--ease-out-quart);
+  }
+  .litera-icon-btn:hover {
+    background-color: color-mix(in srgb, var(--litera-text) 8%, transparent);
+    color: var(--litera-text);
+  }
+  .litera-icon-btn:active {
+    transform: scale(0.94);
+  }
+  .litera-icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+    transform: none;
+  }
+
+  /* ---- Fields ------------------------------------------------------ */
   .litera-input {
-    @apply min-h-8 bg-litera-surface border border-litera-border rounded-[var(--litera-radius)] px-3 py-1.5
-           text-sm text-litera-text placeholder:text-litera-mute;
-    transition: border-color 150ms var(--ease-out-quart),
-                box-shadow 150ms var(--ease-out-quart),
-                background-color 150ms var(--ease-out-quart);
+    @apply min-h-8 px-3 py-1.5 text-sm text-litera-text placeholder:text-litera-subtle;
+    border: 1px solid var(--litera-border);
+    border-radius: var(--litera-radius);
+    /* A well: darker than whatever panel it sits in. */
+    background-color: color-mix(in srgb, var(--litera-ink) 45%, var(--litera-bg));
+    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent);
+    transition: border-color 140ms var(--ease-out-quart),
+                box-shadow 140ms var(--ease-out-quart),
+                background-color 140ms var(--ease-out-quart);
   }
   .litera-input:hover {
-    border-color: color-mix(in srgb, var(--litera-accent) 35%, var(--litera-border-strong));
+    border-color: var(--litera-border-strong);
   }
   .litera-input:disabled {
     cursor: not-allowed;
-    opacity: 0.55;
+    opacity: 0.5;
   }
   .litera-input:focus {
     outline: none;
     border-color: var(--litera-focus);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--litera-focus) 24%, transparent),
-                0 2px 8px color-mix(in srgb, var(--litera-focus) 15%, transparent);
+    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
+                0 0 0 3px color-mix(in srgb, var(--litera-focus) 22%, transparent);
   }
   .litera-btn:focus-visible,
   .litera-btn-primary:focus-visible,
-  .litera-input:focus-visible {
-    outline: 2px solid var(--litera-focus);
-    outline-offset: 2px;
-  }
-  .litera-icon-btn {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-[var(--litera-radius)] text-litera-mute;
-    cursor: pointer;
-    transition: background-color 150ms var(--ease-out-quart),
-                color 150ms var(--ease-out-quart),
-                transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .litera-icon-btn:hover {
-    @apply bg-litera-surface2 text-litera-text;
-    transform: scale(1.06);
-  }
-  .litera-icon-btn:active {
-    transform: scale(0.92);
-  }
   .litera-icon-btn:focus-visible {
     outline: 2px solid var(--litera-focus);
     outline-offset: 2px;
   }
-  .litera-icon-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-    transform: none;
-  }
+
+  /* ---- Labels and pills -------------------------------------------- */
   .litera-status {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
-    background: color-mix(in srgb, var(--litera-surface-2) 90%, var(--litera-accent) 10%);
+    background: color-mix(in srgb, var(--litera-text) 6%, transparent);
     color: var(--litera-text);
-    border: 1px solid color-mix(in srgb, var(--litera-border) 70%, transparent);
-  }
-  .litera-page-header {
-    @apply flex min-h-14 items-center justify-between gap-4 border-b border-litera-border px-5 py-3;
-    background: var(--litera-bg);
+    border: 1px solid var(--litera-hairline);
   }
   .litera-section-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.1em] text-litera-mute;
+    @apply text-[11px] font-semibold uppercase text-litera-subtle;
+    letter-spacing: 0.09em;
+  }
+  .litera-badge,
+  .litera-badge-success,
+  .litera-badge-warn {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+    --badge: var(--litera-accent);
+    background: color-mix(in srgb, var(--badge) 13%, transparent);
+    color: var(--badge);
+    border: 1px solid color-mix(in srgb, var(--badge) 26%, transparent);
+  }
+  .litera-badge-success { --badge: var(--litera-success); }
+  .litera-badge-warn { --badge: var(--litera-warn); }
+
+  /* ---- Page chrome -------------------------------------------------- */
+  .litera-page-header {
+    @apply relative flex min-h-[68px] items-center justify-between gap-4 px-6 py-3;
+    border-bottom: 1px solid var(--litera-border);
+    background-color: var(--litera-bg);
+    /* A breath of the accent in the top-left corner; opaque so sticky
+       headers still cover whatever scrolls beneath them. */
+    background-image: radial-gradient(120% 220% at 0% 0%, color-mix(in srgb, var(--litera-accent) 9%, transparent) 0%, transparent 58%);
+  }
+  .litera-page-title {
+    @apply flex min-w-0 items-center gap-3 text-litera-text;
+    font-size: 1.3125rem;
+    font-weight: 640;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+  }
+  /* Whatever icon a page passes becomes a tinted tile. */
+  .litera-page-title-icon {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center text-litera-accent;
+    border-radius: 10px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--litera-accent) 22%, transparent), color-mix(in srgb, var(--litera-accent) 7%, transparent));
+    box-shadow: inset 0 0 0 1px var(--litera-accent-line), var(--litera-highlight);
+  }
+  .litera-page-title-icon > svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+  .litera-toolbar {
+    @apply flex min-h-12 flex-wrap items-center gap-2 px-6 py-2;
+    border-bottom: 1px solid var(--litera-border);
+    background-color: var(--litera-bg);
   }
 
+  /* Segmented tabs: quiet until selected. */
+  .litera-tab {
+    @apply relative inline-flex min-h-8 items-center gap-1.5 px-3 py-1 text-sm font-medium text-litera-mute;
+    border: 1px solid transparent;
+    border-radius: var(--litera-radius);
+    cursor: pointer;
+    transition: background-color 140ms var(--ease-out-quart),
+                color 140ms var(--ease-out-quart),
+                border-color 140ms var(--ease-out-quart);
+  }
+  .litera-tab:hover {
+    background-color: color-mix(in srgb, var(--litera-text) 6%, transparent);
+    color: var(--litera-text);
+  }
+  .litera-tab[aria-selected="true"],
+  .litera-tab[aria-pressed="true"],
+  .litera-tab[data-active="true"] {
+    border-color: var(--litera-accent-line);
+    background-color: var(--litera-accent-soft);
+    color: var(--litera-accent-strong);
+    box-shadow: var(--litera-highlight);
+  }
+  .litera-tab:focus-visible {
+    outline: 2px solid var(--litera-focus);
+    outline-offset: 2px;
+  }
+
+  /* ---- App navigation ----------------------------------------------- */
+  .litera-sidebar {
+    border-right: 1px solid var(--litera-border);
+    background-color: var(--litera-paper);
+    background-image:
+      radial-gradient(140% 42% at 0% 0%, color-mix(in srgb, var(--litera-accent) 13%, transparent) 0%, transparent 70%),
+      linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--litera-ink) 45%, transparent) 100%);
+  }
+  .litera-wordmark {
+    font-family: var(--litera-font-serif);
+    font-size: 1.125rem;
+    font-weight: 640;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--litera-text);
+  }
+  .litera-nav-item {
+    @apply relative flex min-h-[34px] items-center gap-2.5 px-2.5 text-sm text-litera-mute;
+    border-radius: var(--litera-radius);
+    transition: background-color 140ms var(--ease-out-quart), color 140ms var(--ease-out-quart);
+  }
+  .litera-nav-item > svg {
+    color: var(--litera-text-subtle);
+    transition: color 140ms var(--ease-out-quart);
+  }
+  .litera-nav-item:hover {
+    background-color: color-mix(in srgb, var(--litera-text) 6%, transparent);
+    color: var(--litera-text);
+  }
+  .litera-nav-item:hover > svg {
+    color: var(--litera-text);
+  }
+  .litera-nav-item[aria-current="page"] {
+    background-color: var(--litera-accent-soft);
+    color: var(--litera-text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--litera-accent) 20%, transparent);
+  }
+  .litera-nav-item[aria-current="page"] > svg {
+    color: var(--litera-accent);
+  }
+  /* The marker sits in the gutter, outside the pill. */
+  .litera-nav-item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: -12px;
+    top: 7px;
+    bottom: 7px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--litera-accent);
+    box-shadow: 0 0 12px 0 color-mix(in srgb, var(--litera-accent) 70%, transparent);
+  }
+  .litera-nav-item:focus-visible {
+    outline: 2px solid var(--litera-focus);
+    outline-offset: 1px;
+  }
+  .litera-kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-medium text-litera-mute;
+    font-family: var(--litera-font-sans);
+    border: 1px solid var(--litera-border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--litera-text) 5%, transparent);
+  }
+
+  /* ---- Empty states ------------------------------------------------- */
+  .litera-empty-icon {
+    @apply inline-flex h-14 w-14 items-center justify-center text-litera-accent;
+    border-radius: 16px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--litera-accent) 20%, transparent), color-mix(in srgb, var(--litera-accent) 4%, transparent));
+    box-shadow: inset 0 0 0 1px var(--litera-accent-line), var(--litera-highlight), 0 14px 34px -14px color-mix(in srgb, var(--litera-accent) 60%, transparent);
+  }
+
+  /* ---- Motion ------------------------------------------------------- */
   .litera-fade-in {
     animation: litera-fade-in 200ms var(--ease-out-quart) both;
   }
@@ -398,89 +592,59 @@
     animation: litera-fade-out 140ms var(--ease-out-quart) both;
   }
   .litera-slide-up {
-    animation: litera-slide-up 200ms var(--ease-out-quart) both;
+    animation: litera-slide-up 220ms var(--ease-out-expo) both;
   }
   .litera-slide-down {
-    animation: litera-slide-down 200ms var(--ease-out-quart) both;
+    animation: litera-slide-down 220ms var(--ease-out-expo) both;
   }
   .litera-slide-in-right {
-    animation: litera-slide-in-right 220ms var(--ease-out-quart) both;
+    animation: litera-slide-in-right 260ms var(--ease-out-expo) both;
   }
   .litera-slide-in-left {
-    animation: litera-slide-in-left 220ms var(--ease-out-quart) both;
+    animation: litera-slide-in-left 260ms var(--ease-out-expo) both;
   }
   .litera-scale-in {
-    animation: litera-scale-in 180ms var(--ease-out-quart) both;
+    animation: litera-scale-in 220ms var(--ease-out-expo) both;
   }
   .litera-skeleton {
     @apply rounded;
     background: linear-gradient(
       90deg,
-      var(--litera-panel) 25%,
-      color-mix(in srgb, var(--litera-panel) 80%, var(--litera-line)) 50%,
-      var(--litera-panel) 75%
+      color-mix(in srgb, var(--litera-text) 5%, transparent) 25%,
+      color-mix(in srgb, var(--litera-text) 11%, transparent) 50%,
+      color-mix(in srgb, var(--litera-text) 5%, transparent) 75%
     );
     background-size: 200% 100%;
     animation: litera-shimmer 1.8s ease-in-out infinite;
   }
   .litera-stagger > * {
-    animation: litera-stagger-in 200ms var(--ease-out-quart) both;
+    animation: litera-stagger-in 260ms var(--ease-out-expo) both;
   }
   .litera-stagger > *:nth-child(1) { animation-delay: 0ms; }
-  .litera-stagger > *:nth-child(2) { animation-delay: 40ms; }
-  .litera-stagger > *:nth-child(3) { animation-delay: 80ms; }
-  .litera-stagger > *:nth-child(4) { animation-delay: 120ms; }
-  .litera-stagger > *:nth-child(5) { animation-delay: 160ms; }
-  .litera-stagger > *:nth-child(6) { animation-delay: 200ms; }
-  .litera-stagger > *:nth-child(7) { animation-delay: 240ms; }
-  .litera-stagger > *:nth-child(8) { animation-delay: 280ms; }
+  .litera-stagger > *:nth-child(2) { animation-delay: 35ms; }
+  .litera-stagger > *:nth-child(3) { animation-delay: 70ms; }
+  .litera-stagger > *:nth-child(4) { animation-delay: 105ms; }
+  .litera-stagger > *:nth-child(5) { animation-delay: 140ms; }
+  .litera-stagger > *:nth-child(6) { animation-delay: 175ms; }
+  .litera-stagger > *:nth-child(7) { animation-delay: 210ms; }
+  .litera-stagger > *:nth-child(8) { animation-delay: 245ms; }
 
   .litera-drawer-enter {
-    animation: litera-slide-in-right 220ms var(--ease-out-quart) both;
+    animation: litera-slide-in-right 260ms var(--ease-out-expo) both;
   }
   .litera-drawer-backdrop {
     animation: litera-fade-in 200ms var(--ease-out-quart) both;
   }
-
   .litera-modal-enter {
-    animation: litera-scale-in 200ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    animation: litera-scale-in 220ms var(--ease-out-expo) both;
   }
   .litera-modal-backdrop {
     animation: litera-fade-in 180ms var(--ease-out-quart) both;
   }
 
-  .litera-card {
-    @apply litera-panel p-4 transition-all duration-150;
-  }
-  .litera-card:hover {
-    border-color: color-mix(in srgb, var(--litera-accent) 35%, var(--litera-border-strong));
-    box-shadow: var(--litera-shadow-md);
-    transform: translateY(-1px);
-  }
-
-  .litera-badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
-    background: color-mix(in srgb, var(--litera-accent) 15%, transparent);
-    color: var(--litera-accent);
-    border: 1px solid color-mix(in srgb, var(--litera-accent) 25%, transparent);
-  }
-  .litera-badge-success {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
-    background: color-mix(in srgb, var(--litera-success) 15%, transparent);
-    color: var(--litera-success);
-    border: 1px solid color-mix(in srgb, var(--litera-success) 25%, transparent);
-  }
-  .litera-badge-warn {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
-    background: color-mix(in srgb, var(--litera-warn) 15%, transparent);
-    color: var(--litera-warn);
-    border: 1px solid color-mix(in srgb, var(--litera-warn) 25%, transparent);
-  }
-
   /* Page content: subtle fade+slide on route change */
   .litera-page-enter {
     animation: litera-fade-in 180ms var(--ease-out-quart) both,
-               litera-slide-up 200ms var(--ease-out-quart) both;
+               litera-slide-up 220ms var(--ease-out-expo) both;
   }
-
 }

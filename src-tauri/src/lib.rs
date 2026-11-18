@@ -17,6 +17,7 @@ mod mineru;
 pub mod mono_contracts;
 pub mod network_egress;
 mod plugin_host;
+mod reading_service;
 mod secret;
 mod startup;
 mod storage;
@@ -79,28 +80,45 @@ pub fn run() {
     diagnostics::init(backend_log_filter());
     diagnostics::install_panic_hook();
 
-    if let Err(e) = tauri::Builder::default()
+    let application = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_shell::init())
+        .manage(reading_service::ReadingService::default())
         .invoke_handler(commands::command_handlers!())
         .setup(|app| {
+            let resources = app
+                .path()
+                .resource_dir()
+                .map_err(|error| {
+                    tracing::warn!(%error, "optional startup task failed: locate bundled manuals");
+                })
+                .ok();
             let state =
-                tauri::async_runtime::block_on(startup::bootstrap_state()).map_err(|e| {
-                    diagnostics::write_fatal(&format!("bootstrap failed: {e}"));
-                    Box::<dyn std::error::Error>::from(e)
-                })?;
+                tauri::async_runtime::block_on(startup::bootstrap_state(resources.as_deref()))
+                    .map_err(|e| {
+                        diagnostics::write_fatal(&format!("bootstrap failed: {e}"));
+                        Box::<dyn std::error::Error>::from(e)
+                    })?;
             app.manage(state);
             tracing::info!("LitFolio backend booted");
             Ok(())
         })
-        .run(tauri::generate_context!())
-    {
-        diagnostics::write_fatal(&format!("error while running litfolio: {e}"));
-        std::process::exit(1);
-    }
+        .build(tauri::generate_context!())
+        .unwrap_or_else(|e| {
+            diagnostics::write_fatal(&format!("error while building litfolio: {e}"));
+            std::process::exit(1);
+        });
+    application.run(|app, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            tauri::async_runtime::block_on(
+                app.state::<reading_service::ReadingService>().stop(),
+            );
+        }
+    });
 }
 
 // Unit tests exercise backend modules and should not require the frontend bundle

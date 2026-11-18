@@ -12,6 +12,7 @@ import { SimilarPapersPanel } from "./SimilarPapersPanel";
 import { DoiEnrichRow } from "./DoiEnrichRow";
 import { CustomFieldsSection } from "./PaperCustomFieldsSection";
 import { PaperSupplementsSection } from "./PaperSupplementsSection";
+import { PaperHostMeta } from "./PaperHostMeta";
 import { CopyCitationDropdown } from "./CopyCitationDropdown";
 import { zoteroErrorMessage } from "@/lib/zoteroError";
 
@@ -148,6 +149,7 @@ export function PaperDetailDrawer({
           {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
           {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
           {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
+          <PaperHostMeta paper={paper} onDeleted={onClose} />
           <PaperSupplementsSection paperId={paper.id} />
           <CustomFieldsSection paperId={paper.id} />
           {zoteroPush.error && <div className="text-sm text-litera-error">✕ {zoteroErrorMessage(zoteroPush.error, t)}</div>}

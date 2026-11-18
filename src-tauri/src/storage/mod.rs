@@ -30,6 +30,8 @@ mod pdf_notes;
 mod plugin_state;
 mod provenance;
 pub mod queue;
+pub mod reading_catalog;
+pub(crate) mod reading_document;
 pub mod retrieval;
 pub mod smart_collections;
 mod tags;
@@ -74,6 +76,7 @@ pub use provenance::{
     PROVENANCE_TARGET_VERSION,
 };
 pub use queue::{QueueEntry, QueueRepo};
+pub use reading_catalog::{project_reading_catalog, CatalogReadStatus, ReadingCatalogItem};
 pub use retrieval::{unified_search, UnifiedSearchResult};
 pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};
 pub use tags::{TagRepo, TagWithCount};

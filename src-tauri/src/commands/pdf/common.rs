@@ -12,7 +12,7 @@ pub struct PdfImportSummary {
     pub failed: Vec<PdfFailure>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct PdfFailure {
     pub path: String,
     pub error: String,

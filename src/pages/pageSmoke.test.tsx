@@ -38,14 +38,14 @@ describe("page smoke render", () => {
     expect(renderPage(<LibraryPage />, "/library")).toContain("文献库");
   });
 
-  it("renders the import shell", () => {
-    expect(renderPage(<ImportPage />, "/import")).toContain("导入");
+  it("hands the import route to the reading service frame", () => {
+    expect(renderPage(<ImportPage />, "/import")).toContain("正在打开阅读服务");
   });
 
-  it("opens the arXiv / DOI import tab for feed-item imports", () => {
-    expect(
-      renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import")
-    ).toContain("第 1 步");
+  it("bands a feed-item import above the reading service frame", () => {
+    const html = renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import");
+    expect(html).toContain("来自 RSS 订阅");
+    expect(html).toContain("正在打开阅读服务");
   });
 
   it("renders the DOI import route with a prefilled DOI", () => {

@@ -101,6 +101,8 @@ jobs:
             bundles: "--bundles nsis,msi"
 
     runs-on: ${{ matrix.platform }}
+    env:
+      LITFOLIO_PROFILE: all
 
     steps:
       - name: Checkout
@@ -138,14 +140,30 @@ jobs:
             libfuse2t64 \
             libssl-dev
 
+      # The sidecar is a frozen interpreter, so PyInstaller has to run on the target
+      # platform: this job builds it on its own runner before tauri-action compiles and
+      # bundles the app. Leaving it out fails the Tauri build, which copies
+      # `src-tauri/binaries/easyread-backend-<triple>` as an external binary.
+      - name: Setup EasyRead Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install EasyRead backend dependencies
+        run: python -m pip install pyinstaller ./vendor/easyread
+
       - name: Clean EasyRead build artifacts
+        shell: bash
         run: rm -rf vendor/easyread/build vendor/easyread/easyread.egg-info
+
+      - name: Build EasyRead sidecar
+        run: node scripts/build-easyread-sidecar.mjs --force
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-
       - name: Build signed updater artifacts and publish release
-        uses: tauri-apps/tauri-action@v0.15.0
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

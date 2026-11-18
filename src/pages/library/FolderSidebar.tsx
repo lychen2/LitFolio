@@ -9,7 +9,7 @@ import { SmartCollectionList } from "./SmartCollectionList";
 import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 
 export function FolderSidebar({
-  selectedId, onSelect, selectedSmartId, onSelectSmart, compactOpen, onClose,
+  selectedId, onSelect, selectedSmartId, onSelectSmart, compactOpen, onClose, embedded = false,
 }: {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
@@ -17,6 +17,8 @@ export function FolderSidebar({
   onSelectSmart: (id: number | null) => void;
   compactOpen: boolean;
   onClose: () => void;
+  /** Renders inside a host drawer that already carries the title and close button. */
+  embedded?: boolean;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -67,21 +69,32 @@ export function FolderSidebar({
   });
   const [editorOpen, setEditorOpen] = useState(false);
 
-  if (isCompact && !compactOpen) return null;
+  if (!embedded && isCompact && !compactOpen) return null;
 
   return (
     <aside
-      className={`w-[240px] shrink-0 overflow-auto border-r border-litera-border bg-litera-paper/35 transition-transform duration-200 max-[1024px]:w-[205px] max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[260px] max-[900px]:bg-litera-paper max-[900px]:shadow-2xl ${compactOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full"}`}
+      className={
+        embedded
+          ? "h-full overflow-auto"
+          : `w-[240px] shrink-0 overflow-auto border-r border-litera-border bg-litera-paper/35 transition-transform duration-200 max-[1024px]:w-[205px] max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[260px] max-[900px]:bg-litera-paper max-[900px]:shadow-2xl ${compactOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full"}`
+      }
     >
-      <div className="flex items-center justify-between gap-2 border-b border-litera-border px-3 py-3">
-        <div className="litera-section-label">{t("folders.title")}</div>
-        <div className="flex items-center gap-1">
-          <CreateButton parentId={null} create={create} variant="header" />
-          <button type="button" onClick={onClose} className="litera-icon-btn hidden h-7 w-7 max-[900px]:inline-flex" aria-label={t("common.close")} title={t("common.close")}>
-            <X className="h-3.5 w-3.5" />
-          </button>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-2 border-b border-litera-border px-3 py-3">
+          <div className="litera-section-label">{t("folders.title")}</div>
+          <div className="flex items-center gap-1">
+            <CreateButton parentId={null} create={create} variant="header" />
+            <button type="button" onClick={onClose} className="litera-icon-btn hidden h-7 w-7 max-[900px]:inline-flex" aria-label={t("common.close")} title={t("common.close")}>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-end border-b border-litera-border px-3 py-2">
+          <CreateButton parentId={null} create={create} variant="header" />
+        </div>
+      )}
       <nav className="p-2 flex-1">
         <FolderButton
           active={selectedId == null}

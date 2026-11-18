@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, Loader2, X } from "lucide-react";
 import { api, type Folder as FolderType } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import { FolderAddPopover } from "./FolderAddPopover";
 
 /// Folder picker for a single paper.
@@ -91,4 +92,5 @@ function invalidate(qc: ReturnType<typeof useQueryClient>, paperId: string) {
   qc.invalidateQueries({ queryKey: ["paper-folders", paperId] });
   qc.invalidateQueries({ queryKey: ["folders"] });
   qc.invalidateQueries({ queryKey: ["papers"] });
+  notifyLibraryChanged();
 }

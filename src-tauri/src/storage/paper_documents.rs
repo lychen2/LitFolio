@@ -40,7 +40,9 @@ impl<'a> PaperDocumentRepo<'a> {
                 updated_at = excluded.updated_at,
                 index_status = 'indexed',
                 index_error = NULL,
-                indexed_at = excluded.indexed_at",
+                indexed_at = excluded.indexed_at
+             WHERE paper_documents.markdown != excluded.markdown
+                OR paper_documents.index_status != 'indexed'",
         )
         .bind(paper_id)
         .bind(markdown)

@@ -4,7 +4,7 @@ import { useTheme } from "./ThemeProvider";
 import type { ThemeId, FontId, FontSizeId } from "@/lib/theme";
 
 const THEMES: Array<{ id: ThemeId; labelKey: "theme.violet" | "theme.warm" | "theme.blueprint"; hintKey: "theme.violetHint" | "theme.warmHint" | "theme.blueprintHint"; swatches: string[] }> = [
-  { id: "violet", labelKey: "theme.violet", hintKey: "theme.violetHint", swatches: ["#cba6f7", "#89dceb", "#201e30"] },
+  { id: "violet", labelKey: "theme.violet", hintKey: "theme.violetHint", swatches: ["#cba6f7", "#89dceb", "#1c1d21"] },
   { id: "warm", labelKey: "theme.warm", hintKey: "theme.warmHint", swatches: ["#fab387", "#94e2d5", "#2b231e"] },
   { id: "blueprint", labelKey: "theme.blueprint", hintKey: "theme.blueprintHint", swatches: ["#74c7ec", "#89dceb", "#1d2537"] },
 ];

@@ -1,12 +1,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 use ulid::Ulid;
 
 use super::common::generate_and_index_pdf_markdown_or_warn;
 use crate::bibtex::generate_bibtex;
 use crate::ingest::PaperDraft;
+use crate::reading_service::ReadingService;
 use crate::storage::{Paper, PaperRepo};
 use crate::AppState;
 
@@ -76,6 +77,8 @@ async fn paper_save_with_pdf_inner(
 
 #[tauri::command]
 pub async fn paper_attach_pdf(
+    app: AppHandle,
+    service: State<'_, ReadingService>,
     state: State<'_, Arc<AppState>>,
     id: String,
     source_pdf_path: String,
@@ -97,6 +100,8 @@ pub async fn paper_attach_pdf(
     repo.update_pdf_path(&id, &dest_str)
         .await
         .map_err(|e| e.to_string())?;
+    service.refresh_pdf(&app, &state, &id)
+        .await.map_err(|e| format!("{e:#}"))?;
     generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &id, &dest)
         .await;
     repo.get(&id)

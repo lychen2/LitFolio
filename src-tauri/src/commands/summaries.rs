@@ -21,16 +21,9 @@ use crate::AppState;
 
 pub(crate) use crate::commands::ai_dispatch::run_reading_dispatch;
 
-/// Resolve body text to send to the LLM for TLDR / QuickRead. Three tiers:
-/// 1. `document.md` cache populated by pdfjs in the reader (highest quality);
-/// 2. on-the-fly lopdf extraction from the original PDF (cached back to
-///    document.md so the next call hits tier 1) — needed because users
-///    summarize papers they have not yet opened;
-/// 3. None — caller falls back to abstract-only behaviour.
-///
-/// lopdf is meaningfully weaker than pdfjs on academic PDFs with subset
-/// fonts; we accept that downgrade in exchange for not requiring the user
-/// to manually open every paper in the reader before requesting a summary.
+/// Resolve TLDR / QuickRead input from prepared reader originals, then retained
+/// document caches. Unopened papers use local lopdf extraction, cached into
+/// `document.md`; papers without readable body text use abstract-only input.
 pub(crate) async fn load_or_extract_pdf_body(
     paths: &LibraryPaths,
     paper_id: &str,

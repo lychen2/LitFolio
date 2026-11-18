@@ -1,86 +1,138 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Frame, type Page } from "@playwright/test";
 
-test("reads local source, explicitly generates a translation, and compares the PDF", async ({ page }, testInfo) => {
+/**
+ * The reader route renders the hosted EasyRead page from a loopback service the
+ * Rust side spawns. The browser harness has no Rust side, so the reading-service
+ * mock answers with a fixed loopback origin and this spec serves that origin
+ * itself. What is under test is the host contract: what the frame is asked to
+ * load, what the host publishes into it, and what the host does with the
+ * messages it sends back.
+ */
+const SERVICE_ORIGIN = "http://127.0.0.1:9";
+
+const HOST_PAGE = `<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>LitFolio</title></head>
+<body>
+<p id="upstream">Upstream reader fixture</p>
+<script>
+  window.__hostMessages = [];
+  window.addEventListener("message", (event) => { window.__hostMessages.push(event.data); });
+  window.__emit = (message) => parent.postMessage(
+    Object.assign({ source: "litfolio-easyread" }, message), "*");
+</script>
+</body>
+</html>`;
+
+async function serveHostPage(page: Page) {
+  await page.route(`${SERVICE_ORIGIN}/**`, (route) =>
+    route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: HOST_PAGE }),
+  );
+}
+
+function readerFrame(page: Page): Frame {
+  const frame = page.frames().find((candidate) => candidate.url().startsWith(`${SERVICE_ORIGIN}/read/`));
+  if (!frame) throw new Error("reader frame is not loaded");
+  return frame;
+}
+
+async function openReader(page: Page, paperId: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.addInitScript(() => {
-    localStorage.setItem("litfolio.lang", "en");
-    localStorage.setItem("litera.onboarding.completed", "1");
+    window.localStorage.setItem("litfolio.lang", "en");
+    window.localStorage.setItem("litera.onboarding.completed", "1");
+    window.localStorage.setItem("litera.reader.onboarded", "1");
   });
-  await page.goto("/reader/paper-reader");
-  const onboarding = page.getByRole("dialog", { name: "Reading workspace" });
-  await onboarding.getByRole("button", { name: "Got it" }).click();
+  await serveHostPage(page);
+  await page.goto(`/reader/${paperId}`);
+  await expect(page.locator(`iframe[src="${SERVICE_ORIGIN}/read/${paperId}"]`)).toBeVisible();
+  await expect.poll(async () => {
+    const frame = page.frames().find((candidate) => candidate.url().startsWith(`${SERVICE_ORIGIN}/read/`));
+    return frame ? await frame.textContent("#upstream") : null;
+  }).toBe("Upstream reader fixture");
+}
 
-  await expect(page.getByText("The original paragraph remains readable offline.")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("reader-source.png") });
+test("hosts the upstream reader page in the document column and publishes host state into it", async ({ page }, testInfo) => {
+  await openReader(page, "paper-reader");
 
-  await page.getByRole("button", { name: "Generate full translation" }).click();
-  await expect(page.getByText("The translated paragraph can be compared with the original.")).toBeVisible();
-  await page.getByRole("button", { name: "Side by side", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Original" }).getByText("The original paragraph remains readable offline.")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Translation" }).getByText("The translated paragraph can be compared with the original.")).toBeVisible();
-  await page.getByRole("button", { name: "Original", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Reader Comparison Fixture" })).toBeVisible();
+
+  // The host publishes its own theme tokens and its own interface language;
+  // the framed page keeps upstream's dictionary and adopts the language.
+  await expect.poll(async () =>
+    readerFrame(page).evaluate(() => {
+      const received = (window as unknown as { __hostMessages: Array<{ type?: string; tokens?: Record<string, string>; lang?: string }> }).__hostMessages;
+      return {
+        theme: received.some((message) => message.type === "theme" && message.tokens?.["accent"] !== undefined),
+        locale: received.find((message) => message.type === "locale")?.lang ?? null,
+      };
+    }),
+  ).toEqual({ theme: true, locale: "en" });
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
+  await page.screenshot({ path: testInfo.outputPath("reader-hosted-frame.png") });
+});
+
+test("follows host navigation sent from the framed reader", async ({ page }) => {
+  await openReader(page, "paper-reader");
+
+  await readerFrame(page).evaluate(() =>
+    (window as unknown as { __emit: (message: unknown) => void }).__emit({
+      type: "navigate",
+      path: "/read/paper-cached",
+    }),
+  );
+  await expect(page).toHaveURL(/\/reader\/paper-cached$/);
+
+  await openReader(page, "paper-reader");
+  await readerFrame(page).evaluate(() =>
+    (window as unknown as { __emit: (message: unknown) => void }).__emit({ type: "navigate", path: "/settings" }),
+  );
+  await expect(page).toHaveURL(/\/settings\?tab=profiles$/);
+});
+
+test("opens LitFolio extension tools beside the reader and reads an earlier cached translation", async ({ page }) => {
+  await openReader(page, "paper-cached");
+
+  const tabs = page.getByRole("tablist", { name: "LitFolio extension tools" });
+  await expect(tabs).toBeHidden();
+  await page.getByRole("button", { name: "Toggle extension tools" }).click();
+  await expect(tabs).toBeVisible();
+
+  // The cached-translation tab exists only for a paper that has one stored.
+  await page.getByRole("tab", { name: "Earlier full-text translation" }).click();
+  await expect(page.getByText("The saved translation appears without another model call.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Source text", exact: true }).click();
   await expect(page.getByText("The original paragraph remains readable offline.")).toBeVisible();
-  await page.getByRole("button", { name: "Page 2" }).click();
-  const secondPage = page.locator(".pdfViewer .page[data-page-number='2']");
-  await expect(secondPage).toBeVisible();
-  await expect.poll(() => secondPage.evaluate((element) => {
-    const viewer = element.closest(".pdfViewer")?.parentElement;
-    return viewer?.scrollTop ?? 0;
-  })).toBeGreaterThan(0);
-  await page.screenshot({ path: testInfo.outputPath("reader-pdf-comparison.png") });
-  await page.getByRole("button", { name: "Collapse / expand notes panel" }).click();
-  await expect(page.getByText("Reading Card", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "PDF source", exact: true }).first().click();
-  await expect(page.locator(".pdfViewer .page").first()).toBeVisible();
-  await page.getByRole("button", { name: "Native reading", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Original", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("The original paragraph remains readable offline.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Translation", exact: true })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("keeps the extension panel reachable without a stored translation", async ({ page }) => {
+  await openReader(page, "paper-reader");
+
+  await page.getByRole("button", { name: "Toggle extension tools" }).click();
+  const tabs = page.getByRole("tablist", { name: "LitFolio extension tools" });
+  await expect(tabs).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Reading Card" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Earlier full-text translation" })).toHaveCount(0);
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
 });
 
-test("keeps bilingual text and PDF controls usable in the compact reader", async ({ page }) => {
-  await page.setViewportSize({ width: 960, height: 720 });
-  await page.addInitScript(() => {
-    localStorage.setItem("litfolio.lang", "en");
-    localStorage.setItem("litera.onboarding.completed", "1");
-  });
-  await page.goto("/reader/paper-reader");
-  await page.getByRole("dialog", { name: "Reading workspace" }).getByRole("button", { name: "Got it" }).click();
-  await expect(page.getByText("The original paragraph remains readable offline.")).toBeVisible();
-  await page.getByRole("button", { name: "Generate full translation" }).click();
-  await page.getByRole("button", { name: "Side by side", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Original" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Translation" })).toBeVisible();
-  await page.getByRole("button", { name: "Compare with PDF", exact: true }).click();
-  await expect(page.locator(".pdfViewer .page[data-page-number='1']")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(961);
-});
-
-test("shows Chinese reading controls and opens source page two", async ({ page }, testInfo) => {
+test("describes the hosted reader and its extension panel on first entry", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.addInitScript(() => {
-    localStorage.setItem("litfolio.lang", "zh");
-    localStorage.setItem("litera.onboarding.completed", "1");
+    window.localStorage.setItem("litfolio.lang", "en");
+    window.localStorage.setItem("litera.onboarding.completed", "1");
   });
+  await serveHostPage(page);
   await page.goto("/reader/paper-reader");
-  await page.getByRole("dialog", { name: "阅读工作区" }).getByRole("button", { name: "知道了" }).click();
-  await expect(page.getByRole("button", { name: "原文", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.screenshot({ path: testInfo.outputPath("reader-source-zh.png") });
-  await page.getByRole("button", { name: "第 2 页" }).click();
-  await expect(page.locator(".pdfViewer .page[data-page-number='2']")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("reader-pdf-comparison-zh.png") });
-});
 
-test("opens a cached translation without making a model request", async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("litfolio.lang", "en");
-    localStorage.setItem("litera.onboarding.completed", "1");
-  });
-  await page.goto("/reader/paper-cached");
-  await page.getByRole("dialog", { name: "Reading workspace" }).getByRole("button", { name: "Got it" }).click();
-  await expect(page.getByText("The saved translation appears without another model call.")).toBeVisible();
-  await expect(page.getByText("Cached English translation")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Translation", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Original", exact: true }).click();
-  await expect(page.getByText("The original paragraph remains readable offline.")).toBeVisible();
+  const onboarding = page.getByRole("dialog", { name: "Reading workspace" });
+  await expect(onboarding).toBeVisible();
+  await expect(onboarding).toContainText("extension panel");
+  await expect(onboarding).not.toContainText("bilingual");
+  await onboarding.getByRole("button", { name: "Got it" }).click();
+  await expect(onboarding).toBeHidden();
 });

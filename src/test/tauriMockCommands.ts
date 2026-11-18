@@ -8,11 +8,22 @@ import type {
   QuickReadResult,
 } from "@/lib/api";
 import type { SyncPreviewReport, SyncReport } from "@/lib/syncApi";
-import { selectedManifests } from "@/host/generatedProfileRegistry";
+import { pluginRegistry } from "@/host/profileRegistry";
 import { parseLlmConfig } from "@/lib/apiSchema";
 import { field, object } from "@/lib/apiSchemaCore";
 
 const now = 1_779_999_999;
+
+/**
+ * The browser harness has no Rust side, so the reader frame points at a
+ * loopback origin the Playwright spec serves. Any other port would be a real
+ * listener on the developer machine, so the fixture stays on the discard port.
+ */
+const READING_SERVICE_ORIGIN = "http://127.0.0.1:9";
+
+function readingServiceUrl(paperId: string): string {
+  return paperId ? `${READING_SERVICE_ORIGIN}/read/${paperId}` : `${READING_SERVICE_ORIGIN}/`;
+}
 
 export const mockPaper: Paper = {
   id: "paper-1",
@@ -221,7 +232,7 @@ const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
   ["plugin_host_list", () =>
     ["discovery-feeds", "candidate-inbox", "library-ask", "knowledge-graph"].map((id, i) => ({
-      manifest: selectedManifests.find((m) => m.id === id),
+      manifest: pluginRegistry.find((manifest) => manifest.id === id),
       enabled: true,
       generation: i + 1,
     })).filter((e) => e.manifest != null),
@@ -388,7 +399,7 @@ const commandFixtures = new Map<string, MockResolver>([
   ["ask_session_latest", () => mockAskSession],
   ["ask_session_save", () => mockAskSession],
   ["llm_get_config", () => mockLlmConfig],
-  ["llm_save_config", () => null],
+  ["reading_service_sync", () => null],
   ["llm_test", () => ({ ok: true, model: "mock-model", reply: "pong" })],
   ["llm_list_models", () => []],
   ["llm_pull_model", () => "Model pulled successfully"],
@@ -397,6 +408,11 @@ const commandFixtures = new Map<string, MockResolver>([
 export const registeredMockCommands = [...commandFixtures.keys()].sort();
 
 export function invokeMockCommand<T = unknown>(command: string, args?: unknown): T {
+  if (command === "reading_service_open") {
+    const input = object(args, "reading_service_open");
+    const id = input.id;
+    return { url: readingServiceUrl(typeof id === "string" ? id : "") } as T;
+  }
   if (command === "paper_get") {
     const input = object(args, "paper_get");
     const id = field(input, "id", "paper_get");
@@ -415,6 +431,7 @@ export function invokeMockCommand<T = unknown>(command: string, args?: unknown):
   if (command === "llm_save_config") {
     const input = object(args, "llm_save_config");
     Object.assign(mockLlmConfig, parseLlmConfig(field(input, "config", "llm_save_config")));
+    return undefined as T;
   }
   const resolver = commandFixtures.get(command);
   if (!resolver) {

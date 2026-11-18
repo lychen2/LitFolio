@@ -102,15 +102,15 @@ impl LibraryPaths {
     pub fn pdf_text_file(&self, paper_id: &str) -> PathBuf {
         self.paper_dir(paper_id).join("text.txt")
     }
-    /// Read cached body content for a paper. Returns None when the file is
-    /// missing, unreadable, or only whitespace — i.e. anything the
-    /// summarizer should treat as "no body available".
+    /// Read the canonical reader's original blocks, falling back to existing
+    /// extraction caches when a paper has not been prepared in the reader.
     pub fn read_pdf_text(&self, paper_id: &str) -> Option<String> {
         self.read_paper_markdown(paper_id)
             .or_else(|| self.read_legacy_pdf_text(paper_id))
     }
     pub fn read_paper_markdown(&self, paper_id: &str) -> Option<String> {
-        read_non_empty_file(self.paper_markdown_file(paper_id))
+        super::reading_document::read_original(self, paper_id)
+            .or_else(|| read_non_empty_file(self.paper_markdown_file(paper_id)))
     }
     pub(crate) fn read_translated_paper_markdown_cache(
         &self,
@@ -125,7 +125,13 @@ impl LibraryPaths {
             return None;
         }
         if meta.source_sha256 != markdown_sha256(source_markdown) {
-            return None;
+            // Reader preparation replaces the AI input, not the earlier source
+            // document. Its matching translation remains a readable archive.
+            let legacy = read_non_empty_file(self.paper_markdown_file(paper_id))
+                .or_else(|| self.read_legacy_pdf_text(paper_id))?;
+            if meta.source_sha256 != markdown_sha256(&legacy) {
+                return None;
+            }
         }
         let markdown =
             read_non_empty_file(self.translated_paper_markdown_file(paper_id, target_lang))?;
@@ -454,6 +460,27 @@ mod tests {
             })
         );
         fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn translated_markdown_remains_readable_after_reader_preparation() {
+        let tmp = std::env::temp_dir().join(format!("litera-mdtranslate-{}", ulid::Ulid::new()));
+        let paths = LibraryPaths::new(&tmp);
+        paths.ensure().unwrap();
+        paths.write_paper_markdown("abc", "Earlier extraction").unwrap();
+        paths.write_translated_paper_markdown(
+            "abc", "Chinese", "Earlier translation", "Earlier extraction", "model", 123,
+        ).unwrap();
+        let workspace = tmp.join("reading/abc");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::write(workspace.join("paper.json"),
+            r#"{"blocks":[{"type":"para","en":"Prepared original"}]}"#).unwrap();
+
+        let source = paths.read_pdf_text("abc").unwrap();
+        assert!(source.contains("Prepared original"));
+        let cached = paths.read_translated_paper_markdown_cache("abc", "Chinese", &source);
+        assert_eq!(cached.map(|cache| cache.markdown), Some("Earlier translation".to_string()));
+        fs::remove_dir_all(tmp).unwrap();
     }
 
     #[test]

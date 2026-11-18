@@ -1,3 +1,8 @@
+// Theme colors are CSS variables holding complete colors (oklch), so Tailwind
+// cannot inject an alpha channel on its own. Routing them through color-mix
+// makes opacity modifiers such as `bg-litera-accent/15` produce real output.
+const token = (name) => `color-mix(in srgb, var(--litera-${name}) calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -6,44 +11,34 @@ export default {
     extend: {
       colors: {
         litera: {
-          ink: "var(--litera-ink)",
-          bg: "var(--litera-bg)",
-          paper: "var(--litera-paper)",
-          panel: "var(--litera-panel)",
-          surface: "var(--litera-surface-1)",
-          surface2: "var(--litera-surface-2)",
-          surface3: "var(--litera-surface-3)",
-          line: "var(--litera-line)",
-          border: "var(--litera-border)",
-          "border-strong": "var(--litera-border-strong)",
-          focus: "var(--litera-focus)",
-          mute: "var(--litera-mute)",
-          text: "var(--litera-text)",
-          subtle: "var(--litera-text-subtle)",
-          accent: "var(--litera-accent)",
-          accent2: "var(--litera-accent2)",
-          info: "var(--litera-info)",
-          success: "var(--litera-success)",
-          warn: "var(--litera-warn)",
-          error: "var(--litera-error)",
+          ink: token("ink"),
+          bg: token("bg"),
+          paper: token("paper"),
+          panel: token("panel"),
+          surface: token("surface-1"),
+          surface2: token("surface-2"),
+          surface3: token("surface-3"),
+          line: token("line"),
+          border: token("border"),
+          "border-strong": token("border-strong"),
+          focus: token("focus"),
+          mute: token("mute"),
+          text: token("text"),
+          subtle: token("text-subtle"),
+          accent: token("accent"),
+          "accent-strong": token("accent-strong"),
+          "accent-contrast": token("accent-contrast"),
+          accent2: token("accent2"),
+          info: token("info"),
+          success: token("success"),
+          warn: token("warn"),
+          error: token("error"),
         },
       },
       fontFamily: {
-        sans: [
-          "Quicksand",
-          "Nunito",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          "PingFang SC",
-          "Hiragino Sans GB",
-          "Microsoft YaHei",
-          "Noto Sans SC",
-          "system-ui",
-          "sans-serif",
-        ],
-        mono: ["SFMono-Regular", "Cascadia Code", "Liberation Mono", "ui-monospace", "monospace"],
-        serif: ["Georgia", "Cambria", "Times New Roman", "ui-serif", "serif"],
+        sans: ["var(--litera-font-sans)"],
+        serif: ["var(--litera-font-serif)"],
+        mono: ["var(--litera-font-mono)"],
       },
       fontSize: {
         "display": ["2rem", { lineHeight: "1.2", letterSpacing: "0", fontWeight: "600" }],

@@ -1,27 +1,35 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ArrowLeft, AlertTriangle, BookOpenText, ClipboardCopy, Columns2, FileText, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
-import { PanelGroup, Panel, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
+import { AlertTriangle, ArrowLeft, BookMarked, Columns2, FileText, Highlighter, Languages, NotebookPen, Orbit, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { libraryClient, type Paper } from "@/core/data";
 import { useT } from "@/i18n/I18nProvider";
 import { useNarrowLayout } from "@/hooks/useNarrowLayout";
+import { cn } from "@/lib/cn";
+import type { TKey } from "@/i18n/dict";
 import { HighlightList } from "@/pages/reader/HighlightList";
+import { LegacyTranslationPane, useLegacyTranslation, type LegacyTranslationState } from "@/pages/reader/LegacyTranslationPane";
 import { PdfPane } from "@/pages/reader/PdfPane";
-import { ReaderWorkspacePane, type ReaderWorkspaceTab } from "@/pages/reader/ReaderWorkspacePane";
+import { NoteSectionsPane } from "@/pages/reader/NoteSectionsPane";
+import { SelectionTranslatePane } from "@/pages/reader/SelectionTranslatePane";
+import { TermsPane } from "@/pages/reader/TermsPane";
 import { ReaderOnboarding } from "@/pages/reader/ReaderOnboarding";
 import { MessageScreen } from "@/pages/reader/ReaderMessageScreen";
 import { HelpPanel } from "@/pages/reader/HelpPanel";
-import { TranslatedMarkdownPane } from "@/pages/reader/TranslatedMarkdownPane";
-import { resolveHighlightJump, type ReaderMainMode } from "@/pages/reader/readerState";
-import { READER_COMPACT_TITLE_CLASS } from "@/pages/reader/readerLayout";
+import type { Highlight } from "@/lib/api";
+import type { ReadingHostAction } from "@/lib/apiReadingService";
+import { useLibraryHostActions } from "@/pages/library/LibraryHostActions";
+import { EasyReadFrame } from "./EasyReadFrame";
 
 /**
- * Paper-first reader with PDF comparison, annotations, and split-paper view.
+ * Reader route. The main column is the upstream EasyRead reader page, which
+ * owns reading, layout, translation, its own annotations and figure handling.
+ * LitFolio's tools (reading card, highlight list, terms, selection
+ * translation, PDF region notes, earlier full-text translations) sit in one
+ * panel beside it.
  *
- *   [highlights]  ║  [paper text / PDF]  ║  [PDF comparison / notes]
- *
- * Keep the existing PDF viewer for highlights and page-bound annotations.
+ * `?split=<paperId>` keeps two papers side by side, each with its own tools.
  */
 export function ReaderAssembly() {
   const t = useT();
@@ -34,8 +42,9 @@ export function ReaderAssembly() {
   }, [setSearchParams]);
 
   const closeSplit = useCallback(() => {
-    searchParams.delete("split");
-    setSearchParams(searchParams, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    next.delete("split");
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   if (!paperId) {
@@ -57,13 +66,13 @@ export function ReaderAssembly() {
         <div className="flex-1 min-h-0">
           <PanelGroup direction="horizontal">
             <Panel defaultSize={50} minSize={30}>
-              <ReaderSinglePane paperId={paperId} compact />
+              <ReaderPane paperId={paperId} compact />
             </Panel>
             <PanelResizeHandle className="reader-resize-handle">
               <div className="reader-resize-grip" />
             </PanelResizeHandle>
             <Panel defaultSize={50} minSize={30}>
-              <ReaderSinglePane paperId={splitId} compact onOpenSplit={openSplit} />
+              <ReaderPane paperId={splitId} compact onOpenSplit={openSplit} />
             </Panel>
           </PanelGroup>
         </div>
@@ -71,11 +80,13 @@ export function ReaderAssembly() {
     );
   }
 
-  return <ReaderSinglePane paperId={paperId} onOpenSplit={openSplit} />;
+  return <ReaderPane paperId={paperId} onOpenSplit={openSplit} />;
 }
 
-/** One paper's text, PDF annotations, and workspace. */
-function ReaderSinglePane({
+type ExtrasTab = "notes" | "highlights" | "terms" | "translate" | "cached" | "pdf";
+
+/** One paper: reading frame plus its tools panel. */
+function ReaderPane({
   paperId,
   compact,
   onOpenSplit,
@@ -85,50 +96,38 @@ function ReaderSinglePane({
   onOpenSplit?: (id: string) => void;
 }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<ReaderWorkspaceTab>("notes");
-  const [showHelp, setShowHelp] = useState(false);
-  const [mainMode, setMainMode] = useState<ReaderMainMode>("native");
-  const [sideMode, setSideMode] = useState<"workspace" | "pdf">("workspace");
-  const [documentMode, setDocumentMode] = useState<"translated" | "original" | "bilingual">("translated");
   const isNarrow = useNarrowLayout(1200);
   const effectiveCompact = compact || isNarrow;
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [tab, setTab] = useState<ExtrasTab>("notes");
+  const [selectionText, setSelectionText] = useState("");
+  const [pdfPage, setPdfPage] = useState<number | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  /// The PDF tool is the one heavy panel, so it mounts on first use and stays
+  /// mounted afterwards to keep scroll position and viewer state.
+  const [pdfMounted, setPdfMounted] = useState(false);
+  const scrollFn = useRef<((id: string) => void) | null>(null);
+  const pendingJumpId = useRef<string | null>(null);
+  const highlightsRef = useRef<Highlight[]>([]);
+  const currentHighlightIdx = useRef(-1);
+
   const paperQ = useQuery({
     queryKey: ["paper", paperId],
     queryFn: () => libraryClient.paperGet(paperId),
   });
-  const scrollFn = useRef<((id: string) => void) | null>(null);
-  const pendingJumpId = useRef<string | null>(null);
-  const highlightsRef = useRef<Array<{ id: string }>>([]);
-  const currentHighlightIdx = useRef<number>(-1);
-  const setSelectionTextRef = useRef<((text: string) => void) | null>(null);
-  const pendingSelectionText = useRef<string | null>(null);
-  const [pdfPage, setPdfPage] = useState<number | null>(null);
 
-  // The side panel is optional so the reading column has room for long-form text.
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(true);
-  const toggleLeft = useCallback(() => {
-    const panel = leftPanelRef.current;
-    if (!panel) return;
-    panel.isCollapsed() ? panel.expand() : panel.collapse();
+  useEffect(() => {
+    if (isNarrow) setExtrasOpen(false);
+  }, [isNarrow]);
+
+  useEffect(() => {
+    if (tab === "pdf") setPdfMounted(true);
+  }, [tab]);
+
+  const openExtras = useCallback((next: ExtrasTab) => {
+    setTab(next);
+    setExtrasOpen(true);
   }, []);
-  const openWorkspace = useCallback(() => {
-    setSideMode("workspace");
-    setRightCollapsed(false);
-  }, []);
-  const toggleRight = useCallback(() => {
-    if (sideMode !== "workspace" || rightCollapsed) openWorkspace();
-    else setRightCollapsed(true);
-  }, [openWorkspace, rightCollapsed, sideMode]);
-  const toggleComparison = useCallback(() => {
-    if (sideMode === "pdf" && !rightCollapsed) {
-      setRightCollapsed(true);
-    } else {
-      setSideMode("pdf");
-      setRightCollapsed(false);
-    }
-  }, [rightCollapsed, sideMode]);
 
   const handleScrollRef = useCallback((fn: (id: string) => void) => {
     scrollFn.current = fn;
@@ -137,53 +136,63 @@ function ReaderSinglePane({
       pendingJumpId.current = null;
     }
   }, []);
-  useEffect(() => {
-    if (mainMode !== "pdf") {
-      scrollFn.current = null;
-    }
-  }, [mainMode]);
+
+  const handleJump = useCallback((highlight: Highlight) => {
+    setPdfPage(highlight.page);
+    openExtras("pdf");
+    if (scrollFn.current) scrollFn.current(highlight.id);
+    else pendingJumpId.current = highlight.id;
+  }, [openExtras]);
+
   const handleTranslateSelection = useCallback((text: string) => {
-    pendingSelectionText.current = text;
-    setSelectionTextRef.current?.(text);
-    setActiveTab("translate");
-    openWorkspace();
-  }, [openWorkspace]);
-  const handleSelectionSetterReady = useCallback((setter: (text: string) => void) => {
-    setSelectionTextRef.current = setter;
-    if (pendingSelectionText.current) setter(pendingSelectionText.current);
-    pendingSelectionText.current = null;
-  }, []);
-  const handleJump = useCallback((h: { id: string }) => {
-    const decision = resolveHighlightJump({
-      mode: mainMode,
-      highlightId: h.id,
-      canScroll: !!scrollFn.current,
-    });
-    if (decision.pendingJumpId) {
-      pendingJumpId.current = decision.pendingJumpId;
-    }
-    if (decision.mode !== mainMode) {
-      scrollFn.current = null;
-      setMainMode(decision.mode);
-      return;
-    }
-    if (decision.scrollNow) {
-      scrollFn.current?.(h.id);
-    }
-  }, [mainMode]);
+    setSelectionText(text);
+    openExtras("translate");
+  }, [openExtras]);
+
+  const handleOpenPdfPage = useCallback((page: number) => {
+    setPdfPage(page);
+    openExtras("pdf");
+  }, [openExtras]);
+  const host = useLibraryHostActions({
+    onOpenReader: (id) => {
+      if (id !== paperId) onOpenSplit?.(id);
+    },
+  });
+  /**
+   * The reader's own panels are this page's extras tabs, so those actions open
+   * the tab instead of a host drawer; everything else uses the library
+   * controller, which keeps one workflow for one capability across both hosts.
+   */
+  const hostAction = useCallback(
+    (message: ReadingHostAction) => {
+      switch (message.action) {
+        case "notes":
+        case "highlights":
+        case "terms":
+        case "cached":
+        case "pdf":
+          openExtras(message.action);
+          return;
+        default:
+          host.onAction(message);
+      }
+    },
+    [host, openExtras],
+  );
+
+  const legacy = useLegacyTranslation(paperId);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("button, a, [role='dialog']") || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      
-      // Toggle help with ?
+
       if (e.key === "?") {
         e.preventDefault();
         setShowHelp((prev) => !prev);
         return;
       }
-      
+
       const highlights = highlightsRef.current;
       if (highlights.length > 0 && (e.key === "j" || e.key === "]")) {
         e.preventDefault();
@@ -195,13 +204,12 @@ function ReaderSinglePane({
         handleJump(highlights[currentHighlightIdx.current]);
       } else if (e.key === "1" || e.key === "2" || e.key === "3") {
         e.preventDefault();
-        setActiveTab(e.key === "1" ? "notes" : e.key === "2" ? "translate" : "terms");
-        openWorkspace();
+        openExtras(e.key === "1" ? "notes" : e.key === "2" ? "translate" : "terms");
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleJump, openWorkspace]);
+  }, [handleJump, openExtras]);
 
   if (paperQ.isLoading) {
     return <MessageScreen title={t("common.loading")} backLink="/library" />;
@@ -210,21 +218,36 @@ function ReaderSinglePane({
     return <MessageScreen icon={<AlertTriangle className="h-6 w-6 text-litera-warn" />} title={t("reader.notFound")} backLink="/library" />;
   }
   const paper = paperQ.data;
-  if (!paper.pdf_path) {
-    return (
-      <MessageScreen
-        icon={<AlertTriangle className="h-6 w-6 text-litera-warn" />}
-        title={t("reader.noPdf")}
-        subtitle={t("reader.noPdfHint")}
-        backLink="/library"
-      />
-    );
-  }
+
+  const extrasToggle = (
+    <button
+      onClick={() => setExtrasOpen((open) => !open)}
+      className={cn("litera-icon-btn shrink-0", extrasOpen && "bg-litera-accent/12 text-litera-accent")}
+      title={t("reader.extrasToggle")}
+      aria-label={t("reader.extrasToggle")}
+      aria-pressed={extrasOpen}
+      aria-controls="reader-extras"
+    >
+      {extrasOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+    </button>
+  );
 
   return (
     <div className="h-full flex flex-col">
-      <ReaderOnboarding />
-      {!effectiveCompact && (
+      {!compact && <ReaderOnboarding />}
+      {effectiveCompact ? (
+        <header className="reader-toolbar reader-toolbar-compact">
+          {!compact && (
+            <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-serif text-sm text-litera-text" title={paper.title}>{paper.title}</h1>
+          </div>
+          {extrasToggle}
+        </header>
+      ) : (
         <header className="reader-toolbar">
           <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
             <ArrowLeft className="h-4 w-4" />
@@ -239,157 +262,154 @@ function ReaderSinglePane({
             </div>
           </div>
           <div className="reader-toolbar-group">
-          {paper.bibtex && (
-            <button
-              onClick={() => navigator.clipboard.writeText(paper.bibtex!)}
-              className="litera-icon-btn"
-              title={t("reader.copyBibtex")}
-              aria-label={t("reader.copyBibtex")}
-            >
-              <ClipboardCopy className="h-4 w-4" />
-            </button>
-          )}
-          <button
-            onClick={() => setMainMode("native")}
-            className={`litera-btn text-xs ${mainMode === "native" ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`}
-            aria-pressed={mainMode === "native"}
-          >
-            <BookOpenText className="h-3.5 w-3.5" /> {t("reader.nativeReadTitle")}
-          </button>
-          <button
-            onClick={() => setMainMode("pdf")}
-            className={`litera-btn text-xs ${mainMode === "pdf" ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`}
-            aria-pressed={mainMode === "pdf"}
-          >
-            <FileText className="h-3.5 w-3.5" /> {t("reader.showPdf")}
-          </button>
-          {mainMode === "native" && (
-            <button onClick={toggleComparison} className={`litera-btn text-xs ${sideMode === "pdf" && !rightCollapsed ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent" : ""}`} aria-pressed={sideMode === "pdf" && !rightCollapsed}>
-              <Columns2 className="h-3.5 w-3.5" /> {t("reader.docComparePdf")}
-            </button>
-          )}
-          <button
-            onClick={toggleLeft}
-            className={`litera-icon-btn ${leftCollapsed ? "" : "bg-litera-accent/12 text-litera-accent"}`}
-            title={t("reader.toggleHighlights")}
-            aria-label={t("reader.toggleHighlights")}
-            aria-pressed={!leftCollapsed}
-          >
-            {leftCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            onClick={toggleRight}
-            className={`litera-icon-btn ${rightCollapsed || sideMode !== "workspace" ? "" : "bg-litera-accent/12 text-litera-accent"}`}
-            title={t("reader.toggleWorkspace")}
-            aria-label={t("reader.toggleWorkspace")}
-            aria-pressed={!rightCollapsed && sideMode === "workspace"}
-          >
-            {rightCollapsed || sideMode !== "workspace" ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
-          </button>
-          {onOpenSplit && <SplitPaperPicker currentPaperId={paperId} onOpenSplit={onOpenSplit} />}
+            {extrasToggle}
+            {onOpenSplit && <SplitPaperPicker currentPaperId={paperId} onOpenSplit={onOpenSplit} />}
           </div>
-        </header>
-      )}
-      {effectiveCompact && (
-        <header className="reader-toolbar reader-toolbar-compact">
-          <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className={READER_COMPACT_TITLE_CLASS}>
-            <h1 className="truncate font-serif text-sm text-litera-text" title={paper.title}>{paper.title}</h1>
-          </div>
-          {paper.bibtex && (
-            <button
-              onClick={() => navigator.clipboard.writeText(paper.bibtex!)}
-              className="litera-icon-btn"
-              title={t("reader.copyBibtex")}
-              aria-label={t("reader.copyBibtex")}
-            >
-              <ClipboardCopy className="h-3 w-3" />
-            </button>
-          )}
-          <button onClick={() => setMainMode("native")} className={`litera-icon-btn ${mainMode === "native" ? "text-litera-accent" : ""}`} title={t("reader.nativeReadTitle")} aria-label={t("reader.nativeReadTitle")} aria-pressed={mainMode === "native"}>
-            <BookOpenText className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setMainMode("pdf")} className={`litera-icon-btn ${mainMode === "pdf" ? "text-litera-accent" : ""}`} title={t("reader.showPdf")} aria-label={t("reader.showPdf")} aria-pressed={mainMode === "pdf"}>
-            <FileText className="h-3.5 w-3.5" />
-          </button>
-          {mainMode === "native" && <button onClick={toggleComparison} className={`litera-icon-btn ${sideMode === "pdf" && !rightCollapsed ? "text-litera-accent" : ""}`} title={t("reader.docComparePdf")} aria-label={t("reader.docComparePdf")} aria-pressed={sideMode === "pdf" && !rightCollapsed}><Columns2 className="h-3.5 w-3.5" /></button>}
-          <button onClick={toggleRight} className={`litera-icon-btn ${!rightCollapsed && sideMode === "workspace" ? "text-litera-accent" : ""}`} title={t("reader.toggleWorkspace")} aria-label={t("reader.toggleWorkspace")} aria-pressed={!rightCollapsed && sideMode === "workspace"}><PanelRightOpen className="h-3.5 w-3.5" /></button>
         </header>
       )}
       <div className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-reading-layout"}>
-          {!effectiveCompact && (
-            <>
-              <Panel
-                id="reader-highlights"
-                order={1}
-                ref={leftPanelRef}
-                defaultSize={16}
-                minSize={10}
-                maxSize={24}
-                collapsible
-                collapsedSize={0}
-                onCollapse={() => setLeftCollapsed(true)}
-                onExpand={() => setLeftCollapsed(false)}
-              >
-                <HighlightList paperId={paperId} onJump={handleJump} highlightsRef={highlightsRef} />
-              </Panel>
-              <PanelResizeHandle className={`reader-resize-handle ${leftCollapsed ? "hidden" : ""}`}>
-                <div className="reader-resize-grip" />
-              </PanelResizeHandle>
-            </>
-          )}
-          <Panel id="reader-document" order={2} defaultSize={effectiveCompact ? 100 : 84} minSize={30}>
-            {mainMode === "native" ? (
-              <TranslatedMarkdownPane
-                paperId={paperId}
-                paperTitle={paper.title}
-                mode={documentMode}
-                onModeChange={setDocumentMode}
-                pdfComparisonActive={sideMode === "pdf" && !rightCollapsed}
-                onOpenPdf={() => setMainMode("pdf")}
-                onOpenPdfPage={(page) => {
-                  setPdfPage(page);
-                  setSideMode("pdf");
-                  setRightCollapsed(false);
-                }}
-              />
-            ) : (
-              <PdfPane paperId={paperId} pageToOpen={pdfPage} scrollRefCb={handleScrollRef} onTranslateSelection={handleTranslateSelection} />
-            )}
+        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
+          <Panel id="reader-document" order={1} defaultSize={extrasOpen ? 66 : 100} minSize={35}>
+            <EasyReadFrame paperId={paperId} onAction={hostAction} />
           </Panel>
-          {!rightCollapsed && (
+          {extrasOpen && (
             <>
               <PanelResizeHandle className="reader-resize-handle">
                 <div className="reader-resize-grip" />
               </PanelResizeHandle>
               <Panel
-                id="reader-workspace"
-                order={3}
-                defaultSize={effectiveCompact ? 40 : 34}
-                minSize={25}
-                maxSize={55}
-                onCollapse={() => setRightCollapsed(true)}
-                onExpand={() => setRightCollapsed(false)}
+                id="reader-extras"
+                order={2}
+                defaultSize={effectiveCompact ? 45 : 34}
+                minSize={22}
+                maxSize={62}
+                onCollapse={() => setExtrasOpen(false)}
               >
-                {mainMode === "native" && sideMode === "pdf" ? (
-                  <PdfPane paperId={paperId} pageToOpen={pdfPage} onTranslateSelection={handleTranslateSelection} />
-                ) : (
-                  <ReaderWorkspacePane
-                    paperId={paperId}
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
-                    onSelectionSetterReady={handleSelectionSetterReady}
-                  />
-                )}
+                <ExtrasPane
+                  paperId={paperId}
+                  tab={tab}
+                  onTabChange={setTab}
+                  selectionText={selectionText}
+                  pdfMounted={pdfMounted}
+                  pdfPage={pdfPage}
+                  onScrollRef={handleScrollRef}
+                  onJump={handleJump}
+                  onOpenPdfPage={handleOpenPdfPage}
+                  legacy={legacy}
+                  highlightsRef={highlightsRef}
+                  onTranslateSelection={handleTranslateSelection}
+                />
               </Panel>
             </>
           )}
         </PanelGroup>
       </div>
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {host.ui}
+    </div>
+  );
+}
+
+const EXTRAS_TABS: Array<{ id: ExtrasTab; icon: ReactNode; labelKey: TKey }> = [
+  { id: "notes", icon: <NotebookPen className="h-3.5 w-3.5" />, labelKey: "reader.tabNotes" },
+  { id: "highlights", icon: <Highlighter className="h-3.5 w-3.5" />, labelKey: "reader.highlights" },
+  { id: "terms", icon: <Orbit className="h-3.5 w-3.5" />, labelKey: "reader.tabTerms" },
+  { id: "translate", icon: <Languages className="h-3.5 w-3.5" />, labelKey: "reader.tabTranslate" },
+  { id: "cached", icon: <BookMarked className="h-3.5 w-3.5" />, labelKey: "reader.legacyTab" },
+  { id: "pdf", icon: <FileText className="h-3.5 w-3.5" />, labelKey: "reader.pdfTab" },
+];
+function ExtrasPane({
+  paperId,
+  tab,
+  onTabChange,
+  selectionText,
+  pdfMounted,
+  pdfPage,
+  onScrollRef,
+  onJump,
+  onOpenPdfPage,
+  legacy,
+  highlightsRef,
+  onTranslateSelection,
+}: {
+  paperId: string;
+  tab: ExtrasTab;
+  onTabChange: (tab: ExtrasTab) => void;
+  selectionText: string;
+  pdfMounted: boolean;
+  pdfPage: number | null;
+  onScrollRef: (fn: (id: string) => void) => void;
+  onJump: (highlight: Highlight) => void;
+  onOpenPdfPage: (page: number) => void;
+  legacy: LegacyTranslationState;
+  highlightsRef: React.MutableRefObject<Highlight[]>;
+  onTranslateSelection: (text: string) => void;
+}) {
+  const t = useT();
+  const tabs = useMemo(
+    () => EXTRAS_TABS.filter((entry) => entry.id !== "cached" || Boolean(legacy.translation)),
+    [legacy.translation],
+  );
+  return (
+    <div id="reader-extras" className="reader-workspace h-full flex flex-col bg-litera-paper/30">
+      <div className="reader-panel-header">
+        <span className="litera-section-label">{t("reader.extrasTitle")}</span>
+        <div className="flex items-center gap-1" role="tablist" aria-label={t("reader.extrasTitle")}>
+          {tabs.map((entry) => (
+            <button
+              key={entry.id}
+              role="tab"
+              aria-selected={tab === entry.id}
+              onClick={() => onTabChange(entry.id)}
+              title={t(entry.labelKey)}
+              aria-label={t(entry.labelKey)}
+              className={cn(
+                "inline-flex min-h-7 items-center gap-1 rounded-[var(--litera-radius)] border px-1.5 py-1 text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-litera-focus",
+                tab === entry.id
+                  ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent"
+                  : "border-transparent text-litera-mute hover:bg-litera-surface2 hover:text-litera-text",
+              )}
+            >
+              {entry.icon}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 relative">
+        <div className={cn("h-full", tab !== "notes" && "hidden")}>
+          <NoteSectionsPane paperId={paperId} />
+        </div>
+        <div className={cn("h-full absolute inset-0", tab !== "highlights" && "hidden")}>
+          <HighlightList paperId={paperId} onJump={onJump} highlightsRef={highlightsRef} />
+        </div>
+        <div className={cn("h-full absolute inset-0", tab !== "terms" && "hidden")}>
+          <TermsPane paperId={paperId} />
+        </div>
+        <div className={cn("h-full absolute inset-0", tab !== "translate" && "hidden")}>
+          <SelectionTranslatePane paperId={paperId} selectionText={selectionText} />
+        </div>
+        {legacy.translation && (
+          <div className={cn("h-full absolute inset-0", tab !== "cached" && "hidden")}>
+            <LegacyTranslationPane
+              paperId={paperId}
+              translation={legacy.translation}
+              error={legacy.error}
+              isLoading={legacy.isLoading}
+              onOpenPdfPage={onOpenPdfPage}
+            />
+          </div>
+        )}
+        {pdfMounted && (
+          <div className={cn("h-full absolute inset-0", tab !== "pdf" && "hidden")}>
+            <PdfPane
+              paperId={paperId}
+              pageToOpen={pdfPage}
+              scrollRefCb={onScrollRef}
+              onTranslateSelection={onTranslateSelection}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -500,14 +520,9 @@ function SplitPaperPicker({
             </label>
           </div>
           {papersQ.isLoading ? (
-            <div className="flex items-center gap-2 px-3 py-3 text-xs text-litera-mute">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              {t("reader.splitSearching")}
-            </div>
+            <div className="px-3 py-3 text-xs text-litera-mute">{t("reader.splitSearching")}</div>
           ) : papersQ.isError ? (
-            <div className="px-3 py-3 text-xs text-litera-error">
-              {t("reader.splitSearchFailed")}
-            </div>
+            <div className="px-3 py-3 text-xs text-litera-error">{t("reader.splitSearchFailed")}</div>
           ) : papers.length === 0 ? (
             <div className="px-3 py-3 text-xs text-litera-mute">
               {t(query.trim() ? "reader.splitNoResults" : "reader.splitNoOtherPapers")}

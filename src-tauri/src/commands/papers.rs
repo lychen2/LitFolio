@@ -2,11 +2,12 @@
 
 use std::sync::Arc;
 use std::time::Instant;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tracing::Instrument;
 
 use crate::bibtex::generate_bibtex;
 use crate::ingest::{fetch_doi, PaperDraft};
+use crate::reading_service::ReadingService;
 use crate::storage::{Paper, PaperRepo, ReadStatus};
 use crate::AppState;
 
@@ -168,6 +169,8 @@ pub async fn papers_all_arxiv_ids(state: State<'_, Arc<AppState>>) -> Result<Vec
 
 #[tauri::command]
 pub async fn paper_set_read_status(
+    app: AppHandle,
+    service: State<'_, ReadingService>,
     state: State<'_, Arc<AppState>>,
     id: String,
     status: String,
@@ -178,18 +181,19 @@ pub async fn paper_set_read_status(
         "must" => ReadStatus::Must,
         _ => ReadStatus::Unread,
     };
-    PaperRepo::new(&state.pool)
-        .set_read_status(&id, s)
-        .await
-        .map_err(|e| e.to_string())
+    service.set_read_status(&app, &state, &id, s)
+        .await.map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
-pub async fn paper_delete(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
-    PaperRepo::new(&state.pool)
-        .delete(&id)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn paper_delete(
+    app: AppHandle,
+    service: State<'_, ReadingService>,
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), String> {
+    service.delete_paper(&app, &state, &id)
+        .await.map_err(|e| format!("{e:#}"))?;
     let dir = state.paths.paper_dir(&id);
     if dir.exists() {
         std::fs::remove_dir_all(&dir).map_err(|e| format!("remove {}: {e}", dir.display()))?;
@@ -204,6 +208,8 @@ pub async fn paper_delete(state: State<'_, Arc<AppState>>, id: String) -> Result
 /// the same merge policy as PDF import (`pdf/import_files.rs`).
 #[tauri::command]
 pub async fn paper_enrich_from_doi(
+    app: AppHandle,
+    service: State<'_, ReadingService>,
     state: State<'_, Arc<AppState>>,
     id: String,
     doi: String,
@@ -249,9 +255,8 @@ pub async fn paper_enrich_from_doi(
     merge_draft_into_paper(&mut paper, draft, resolved_doi);
     paper.bibtex = Some(generate_bibtex(&paper));
 
-    repo.update_metadata(&paper)
-        .await
-        .map_err(|e| e.to_string())?;
+    service.update_metadata(&app, &state, &paper)
+        .await.map_err(|e| format!("{e:#}"))?;
     Ok(paper)
 }
 

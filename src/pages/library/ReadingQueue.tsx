@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Clock, GripVertical, Loader2, Trash2 } from "lucide-react";
+import { BookOpen, Calendar, Clock, GripVertical, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
-export function ReadingQueue() {
+export function ReadingQueue({ onOpenPaper }: { onOpenPaper?: (paperId: string) => void }) {
   const t = useT();
   const qc = useQueryClient();
   const { data: entries, isLoading } = useQuery({
@@ -53,9 +53,20 @@ export function ReadingQueue() {
                 <span className="text-[10px] text-litera-mute font-mono">{idx + 1}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-litera-text truncate">
-                  {entry.title ?? entry.paper_id}
-                </div>
+                {onOpenPaper ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenPaper(entry.paper_id)}
+                    className="block w-full truncate text-left text-sm font-medium text-litera-text hover:text-litera-accent"
+                    title={t("library.readPdfTitle")}
+                  >
+                    {entry.title ?? entry.paper_id}
+                  </button>
+                ) : (
+                  <div className="text-sm font-medium text-litera-text truncate">
+                    {entry.title ?? entry.paper_id}
+                  </div>
+                )}
                 <div className="text-xs text-litera-mute mt-0.5">
                   {entry.authors && <span>{entry.authors}</span>}
                   {entry.year && <span> · {entry.year}</span>}
@@ -73,14 +84,27 @@ export function ReadingQueue() {
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => removeMut.mutate(entry.paper_id)}
-                disabled={removeMut.isPending}
-                className="text-litera-mute hover:text-litera-error transition-colors shrink-0 mt-1"
-                title={t("queue.remove")}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
+                {onOpenPaper && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenPaper(entry.paper_id)}
+                    className="text-litera-mute hover:text-litera-accent transition-colors"
+                    title={t("library.readPdfTitle")}
+                    aria-label={t("library.readPdf")}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => removeMut.mutate(entry.paper_id)}
+                  disabled={removeMut.isPending}
+                  className="text-litera-mute hover:text-litera-error transition-colors"
+                  title={t("queue.remove")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </li>
           );
         })}

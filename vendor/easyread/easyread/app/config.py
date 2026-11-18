@@ -1,0 +1,191 @@
+"""配置和数据位置。
+
+从源码目录运行时，数据就放在源码目录（library/、config.json）；pip 安装后放在 ~/EasyRead。
+环境变量 EASYREAD_HOME 改数据目录，EASYREAD_LIBRARY 临时指定文献库（测试、多库）。
+"""
+from __future__ import annotations
+
+import copy
+import os
+from pathlib import Path
+
+from ..chat.chat_models import DEFAULT_CHAT
+from ..engines.presets import PRESET_GROUPS, PRESETS  # noqa: F401
+from ..library.store import read_json, write_json_atomic
+from . import host_config
+
+
+PACKAGE = Path(__file__).resolve().parent.parent
+WEB = PACKAGE / "web"
+_SOURCE = PACKAGE.parent
+HOME = Path(os.environ.get("EASYREAD_HOME") or (_SOURCE if (_SOURCE / "pyproject.toml").exists() else Path.home() / "EasyRead"))
+PROJECT = HOME  # 旧名，cli 里还在用
+CONFIG_PATH = HOME / "config.json"
+LOG_PATH = HOME / "easyread.log"
+SERVER_INFO = HOME / ".server.json"
+
+DEFAULTS = {
+    "library_dir": str(HOME / "library"),
+    "port": 8765,
+    "engine": "claude",          # claude | codex | codebuddy | grok | agy | cursor（本机 CLI 无头）| openai（任意 OpenAI 兼容接口）| none
+    "auto_translate": True,      # 导入后自动开始翻译
+    "target": os.environ.get("EASYREAD_TARGET") or "zh",  # 译文语言，见 langs.py；环境变量只改默认值，设置里选的仍然优先
+    "translation_instructions": "",
+    "translation_prompt": None,
+    "translate_figure_text": True,
+    "figure_images": {"enabled": False, "provider": "codex", "base_url": "", "api_key": "", "model": "", "timeout": 600},
+    "opencode": {"command": "", "model": "", "extra_args": [], "timeout": 1200},
+    "check_updates": True,       # 打开文献库时问 GitHub 有没有新版本（一天一次），见 updates.py
+    "batch_pages": 2,            # 每次交给模型的页数
+    "paper_concurrency": 1,      # 默认逐篇处理；手动设1-4，重启生效，会与每篇的分段并发相乘
+    "page_cap": 60,              # 全文超过多少页先确认；0 表示不限
+    "concurrency": 0,            # 同时译几段（分段并行，见 segments.py）；0 是自动，每段约 2 批、最多 4 段；手动最多 8 段
+    "concurrency_v": 2,          # 1.3.1 起 concurrency 的意思变了，旧配置的 1 当成自动，见 load
+    "claude": {"command": "claude", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
+    "codex": {"command": "codex", "model": "", "reasoning_effort": "", "service_tier": "", "extra_args": [], "timeout": 1200},
+    "codebuddy": {"command": "codebuddy", "model": "", "extra_args": [], "timeout": 1200},
+    "zcode": {"command": "zcode", "model": "", "extra_args": [], "timeout": 1200},
+    "qoder": {"command": "", "model": "", "extra_args": [], "timeout": 1200},
+    # 另外三个本机 CLI（见 agent_cli.py）；command 空着按默认名找，model 空着用 CLI 自己的默认
+    "grok": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
+    "agy": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
+    "cursor": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
+    # api：chat（/chat/completions）| responses（/responses），见 openai_api.py
+    "openai": {"preset": "", "base_url": "", "api": "chat", "api_key": "", "model": "", "vision": False, "timeout": 600},
+    # 阅读页右侧“问 AI”的模型名单和默认模型，见 chat_models.py
+    "chat": copy.deepcopy(DEFAULT_CHAT),
+}
+
+def _merge(base: dict, over: dict) -> dict:
+    out = copy.deepcopy(base)
+    for k, v in (over or {}).items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def is_first_run() -> bool:
+    return not CONFIG_PATH.exists()
+
+
+def _saved() -> dict:
+    raw = read_json(CONFIG_PATH, {}) or {}
+    if raw.get("concurrency_v") != 2 and raw.get("concurrency") == 1:
+        # 以前默认 1，而且切到本机 CLI 时设置页会强制改回 1，旧配置里的 1 多半不是自己选的：当成自动。
+        # 存过一次之后带上 concurrency_v，再选 1 就是真的要一段一段译
+        raw["concurrency"] = 0
+    elif raw.get("concurrency_v") != 2 and isinstance(raw.get("concurrency"), int) and raw["concurrency"] > 4:
+        raw["concurrency"] = 4  # 以前的 6 是“同时 6 批”，现在是“同时 6 段”：升级时不替老用户开到 4 段以上
+    raw["concurrency_v"] = 2
+    return raw
+
+
+def load() -> dict:
+    saved = _saved()
+    if host_config.hosted():
+        scrub_saved(saved)  # 旧文件里可能还留着 Key：清掉再读
+    cfg = _merge(DEFAULTS, saved)
+    lib = os.environ.get("EASYREAD_LIBRARY") or os.environ.get("COREAD_LIBRARY")
+    if lib:  # 测试或多库时临时指定文献库
+        cfg["library_dir"] = lib
+    if host_config.hosted():
+        _apply_host(cfg, saved)
+    return cfg
+
+
+def scrub_saved(saved: dict) -> None:
+    """Drop credentials a pre-hosted config.json still carries, so the file holds none."""
+    if not host_config.has_secrets(saved):
+        return
+    try:
+        write_json_atomic(CONFIG_PATH, host_config.strip_secrets(saved))
+    except OSError:
+        pass
+
+
+def _apply_host(cfg: dict, saved: dict) -> None:
+    """托管模式：模型由宿主给出，不检查更新；自动翻译只在用户存过时才保留。"""
+    cfg["check_updates"] = False
+    if "auto_translate" not in saved:
+        cfg["auto_translate"] = False
+    if "engine" not in saved:
+        cfg["engine"] = "openai"  # 用户选过本机 CLI 就继续用用户的
+    cfg["openai"] = host_config.merge(cfg.get("openai") or {})
+
+
+def set_host_profile(profile: dict | None) -> dict:
+    """装宿主的阅读模型（server 的 POST /api/host/config 调它）：profile 为 null 清空；字段不合法抛 ValueError。"""
+    return host_config.set_profile(profile)
+
+
+def host_profile() -> dict:
+    """给页面和宿主的摘要：不含 Key，只看得到配置了没有、用的哪个模型。"""
+    return host_config.public_profile()
+
+
+def temp_library() -> bool:
+    return bool(os.environ.get("EASYREAD_LIBRARY") or os.environ.get("COREAD_LIBRARY"))
+
+
+def save(patch: dict) -> dict:
+    if host_config.hosted():
+        host_config.prepare_save(patch)  # 回传的 Key 丢掉；新填的 Key 报错说明去哪儿改
+    cfg = _merge(_merge(DEFAULTS, _saved()), patch)
+    if host_config.hosted():
+        host_config.strip_secrets(cfg)  # 以前存过的 Key 也不留在文件里
+    write_json_atomic(CONFIG_PATH, cfg)
+    return load()
+
+
+def with_key(o: dict, section: str = "openai") -> dict:
+    """页面提交的 API 设置 → 要存的样子。按配置区和服务地址分别保存 Key，换来换去不用重填；
+    页面发回来的打码 Key 或空 Key 表示不改。"""
+    cur = load()[section]
+    o = dict(o)
+    key = o.pop("api_key", None)
+    preset = o.get("preset", cur.get("preset")) or ""
+    from .api_keys import key_id, saved_keys
+    keys = saved_keys(cur)
+    slot = key_id(preset, o.get("base_url", cur.get("base_url", "")))
+    if host_config.hosted():
+        # 宿主模式不维护 Key 表：新填的 Key 报错说清去哪儿改，回传的旧 Key 丢掉。
+        host_config.refuse_new_secret(key)
+        o.pop("keys", None)
+        return o
+    if key and not key.startswith("••••"):
+        keys[slot] = key.strip()
+    o["keys"] = keys
+    o["api_key"] = keys.get(slot, "")
+    return o
+
+
+def public(cfg: dict) -> dict:
+    """给页面看的配置：密钥只露后四位。"""
+    from .api_keys import saved_keys
+    from ..translate import prompt_style
+    out = copy.deepcopy(cfg)
+    out["translation_prompt_default"] = prompt_style.default(cfg.get("target"))
+    out["translation_prompt_effective"] = prompt_style.effective(cfg)
+    for section in ("openai", "figure_images"):
+        if section not in out:
+            continue
+        if host_config.hosted() and section == "openai":
+            out[section].pop("host_request", None)  # 进程内的请求选项，页面不用管
+            out[section]["api_key"] = ""
+            out[section]["has_key"] = bool((host_config.profile() or {}).get("api_key"))
+            out[section]["saved_keys"] = []
+            out[section].pop("keys", None)
+            continue
+        out[section]["keys"] = saved_keys(cfg[section])
+        key = out[section].get("api_key") or ""
+        out[section]["api_key"] = ("••••" + key[-4:]) if key else ""
+        out[section]["has_key"] = bool(key)
+        out[section]["saved_keys"] = [k for k, v in (out[section].pop("keys", None) or {}).items() if v]
+    if host_config.hosted():
+        out["host"] = host_config.public_profile()
+    return out
+
+
+def library_dir(cfg: dict | None = None) -> Path:
+    p = Path((cfg or load())["library_dir"])
+    p.mkdir(parents=True, exist_ok=True)
+    return p

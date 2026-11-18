@@ -85,6 +85,23 @@ async fn insert_get_list_count_roundtrip() {
 }
 
 #[tokio::test]
+async fn metadata_only_paper_retains_null_fields() {
+    let (pool, dir) = temp_pool().await;
+    sqlx::query("INSERT INTO papers (id, title, authors_json, added_at, updated_at, read_status)
+                 VALUES ('metadata-only', 'Reference', '[]', 1, 1, 'unread')")
+        .execute(&pool).await.unwrap();
+    let repo = PaperRepo::new(&pool);
+    let paper = repo.get("metadata-only").await.unwrap().unwrap();
+    assert!(paper.pdf_path.is_none(), "NULL PDF must not become an empty path");
+    assert!(paper.tldr.is_none(), "missing AI result must remain absent");
+    assert!(paper.title_translated.is_none());
+    assert!(paper.abstract_text.is_none());
+    assert!(repo.list_all().await.unwrap()[0].pdf_path.is_none());
+    pool.close().await;
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
 async fn update_quick_read_persists_all_four() {
     let (pool, dir) = temp_pool().await;
     let repo = PaperRepo::new(&pool);

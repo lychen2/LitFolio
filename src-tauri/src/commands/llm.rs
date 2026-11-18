@@ -27,8 +27,13 @@ pub fn llm_get_config(state: State<'_, Arc<AppState>>) -> Result<LlmConfig, Stri
 }
 
 #[tauri::command]
-pub fn llm_save_config(state: State<'_, Arc<AppState>>, config: LlmConfig) -> Result<(), String> {
-    save_config(&state.paths, &config).map_err(|e| e.to_string())
+pub async fn llm_save_config(
+    state: State<'_, Arc<AppState>>,
+    service: State<'_, crate::reading_service::ReadingService>,
+    config: LlmConfig,
+) -> Result<(), String> {
+    save_config(&state.paths, &config).map_err(|e| e.to_string())?;
+    service.refresh_profile(&state).await.map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]

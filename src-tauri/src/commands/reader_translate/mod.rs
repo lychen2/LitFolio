@@ -168,11 +168,9 @@ pub async fn paper_translated_markdown_get(
 }
 
 /// Read the paper's original Markdown body with no AI or network involvement.
-/// Tier 1 is the `document.md` cache written by the reader's PDF.js pass; tier
-/// 2 is the local lopdf extraction in
-/// [`crate::commands::summaries::load_or_extract_pdf_body`], which also caches
-/// its result. `None` means the paper has neither a cached body nor a readable
-/// stored PDF.
+/// Prepared reader originals take precedence over retained extraction caches.
+/// When neither exists, local PDF extraction caches its result through
+/// [`crate::commands::summaries::load_or_extract_pdf_body`].
 #[tauri::command]
 pub async fn paper_markdown_get(
     state: State<'_, Arc<AppState>>,
@@ -543,6 +541,23 @@ mod tests {
     use crate::storage::{open_pool, run_migrations, LibraryPaths, ReadStatus};
     use tokio::sync::Mutex as AsyncMutex;
     use tokio_util::sync::CancellationToken;
+
+    #[tokio::test]
+    async fn paper_markdown_get_reads_prepared_originals_before_legacy_cache() {
+        let (state, root) = test_state().await;
+        let paper_id = "prepared-paper";
+        seed_paper(&state, paper_id, Some("/nonexistent/source.pdf".to_string())).await;
+        state.paths.write_paper_markdown(paper_id, "Earlier extraction").unwrap();
+        let workspace = state.paths.root.join("reading").join(paper_id);
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(workspace.join("paper.json"),
+            r#"{"blocks":[{"type":"para","en":"Prepared original","zh":"译文"}]}"#).unwrap();
+
+        let body = paper_markdown_get_impl(&state, paper_id).await.unwrap().unwrap();
+        assert_eq!(body, "Prepared original\n\n");
+        state.pool.close().await;
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     /// Cached `document.md` wins and the stored PDF path is never consulted.
     #[tokio::test]

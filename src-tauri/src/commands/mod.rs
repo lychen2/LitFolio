@@ -36,6 +36,7 @@ pub mod queue;
 pub mod reader_ask;
 pub mod reader_terms;
 pub mod reader_translate;
+pub mod reading_service;
 pub mod search;
 pub mod smart_collections;
 pub mod summaries;
@@ -324,6 +325,8 @@ macro_rules! command_paths_reader_notes {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_feeds_discovery_graph!([
             $($commands)*
+            commands::reading_service::reading_service_open,
+            commands::reading_service::reading_service_sync,
             commands::highlights::highlight_create,
             commands::highlights::highlight_list,
             commands::highlights::highlight_update_note,
