@@ -140,7 +140,7 @@ impl ReadingService {
             }
         }
         if guard.is_none() {
-            let command: std::process::Command = app.shell().sidecar("easyread-backend")?.into();
+            let command: std::process::Command = app.shell().sidecar("core")?.into();
             let home = app.path().app_config_dir()?.join("easyread");
             *guard = Some(Runtime::start(command, &home, &state.paths.root.join("reading")).await?);
         }

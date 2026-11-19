@@ -13,7 +13,7 @@ const target = process.env.TAURI_ENV_TARGET_TRIPLE ?? host;
 const windows = target.includes("windows");
 const suffix = windows ? ".exe" : "";
 const python = process.env.PYTHON ?? (process.platform === "win32" ? "python" : "python3");
-const dest = join(root, "src-tauri", "binaries", `easyread-backend-${target}${suffix}`);
+const dest = join(root, "src-tauri", "binaries", `core-${target}${suffix}`);
 const force = process.argv.includes("--force") || process.env.EASYREAD_SIDECAR_FORCE === "1";
 
 if (target !== host) {

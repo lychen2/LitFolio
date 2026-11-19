@@ -143,7 +143,7 @@ jobs:
       # The sidecar is a frozen interpreter, so PyInstaller has to run on the target
       # platform: this job builds it on its own runner before tauri-action compiles and
       # bundles the app. Leaving it out fails the Tauri build, which copies
-      # `src-tauri/binaries/easyread-backend-<triple>` as an external binary.
+      # `src-tauri/binaries/core-<triple>` as an external binary.
       - name: Setup EasyRead Python
         uses: actions/setup-python@v5
         with:

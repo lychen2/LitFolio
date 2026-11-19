@@ -16,14 +16,14 @@ import uuid
 
 from PIL import Image
 
-from .. import __version__
+from ..app import host_config
 from ..app.i18n import tr
 from ..server import http
 from .engines import Cancelled, EngineError
 
 
 def _request(options: dict, source: bytes, prompt: str) -> bytes:
-    boundary = "easyread-" + uuid.uuid4().hex
+    boundary = f"{host_config.AI_REQUEST_PREFIX}-{uuid.uuid4().hex}"
     chunks = []
     for key, value in {"model": options["model"], "prompt": prompt, "n": "1"}.items():
         chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
@@ -33,7 +33,7 @@ def _request(options: dict, source: bytes, prompt: str) -> bytes:
         image.convert("RGBA" if "A" in image.getbands() else "RGB").save(png, format="PNG")
     chunks.extend([f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="figure.png"\r\nContent-Type: image/png\r\n\r\n'.encode(),
                    png.getvalue(), f'\r\n--{boundary}--\r\n'.encode()])
-    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": f"EasyRead/{__version__}"}
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": host_config.AI_USER_AGENT}
     if options.get("api_key"):
         headers["Authorization"] = "Bearer " + options["api_key"]
     req = urllib.request.Request(options["base_url"].rstrip("/") + "/images/edits", data=b"".join(chunks), headers=headers)

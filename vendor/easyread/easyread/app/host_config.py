@@ -25,9 +25,13 @@ import os
 import threading
 from urllib.parse import urlsplit
 
+from .. import __version__
+
 HOST_ENV = "EASYREAD_HOST"
 HOST_VALUE = "litfolio"
 HOSTED = (os.environ.get(HOST_ENV) or "").strip().lower() == HOST_VALUE
+AI_USER_AGENT = "LitFolio" if HOSTED else f"EasyRead/{__version__}"
+AI_REQUEST_PREFIX = "core" if HOSTED else "easyread"
 
 API_KINDS = ("chat", "responses")
 THINKING_FORMATS = ("auto", "thinking", "enable_thinking", "chat_template", "reasoning_effort", "omit")

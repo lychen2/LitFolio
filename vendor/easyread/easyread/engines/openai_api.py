@@ -22,7 +22,6 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterator
 
-from .. import __version__
 from ..server import http
 from . import api_diagnostics, usage
 from .engines import Cancelled, EngineError, OutputLimitReached
@@ -40,7 +39,7 @@ def _hint(code: int) -> str:
             404: tr("（地址、模型名或接口格式不对）"), 429: tr("（被限流了，稍后重试或换个模型）")}.get(code, "")
 
 
-_SESSION = f"easyread-{uuid.uuid4()}"  # 每次启动一个，整个进程内不变
+_SESSION = f"{host_config.AI_REQUEST_PREFIX}-{uuid.uuid4()}"  # 每次启动一个，整个进程内不变
 
 
 def kind(o: dict) -> str:
@@ -57,7 +56,7 @@ def _base(o: dict) -> str:
 def _headers(o: dict, stream: bool = False) -> dict:
     # 要带 User-Agent：Python 默认的 "Python-urllib/x" 会被 Cloudflare 后面的接口（比如 OpenCode）直接拦掉，报 403 error code: 1010
     # x-opencode-session：OpenCode Go 要求带一个稳定的会话 ID，不带报 400 MissingSessionID；别的服务商会忽略这个头
-    h = {"Content-Type": "application/json", "User-Agent": f"EasyRead/{__version__}", "x-opencode-session": _SESSION}
+    h = {"Content-Type": "application/json", "User-Agent": host_config.AI_USER_AGENT, "x-opencode-session": _SESSION}
     if stream:
         h["Accept"] = "text/event-stream"
     if o.get("api_key"):

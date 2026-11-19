@@ -192,6 +192,28 @@ async fn item_exists(pool: &Pool, entry_id: &str) -> bool {
 }
 
 #[tokio::test]
+async fn seed_defaults_imports_dsh_optics_feeds_once() {
+    let (pool, dir) = temp().await;
+    let repo = FeedRepo::new(&pool);
+
+    assert_eq!(repo.seed_defaults_if_empty().await.unwrap(), 88);
+    for url in [
+        "https://rss.arxiv.org/rss/physics.optics",
+        "https://pubs.acs.org/rss/apchd5/asap.xml",
+        "https://feeds.aps.org/rss/recent/prl.xml",
+    ] {
+        assert!(
+            find_feed_id_by_url(&pool, url).await.unwrap().is_some(),
+            "{url}"
+        );
+    }
+    assert_eq!(repo.seed_defaults_if_empty().await.unwrap(), 0);
+
+    pool.close().await;
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
 async fn repair_default_urls_repoints_legacy_optica_feeds() {
     let (pool, dir) = temp().await;
     let repo = FeedRepo::new(&pool);

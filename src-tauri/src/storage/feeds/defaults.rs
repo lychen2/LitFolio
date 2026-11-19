@@ -16,9 +16,8 @@ impl FeedRepo<'_> {
         Ok(repaired)
     }
 
-    /// On first launch the user has no feeds; seed a sensible default list of
-    /// optics / photonics journal feeds. Only fires when the table is empty,
-    /// so deleting a default and restarting doesn't bring it back.
+    /// Seed the default research subscriptions when the feed table is empty.
+    /// A library with subscriptions keeps its current selection.
     pub async fn seed_defaults_if_empty(&self) -> Result<usize> {
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feeds")
             .fetch_one(self.pool)

@@ -34,7 +34,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "externalBin": ["binaries/easyread-backend"],
+    "externalBin": ["binaries/core"],
     "targets": "all",
     "icon": [
       "icons/32x32.png",
