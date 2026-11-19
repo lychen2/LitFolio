@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ArxivDraft, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import {
   duplicateStatusFromError,
   importJobId,
@@ -301,6 +302,7 @@ export function useSaveWithPdfMutation(params: SaveMutationParams) {
       markImportJobCompleted(params, p);
       params.reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyLibraryChanged();
       notifyRecentImportsChanged();
     },
     onError: (e: Error) => {
@@ -343,6 +345,7 @@ export function useAutoDownloadMutation(params: SaveMutationParams) {
       markImportJobCompleted(params, p);
       params.reset();
       qc.invalidateQueries({ queryKey: ["papers"] });
+      notifyLibraryChanged();
       notifyRecentImportsChanged();
     },
     onError: (e: Error) => {

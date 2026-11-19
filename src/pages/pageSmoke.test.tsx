@@ -38,14 +38,18 @@ describe("page smoke render", () => {
     expect(renderPage(<LibraryPage />, "/library")).toContain("文献库");
   });
 
-  it("hands the import route to the reading service frame", () => {
-    expect(renderPage(<ImportPage />, "/import")).toContain("正在打开阅读服务");
+  it("opens the inline paper and link import by default", () => {
+    expect(renderPage(<ImportPage />, "/import")).toContain('aria-pressed="true" class="litera-btn-primary text-sm">PDF 或链接');
   });
 
-  it("bands a feed-item import above the reading service frame", () => {
+  it("keeps local PDF and folder import available at its direct route", () => {
+    expect(renderPage(<ImportPage />, "/import?tab=pdf", "/import")).toContain("选择 PDF 文件");
+  });
+
+  it("shows the RSS source above the identifier form", () => {
     const html = renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import");
     expect(html).toContain("来自 RSS 订阅");
-    expect(html).toContain("正在打开阅读服务");
+    expect(html).toContain('aria-pressed="true" class="litera-btn-primary text-sm">arXiv 或 DOI');
   });
 
   it("renders the DOI import route with a prefilled DOI", () => {

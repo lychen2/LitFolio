@@ -22,6 +22,8 @@ export function FeedsPage() {
   const t = useT();
   const [selectedFeedId, setSelectedFeedId] = useState<number | null>(null);
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [filter, setFilter] = useState("");
+  const keyword = filter.trim();
   const [feedSidebarOpen, setFeedSidebarOpen] = useState(false);
   useEffect(() => {
     if (!feedSidebarOpen) return;
@@ -53,11 +55,12 @@ export function FeedsPage() {
     refetchIntervalInBackground: false,
   });
   const itemsQ = useQuery({
-    queryKey: ["feed-items", selectedFeedId, onlyUnread],
+    queryKey: ["feed-items", selectedFeedId, onlyUnread, keyword],
     queryFn: () =>
       api.feedItemsList({
         feedId: selectedFeedId,
         onlyUnread,
+        keyword,
         limit: 100,
       }),
     refetchInterval: 30000,
@@ -104,6 +107,8 @@ export function FeedsPage() {
           <ItemsToolbar
             onlyUnread={onlyUnread}
             onOnlyUnread={setOnlyUnread}
+            filter={filter}
+            onFilter={setFilter}
             selected={selectedFeedId ? feedsQ.data?.find((f) => f.id === selectedFeedId) : null}
           />
           <ItemsList
@@ -111,6 +116,7 @@ export function FeedsPage() {
             isLoading={itemsQ.isLoading}
             error={itemsQ.error as Error | null}
             feeds={feedsQ.data ?? []}
+            filtered={onlyUnread || keyword.length > 0}
           />
         </div>
       </div>

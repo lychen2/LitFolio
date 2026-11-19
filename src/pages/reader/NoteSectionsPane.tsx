@@ -77,7 +77,7 @@ const SECTION_META: Record<string, { icon: string; labelKey: TKey; placeholderKe
 export function NoteSectionsPane({ paperId }: { paperId: string }) {
   const t = useT();
   const qc = useQueryClient();
-  const { data: sections, isLoading } = useQuery({
+  const { data: sections, isLoading, isError, refetch } = useQuery({
     queryKey: ["noteSections", paperId],
     queryFn: () => api.noteSectionsGet(paperId),
     refetchOnWindowFocus: false,
@@ -120,6 +120,9 @@ export function NoteSectionsPane({ paperId }: { paperId: string }) {
         <span className="text-xs uppercase tracking-wider text-litera-mute">{t("reader.tabNotes")}</span>
       </div>
       <div className="flex-1 overflow-auto px-3 py-2 space-y-2">
+        {isError ? (
+          <button type="button" className="litera-btn text-xs" onClick={() => refetch()}>{t("common.retry")}</button>
+        ) : !sections?.length && <p className="py-2 text-sm text-litera-mute">{t("reader.card.empty")}</p>}
         {sections?.map((s) => (
           <SectionCard
             key={s.id}

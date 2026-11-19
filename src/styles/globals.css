@@ -435,7 +435,7 @@
     border: 1px solid var(--litera-hairline);
   }
   .litera-section-label {
-    @apply text-[11px] font-semibold uppercase text-litera-subtle;
+    @apply text-[11px] font-semibold text-litera-subtle;
     letter-spacing: 0.09em;
   }
   .litera-badge,

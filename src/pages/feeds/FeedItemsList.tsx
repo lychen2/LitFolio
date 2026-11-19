@@ -6,12 +6,13 @@ import { FeedItemDetailDrawer } from "./FeedItemDetailDrawer";
 import { FeedItemRow } from "./FeedItemRow";
 
 export function ItemsList({
-  items, isLoading, error, feeds,
+  items, isLoading, error, feeds, filtered,
 }: {
   items: FeedItem[];
   isLoading: boolean;
   error: Error | null;
   feeds: FeedWithCounts[];
+  filtered: boolean;
 }) {
   const t = useT();
   const feedMap = useMemo(() => new Map(feeds.map((f) => [f.id, f])), [feeds]);
@@ -30,7 +31,7 @@ export function ItemsList({
     return <div className="p-6 text-sm text-litera-error">{t("feeds.itemsLoadFailed", { message: error.message })}</div>;
   }
   if (isLoading) return <LoadingItems />;
-  if (items.length === 0) return <EmptyItems />;
+  if (items.length === 0) return <EmptyItems filtered={filtered} />;
   return (
     <>
       <ul className="divide-y divide-litera-line">
@@ -67,12 +68,12 @@ function LoadingItems() {
   );
 }
 
-function EmptyItems() {
+function EmptyItems({ filtered }: { filtered: boolean }) {
   const t = useT();
   return (
     <div className="p-12 text-center text-sm text-litera-mute">
       <Inbox className="h-9 w-9 mx-auto mb-3 opacity-40" />
-      {t("feeds.empty")}
+      {t(filtered ? "feeds.noMatches" : "feeds.empty")}
     </div>
   );
 }

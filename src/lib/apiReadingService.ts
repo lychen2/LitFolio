@@ -46,6 +46,9 @@ export const READING_ACTIONS = [
 
 export type ReadingAction = (typeof READING_ACTIONS)[number];
 
+export const READER_SHORTCUTS = ["1", "2", "3", "j", "k", "]", "[", "?"] as const;
+export type ReaderShortcut = (typeof READER_SHORTCUTS)[number];
+const SHORTCUTS: ReadonlySet<string> = new Set<string>(READER_SHORTCUTS);
 /** One action request from the reader page, addressed by upstream paper IDs. */
 export interface ReadingHostAction {
   type: "action";
@@ -66,13 +69,19 @@ export type ReadingHostRoute =
   | { kind: "library" }
   | { kind: "settings" }
   | { kind: "ask" }
+  | { kind: "import"; tab?: "pdf" | "arxiv_doi"; link?: string }
   | { kind: "reader"; paperId: string };
 
 export type ReadingHostMessage =
   | { type: "navigate"; route: ReadingHostRoute }
+  | { type: "ready" }
   | { type: "library-changed" }
-  | { type: "imported"; paperId: string; reference: string }
   | { type: "delete"; paperId: string; requestId: string }
+  | { type: "library-collection"; key: string | null }
+  | { type: "library-collection-retry" }
+  | { type: "reader-shortcut"; key: ReaderShortcut }
+  | { type: "reader-control"; control: "extras" | "split" }
+  | { type: "note-ime-anchor"; x: number; y: number; height: number }
   | ReadingHostAction;
 
 function parseAction(obj: Shape, path: string): ReadingHostAction {
@@ -106,17 +115,47 @@ const STATIC_ROUTES: Record<string, ReadingHostRoute | undefined> = {
   "/": { kind: "library" },
   "/settings": { kind: "settings" },
   "/ask": { kind: "ask" },
+  "/import": { kind: "import" },
+  "/import?tab=pdf": { kind: "import", tab: "pdf" },
+  "/import?tab=arxiv_doi": { kind: "import", tab: "arxiv_doi" },
 };
 
 /** Call only after checking both the source window and service origin. */
 export function parseReadingHostMessage(value: unknown, path = "ReadingHostMessage"): ReadingHostMessage {
   const obj = object(value, path);
-  if (stringField(obj, "source", path) !== "litfolio-easyread") {
-    throw schemaError(`${path}.source`, "litfolio-easyread", obj.source);
+  if (stringField(obj, "source", path) !== "litfolio-core") {
+    throw schemaError(`${path}.source`, "litfolio-core", obj.source);
   }
   const type = stringField(obj, "type", path);
   if (type === "action") return parseAction(obj, path);
+  if (type === "ready") return { type };
   if (type === "library-changed") return { type };
+  if (type === "library-collection-retry") return { type };
+  if (type === "library-collection") {
+    if (obj.key === null) return { type, key: null };
+    const key = stringField(obj, "key", path);
+    if (!/^(folder|smart):\d+$/.test(key)) throw schemaError(`${path}.key`, "folder or smart collection key", key);
+    return { type, key };
+  }
+  if (type === "reader-shortcut") {
+    const key = stringField(obj, "key", path);
+    if (!SHORTCUTS.has(key)) throw schemaError(`${path}.key`, "reader shortcut", key);
+    return { type, key: key as ReaderShortcut };
+  }
+  if (type === "reader-control") {
+    const control = stringField(obj, "control", path);
+    if (control !== "extras" && control !== "split") throw schemaError(`${path}.control`, "extras or split", control);
+    return { type, control };
+  }
+  if (type === "note-ime-anchor") {
+    const { x, y, height } = obj;
+    if (typeof x !== "number" || !Number.isFinite(x) || x < 0 ||
+        typeof y !== "number" || !Number.isFinite(y) || y < 0 ||
+        typeof height !== "number" || !Number.isFinite(height) || height <= 0) {
+      throw schemaError(path, "visible note editor coordinates", obj);
+    }
+    return { type, x, y, height };
+  }
   if (type === "delete") {
     const paperId = stringField(obj, "paperId", path);
     const requestId = stringField(obj, "requestId", path);
@@ -124,26 +163,25 @@ export function parseReadingHostMessage(value: unknown, path = "ReadingHostMessa
     if (!/^\d{1,12}$/.test(requestId)) throw schemaError(`${path}.requestId`, "delete request ID", requestId);
     return { type, paperId, requestId };
   }
-  if (type === "imported") {
-    const paperId = stringField(obj, "paperId", path);
-    if (!/^[A-Za-z0-9_-]{4,64}$/.test(paperId)) {
-      throw schemaError(`${path}.paperId`, "upstream paper ID", paperId);
-    }
-    return { type, paperId, reference: stringField(obj, "reference", path) };
-  }
   if (type !== "navigate") {
-    throw schemaError(`${path}.type`, "navigate, imported, library-changed, delete or action", type);
+    throw schemaError(`${path}.type`, "reading host message type", type);
   }
   const target = stringField(obj, "path", path);
   const readerMatch = /^\/read\/([A-Za-z0-9_-]{4,64})$/.exec(target);
   if (readerMatch) return { type, route: { kind: "reader", paperId: readerMatch[1] } };
   const route = Object.hasOwn(STATIC_ROUTES, target) ? STATIC_ROUTES[target] : undefined;
+  if (target === "/import?tab=arxiv_doi") {
+    const link = optionalStringField(obj, "link", path);
+    if (link?.trim()) return { type, route: { kind: "import", tab: "arxiv_doi", link } };
+  }
   if (route) return { type, route };
-  throw schemaError(`${path}.path`, "/read/<id>, /, /settings or /ask", target);
+  throw schemaError(`${path}.path`, "reading host navigation target", target);
 }
 
 export const readingServiceApi = {
   open: (id?: string): Promise<ReadingServiceSession> =>
     invokeParsed("reading_service_open", { id: id ?? null }, parseReadingServiceSession),
   sync: () => invoke<void>("reading_service_sync"),
+  positionNoteIme: (x: number, y: number, height: number) =>
+    invoke<void>("reading_service_position_note_ime", { x, y, height }),
 };

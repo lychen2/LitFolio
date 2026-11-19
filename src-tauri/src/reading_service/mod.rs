@@ -1,7 +1,7 @@
-//! Owns the bundled EasyRead service. Python alone writes reading workspaces.
+//! Owns the bundled LitFolio service. Python alone writes reading workspaces.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -130,6 +130,17 @@ struct HostPaper<'a> {
     pdf_notes: &'a [PdfNote],
 }
 
+fn reading_home(app_config_dir: &Path) -> Result<PathBuf> {
+    let home = app_config_dir.join("core");
+    let legacy_home = app_config_dir.join("easyread");
+    if !home.try_exists()? && legacy_home.try_exists()? {
+        std::fs::rename(&legacy_home, &home).with_context(|| {
+            format!("move reading settings from {} to {}", legacy_home.display(), home.display())
+        })?;
+    }
+    Ok(home)
+}
+
 impl ReadingService {
     pub async fn open(&self, app: &AppHandle, state: &AppState, id: Option<&str>) -> Result<ReadingSession> {
         // Serializes startup, legacy attachment and catalog projection across frames.
@@ -141,7 +152,7 @@ impl ReadingService {
         }
         if guard.is_none() {
             let command: std::process::Command = app.shell().sidecar("core")?.into();
-            let home = app.path().app_config_dir()?.join("easyread");
+            let home = reading_home(&app.path().app_config_dir()?)?;
             *guard = Some(Runtime::start(command, &home, &state.paths.root.join("reading")).await?);
         }
         let runtime = guard.as_mut().context("reading service did not start")?;
@@ -212,14 +223,14 @@ impl Runtime {
         std::fs::create_dir_all(home)?;
         command
             .args(["serve", "--port", "0"])
-            .env("EASYREAD_HOST", "litfolio")
-            .env("EASYREAD_HOME", home)
-            .env("EASYREAD_LIBRARY", library)
+            .env("LITFOLIO_CORE_HOST", "litfolio")
+            .env("LITFOLIO_CORE_HOME", home)
+            .env("LITFOLIO_CORE_LIBRARY", library)
             .env("PYTHONUNBUFFERED", "1")
             .env("PYTHONUTF8", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            // Detailed Python diagnostics stay in EASYREAD_HOME/easyread.log.
+            // Detailed Python diagnostics stay in LITFOLIO_CORE_HOME/core.log.
             .stderr(Stdio::null());
         #[cfg(unix)]
         {
@@ -228,7 +239,7 @@ impl Runtime {
         }
         let mut command = Command::from(command);
         command.kill_on_drop(true);
-        let child = command.spawn().context("start bundled EasyRead backend")?;
+        let child = command.spawn().context("start bundled LitFolio backend")?;
         let pid = child.id().context("reading service PID missing")?;
         let mut process = ServiceProcess { child, pid };
         let stdout = process.child.stdout.take().context("reading service stdout missing")?;
@@ -248,10 +259,10 @@ impl Runtime {
                     }
                 }
             }
-            bail!("EasyRead exited before becoming ready; see {}/easyread.log", home.display())
+            bail!("LitFolio exited before becoming ready; see {}/core.log", home.display())
         })
         .await
-        .context("EasyRead startup timed out")??;
+        .context("LitFolio startup timed out")??;
         // Drain subsequent output without logging private document contents.
         tauri::async_runtime::spawn(async move {
             while matches!(lines.next_line().await, Ok(Some(_))) {}
@@ -278,7 +289,7 @@ impl Runtime {
             .send()
             .await?
             .error_for_status()
-            .with_context(|| format!("EasyRead {path} failed"))
+            .with_context(|| format!("LitFolio {path} failed"))
     }
 
     async fn configure(&self, state: &AppState) -> Result<()> {
@@ -304,7 +315,7 @@ impl Runtime {
         self.http.get(format!("{}/api/host/catalog", self.url))
             .header("X-Token", &self.token)
             .send().await?.error_for_status()?.json().await
-            .context("read EasyRead catalog")
+            .context("read LitFolio catalog")
     }
 
     async fn project(&mut self, state: &AppState) -> Result<()> {
@@ -381,7 +392,7 @@ impl Runtime {
         };
         let result: WorkspaceId = self.post("/api/host/paper", &body).await?.json().await?;
         if result.id != paper.id {
-            bail!("EasyRead returned a different paper identity");
+            bail!("LitFolio returned a different paper identity");
         }
         Ok(())
     }

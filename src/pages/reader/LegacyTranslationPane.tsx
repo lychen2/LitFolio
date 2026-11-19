@@ -31,7 +31,7 @@ export interface LegacyTranslationState {
 /**
  * The paper's earlier full-text translation, stored by LitFolio's own
  * translation path before the upstream reader owned translation. Absent for
- * papers translated only inside EasyRead.
+ * papers translated only inside LitFolio.
  */
 export function useLegacyTranslation(paperId: string) {
   const { lang } = useI18n();

@@ -53,6 +53,7 @@ export const knowledgeApi = {
   feedItemsList: (params: {
     feedId?: number | null;
     onlyUnread?: boolean;
+    keyword?: string;
     limit?: number;
     offset?: number;
   }) =>
@@ -61,6 +62,7 @@ export const knowledgeApi = {
       {
         feedId: params.feedId ?? null,
         onlyUnread: params.onlyUnread ?? null,
+        keyword: params.keyword ?? null,
         limit: params.limit ?? null,
         offset: params.offset ?? null,
       },

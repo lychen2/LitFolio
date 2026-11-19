@@ -153,23 +153,15 @@ pub async fn reader_ask_paper(
     let profile = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
     let messages = build_ask_messages(&envelope, &question);
 
-    run_reading_dispatch(
-        &state,
-        "reader_ask_paper",
-        &paper.id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        async {
-            chat_complete_with_task_kind(&state.http, &profile, TaskKind::Ask.as_str(), &messages)
-                .await
-                .map(|resp| ReaderAskResult {
-                    answer: resp.content,
-                    model: resp.model,
-                    envelope_id: envelope.envelope_id.clone(),
-                })
-        },
-    )
+    run_reading_dispatch(&state, "reader_ask_paper", None, &profile.name, &profile.chat_model, &envelope, async {
+        chat_complete_with_task_kind(&state.http, &profile, TaskKind::Ask.as_str(), &messages)
+            .await
+            .map(|resp| ReaderAskResult {
+                answer: resp.content,
+                model: resp.model,
+                envelope_id: envelope.envelope_id.clone(),
+            })
+    })
     .await
 }
 

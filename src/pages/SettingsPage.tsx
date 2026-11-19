@@ -32,7 +32,7 @@ const TAB_DEFS: { key: SettingsTab; labelKey: TKey; icon: typeof Cpu }[] = [
 ];
 
 function settingsTabFrom(value: string | null): SettingsTab {
-  return TAB_DEFS.some((tab) => tab.key === value) ? (value as SettingsTab) : "privacy";
+  return TAB_DEFS.find((tab) => tab.key === value)?.key ?? "profiles";
 }
 
 export function SettingsPage() {
@@ -92,6 +92,7 @@ export function SettingsPage() {
 
   const activeMissing = !!(draft.active && !draft.profiles.some((p) => p.name === draft.active));
   const isDirty = !!data && JSON.stringify(draft) !== JSON.stringify(data);
+  const showsSave = tab === "profiles" || tab === "tools";
   const saveState = save.isPending
     ? t("settings.saving")
     : save.error
@@ -106,8 +107,7 @@ export function SettingsPage() {
     <section className="flex h-full flex-col overflow-hidden">
       <PageHeader
         title={t("settings.title")}
-        subtitle={t("settings.subtitle")}
-        actions={(
+        actions={showsSave && (
           <>
             {saveState && (
               <span className={`text-xs ${save.error ? "text-litera-error" : save.isSuccess && !isDirty ? "text-litera-success" : "text-litera-mute"}`} role="status">
@@ -193,7 +193,7 @@ export function SettingsPage() {
               </div>
             )}
 
-            {save.error && <div className="text-sm text-litera-error">✕ {(save.error as Error).message}</div>}
+            {showsSave && save.error && <div role="alert" className="text-sm text-litera-error">{save.error.message}</div>}
           </div>
         </div>
       </div>

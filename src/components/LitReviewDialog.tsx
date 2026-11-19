@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ClipboardCopy, Download, FileText, Loader2, PenLine, X } from "lucide-react";
 import { api, type LitReviewResult } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { useDialogKeyboard } from "./useDialogKeyboard";
 
 const GROUPINGS = [
   { value: "theme", labelKey: "litReview.groupTheme" },
@@ -23,6 +24,7 @@ export function LitReviewDialog({
   onSaveNote?: (markdown: string) => void;
 }) {
   const t = useT();
+  const dialog = useDialogKeyboard(onClose);
   const [grouping, setGrouping] = useState<string>("theme");
   const [result, setResult] = useState<LitReviewResult | null>(null);
   const [editedMarkdown, setEditedMarkdown] = useState<string>("");
@@ -56,6 +58,8 @@ export function LitReviewDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
       <div
+        {...dialog}
+        aria-label={t("litReview.title")}
         onClick={(e) => e.stopPropagation()}
         className="w-[720px] max-w-[90vw] h-[80vh] bg-litera-paper border border-litera-line rounded-xl shadow-2xl flex flex-col"
       >
@@ -66,7 +70,7 @@ export function LitReviewDialog({
             <span className="font-medium">{t("litReview.title")}</span>
             <span className="text-xs text-litera-mute">({paperCount} {t("litReview.papers")})</span>
           </div>
-          <button onClick={onClose} className="text-litera-mute hover:text-litera-text">
+          <button onClick={onClose} aria-label={t("common.close")} className="text-litera-mute hover:text-litera-text">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -86,7 +90,7 @@ export function LitReviewDialog({
                     : "border-litera-line text-litera-mute hover:bg-litera-panel"
                 }`}
               >
-                {t(g.labelKey as any)}
+                {t(g.labelKey)}
               </button>
             ))}
           </div>

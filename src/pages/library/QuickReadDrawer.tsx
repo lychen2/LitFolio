@@ -1,16 +1,17 @@
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle, BookOpen, Compass, Layers, Loader2, Sparkles, Trash2,
+  AlertTriangle, BookOpen, Compass, Layers, Loader2, Sparkles,
   Wrench, X,
 } from "lucide-react";
 import { api, type Paper, type QuickReadResult } from "@/lib/api";
 import { errorMessageOr } from "@/lib/error";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useDialogKeyboard } from "@/components/useDialogKeyboard";
 
 export function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void }) {
   const qc = useQueryClient();
   const { t } = useI18n();
+  const dialog = useDialogKeyboard(onClose);
   const { data: latest } = useQuery({
     queryKey: ["paper", paper.id],
     queryFn: () => api.paperGet(paper.id),
@@ -24,28 +25,16 @@ export function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () 
       qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
     },
   });
-  const del = useMutation({
-    mutationFn: () => api.paperDelete(paper.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
-      onClose();
-    },
-  });
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const hasCached = hasCachedQuickRead(current);
   const result = cachedQuickRead(current, hasCached) ?? m.data ?? null;
 
   return (
     <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter">
+      <div {...dialog} aria-label={t("reader.tabNotes")} onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter">
         <DrawerHeader paper={current} onClose={onClose} />
         <DrawerToolbar
           hasCached={hasCached}
           modelPending={m.isPending}
-          deletePending={del.isPending}
-          confirmingDelete={confirmingDelete}
-          setConfirmingDelete={setConfirmingDelete}
-          onDelete={() => del.mutate()}
           onGenerate={() => m.mutate()}
         />
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
@@ -108,14 +97,10 @@ function DrawerHeader({ paper, onClose }: { paper: Paper; onClose: () => void })
 }
 
 function DrawerToolbar({
-  hasCached, modelPending, deletePending, confirmingDelete, setConfirmingDelete, onDelete, onGenerate,
+  hasCached, modelPending, onGenerate,
 }: {
   hasCached: boolean;
   modelPending: boolean;
-  deletePending: boolean;
-  confirmingDelete: boolean;
-  setConfirmingDelete: (value: boolean) => void;
-  onDelete: () => void;
   onGenerate: () => void;
 }) {
   const { t } = useI18n();
@@ -125,57 +110,12 @@ function DrawerToolbar({
         {hasCached ? t("library.cachedResult") : modelPending ? t("library.callingModel") : t("library.generateDeepRead")}
       </div>
       <div className="flex items-center gap-2">
-        <DeleteControl
-          confirming={confirmingDelete}
-          pending={deletePending}
-          setConfirming={setConfirmingDelete}
-          onDelete={onDelete}
-        />
         <button onClick={onGenerate} disabled={modelPending} className="litera-btn-primary text-xs disabled:opacity-50">
           {modelPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
           {hasCached ? t("library.regenerate") : t("library.runDeepRead")}
         </button>
       </div>
     </div>
-  );
-}
-
-function DeleteControl({
-  confirming, pending, setConfirming, onDelete,
-}: {
-  confirming: boolean;
-  pending: boolean;
-  setConfirming: (value: boolean) => void;
-  onDelete: () => void;
-}) {
-  const { t } = useI18n();
-  if (!confirming) {
-    return (
-      <button
-        onClick={() => setConfirming(true)}
-        disabled={pending}
-        className="litera-btn text-xs text-litera-error hover:text-litera-error disabled:opacity-50"
-        title={t("library.deletePaperTitle")}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    );
-  }
-  return (
-    <>
-      <span className="text-[11px] text-litera-error">{t("library.confirmDeletePaper")}</span>
-      <button
-        onClick={() => { setConfirming(false); onDelete(); }}
-        disabled={pending}
-        className="litera-btn text-xs bg-litera-error/15 text-litera-error hover:bg-litera-error/25 disabled:opacity-50 inline-flex items-center gap-1"
-      >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-        {t("common.delete")}
-      </button>
-      <button onClick={() => setConfirming(false)} className="litera-btn text-xs">
-        {t("common.cancel")}
-      </button>
-    </>
   );
 }
 

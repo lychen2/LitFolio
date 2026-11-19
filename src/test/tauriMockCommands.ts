@@ -400,6 +400,7 @@ const commandFixtures = new Map<string, MockResolver>([
   ["ask_session_save", () => mockAskSession],
   ["llm_get_config", () => mockLlmConfig],
   ["reading_service_sync", () => null],
+  ["reading_service_position_note_ime", () => null],
   ["llm_test", () => ({ ok: true, model: "mock-model", reply: "pong" })],
   ["llm_list_models", () => []],
   ["llm_pull_model", () => "Model pulled successfully"],

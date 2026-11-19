@@ -61,15 +61,7 @@ pub(super) async fn highlight_explain_impl(
     )
     .map_err(|e| format!("{}: {}", e.category(), e))?;
 
-    let result = run_reading_dispatch(
-        &state,
-        "highlight_explain",
-        &highlight.paper_id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        explain_highlight(&state.http, &profile, &paper, text, &body),
-    )
+    let result = run_reading_dispatch(&state, "highlight_explain", None, &profile.name, &profile.chat_model, &envelope, explain_highlight(&state.http, &profile, &paper, text, &body))
     .await?;
     if result.explanation.trim().is_empty() {
         return Err("empty explanation response".into());

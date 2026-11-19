@@ -1,4 +1,4 @@
-//! Projection of the EasyRead reading catalog into LitFolio's SQLite index.
+//! Projection of the LitFolio reading catalog into LitFolio's SQLite index.
 //!
 //! The reading service owns paper metadata, read state and tags. This module
 //! stores that catalog as a derived index keyed by the same paper id, so

@@ -3,6 +3,7 @@ import { Loader2, Plus, Sparkles, X } from "lucide-react";
 import { api, type Recommendation } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { useState } from "react";
+import { useDialogKeyboard } from "@/components/useDialogKeyboard";
 
 export function SimilarPapersPanel({
   paperId,
@@ -14,6 +15,7 @@ export function SimilarPapersPanel({
   onClose: () => void;
 }) {
   const t = useT();
+  const dialog = useDialogKeyboard(onClose);
   const qc = useQueryClient();
   const [results, setResults] = useState<Recommendation[] | null>(null);
 
@@ -46,6 +48,8 @@ export function SimilarPapersPanel({
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
       <div
+        {...dialog}
+        aria-label={t("similar.title")}
         onClick={(e) => e.stopPropagation()}
         className="w-[520px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col"
       >
@@ -54,7 +58,7 @@ export function SimilarPapersPanel({
             <Sparkles className="h-4 w-4 text-litera-accent" />
             <span className="text-sm font-medium">{t("similar.title")}</span>
           </div>
-          <button onClick={onClose} className="text-litera-mute hover:text-litera-text">
+          <button onClick={onClose} aria-label={t("common.close")} className="text-litera-mute hover:text-litera-text">
             <X className="h-4 w-4" />
           </button>
         </header>

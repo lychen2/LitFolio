@@ -101,7 +101,7 @@ export const PdfPane = memo(function PdfPane({
   pageToOpen,
 }: {
   paperId: string;
-  scrollRefCb?: (fn: (id: string) => void) => void;
+  scrollRefCb?: (fn: ((id: string) => void) | null) => void;
   onTranslateSelection?: (text: string) => void;
   pageToOpen?: number | null;
 }) {
@@ -600,6 +600,7 @@ export const PdfPane = memo(function PdfPane({
   useEffect(() => {
     if (!scrollRefCb) return;
     scrollRefCb(jumpToHighlight);
+    return () => scrollRefCb(null);
   }, [scrollRefCb, jumpToHighlight]);
 
   if (loadErr)

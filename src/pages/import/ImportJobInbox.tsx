@@ -109,7 +109,7 @@ function ImportJobCard({ job }: { job: ImportJob }) {
         <JobStatusIcon status={job.status} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-litera-line/70 px-2 py-0.5 text-[10px] uppercase tracking-wider text-litera-mute">
+            <span className="rounded-full border border-litera-line/70 px-2 py-0.5 text-[10px] tracking-wider text-litera-mute">
               {t(sourceKey(job.source))}
             </span>
             <span
@@ -185,7 +185,7 @@ function PersistedJobCard({ job }: { job: JobRecord }) {
         <PersistedJobStatusIcon status={job.status} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-litera-line/70 px-2 py-0.5 text-[10px] uppercase tracking-wider text-litera-mute">
+            <span className="rounded-full border border-litera-line/70 px-2 py-0.5 text-[10px] tracking-wider text-litera-mute">
               {persistedJobKindLabel(job.kind)}
             </span>
             <span

@@ -51,9 +51,17 @@ async fn frozen_service_preserves_legacy_identity_edits_and_stops() -> Result<()
     let tag = TagRepo::new(&state.pool).create("legacy-tag", Some("#ff0000")).await?;
     TagRepo::new(&state.pool).attach(&reference_id, tag.id).await?;
     let paper = PaperRepo::new(&state.pool).get(&id).await?.context("seed paper")?;
+    let config_dir = scratch.join("config");
+    let legacy_home = config_dir.join("easyread");
+    std::fs::create_dir_all(&legacy_home)?;
+    std::fs::write(legacy_home.join("config.json"), r#"{"target":"ja"}"#)?;
+    let home = reading_home(&config_dir)?;
+    assert_eq!(home, config_dir.join("core"));
+    assert!(!legacy_home.try_exists()?);
+    assert_eq!(reading_home(&config_dir)?, home);
     let runtime = Runtime::start(
         std::process::Command::new(binary),
-        &scratch.join("home"),
+        &home,
         &state.paths.root.join("reading"),
     )
     .await?;
@@ -63,6 +71,9 @@ async fn frozen_service_preserves_legacy_identity_edits_and_stops() -> Result<()
     let outcome: Result<()> = async {
         let mut guard = service.runtime.lock().await;
         let runtime = guard.as_mut().context("started runtime")?;
+        let config: Value = runtime.http.get(format!("{url}/api/config"))
+            .send().await?.error_for_status()?.json().await?;
+        assert_eq!(config["config"]["target"], "ja");
         runtime.configure(&state).await?;
         runtime.attach_missing(&state, &HashSet::new(), None).await?;
         runtime.attach_legacy(&state, &paper).await?;

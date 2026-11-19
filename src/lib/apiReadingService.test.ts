@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { READING_ACTIONS, parseReadingHostMessage } from "./apiReadingService";
 
-const envelope = (payload: Record<string, unknown>) => ({ source: "litfolio-easyread", ...payload });
+const envelope = (payload: Record<string, unknown>) => ({ source: "litfolio-core", ...payload });
 
 describe("parseReadingHostMessage action messages", () => {
   it("accepts a paper action with its upstream IDs", () => {
@@ -54,7 +54,7 @@ describe("parseReadingHostMessage action messages", () => {
 
   it("still refuses messages from another source and other message types", () => {
     expect(() => parseReadingHostMessage({ source: "other", type: "action", action: "tldr", paperIds: ["abc12345"] }))
-      .toThrow("litfolio-easyread");
+      .toThrow("litfolio-core");
     expect(() => parseReadingHostMessage(envelope({ type: "theme" })))
       .toThrow("ReadingHostMessage.type");
   });

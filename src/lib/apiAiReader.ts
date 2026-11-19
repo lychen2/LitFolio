@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, type Channel } from "@tauri-apps/api/core";
 
 import { parseHighlight, parseLlmConfig } from "./apiSchema";
 import {
@@ -32,13 +32,15 @@ export const aiReaderApi = {
     invoke<void>("llm_save_config", { config }),
   llmTest: (profile: LlmProfile) =>
     invoke<LlmTestResult>("llm_test", { profile }),
-  paperTldr: (id: string) => invoke<TldrResult>("paper_tldr", { id }),
+  paperTldr: (id: string, onStarted?: Channel<string>) =>
+    invoke<TldrResult>("paper_tldr", { id, onStarted }),
   paperQuickRead: (id: string) =>
     invoke<QuickReadResult>("paper_quick_read", { id }),
-  paperTranslate: (id: string, targetLang?: string) =>
+  paperTranslate: (id: string, targetLang?: string, onStarted?: Channel<string>) =>
     invoke<TranslationResult>("paper_translate", {
       id,
       targetLang: targetLang ?? "Chinese",
+      onStarted,
     }),
   draftTranslate: (draft: ArxivDraft, targetLang?: string) =>
     invoke<TranslationResult>("draft_translate", {

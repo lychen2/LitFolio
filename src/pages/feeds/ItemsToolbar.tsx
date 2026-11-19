@@ -4,10 +4,12 @@ import { api, type FeedRefreshResult, type FeedWithCounts } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
 export function ItemsToolbar({
-  onlyUnread, onOnlyUnread, selected,
+  onlyUnread, onOnlyUnread, filter, onFilter, selected,
 }: {
   onlyUnread: boolean;
   onOnlyUnread: (v: boolean) => void;
+  filter: string;
+  onFilter: (value: string) => void;
   selected: FeedWithCounts | null | undefined;
 }) {
   const t = useT();
@@ -22,8 +24,16 @@ export function ItemsToolbar({
   });
 
   return (
-    <div className="border-b border-litera-line px-5 py-3 flex items-center gap-3">
-      <button onClick={() => onOnlyUnread(!onlyUnread)} className={filterClass(onlyUnread)}>
+    <div className="border-b border-litera-line px-5 py-3 flex flex-wrap items-center gap-3">
+      <input
+        type="search"
+        className="litera-input w-52 max-w-full text-xs"
+        aria-label={t("feeds.filterTitle")}
+        placeholder={t("feeds.filterTitle")}
+        value={filter}
+        onChange={(event) => onFilter(event.currentTarget.value)}
+      />
+      <button type="button" aria-pressed={onlyUnread} onClick={() => onOnlyUnread(!onlyUnread)} className={filterClass(onlyUnread)}>
         {onlyUnread ? t("feeds.onlyUnread") : t("common.all")}
       </button>
       {selected && (

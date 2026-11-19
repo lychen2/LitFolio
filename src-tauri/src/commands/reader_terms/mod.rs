@@ -145,15 +145,7 @@ async fn terms_explain_impl(
     )
     .await?;
 
-    let defs = run_reading_dispatch(
-        state,
-        operation,
-        paper_id,
-        &prof.name,
-        &prof.chat_model,
-        &envelope,
-        explain::explain_terms(&state.http, &prof, &paper, &terms, &abbrev_long),
-    )
+    let defs = run_reading_dispatch(state, operation, None, &prof.name, &prof.chat_model, &envelope, explain::explain_terms(&state.http, &prof, &paper, &terms, &abbrev_long))
     .await?;
 
     for term in &existing {
@@ -239,21 +231,13 @@ pub async fn paper_term_add(
                 score: 0.0,
                 local_evidence: evidence_text.clone(),
             };
-            let defs = run_reading_dispatch(
-                &state,
-                "paper_term_add",
-                &paper_id,
-                &prof.name,
-                &prof.chat_model,
-                &envelope,
-                explain::explain_terms(
-                    &state.http,
-                    &prof,
-                    &paper,
-                    std::slice::from_ref(&candidate),
-                    &HashMap::new(),
-                ),
-            )
+            let defs = run_reading_dispatch(&state, "paper_term_add", None, &prof.name, &prof.chat_model, &envelope, explain::explain_terms(
+                &state.http,
+                &prof,
+                &paper,
+                std::slice::from_ref(&candidate),
+                &HashMap::new(),
+            ))
             .await?;
             defs.get(trimmed)
                 .cloned()

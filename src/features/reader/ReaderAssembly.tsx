@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, BookMarked, Columns2, FileText, Highlighter, Languages, NotebookPen, Orbit, PanelRightClose, PanelRightOpen, Search, X } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { AlertTriangle, BookMarked, FileText, Highlighter, Languages, NotebookPen, Orbit, Search, X } from "lucide-react";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { libraryClient, type Paper } from "@/core/data";
 import { useT } from "@/i18n/I18nProvider";
@@ -17,13 +17,17 @@ import { TermsPane } from "@/pages/reader/TermsPane";
 import { ReaderOnboarding } from "@/pages/reader/ReaderOnboarding";
 import { MessageScreen } from "@/pages/reader/ReaderMessageScreen";
 import { HelpPanel } from "@/pages/reader/HelpPanel";
-import type { Highlight } from "@/lib/api";
-import type { ReadingHostAction } from "@/lib/apiReadingService";
+import { api, type Highlight } from "@/lib/api";
+import { READER_SHORTCUTS, type ReaderShortcut, type ReadingHostAction } from "@/lib/apiReadingService";
+import { isReaderMarginNote } from "@/pages/reader/pdfSelectionHelpers";
 import { useLibraryHostActions } from "@/pages/library/LibraryHostActions";
-import { EasyReadFrame } from "./EasyReadFrame";
+import { CoreFrame } from "./CoreFrame";
+
+const HOST_SHORTCUTS: ReadonlySet<string> = new Set(READER_SHORTCUTS);
+const visibleHighlights = (highlights: Highlight[]) => highlights.filter((item) => !isReaderMarginNote(item));
 
 /**
- * Reader route. The main column is the upstream EasyRead reader page, which
+ * Reader route. The main column is the upstream LitFolio reader page, which
  * owns reading, layout, translation, its own annotations and figure handling.
  * LitFolio's tools (reading card, highlight list, terms, selection
  * translation, PDF region notes, earlier full-text translations) sit in one
@@ -55,9 +59,6 @@ export function ReaderAssembly() {
     return (
       <section className="h-full flex flex-col">
         <header className="reader-toolbar">
-          <Link to="/library" className="litera-btn text-xs" title={t("reader.backToLibrary")}>
-            <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("reader.back")}</span>
-          </Link>
           <div className="min-w-0 flex-1 truncate text-xs font-medium text-litera-mute">{t("reader.splitView")}</div>
           <button onClick={closeSplit} className="litera-btn text-xs" title={t("reader.closeSplit")}>
             <X className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("reader.closeSplit")}</span>
@@ -103,17 +104,24 @@ function ReaderPane({
   const [selectionText, setSelectionText] = useState("");
   const [pdfPage, setPdfPage] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [splitPickerOpen, setSplitPickerOpen] = useState(false);
+  const pane = useRef<HTMLDivElement>(null);
   /// The PDF tool is the one heavy panel, so it mounts on first use and stays
   /// mounted afterwards to keep scroll position and viewer state.
   const [pdfMounted, setPdfMounted] = useState(false);
   const scrollFn = useRef<((id: string) => void) | null>(null);
   const pendingJumpId = useRef<string | null>(null);
-  const highlightsRef = useRef<Highlight[]>([]);
   const currentHighlightIdx = useRef(-1);
 
   const paperQ = useQuery({
     queryKey: ["paper", paperId],
     queryFn: () => libraryClient.paperGet(paperId),
+  });
+  const highlightsQ = useQuery({
+    queryKey: ["highlights", paperId],
+    queryFn: () => api.highlightList(paperId),
+    select: visibleHighlights,
+    enabled: Boolean(paperQ.data),
   });
 
   useEffect(() => {
@@ -129,9 +137,9 @@ function ReaderPane({
     setExtrasOpen(true);
   }, []);
 
-  const handleScrollRef = useCallback((fn: (id: string) => void) => {
+  const handleScrollRef = useCallback((fn: ((id: string) => void) | null) => {
     scrollFn.current = fn;
-    if (pendingJumpId.current) {
+    if (fn && pendingJumpId.current) {
       fn(pendingJumpId.current);
       pendingJumpId.current = null;
     }
@@ -163,9 +171,13 @@ function ReaderPane({
    * the tab instead of a host drawer; everything else uses the library
    * controller, which keeps one workflow for one capability across both hosts.
    */
+  const { onAction } = host;
   const hostAction = useCallback(
     (message: ReadingHostAction) => {
       switch (message.action) {
+        case "selection-translate":
+          if (message.text) handleTranslateSelection(message.text);
+          return;
         case "notes":
         case "highlights":
         case "terms":
@@ -174,42 +186,50 @@ function ReaderPane({
           openExtras(message.action);
           return;
         default:
-          host.onAction(message);
+          onAction(message);
       }
     },
-    [host, openExtras],
+    [onAction, handleTranslateSelection, openExtras],
   );
 
   const legacy = useLegacyTranslation(paperId);
 
+  const handleShortcut = useCallback((key: ReaderShortcut) => {
+    if (key === "?") {
+      setShowHelp((prev) => !prev);
+      return;
+    }
+    if (key === "1" || key === "2" || key === "3") {
+      openExtras(key === "1" ? "notes" : key === "2" ? "translate" : "terms");
+      return;
+    }
+    const highlights = highlightsQ.data;
+    if (!highlights?.length) return;
+    const step = key === "j" || key === "]" ? 1 : -1;
+    currentHighlightIdx.current = Math.max(0, Math.min(currentHighlightIdx.current + step, highlights.length - 1));
+    handleJump(highlights[currentHighlightIdx.current]);
+  }, [handleJump, highlightsQ.data, openExtras]);
+
+  const handleReaderControl = useCallback((control: "extras" | "split") => {
+    if (control === "extras") setExtrasOpen((open) => !open);
+    else if (onOpenSplit) setSplitPickerOpen(true);
+  }, [onOpenSplit]);
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("button, a, [role='dialog']") || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-
-      if (e.key === "?") {
-        e.preventDefault();
-        setShowHelp((prev) => !prev);
-        return;
-      }
-
-      const highlights = highlightsRef.current;
-      if (highlights.length > 0 && (e.key === "j" || e.key === "]")) {
-        e.preventDefault();
-        currentHighlightIdx.current = Math.min(currentHighlightIdx.current + 1, highlights.length - 1);
-        handleJump(highlights[currentHighlightIdx.current]);
-      } else if (highlights.length > 0 && (e.key === "k" || e.key === "[")) {
-        e.preventDefault();
-        currentHighlightIdx.current = Math.max(currentHighlightIdx.current - 1, 0);
-        handleJump(highlights[currentHighlightIdx.current]);
-      } else if (e.key === "1" || e.key === "2" || e.key === "3") {
-        e.preventDefault();
-        openExtras(e.key === "1" ? "notes" : e.key === "2" ? "translate" : "terms");
-      }
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
+          event.altKey || event.ctrlKey || event.metaKey || !(target instanceof Element) ||
+          !pane.current?.contains(target) ||
+          target.closest("button, a, input, textarea, select, [contenteditable], [role='dialog']")) return;
+      const key = event.key.toLowerCase();
+      if (!HOST_SHORTCUTS.has(key)) return;
+      event.preventDefault();
+      handleShortcut(key as ReaderShortcut);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleJump, openExtras]);
+  }, [handleShortcut]);
 
   if (paperQ.isLoading) {
     return <MessageScreen title={t("common.loading")} backLink="/library" />;
@@ -217,60 +237,28 @@ function ReaderPane({
   if (!paperQ.data) {
     return <MessageScreen icon={<AlertTriangle className="h-6 w-6 text-litera-warn" />} title={t("reader.notFound")} backLink="/library" />;
   }
-  const paper = paperQ.data;
-
-  const extrasToggle = (
-    <button
-      onClick={() => setExtrasOpen((open) => !open)}
-      className={cn("litera-icon-btn shrink-0", extrasOpen && "bg-litera-accent/12 text-litera-accent")}
-      title={t("reader.extrasToggle")}
-      aria-label={t("reader.extrasToggle")}
-      aria-pressed={extrasOpen}
-      aria-controls="reader-extras"
-    >
-      {extrasOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-    </button>
-  );
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={pane} className="relative h-full flex flex-col">
       {!compact && <ReaderOnboarding />}
-      {effectiveCompact ? (
-        <header className="reader-toolbar reader-toolbar-compact">
-          {!compact && (
-            <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          )}
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-serif text-sm text-litera-text" title={paper.title}>{paper.title}</h1>
-          </div>
-          {extrasToggle}
-        </header>
-      ) : (
-        <header className="reader-toolbar">
-          <Link to="/library" className="litera-icon-btn shrink-0" title={t("reader.backToLibrary")} aria-label={t("reader.backToLibrary")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-serif text-base text-litera-text" title={paper.title}>{paper.title}</h1>
-            <div className="truncate text-[11px] text-litera-mute">
-              {paper.authors.slice(0, 3).join(", ")}{paper.authors.length > 3 ? " et al." : ""}
-              {paper.year ? ` · ${paper.year}` : ""}
-              {paper.venue ? ` · ${paper.venue}` : ""}
-              {paper.arxiv_id ? ` · arXiv:${paper.arxiv_id}` : ""}
-            </div>
-          </div>
-          <div className="reader-toolbar-group">
-            {extrasToggle}
-            {onOpenSplit && <SplitPaperPicker currentPaperId={paperId} onOpenSplit={onOpenSplit} />}
-          </div>
-        </header>
+      {compact && (
+        <h2 className="shrink-0 truncate border-b border-litera-line px-3 py-1.5 text-xs font-medium" title={paperQ.data.title}>
+          {paperQ.data.title}
+        </h2>
       )}
       <div className="flex-1 min-h-0">
         <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
           <Panel id="reader-document" order={1} defaultSize={extrasOpen ? 66 : 100} minSize={35}>
-            <EasyReadFrame paperId={paperId} onAction={hostAction} />
+            <CoreFrame
+              paperId={paperId}
+              onAction={hostAction}
+              onShortcut={handleShortcut}
+              onReaderControl={handleReaderControl}
+              extrasOpen={extrasOpen}
+              canSplit={Boolean(onOpenSplit)}
+              splitView={compact}
+              hasHighlights={Boolean(highlightsQ.data?.length)}
+            />
           </Panel>
           {extrasOpen && (
             <>
@@ -296,7 +284,7 @@ function ReaderPane({
                   onJump={handleJump}
                   onOpenPdfPage={handleOpenPdfPage}
                   legacy={legacy}
-                  highlightsRef={highlightsRef}
+                  highlights={highlightsQ}
                   onTranslateSelection={handleTranslateSelection}
                 />
               </Panel>
@@ -304,6 +292,9 @@ function ReaderPane({
           )}
         </PanelGroup>
       </div>
+      {splitPickerOpen && onOpenSplit && (
+        <SplitPaperPicker paperId={paperId} onOpenSplit={onOpenSplit} onClose={() => setSplitPickerOpen(false)} />
+      )}
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
       {host.ui}
     </div>
@@ -329,7 +320,7 @@ function ExtrasPane({
   onJump,
   onOpenPdfPage,
   legacy,
-  highlightsRef,
+  highlights,
   onTranslateSelection,
 }: {
   paperId: string;
@@ -338,11 +329,11 @@ function ExtrasPane({
   selectionText: string;
   pdfMounted: boolean;
   pdfPage: number | null;
-  onScrollRef: (fn: (id: string) => void) => void;
+  onScrollRef: (fn: ((id: string) => void) | null) => void;
   onJump: (highlight: Highlight) => void;
   onOpenPdfPage: (page: number) => void;
   legacy: LegacyTranslationState;
-  highlightsRef: React.MutableRefObject<Highlight[]>;
+  highlights: UseQueryResult<Highlight[]>;
   onTranslateSelection: (text: string) => void;
 }) {
   const t = useT();
@@ -353,8 +344,7 @@ function ExtrasPane({
   return (
     <div id="reader-extras" className="reader-workspace h-full flex flex-col bg-litera-paper/30">
       <div className="reader-panel-header">
-        <span className="litera-section-label">{t("reader.extrasTitle")}</span>
-        <div className="flex items-center gap-1" role="tablist" aria-label={t("reader.extrasTitle")}>
+        <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={t("reader.extrasTitle")}>
           {tabs.map((entry) => (
             <button
               key={entry.id}
@@ -371,6 +361,7 @@ function ExtrasPane({
               )}
             >
               {entry.icon}
+              <span>{t(entry.labelKey)}</span>
             </button>
           ))}
         </div>
@@ -380,7 +371,7 @@ function ExtrasPane({
           <NoteSectionsPane paperId={paperId} />
         </div>
         <div className={cn("h-full absolute inset-0", tab !== "highlights" && "hidden")}>
-          <HighlightList paperId={paperId} onJump={onJump} highlightsRef={highlightsRef} />
+          <HighlightList paperId={paperId} onJump={onJump} list={highlights} />
         </div>
         <div className={cn("h-full absolute inset-0", tab !== "terms" && "hidden")}>
           <TermsPane paperId={paperId} />
@@ -415,17 +406,17 @@ function ExtrasPane({
 }
 
 function SplitPaperPicker({
-  currentPaperId,
+  paperId,
   onOpenSplit,
+  onClose,
 }: {
-  currentPaperId: string;
+  paperId: string;
   onOpenSplit: (id: string) => void;
+  onClose: () => void;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const papersQ = useQuery({
@@ -434,44 +425,25 @@ function SplitPaperPicker({
       const trimmed = query.trim();
       return trimmed ? libraryClient.papersSearch(trimmed, 8) : libraryClient.papersRecent(8);
     },
-    enabled: open,
     staleTime: 5_000,
   });
 
-  const papers: Paper[] = (papersQ.data ?? []).filter((paper) => paper.id !== currentPaperId);
+  const papers: Paper[] = (papersQ.data ?? []).filter((paper) => paper.id !== paperId);
   const focusedPaper = papers[focusedIndex];
 
   useEffect(() => {
-    if (!open) return;
     setFocusedIndex(0);
-  }, [open, query]);
+  }, [query]);
 
   useEffect(() => {
-    if (!open) return;
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [open]);
-
-  function pickPaper(paper: Paper) {
-    onOpenSplit(paper.id);
-    setOpen(false);
-    setQuery("");
-  }
+    inputRef.current?.focus();
+  }, []);
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      setOpen(false);
+      onClose();
       return;
     }
     if (event.key === "ArrowDown") {
@@ -486,23 +458,15 @@ function SplitPaperPicker({
     }
     if (event.key === "Enter" && focusedPaper) {
       event.preventDefault();
-      pickPaper(focusedPaper);
+      onOpenSplit(focusedPaper.id);
+      onClose();
     }
   }
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        onClick={() => setOpen((value) => !value)}
-        className={`litera-btn text-xs ${open ? "bg-litera-accent/15 text-litera-accent border-litera-accent/30" : ""}`}
-        title={t("reader.splitView")}
-        aria-label={t("reader.splitView")}
-        aria-expanded={open}
-      >
-        <Columns2 className="h-3.5 w-3.5" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[360px] max-w-[calc(100vw-2rem)] litera-panel shadow-xl">
+    <div className="fixed inset-0 z-30 grid place-items-center bg-litera-ink/40" onClick={onClose}>
+        <div role="dialog" aria-modal="true" aria-label={t("reader.splitPickerTitle")} onClick={(event) => event.stopPropagation()}
+          className="w-[360px] max-w-[calc(100vw-2rem)] litera-panel shadow-xl">
           <div className="border-b border-litera-line px-3 py-2">
             <div className="mb-1 text-[11px] font-medium uppercase tracking-normal text-litera-mute">
               {t("reader.splitPickerTitle")}
@@ -533,7 +497,7 @@ function SplitPaperPicker({
                 <li key={paper.id}>
                   <button
                     onMouseEnter={() => setFocusedIndex(index)}
-                    onClick={() => pickPaper(paper)}
+                    onClick={() => { onOpenSplit(paper.id); onClose(); }}
                     className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-litera-panel/80 ${
                       index === focusedIndex ? "bg-litera-panel/80" : ""
                     }`}
@@ -551,7 +515,6 @@ function SplitPaperPicker({
             </ul>
           )}
         </div>
-      )}
     </div>
   );
 }

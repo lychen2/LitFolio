@@ -327,6 +327,7 @@ macro_rules! command_paths_reader_notes {
             $($commands)*
             commands::reading_service::reading_service_open,
             commands::reading_service::reading_service_sync,
+            commands::reading_service::reading_service_position_note_ime,
             commands::highlights::highlight_create,
             commands::highlights::highlight_list,
             commands::highlights::highlight_update_note,

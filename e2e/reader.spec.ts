@@ -1,7 +1,7 @@
 import { expect, test, type Frame, type Page } from "@playwright/test";
 
 /**
- * The reader route renders the hosted EasyRead page from a loopback service the
+ * The reader route renders the hosted LitFolio page from a loopback service the
  * Rust side spawns. The browser harness has no Rust side, so the reading-service
  * mock answers with a fixed loopback origin and this spec serves that origin
  * itself. What is under test is the host contract: what the frame is asked to
@@ -14,12 +14,17 @@ const HOST_PAGE = `<!doctype html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><title>LitFolio</title></head>
 <body>
-<p id="upstream">Upstream reader fixture</p>
+<h1 id="upstream">Upstream reader fixture</h1>
+<button id="extras">Extension panel</button>
 <script>
   window.__hostMessages = [];
   window.addEventListener("message", (event) => { window.__hostMessages.push(event.data); });
   window.__emit = (message) => parent.postMessage(
-    Object.assign({ source: "litfolio-easyread" }, message), "*");
+    Object.assign({ source: "litfolio-core" }, message), "*");
+  document.querySelector("#extras").onclick = () => window.__emit({ type: "reader-control", control: "extras" });
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "theme") document.documentElement.dataset.themeApplied = "true";
+  });
 </script>
 </body>
 </html>`;
@@ -55,7 +60,7 @@ async function openReader(page: Page, paperId: string) {
 test("hosts the upstream reader page in the document column and publishes host state into it", async ({ page }, testInfo) => {
   await openReader(page, "paper-reader");
 
-  await expect(page.getByRole("heading", { name: "Reader Comparison Fixture" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reader Comparison Fixture" })).toHaveCount(0);
 
   // The host publishes its own theme tokens and its own interface language;
   // the framed page keeps upstream's dictionary and adopts the language.
@@ -69,6 +74,13 @@ test("hosts the upstream reader page in the document column and publishes host s
     }),
   ).toEqual({ theme: true, locale: "en" });
 
+  // The iframe can replace its document after changing locale. A new bridge
+  // listener must receive host state even when no iframe load event fires.
+  await readerFrame(page).evaluate(() => {
+    delete document.documentElement.dataset.themeApplied;
+    parent.postMessage({ source: "litfolio-core", type: "ready" }, "*");
+  });
+  await expect(readerFrame(page).locator("html")).toHaveAttribute("data-theme-applied", "true");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1281);
   await page.screenshot({ path: testInfo.outputPath("reader-hosted-frame.png") });
 });
@@ -94,9 +106,9 @@ test("follows host navigation sent from the framed reader", async ({ page }) => 
 test("opens LitFolio extension tools beside the reader and reads an earlier cached translation", async ({ page }) => {
   await openReader(page, "paper-cached");
 
-  const tabs = page.getByRole("tablist", { name: "LitFolio extension tools" });
+  const tabs = page.getByRole("tablist", { name: "Reading tools" });
   await expect(tabs).toBeHidden();
-  await page.getByRole("button", { name: "Toggle extension tools" }).click();
+  await readerFrame(page).getByRole("button", { name: "Extension panel" }).click();
   await expect(tabs).toBeVisible();
 
   // The cached-translation tab exists only for a paper that has one stored.
@@ -111,8 +123,8 @@ test("opens LitFolio extension tools beside the reader and reads an earlier cach
 test("keeps the extension panel reachable without a stored translation", async ({ page }) => {
   await openReader(page, "paper-reader");
 
-  await page.getByRole("button", { name: "Toggle extension tools" }).click();
-  const tabs = page.getByRole("tablist", { name: "LitFolio extension tools" });
+  await readerFrame(page).getByRole("button", { name: "Extension panel" }).click();
+  const tabs = page.getByRole("tablist", { name: "Reading tools" });
   await expect(tabs).toBeVisible();
   await expect(page.getByRole("tab", { name: "Reading Card" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Earlier full-text translation" })).toHaveCount(0);

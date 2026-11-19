@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, RefreshCw, Search } from "lucide-react";
 import { api, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 
 /// Editable DOI field for the paper detail drawer. Lets the user supply (or
 /// correct) a DOI for a paper whose metadata wasn't recognized at import time,
@@ -23,6 +24,7 @@ export function DoiEnrichRow({
       onEnriched(updated);
       qc.invalidateQueries({ queryKey: ["papers"] });
       qc.invalidateQueries({ queryKey: ["paper", paper.id] });
+      notifyLibraryChanged();
     },
   });
 

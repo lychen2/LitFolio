@@ -1,33 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Circle, CircleCheck, CircleDot, Loader2, Paperclip, Plus, Star, Tag as TagIcon, Trash2, X } from "lucide-react";
+import { Loader2, Paperclip, Plus, Tag as TagIcon, X } from "lucide-react";
 import { api, pickSinglePdf, type Paper, type ReadStatus } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import { FolderPicker } from "./FolderPicker";
 import { updatePaperStatusCache } from "./paperStatusCache";
-const STATUS_SEQUENCE: ReadStatus[] = ["unread", "reading", "read", "must"];
+const STATUS_OPTIONS = [
+  ["unread", "common.unread"],
+  ["reading", "common.reading"],
+  ["read", "common.read"],
+  ["must", "common.must"],
+] as const;
 
-const STATUS_VIEW: Record<
-  ReadStatus,
-  { labelKey: "common.unread" | "common.reading" | "common.read" | "common.must"; icon: typeof Circle; tone: string }
-> = {
-  unread: { labelKey: "common.unread", icon: Circle, tone: "text-litera-mute" },
-  reading: { labelKey: "common.reading", icon: CircleDot, tone: "text-litera-accent2" },
-  read: { labelKey: "common.read", icon: CircleCheck, tone: "text-litera-success" },
-  must: { labelKey: "common.must", icon: Star, tone: "text-litera-warn" },
-};
-
-/**
- * Paper metadata the retired LitFolio list carried on each row: read status,
- * tags, folders, the attached PDF and delete. The canonical upstream list owns
- * the row itself, so these live with the detail surface the host opens for one
- * paper and write through the same commands the old rows used.
- */
-export function PaperHostMeta({ paper, onDeleted }: { paper: Paper; onDeleted: () => void }) {
+export function PaperHostMeta({ paper }: { paper: Paper }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const status = useMutation({
     mutationFn: (next: ReadStatus) => api.paperSetReadStatus(paper.id, next),
     onSuccess: (_result, next) => {
@@ -48,31 +36,22 @@ export function PaperHostMeta({ paper, onDeleted }: { paper: Paper; onDeleted: (
       notifyLibraryChanged();
     },
   });
-  const remove = useMutation({
-    mutationFn: () => api.paperDelete(paper.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["papers"], refetchType: "active" });
-      notifyLibraryChanged();
-      onDeleted();
-    },
-  });
-  const view = STATUS_VIEW[paper.read_status];
-  const StatusIcon = view.icon;
-  const current = STATUS_SEQUENCE.indexOf(paper.read_status);
-  const deleteTitle = t("library.confirmDelete", { title: paper.title, id: paper.id });
+  const statusLabel = t("library.filterStatus");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => status.mutate(STATUS_SEQUENCE[(current + 1) % STATUS_SEQUENCE.length])}
-        disabled={status.isPending}
-        className={`litera-btn text-xs disabled:opacity-50 ${view.tone}`}
-        title={t("library.statusToggle", { status: t(view.labelKey) })}
-      >
-        {status.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StatusIcon className="h-3.5 w-3.5" />}
-        {t(view.labelKey)}
-      </button>
+      <div role="group" aria-label={statusLabel} className="inline-flex rounded-[var(--litera-radius)] border border-litera-line p-0.5">
+        {STATUS_OPTIONS.map(([value, key]) => {
+          const selected = (status.isPending ? status.variables : paper.read_status) === value;
+          return (
+            <button key={value} type="button" aria-pressed={selected} disabled={status.isPending}
+              onClick={() => status.mutate(value)}
+              className={`rounded px-2 py-1 text-xs ${selected ? "bg-litera-accent/20 text-litera-accent" : "text-litera-mute hover:text-litera-text"}`}>
+              {t(key)}
+            </button>
+          );
+        })}
+      </div>
       <button
         type="button"
         onClick={() => attach.mutate()}
@@ -83,37 +62,10 @@ export function PaperHostMeta({ paper, onDeleted }: { paper: Paper; onDeleted: (
         {attach.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
         {t("library.attachPdf")}
       </button>
-      {confirmingDelete ? (
-        <>
-          <button
-            type="button"
-            onClick={() => remove.mutate()}
-            disabled={remove.isPending}
-            className="litera-btn text-xs text-litera-error disabled:opacity-50"
-            title={deleteTitle}
-          >
-            {remove.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            {t("common.delete")}
-          </button>
-          <button type="button" onClick={() => setConfirmingDelete(false)} className="litera-btn text-xs">
-            {t("common.cancel")}
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirmingDelete(true)}
-          className="litera-btn text-xs text-litera-error"
-          title={deleteTitle}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {t("library.deletePaperTitle")}
-        </button>
-      )}
       <PaperTags paperId={paper.id} />
       <FolderPicker paperId={paper.id} />
       {attach.error && <p className="w-full text-xs text-litera-error">✕ {t("library.attachPdfFailed")}</p>}
-      {remove.error && <p className="w-full text-xs text-litera-error">✕ {t("library.deleteFailed")}</p>}
+      {status.error && <p role="alert" className="w-full text-xs text-litera-error">{t("library.statusUpdateFailed")}</p>}
     </div>
   );
 }
@@ -169,22 +121,24 @@ function PaperTags({ paperId }: { paperId: string }) {
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
               if (event.key === "Enter" && name.trim()) attachNamed.mutate(name.trim());
               if (event.key === "Escape") {
+                event.stopPropagation();
                 setAdding(false);
                 setName("");
               }
             }}
-            placeholder={t("library.filterTag")}
-            aria-label={t("library.filterTag")}
+            placeholder={t("paper.detail.category")}
+            aria-label={t("paper.detail.category")}
             className="litera-input w-32 py-0.5 text-[11px]"
           />
           <button
             type="button"
             onClick={() => name.trim() && attachNamed.mutate(name.trim())}
             className="text-litera-mute hover:text-litera-text"
-            title={t("library.filterTag")}
-            aria-label={t("library.filterTag")}
+            title={t("paper.detail.category")}
+            aria-label={t("paper.detail.category")}
           >
             {attachNamed.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           </button>
@@ -195,7 +149,7 @@ function PaperTags({ paperId }: { paperId: string }) {
           onClick={() => setAdding(true)}
           className="inline-flex items-center gap-0.5 rounded border border-dashed border-litera-line px-1.5 py-0.5 text-[11px] text-litera-mute hover:border-litera-mute hover:text-litera-text"
         >
-          <Plus className="h-2.5 w-2.5" /> {t("library.filterTag")}
+          <Plus className="h-2.5 w-2.5" /> {t("paper.detail.category")}
         </button>
       )}
     </div>

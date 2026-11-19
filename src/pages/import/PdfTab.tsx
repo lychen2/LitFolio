@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileText, Folder, Loader2, Upload } from "lucide-react";
 import { api, pickPdfFiles } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
+import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import {
   duplicateStatusFromFailures,
   formatPdfImportError,
@@ -72,7 +74,8 @@ export function PdfTab() {
           failed: failed.length,
         },
       });
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      void qc.invalidateQueries({ queryKey: ["papers"] });
+      if (s.imported.length) notifyLibraryChanged();
       notifyRecentImportsChanged();
     },
     onError: (e: Error, paths) => {
@@ -93,6 +96,8 @@ export function PdfTab() {
     },
   });
   const folderMut = useFolderImportMutation(setFolderProgress, setResult, t);
+  const dropRef = useRef<HTMLDivElement>(null);
+  usePdfDropTarget(dropRef, setPicked, !m.isPending && !folderMut.isPending);
 
   async function pick() {
     const files = await pickPdfFiles();
@@ -107,7 +112,7 @@ export function PdfTab() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="litera-panel p-8 text-center">
+      <div ref={dropRef} className="litera-panel p-8 text-center">
         <Upload className="h-10 w-10 mx-auto mb-3 text-litera-mute" />
         <p className="text-sm text-litera-text">{t("import.pdfTab.desc")}</p>
         <p className="text-xs text-litera-mute mt-1">
@@ -209,7 +214,8 @@ function useFolderImportMutation(
           failed: failed.length,
         },
       });
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      void qc.invalidateQueries({ queryKey: ["papers"] });
+      if (s.imported.length) notifyLibraryChanged();
       notifyRecentImportsChanged();
     },
     onError: (e: Error, dirPath) => {

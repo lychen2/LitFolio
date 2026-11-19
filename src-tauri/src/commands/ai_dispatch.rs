@@ -8,6 +8,8 @@
 
 use std::future::Future;
 
+use tauri::ipc::Channel;
+
 use tokio_util::sync::CancellationToken;
 
 use crate::ai::{dispatch_with_cancel, ReadingContextEnvelope};
@@ -33,14 +35,14 @@ pub fn redact_error(err: &str) -> String {
 pub(crate) async fn run_reading_dispatch<T>(
     state: &AppState,
     operation: &str,
-    paper_id: &str,
+    on_started: Option<Channel<String>>,
     profile_name: &str,
     model: &str,
     envelope: &ReadingContextEnvelope,
     io: impl Future<Output = anyhow::Result<T>>,
 ) -> Result<T, String> {
     let executions = AiExecutionRepo::new(&state.pool);
-    let exec_id = format!("exec-{}-{}-{}", operation, paper_id, now_ms());
+    let exec_id = format!("exec-{}", ulid::Ulid::new());
     let started = now_ms();
     let _ = executions
         .record_start(&ExecutionRecord {
@@ -48,7 +50,7 @@ pub(crate) async fn run_reading_dispatch<T>(
             operation: operation.to_string(),
             trigger: "user-action".to_string(),
             envelope_id: envelope.envelope_id.clone(),
-            paper_id: Some(paper_id.to_string()),
+            paper_id: Some(envelope.paper_id.clone()),
             profile_name: profile_name.to_string(),
             model: model.to_string(),
             state: "running".to_string(),
@@ -65,6 +67,9 @@ pub(crate) async fn run_reading_dispatch<T>(
         .lock()
         .await
         .insert(exec_id.clone(), token.clone());
+    if let Some(channel) = on_started {
+        let _ = channel.send(exec_id.clone());
+    }
 
     let outcome = dispatch_with_cancel(&token, io).await;
 

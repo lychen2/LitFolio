@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{ipc::JavaScriptChannelId, State, Webview};
 
 use crate::ai::{
     active_profile_for_task, active_reading_profile, freeze_reading_context, load_config,
@@ -76,7 +76,12 @@ pub(crate) async fn freeze_paper_context(
 }
 
 #[tauri::command]
-pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<TldrResult, String> {
+pub async fn paper_tldr(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    webview: Webview,
+    on_started: Option<JavaScriptChannelId>,
+) -> Result<TldrResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let output_language = cfg.output_language.as_str();
     let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
@@ -107,7 +112,7 @@ pub async fn paper_tldr(state: State<'_, Arc<AppState>>, id: String) -> Result<T
     let result = run_reading_dispatch(
         &state,
         "paper_tldr",
-        &id,
+        on_started.map(|channel| channel.channel_on(webview)),
         &prof.name,
         &prof.chat_model,
         &envelope,
@@ -165,28 +170,20 @@ pub async fn paper_quick_read(
     .await?;
 
     let http = state.http.clone();
-    let result = run_reading_dispatch(
-        &state,
-        "paper_quick_read",
-        &id,
-        &prof.name,
-        &prof.chat_model,
-        &envelope,
-        quick_read_paper_text(
-            &http,
-            &prof,
-            &PaperSummaryRequest {
-                title: &paper.title,
-                authors: &paper.authors,
-                venue: paper.venue.as_deref(),
-                year: paper.year,
-                abstract_text: paper.abstract_text.as_deref(),
-                body_text: body.as_deref(),
-                extra_context: None,
-                output_language,
-            },
-        ),
-    )
+    let result = run_reading_dispatch(&state, "paper_quick_read", None, &prof.name, &prof.chat_model, &envelope, quick_read_paper_text(
+        &http,
+        &prof,
+        &PaperSummaryRequest {
+            title: &paper.title,
+            authors: &paper.authors,
+            venue: paper.venue.as_deref(),
+            year: paper.year,
+            abstract_text: paper.abstract_text.as_deref(),
+            body_text: body.as_deref(),
+            extra_context: None,
+            output_language,
+        },
+    ))
     .await?;
     repo.update_quick_read(
         &id,
@@ -205,6 +202,8 @@ pub async fn paper_translate(
     state: State<'_, Arc<AppState>>,
     id: String,
     target_lang: Option<String>,
+    webview: Webview,
+    on_started: Option<JavaScriptChannelId>,
 ) -> Result<crate::ai::TranslationResult, String> {
     let cfg = load_config(&state.paths).map_err(|e| e.to_string())?;
     let prof = active_reading_profile(&cfg).map_err(|e| e.to_string())?;
@@ -236,17 +235,11 @@ pub async fn paper_translate(
     let result = run_reading_dispatch(
         &state,
         "paper_translate",
-        &id,
+        on_started.map(|channel| channel.channel_on(webview)),
         &prof.name,
         &prof.chat_model,
         &envelope,
-        crate::ai::translate_paper_text(
-            &http,
-            &prof,
-            &title,
-            paper.abstract_text.as_deref(),
-            &lang,
-        ),
+        crate::ai::translate_paper_text(&http, &prof, &title, paper.abstract_text.as_deref(), &lang),
     )
     .await?;
     repo.update_translation(

@@ -30,7 +30,9 @@ test.describe("app smoke", () => {
     await expect(page.locator(`iframe[src^="${READING_SERVICE_ORIGIN}"]`)).toBeVisible();
 
     await page.goto("/import");
-    await expect(page.locator(`iframe[src="${READING_SERVICE_ORIGIN}/?litfolio=import&ref="]`)).toBeVisible();
+    await page.getByText("Advanced import options", { exact: true }).click();
+    await expect(page.getByRole("button", { name: "PDF or link", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTitle("PDF or link", { exact: true })).toHaveAttribute("src", `${READING_SERVICE_ORIGIN}/host/import`);
 
     await page.goto("/reader/paper-1");
     await expect(page.locator(`iframe[src="${READING_SERVICE_ORIGIN}/read/paper-1"]`)).toBeVisible();
@@ -66,11 +68,12 @@ test.describe("app smoke", () => {
     expect(externalNavigations).toEqual([]);
   });
 
-  test("hands an import reference to the upstream import workflow", async ({ page }) => {
+  test("prefills the identifier form from an RSS import link", async ({ page }) => {
     const reference = "https://doi.org/10.1145%2F3530819";
     await page.goto(`/import?fromFeedItem=feed-1&link=${reference}`);
 
     await expect(page.getByText("From RSS subscription")).toBeVisible();
-    await expect(page.locator(`iframe[src^="${READING_SERVICE_ORIGIN}/?litfolio=import&ref="]`)).toBeVisible();
+    await expect(page.getByRole("button", { name: "arXiv or DOI" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("textbox")).toHaveValue("10.1145/3530819");
   });
 });

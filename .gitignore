@@ -18,10 +18,10 @@ dist-ssr
 # rust / tauri
 src-tauri/target/
 src-tauri/gen/
-vendor/easyread/build/
-vendor/easyread/**/__pycache__/
-vendor/easyread/**/*.pyc
-vendor/easyread/**/*.egg-info/
+vendor/core/build/
+vendor/core/**/__pycache__/
+vendor/core/**/*.pyc
+vendor/core/**/*.egg-info/
 src-tauri/binaries/
 
 # local data

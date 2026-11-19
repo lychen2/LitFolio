@@ -117,25 +117,17 @@ pub async fn reader_translate_selection(
     )
     .await?;
 
-    run_reading_dispatch(
-        &state,
-        "reader_translate_selection",
-        &paper_id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        async {
-            translate_selection(TranslateSelectionInput {
-                client: &state.http,
-                profile: &profile,
-                paper: &paper,
-                selection: &clipped,
-                terms: &terms,
-                target_lang: &lang,
-            })
-            .await
-        },
-    )
+    run_reading_dispatch(&state, "reader_translate_selection", None, &profile.name, &profile.chat_model, &envelope, async {
+        translate_selection(TranslateSelectionInput {
+            client: &state.http,
+            profile: &profile,
+            paper: &paper,
+            selection: &clipped,
+            terms: &terms,
+            target_lang: &lang,
+        })
+        .await
+    })
     .await
 }
 
@@ -256,15 +248,7 @@ pub async fn paper_translate_markdown(
     )
     .await?;
 
-    let result = run_reading_dispatch(
-        &state,
-        "paper_translate_markdown",
-        &paper_id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        translate_markdown_text(&state.http, &profile, &paper.title, &body, &lang),
-    )
+    let result = run_reading_dispatch(&state, "paper_translate_markdown", None, &profile.name, &profile.chat_model, &envelope, translate_markdown_text(&state.http, &profile, &paper.title, &body, &lang))
     .await?;
     state
         .paths
@@ -324,25 +308,17 @@ pub async fn highlight_translate(
     )
     .await?;
 
-    let result = run_reading_dispatch(
-        &state,
-        "highlight_translate",
-        &highlight.paper_id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        async {
-            translate_selection(TranslateSelectionInput {
-                client: &state.http,
-                profile: &profile,
-                paper: &paper,
-                selection: &clipped,
-                terms: &terms,
-                target_lang: &lang,
-            })
-            .await
-        },
-    )
+    let result = run_reading_dispatch(&state, "highlight_translate", None, &profile.name, &profile.chat_model, &envelope, async {
+        translate_selection(TranslateSelectionInput {
+            client: &state.http,
+            profile: &profile,
+            paper: &paper,
+            selection: &clipped,
+            terms: &terms,
+            target_lang: &lang,
+        })
+        .await
+    })
     .await?;
     if result.translation.trim().is_empty() {
         return Err("empty translation response".into());
@@ -405,15 +381,7 @@ pub async fn highlight_summarize(
     )
     .await?;
 
-    let result = run_reading_dispatch(
-        &state,
-        "highlight_summarize",
-        &highlight.paper_id,
-        &profile.name,
-        &profile.chat_model,
-        &envelope,
-        async { summarize_highlight(&state.http, &profile, &paper, &clipped).await },
-    )
+    let result = run_reading_dispatch(&state, "highlight_summarize", None, &profile.name, &profile.chat_model, &envelope, async { summarize_highlight(&state.http, &profile, &paper, &clipped).await })
     .await?;
     if result.summary.trim().is_empty() {
         return Err("empty summary response".into());

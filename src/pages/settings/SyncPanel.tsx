@@ -382,7 +382,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] uppercase tracking-wider text-litera-mute">
+      <span className="text-[11px] tracking-wider text-litera-mute">
         {label}
       </span>
       {children}

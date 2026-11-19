@@ -1,15 +1,16 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { Channel } from "@tauri-apps/api/core";
 import { Loader2, X } from "lucide-react";
 import { LitReviewDialog } from "@/components/LitReviewDialog";
 import { ExportCitationsDialog } from "@/components/ExportCitationsDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 import { api, type Paper } from "@/lib/api";
-import type { ReadingHostAction } from "@/lib/apiReadingService";
+import type { ReadingAction, ReadingHostAction } from "@/lib/apiReadingService";
 import { cn } from "@/lib/cn";
-import { errorMessageOr } from "@/lib/error";
+import { errorMessage, errorMessageOr } from "@/lib/error";
 import { zoteroErrorMessage } from "@/lib/zoteroError";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import { SelectionTranslatePane } from "@/pages/reader/SelectionTranslatePane";
@@ -18,6 +19,7 @@ import { PaperDetailDrawer } from "./PaperDetailDrawer";
 import { QuickReadDrawer } from "./QuickReadDrawer";
 import { ReadingQueue } from "./ReadingQueue";
 import { SimilarPapersPanel } from "./SimilarPapersPanel";
+import { useDialogKeyboard } from "@/components/useDialogKeyboard";
 
 /**
  * Host-side plan for one action the hosted reader sends. Single-paper tools
@@ -96,7 +98,7 @@ export interface LibraryHostActionsOptions {
 }
 
 export interface LibraryHostActionsController {
-  /** Stable handler for `EasyReadFrame`'s `onAction`. */
+  /** Stable handler for `CoreFrame`'s `onAction`. */
   onAction: (message: ReadingHostAction) => void;
   /** Render once per host: the status banner and whichever surface is open. */
   ui: ReactNode;
@@ -110,11 +112,19 @@ type Surface =
   | { kind: "queue" }
   | { kind: "collections" }
   | { kind: "review"; paperIds: string[] }
-  | { kind: "export"; paperIds: string[] };
+  | { kind: "export"; paperIds: string[] }
+  | { kind: "zotero-confirm"; skippedIds: string[]; initiallyPushed: number };
 
 interface Banner {
   tone: "busy" | "error" | "notice";
   text: string;
+}
+
+interface ModelTask {
+  key: number;
+  text: string;
+  executionId?: string;
+  cancelling?: boolean;
 }
 
 /**
@@ -136,14 +146,22 @@ export function useLibraryHostActions({
   const navigate = useNavigate();
   const [surface, setSurface] = useState<Surface | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [modelTasks, setModelTasks] = useState<ModelTask[]>([]);
   const close = useCallback(() => setSurface(null), []);
+  const options = useRef({ collections, onOpenReader });
+  useEffect(() => {
+    options.current = { collections, onOpenReader };
+  });
+  const latestAction = useRef(0);
 
   const openReader = useCallback(
     (paperId: string) => {
-      if (onOpenReader) onOpenReader(paperId);
+      setSurface(null);
+      const override = options.current.onOpenReader;
+      if (override) override(paperId);
       else navigate(`/reader/${paperId}`);
     },
-    [navigate, onOpenReader],
+    [navigate],
   );
 
   const ensurePaper = useCallback(
@@ -167,110 +185,161 @@ export function useLibraryHostActions({
   );
 
   const pushZotero = useCallback(
-    async (paperIds: string[], force: boolean): Promise<void> => {
+    async (paperIds: string[]): Promise<string | null> => {
       let result;
       try {
-        result = await api.zoteroPush(paperIds, force);
+        result = await api.zoteroPush(paperIds, false);
       } catch (error) {
         throw new Error(zoteroErrorMessage(error, t));
       }
-      if (result.skipped.length > 0 && !force) {
-        if (window.confirm(t("library.zoteroRepushConfirm", { count: String(result.skipped.length) }))) {
-          await pushZotero(result.skipped, true);
-          return;
-        }
-        setBanner({ tone: "notice", text: t("library.zoteroSkipped", { count: String(result.skipped.length) }) });
-        return;
+      if (result.skipped.length > 0) {
+        setSurface({ kind: "zotero-confirm", skippedIds: result.skipped, initiallyPushed: result.pushed });
+        return null;
       }
-      setBanner({ tone: "notice", text: t("library.zoteroPushed", { count: String(result.pushed) }) });
+      return t("library.zoteroPushed", { count: String(result.pushed) });
     },
     [t],
   );
 
   const run = useCallback(
-    async (plan: LibraryActionPlan) => {
+    async (plan: LibraryActionPlan, onStarted?: Channel<string>): Promise<string | null> => {
       switch (plan.surface) {
         case "reader":
           openReader(plan.paperId);
-          return;
+          return null;
         case "queue-open":
           setSurface({ kind: "queue" });
-          return;
+          return null;
         case "collections":
-          if (collections) setSurface({ kind: "collections" });
+          if (options.current.collections) setSurface({ kind: "collections" });
           else navigate("/library?panel=collections");
-          return;
+          return null;
         case "selection-translate":
           await ensurePaper(plan.paperId);
           setSurface({ kind: "selection", paperId: plan.paperId, text: plan.text });
-          return;
+          return null;
         case "review":
           setSurface({ kind: "review", paperIds: plan.paperIds });
-          return;
+          return null;
         case "export":
           setSurface({ kind: "export", paperIds: plan.paperIds });
-          return;
+          return null;
         case "zotero":
-          await pushZotero(plan.paperIds, false);
-          return;
+          return pushZotero(plan.paperIds);
         case "queue-add":
           await Promise.all(plan.paperIds.map((id) => api.queueAdd(id)));
           await queryClient.invalidateQueries({ queryKey: ["queue"] });
           notifyLibraryChanged();
-          setBanner({ tone: "notice", text: t("import.sidebar.queueDone") });
-          return;
+          return t("import.sidebar.queueDone");
         case "details":
           await ensurePaper(plan.paperId);
           setSurface({ kind: "detail", paperId: plan.paperId });
-          return;
+          return null;
         case "tldr":
-          await ensurePaper(plan.paperId);
-          await api.paperTldr(plan.paperId);
-          await refreshPaper(plan.paperId);
-          setSurface({ kind: "detail", paperId: plan.paperId });
-          return;
         case "translate-metadata":
-          await ensurePaper(plan.paperId);
-          await api.paperTranslate(plan.paperId, llmLanguageNameFor(lang));
+          if (plan.surface === "tldr") await api.paperTldr(plan.paperId, onStarted);
+          else await api.paperTranslate(plan.paperId, llmLanguageNameFor(lang), onStarted);
           await refreshPaper(plan.paperId);
-          setSurface({ kind: "detail", paperId: plan.paperId });
-          return;
+          return null;
         case "quick-read":
           await ensurePaper(plan.paperId);
           setSurface({ kind: "quick-read", paperId: plan.paperId });
-          return;
+          return null;
         case "similar":
           await ensurePaper(plan.paperId);
           setSurface({ kind: "similar", paperId: plan.paperId });
-          return;
+          return null;
       }
     },
-    [collections, ensurePaper, lang, navigate, openReader, pushZotero, queryClient, refreshPaper, t],
+    [ensurePaper, lang, navigate, openReader, pushZotero, queryClient, refreshPaper, t],
   );
 
+  const confirmZoteroPush = useCallback(async () => {
+    if (surface?.kind !== "zotero-confirm") return;
+    const confirmation = surface;
+    setSurface(null);
+    try {
+      const result = await api.zoteroPush(confirmation.skippedIds, true);
+      setBanner({ tone: "notice", text: t("library.zoteroPushed", { count: String(confirmation.initiallyPushed + result.pushed) }) });
+    } catch (error) {
+      setBanner({ tone: "error", text: zoteroErrorMessage(error, t) });
+    }
+  }, [surface, t]);
+
+  const cancelZoteroPush = useCallback(() => {
+    if (surface?.kind !== "zotero-confirm") return;
+    setBanner({ tone: "notice", text: t("library.zoteroSkipped", { count: String(surface.skippedIds.length) }) });
+    setSurface(null);
+  }, [surface, t]);
   const onAction = useCallback(
     (message: ReadingHostAction) => {
-      setBanner({ tone: "busy", text: t("common.loading") });
+      const token = ++latestAction.current;
+      const plan = planLibraryAction(message);
+      const isModelTask = plan.surface === "tldr" || plan.surface === "translate-metadata";
+      let onStarted: Channel<string> | undefined;
+      setBanner(null);
+      if (isModelTask) {
+        const text = t(plan.surface === "tldr" ? "library.generatingTldr" : "library.translatingMetadata");
+        setModelTasks((tasks) => [...tasks, { key: token, text }]);
+        onStarted = new Channel<string>((executionId) => {
+          setModelTasks((tasks) => tasks.map((task) => task.key === token ? { ...task, executionId } : task));
+        });
+      }
       void (async () => {
         try {
-          await run(planLibraryAction(message));
-          setBanner(null);
+          const notice = await run(plan, onStarted);
+          if (notice && latestAction.current === token) setBanner({ tone: "notice", text: notice });
         } catch (error) {
-          setBanner({ tone: "error", text: errorMessageOr(error, t("reader.unknownError")) });
+          if (isModelTask && errorMessage(error) === "cancelled") {
+            setBanner({ tone: "notice", text: t("library.actionCancelled") });
+          } else if (isModelTask || latestAction.current === token) {
+            setBanner({ tone: "error", text: errorMessageOr(error, t("reader.unknownError")) });
+          }
+        } finally {
+          if (isModelTask) setModelTasks((tasks) => tasks.filter((task) => task.key !== token));
         }
       })();
     },
     [run, t],
   );
 
+  const cancelModelTask = useCallback(async ({ key, executionId }: ModelTask) => {
+    if (!executionId) return;
+    setModelTasks((tasks) => tasks.map((task) => task.key === key ? { ...task, cancelling: true } : task));
+    try {
+      if (await api.aiCancelExecution(executionId)) return;
+    } catch (error) {
+      setBanner({ tone: "error", text: errorMessageOr(error, t("reader.unknownError")) });
+    }
+    setModelTasks((tasks) => tasks.map((task) => task.key === key ? { ...task, cancelling: false } : task));
+  }, [t]);
+
   return {
     onAction,
     ui: (
       <>
-        {banner && <HostBanner banner={banner} onDismiss={() => setBanner(null)} />}
+        {(banner || modelTasks.length > 0) && (
+          <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 flex max-w-[90vw] -translate-x-1/2 flex-col items-center gap-2">
+            {modelTasks.map((task) => (
+              <HostBanner
+                key={task.key}
+                banner={{ tone: "busy", text: task.text }}
+                onCancel={() => void cancelModelTask(task)}
+                cancelDisabled={!task.executionId || task.cancelling}
+              />
+            ))}
+            {banner && <HostBanner banner={banner} onDismiss={() => setBanner(null)} />}
+          </div>
+        )}
         {surface?.kind === "detail" && (
           <LivePaper paperId={surface.paperId}>
-            {(paper) => <PaperDetailDrawer paper={paper} onClose={close} />}
+            {(paper) => (
+              <PaperDetailDrawer
+                paper={paper}
+                onClose={close}
+                onAction={(action: ReadingAction) => onAction({ type: "action", action, paperIds: [paper.id] })}
+              />
+            )}
           </LivePaper>
         )}
         {surface?.kind === "quick-read" && (
@@ -318,12 +387,33 @@ export function useLibraryHostActions({
           <LitReviewDialog paperIds={surface.paperIds} paperCount={surface.paperIds.length} onClose={close} />
         )}
         {surface?.kind === "export" && <ExportCitationsDialog paperIds={surface.paperIds} onClose={close} />}
+        {surface?.kind === "zotero-confirm" && (
+          <HostDrawer title={t("library.zoteroConfirmTitle")} onClose={cancelZoteroPush}>
+            <div className="flex h-full flex-col gap-4 p-5">
+              <p className="text-sm text-litera-text">
+                {t("library.zoteroRepushConfirm", { count: String(surface.skippedIds.length) })}
+              </p>
+              <div className="mt-auto flex justify-end gap-2">
+                <button onClick={cancelZoteroPush} className="litera-btn text-xs">{t("common.cancel")}</button>
+                <button onClick={() => void confirmZoteroPush()} className="litera-btn-primary text-xs">
+                  {t("library.zoteroConfirmPush")}
+                </button>
+              </div>
+            </div>
+          </HostDrawer>
+        )}
       </>
     ),
   };
 }
 
-function HostBanner({ banner, onDismiss }: { banner: Banner; onDismiss: () => void }) {
+function HostBanner({ banner, onDismiss, onCancel, cancelDisabled }: {
+  banner: Banner;
+  onDismiss?: () => void;
+  onCancel?: () => void;
+  cancelDisabled?: boolean;
+}) {
+  const { t } = useI18n();
   const tone =
     banner.tone === "error"
       ? "border-litera-error/40 bg-litera-error/12 text-litera-error"
@@ -334,18 +424,23 @@ function HostBanner({ banner, onDismiss }: { banner: Banner; onDismiss: () => vo
     <div
       role={banner.tone === "error" ? "alert" : "status"}
       className={cn(
-        "fixed bottom-5 left-1/2 z-40 flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg",
+        "pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg",
         tone,
       )}
     >
       {banner.tone === "busy" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       <span className="break-words">{banner.text}</span>
-      {banner.tone !== "busy" && (
+      {onCancel && (
+        <button type="button" onClick={onCancel} disabled={cancelDisabled} className="litera-btn text-xs">
+          {t("common.cancel")}
+        </button>
+      )}
+      {onDismiss && (
         <button
           onClick={onDismiss}
           className="ml-1 shrink-0 opacity-70 hover:opacity-100"
-          aria-label="dismiss"
-          title="dismiss"
+          aria-label={t("common.close")}
+          title={t("common.close")}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -368,12 +463,15 @@ function HostDrawer({
   onClose: () => void;
 }) {
   const t = useI18n().t;
+  const dialog = useDialogKeyboard(onClose);
   return (
     <div
       className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop"
       onClick={onClose}
     >
       <div
+        {...dialog}
+        aria-label={title}
         onClick={(event) => event.stopPropagation()}
         className={cn(
           "litera-drawer-enter flex h-full max-w-[94vw] flex-col border-l border-litera-line bg-litera-paper shadow-2xl",

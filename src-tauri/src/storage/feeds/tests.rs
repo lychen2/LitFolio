@@ -47,19 +47,24 @@ async fn create_list_upsert_roundtrip() {
     assert_eq!(listed[0].total_items, 2);
     assert_eq!(listed[0].unread_items, 2);
 
-    let entries = repo.list_items(Some(feed.id), false, 10, 0).await.unwrap();
+    let entries = repo
+        .list_items(Some(feed.id), false, None, 10, 0)
+        .await
+        .unwrap();
     assert_eq!(entries.len(), 2);
-    assert_eq!(entries[0].title, "Second");
-    assert_eq!(entries[1].title, "First");
 
-    let fetched = repo.get_item(&entries[1].id).await.unwrap().unwrap();
+    let first = entries.iter().find(|entry| entry.entry_id == "a").unwrap();
+    let fetched = repo.get_item(&first.id).await.unwrap().unwrap();
     assert_eq!(fetched.entry_id, "a");
     assert_eq!(fetched.link.as_deref(), Some("https://example.com/a"));
     assert!(fetched.summary.as_deref().unwrap_or_default().is_empty());
     assert_eq!(fetched.authors, vec!["Alice"]);
 
-    repo.set_item_seen(&entries[1].id, true).await.unwrap();
-    let unread = repo.list_items(Some(feed.id), true, 10, 0).await.unwrap();
+    repo.set_item_seen(&first.id, true).await.unwrap();
+    let unread = repo
+        .list_items(Some(feed.id), true, None, 10, 0)
+        .await
+        .unwrap();
     assert_eq!(unread.len(), 1);
     assert_eq!(unread[0].title, "Second");
 
@@ -67,7 +72,7 @@ async fn create_list_upsert_roundtrip() {
 }
 
 #[tokio::test]
-async fn list_items_prioritizes_unread_then_later_fetch_for_same_publish_time() {
+async fn list_items_sorts_by_first_fetch_and_filters_before_pagination() {
     let (pool, dir) = temp().await;
     let repo = FeedRepo::new(&pool);
     let feed = repo
@@ -81,7 +86,7 @@ async fn list_items_prioritizes_unread_then_later_fetch_for_same_publish_time() 
             link: None,
             summary: None,
             authors: vec![],
-            published_at: Some(1_700_000_000),
+            published_at: Some(1_800_000_000),
         },
         NewFeedItem {
             entry_id: "newer-fetch".into(),
@@ -106,14 +111,29 @@ async fn list_items_prioritizes_unread_then_later_fetch_for_same_publish_time() 
         .await
         .unwrap();
 
-    let entries = repo.list_items(Some(feed.id), false, 10, 0).await.unwrap();
+    let entries = repo.list_items(None, false, None, 10, 0).await.unwrap();
     assert_eq!(entries[0].entry_id, "newer-fetch");
     assert_eq!(entries[1].entry_id, "older-fetch");
 
     repo.set_item_seen(&entries[0].id, true).await.unwrap();
-    let entries = repo.list_items(Some(feed.id), false, 10, 0).await.unwrap();
-    assert_eq!(entries[0].entry_id, "older-fetch");
-    assert_eq!(entries[1].entry_id, "newer-fetch");
+    let entries = repo.list_items(None, false, None, 10, 0).await.unwrap();
+    assert_eq!(entries[0].entry_id, "newer-fetch");
+    let filtered = repo
+        .list_items(Some(feed.id), true, Some("  OLDER  "), 1, 0)
+        .await
+        .unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].entry_id, "older-fetch");
+    let filtered = repo
+        .list_items(Some(feed.id), true, Some("newer"), 1, 0)
+        .await
+        .unwrap();
+    assert!(filtered.is_empty());
+    let filtered = repo
+        .list_items(None, false, Some("older"), 1, 0)
+        .await
+        .unwrap();
+    assert_eq!(filtered[0].entry_id, "older-fetch");
 
     std::fs::remove_dir_all(&dir).ok();
 }

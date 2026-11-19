@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ClipboardCopy, Download, FileText, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import { useDialogKeyboard } from "./useDialogKeyboard";
 
 export const citationExportFormats = [
   { value: "bibtex", ext: "bib", mime: "application/x-bibtex" },
@@ -23,6 +24,7 @@ export function ExportCitationsDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const dialog = useDialogKeyboard(onClose);
   const [format, setFormat] = useState<string>("bibtex");
   const [copied, setCopied] = useState(false);
 
@@ -54,6 +56,8 @@ export function ExportCitationsDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-litera-ink/40 backdrop-blur-sm" onClick={onClose}>
       <div
+        {...dialog}
+        aria-label={t("citations.title")}
         onClick={(e) => e.stopPropagation()}
         className="w-[420px] max-w-[90vw] bg-litera-paper border border-litera-line rounded-xl shadow-2xl p-5"
       >
@@ -62,7 +66,7 @@ export function ExportCitationsDialog({
             <FileText className="h-4 w-4 text-litera-accent" />
             <span className="font-medium">{t("citations.title")}</span>
           </div>
-          <button onClick={onClose} className="text-litera-mute hover:text-litera-text">
+          <button onClick={onClose} aria-label={t("common.close")} className="text-litera-mute hover:text-litera-text">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -84,7 +88,7 @@ export function ExportCitationsDialog({
                     : "border-litera-line text-litera-mute hover:bg-litera-panel"
                 }`}
               >
-                {t(`citations.${f.value === "gb/t7714" ? "gbt" : f.value}` as any)}
+                {t(`citations.${f.value === "gb/t7714" ? "gbt" : f.value}`)}
               </button>
             ))}
           </div>

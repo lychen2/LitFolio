@@ -1,7 +1,7 @@
 {
   "name": "litfolio-desktop",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "description": "LitFolio — local-first literature management with LLM-powered summarization",
   "scripts": {
@@ -9,8 +9,8 @@
     "build": "node scripts/generate-profile-registry.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "node scripts/build-easyread-sidecar.mjs && tauri dev",
-    "tauri:build": "node scripts/build-easyread-sidecar.mjs --force && LITFOLIO_PROFILE=core tauri build --features custom-protocol -- --no-default-features --locked",
+    "tauri:dev": "node scripts/build-core-sidecar.mjs && tauri dev",
+    "tauri:build": "node scripts/build-core-sidecar.mjs --force && LITFOLIO_PROFILE=core tauri build --features custom-protocol -- --no-default-features --locked",
     "typecheck": "VITE_LITFOLIO_PROFILE=all node scripts/generate-profile-registry.mjs && tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:strict": "eslint src --ext .ts,.tsx --max-warnings=0",

@@ -123,23 +123,23 @@ pnpm tauri:build  # 构建 core profile 桌面安装包
 `pnpm dev` 只启动前端开发服务器。`core` 构建会裁剪可选插件；需要全部插件时可使用：
 
 ```bash
-node scripts/build-easyread-sidecar.mjs --force && \
+node scripts/build-core-sidecar.mjs --force && \
   VITE_LITFOLIO_PROFILE=all LITFOLIO_PROFILE=all pnpm tauri build
 ```
 
 以上环境变量写法适用于 Bash / zsh，Windows PowerShell 请使用 `$env:变量名="值"` 后执行命令。
 
-### EasyRead 阅读服务（打包二进制）
+### 阅读核心（打包二进制）
 
-阅读界面由 EasyRead 服务提供。`pnpm tauri:dev` 与 `pnpm tauri:build` 都会先运行 `scripts/build-easyread-sidecar.mjs`：用 PyInstaller 把 `vendor/easyread/` 冻结成单文件可执行程序 `src-tauri/binaries/easyread-backend-<triple>`，由 Tauri `externalBin` 装进安装包。冻结产物自带 CPython 运行时，安装后的 LitFolio 不需要系统 Python。
+`pnpm tauri:dev` 与 `pnpm tauri:build` 会先运行 `scripts/build-core-sidecar.mjs`，通过 PyInstaller 将 `vendor/core/` 冻结为 `src-tauri/binaries/core-<triple>`，再由 Tauri `externalBin` 装进安装包。冻结产物自带 CPython，安装后的 LitFolio 无需系统 Python。
 
 首次构建前准备 Python（上游要求 ≥ 3.10，发布流程使用 3.12）与打包依赖：
 
 ```bash
-python -m pip install pyinstaller ./vendor/easyread
+python -m pip install pyinstaller ./vendor/core
 ```
 
-`pnpm tauri:dev` 按 `vendor/easyread/` 源码的修改时间决定是否重建，源码未变时直接复用已有产物；`pnpm tauri:build`、发布流程与手动指定 `--force` 时总是重新冻结，安装包不会带上过期产物。PyInstaller 不能交叉编译，侧车必须在目标平台上构建，`release.yml` 因此在每个原生 runner 上先构建侧车再交给 tauri-action 打包。
+`pnpm tauri:dev` 按 `vendor/core/` 源码的修改时间决定是否重建，源码未变时直接复用已有产物。`pnpm tauri:build`、发布流程与手动指定 `--force` 时总是重新冻结。PyInstaller 不能交叉编译，`release.yml` 在每个目标平台上先构建侧车，再交给 tauri-action 打包。
 
 <details>
 <summary><strong>项目结构与验证命令</strong></summary>
@@ -164,4 +164,4 @@ cd src-tauri && cargo test
 
 ## License
 
-[GPL-3.0-or-later](LICENSE)。重合的阅读与文献库功能集成 [EasyRead](https://github.com/Edwardxlai/easyread)（MIT，上游源码见 `vendor/easyread/`），原作者版权与授权条款见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[GPL-3.0-or-later](LICENSE)。重合的阅读与文献库功能集成 [EasyRead](https://github.com/Edwardxlai/easyread)（MIT，上游源码见 `vendor/core/`），原作者版权与授权条款见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

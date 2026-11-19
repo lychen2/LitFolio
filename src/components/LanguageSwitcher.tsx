@@ -25,8 +25,8 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-1 text-xs" role="group" aria-label={t("lang.label")}>
-      <Languages className="h-3.5 w-3.5 text-litera-mute" aria-hidden="true" />
+    <div className="flex items-center gap-1 text-xs max-[900px]:flex-col" role="group" aria-label={t("lang.label")}>
+      <Languages className="h-3.5 w-3.5 text-litera-mute max-[900px]:hidden" aria-hidden="true" />
       <button
         type="button"
         onClick={() => switchTo("zh")}
@@ -37,6 +37,7 @@ export function LanguageSwitcher() {
             : "text-litera-text/70 hover:text-litera-text")
         }
         title={t("lang.zh")}
+        aria-pressed={lang === "zh"}
       >
         ZH
       </button>
@@ -50,6 +51,7 @@ export function LanguageSwitcher() {
             : "text-litera-text/70 hover:text-litera-text")
         }
         title={t("lang.en")}
+        aria-pressed={lang === "en"}
       >
         EN
       </button>

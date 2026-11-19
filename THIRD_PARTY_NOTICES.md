@@ -1,6 +1,6 @@
 # Third-party notices
 
-LitFolio bundles [EasyRead](https://github.com/Edwardxlai/easyread) v1.5.0 (`a08c0d2`) as the implementation of overlapping paper-reading and library workflows. The upstream source and its included vendor notices are in `vendor/easyread/`; LitFolio's Tauri integration and exclusive features extend that implementation. EasyRead is packaged as a frozen executable that embeds its own Python runtime, so the components below are distributed inside that executable.
+LitFolio bundles [EasyRead](https://github.com/Edwardxlai/easyread) v1.5.0 (`a08c0d2`) as the implementation of overlapping paper-reading and library workflows. The upstream source and its included vendor notices are in `vendor/core/`. LitFolio's Tauri integration and exclusive features extend that implementation. The reading core is packaged as a frozen executable that embeds its own Python runtime and the components listed below.
 
 ## EasyRead
 
@@ -26,9 +26,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Components inside the frozen EasyRead service
+## Components inside the frozen LitFolio service
 
-The build installs `vendor/easyread` and its declared dependencies, then freezes them with PyInstaller. Each package keeps its own licence text inside the executable; the list below records the projects and their licences.
+The build installs `vendor/core` and its declared dependencies, then freezes them with PyInstaller. Each package keeps its own licence text inside the executable. The list below records the projects and their licences.
 
 | Component | Licence |
 | --- | --- |

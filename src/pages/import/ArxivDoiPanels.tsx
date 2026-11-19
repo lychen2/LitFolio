@@ -43,7 +43,7 @@ export function IdentifierPanel({
   const trimmed = value.trim();
   return (
     <div className="litera-panel p-5">
-      <label className="text-xs uppercase tracking-wider text-litera-mute">
+      <label className="text-xs tracking-wider text-litera-mute">
         {t("import.step1.label")}
       </label>
       <div className="flex gap-2 mt-2">
@@ -231,7 +231,7 @@ function SourceDecisionRow({
         </span>
         <span
           className={
-            "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider " +
+            "rounded-full border px-2 py-0.5 text-[10px] tracking-wider " +
             sourceStatusClassName(decision.status)
           }
         >

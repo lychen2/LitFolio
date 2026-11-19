@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import { clsx } from "clsx";
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { useT } from "@/i18n/I18nProvider";
 import { visibleNavigation } from "@/lib/navigationRegistry";
 import { useEnabledPluginIds } from "@/host/PluginSlot";
@@ -24,6 +24,7 @@ export function AppNav({
 }) {
   const t = useT();
   const location = useLocation();
+  const logoTintId = useId();
   const { data: enabled } = useEnabledPluginIds();
   const { items: navItems, groups } = visibleNavigation(enabled);
   const items = new Map(navItems.map((item) => [item.to, item]));
@@ -36,11 +37,21 @@ export function AppNav({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-2 mb-4">
-        <img
-          src="/litera.svg"
-          alt="LitFolio"
-          className="h-7 w-7 shrink-0 rounded-[var(--litera-radius-sm,6px)] shadow-sm object-cover"
-        />
+        <svg
+          viewBox="0 0 512 512"
+          role="img"
+          aria-label="LitFolio"
+          className="h-7 w-7 shrink-0 rounded-[var(--litera-radius-sm,6px)] shadow-sm"
+        >
+          <defs>
+            <filter id={logoTintId} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+              <feFlood floodColor="var(--litera-accent)" result="themeAccent" />
+              <feBlend in="themeAccent" in2="SourceGraphic" mode="color" />
+              <feComposite in2="SourceAlpha" operator="in" />
+            </filter>
+          </defs>
+          <image href="/litera.svg" width="512" height="512" filter={`url(#${logoTintId})`} />
+        </svg>
         <span className="nav-label text-base font-semibold tracking-tight text-litera-text">LitFolio</span>
         {showPinToggle && (
           <button
@@ -103,9 +114,9 @@ export function AppNav({
         ))}
       </nav>
 
-      <div className="nav-footer mt-5 flex flex-col gap-2 border-t border-litera-border px-2 pt-3">
+      <div className="nav-footer mt-5 flex flex-col gap-2 border-t border-litera-border px-2 pt-3 max-[900px]:items-center max-[900px]:px-0">
         <LanguageSwitcher />
-        <div className="flex items-center gap-2 text-[11px] text-litera-mute">
+        <div className="flex items-center gap-2 text-[11px] text-litera-mute max-[900px]:hidden">
           {appVersion ? <span>v{appVersion}</span> : null}
           {storageBytes != null && (
             <span className="flex items-center gap-1 tabular-nums">

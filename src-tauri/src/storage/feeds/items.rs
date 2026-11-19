@@ -108,13 +108,18 @@ impl FeedRepo<'_> {
         &self,
         feed_id: Option<i64>,
         only_unread: bool,
+        keyword: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<FeedItem>> {
-        let sql = item_list_sql(feed_id.is_some(), only_unread);
+        let keyword = keyword.map(str::trim).filter(|value| !value.is_empty());
+        let sql = item_list_sql(feed_id.is_some(), only_unread, keyword.is_some());
         let mut q = sqlx::query(&sql);
         if let Some(fid) = feed_id {
             q = q.bind(fid);
+        }
+        if let Some(keyword) = keyword {
+            q = q.bind(keyword);
         }
         q = q.bind(limit).bind(offset);
         let rows = q.fetch_all(self.pool).await.context("list feed_items")?;
@@ -188,7 +193,7 @@ impl FeedRepo<'_> {
     }
 }
 
-fn item_list_sql(has_feed: bool, only_unread: bool) -> String {
+fn item_list_sql(has_feed: bool, only_unread: bool, has_keyword: bool) -> String {
     let mut sql = String::from(
         "SELECT id, feed_id, entry_id, title, link, summary, authors_json,
                 published_at, fetched_at, seen, imported_paper_id,
@@ -202,9 +207,12 @@ fn item_list_sql(has_feed: bool, only_unread: bool) -> String {
     if only_unread {
         clauses.push("seen = 0");
     }
+    if has_keyword {
+        clauses.push("instr(lower(title), lower(?)) > 0");
+    }
     append_where(&mut sql, &clauses);
     sql.push_str(
-        " ORDER BY seen ASC, COALESCE(published_at, fetched_at) DESC, fetched_at DESC, id DESC LIMIT ? OFFSET ?",
+        " ORDER BY fetched_at DESC, id DESC LIMIT ? OFFSET ?",
     );
     sql
 }
