@@ -1,0 +1,10 @@
+{
+  "build": {
+    "beforeDevCommand": "python3.11 scripts/android/prepare.py && pnpm dev",
+    "beforeBuildCommand": "python3.11 scripts/android/prepare.py && pnpm build"
+  },
+  "bundle": {
+    "externalBin": [],
+    "createUpdaterArtifacts": false
+  }
+}

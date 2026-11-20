@@ -23,7 +23,13 @@ const HOST_PAGE = `<!doctype html>
     Object.assign({ source: "litfolio-core" }, message), "*");
   document.querySelector("#extras").onclick = () => window.__emit({ type: "reader-control", control: "extras" });
   window.addEventListener("message", (event) => {
-    if (event.data?.type === "theme") document.documentElement.dataset.themeApplied = "true";
+    const { type, colorScheme, tokens } = event.data ?? {};
+    if (type !== "theme") return;
+    const root = document.documentElement;
+    root.dataset.themeApplied = "true";
+    root.dataset.colorScheme = colorScheme;
+    root.style.setProperty("--litera-annotation-bg", tokens["annotation-bg"]);
+    root.style.setProperty("--litera-annotation-ink", tokens["annotation-ink"]);
   });
 </script>
 </body>
@@ -73,6 +79,25 @@ test("hosts the upstream reader page in the document column and publishes host s
       };
     }),
   ).toEqual({ theme: true, locale: "en" });
+
+  const frameRoot = readerFrame(page).locator("html");
+  await page.locator("html").evaluate((root) => {
+    root.dataset.theme = "violet";
+    root.dataset.mode = "dark";
+  });
+  for (const mode of ["light", "dark"]) {
+    const annotation = await page.locator("html").evaluate((root, mode) => {
+      root.dataset.mode = mode;
+      const styles = getComputedStyle(root);
+      return ["--litera-annotation-bg", "--litera-annotation-ink"].map((name) => styles.getPropertyValue(name).trim());
+    }, mode);
+    expect(annotation.every(Boolean)).toBe(true);
+    await expect(frameRoot).toHaveAttribute("data-color-scheme", mode);
+    await expect.poll(() => frameRoot.evaluate((root) => {
+      const styles = getComputedStyle(root);
+      return ["--litera-annotation-bg", "--litera-annotation-ink"].map((name) => styles.getPropertyValue(name).trim());
+    })).toEqual(annotation);
+  }
 
   // The iframe can replace its document after changing locale. A new bridge
   // listener must receive host state even when no iframe load event fires.

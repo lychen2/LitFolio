@@ -21,7 +21,6 @@ async fn frozen_service_preserves_legacy_identity_edits_and_stops() -> Result<()
         host_network: crate::network_egress::HostNetworkState::new(Default::default()),
         ai_cancels: Mutex::new(Default::default()),
         batch_cancel: Mutex::new(None),
-        sync_lock: Mutex::new(()),
         plugin_host: crate::plugin_host::PluginHostState::new(),
     };
     let id = ulid::Ulid::new().to_string();

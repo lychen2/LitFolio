@@ -8,7 +8,7 @@ import time
 from uuid import uuid4
 
 from ..chat import chat_models
-from ..app import config
+from ..app import config, host_config
 from ..translate import langs, translate, instructions
 from ..engines import usage
 from ..engines.timing import Timeline
@@ -35,15 +35,38 @@ def engine_for(cfg: dict, model: str | None) -> dict:
 class Jobs:
     def __init__(self, lib: Library):
         self.lib = lib
-        self.bulk: queue.Queue[str] = queue.Queue()
-        self.small: queue.Queue[dict] = queue.Queue()
+        self.bulk: queue.Queue[str | None] = queue.Queue()
+        self.small: queue.Queue[dict | None] = queue.Queue()
         self.cancels: dict[str, threading.Event] = {}
         self.recent: list[dict] = []  # 小任务的状态，给页面轮询
         self.lock = threading.Lock()
+        self._closing = threading.Event()
+        self._workers: list[threading.Thread] = []
         self._resume()
-        threading.Thread(target=self._small_loop, daemon=True).start()
-        for _ in range(worker_count(config.load())):
-            threading.Thread(target=self._bulk_loop, daemon=True).start()
+        targets = [self._small_loop] + [self._bulk_loop] * worker_count(config.load())
+        try:
+            for target in targets:
+                worker = threading.Thread(target=target, daemon=True)
+                worker.start()
+                self._workers.append(worker)
+        except RuntimeError:
+            self.close()
+            raise
+
+    def close(self):
+        """Stop the embedded pool, leaving queued papers on disk for restart."""
+        with self.lock:
+            self._closing.set()
+            running = list(self.cancels)
+            self.small.put(None)
+            for _ in self._workers[1:]:
+                self.bulk.put(None)
+        try:
+            if running:
+                self.stop_model_work(running)
+        finally:
+            for worker in self._workers:
+                worker.join()
 
     # ---------- 整篇 ----------
     def _write(self, ws: Workspace, **fields):
@@ -166,8 +189,7 @@ class Jobs:
                 self.bulk.put(ws.id)
 
     def _bulk_loop(self):
-        while True:
-            pid = self.bulk.get()
+        while not self._closing.is_set() and (pid := self.bulk.get()) is not None:
             try:
                 self._process_bulk(pid)
             except Exception:  # noqa: BLE001
@@ -176,6 +198,8 @@ class Jobs:
 
     def _process_bulk(self, pid: str):
         with self.lock:
+            if self._closing.is_set():
+                return
             ws = self.lib.ws(pid)
             if not ws:
                 return
@@ -316,8 +340,8 @@ class Jobs:
             return any(j["state"] in ("queued", "running") for j in self.recent)
 
     def _small_loop(self):
-        while True:
-            job = self.small.get()
+        cancel = self._closing if host_config.embedded() else None
+        while (job := self.small.get()) is not None and not self._closing.is_set():
             ws = self.lib.ws(job["pid"])
             if not ws:
                 job["state"], job["message"] = "error", tr("文献已移除，无法执行任务")
@@ -326,9 +350,9 @@ class Jobs:
             try:
                 cfg = config.load()
                 if job["kind"] == "answer":
-                    translate.answer(ws, cfg, job["note"], None)
+                    translate.answer(ws, cfg, job["note"], cancel)
                 elif job["kind"] == "retranslate":
-                    translate.retranslate(ws, cfg, job["key"], job.get("hint", ""), None)
+                    translate.retranslate(ws, cfg, job["key"], job.get("hint", ""), cancel)
                 job["state"], job["message"] = "done", tr("完成")
             except Exception as e:  # noqa: BLE001
                 job["state"], job["message"] = "error", str(e)[:500]

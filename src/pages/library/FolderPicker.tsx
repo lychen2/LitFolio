@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Folder, Loader2, X } from "lucide-react";
+import { Folder, Spinner, X } from "@/components/icons";
 import { api, type Folder as FolderType } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
@@ -82,7 +82,7 @@ function FolderChip({
         className="opacity-50 hover:opacity-100 ml-0.5"
         title={t("folders.removeFromFolder")}
       >
-        {pending ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <X className="h-2.5 w-2.5" />}
+        {pending ? <Spinner className="h-2.5 w-2.5 animate-spin" /> : <X className="h-2.5 w-2.5" />}
       </button>
     </span>
   );

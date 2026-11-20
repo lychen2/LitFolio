@@ -1,9 +1,16 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   applyTheme,
   persistTheme,
   readStoredTheme,
   type ThemeId,
+  applyThemeMode,
+  persistThemeMode,
+  readStoredThemeMode,
+  resolveThemeMode,
+  subscribeToSystemTheme,
+  type ThemeMode,
+  type ThemeModePreference,
   applyFont,
   persistFont,
   readStoredFont,
@@ -17,6 +24,9 @@ import {
 interface ThemeContextValue {
   theme: ThemeId;
   setTheme: (theme: ThemeId) => void;
+  mode: ThemeMode;
+  modePreference: ThemeModePreference;
+  setModePreference: (preference: ThemeModePreference) => void;
   font: FontId;
   setFont: (font: FontId) => void;
   fontSize: FontSizeId;
@@ -24,6 +34,8 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+const useBrowserLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
 
 export function ThemeProvider({
   children,
@@ -37,6 +49,9 @@ export function ThemeProvider({
   initialFontSize?: FontSizeId;
 }) {
   const [theme, setThemeState] = useState<ThemeId>(() => initialTheme ?? readStoredTheme());
+  const [modePreference, setModePreferenceState] = useState(() => readStoredThemeMode());
+  const getMode = () => resolveThemeMode(modePreference);
+  const mode = useSyncExternalStore(subscribeToSystemTheme, getMode, getMode);
   const [font, setFontState] = useState<FontId>(() => initialFont ?? readStoredFont());
   const [fontSize, setFontSizeState] = useState<FontSizeId>(() => initialFontSize ?? readStoredFontSize());
 
@@ -44,6 +59,10 @@ export function ThemeProvider({
     applyTheme(theme);
     persistTheme(theme);
   }, [theme]);
+
+  useBrowserLayoutEffect(() => {
+    applyThemeMode(mode);
+  }, [mode]);
 
   useEffect(() => {
     applyFont(font);
@@ -61,6 +80,11 @@ export function ThemeProvider({
     setThemeState(nextTheme);
   }, []);
 
+  const setModePreference = useCallback((preference: ThemeModePreference) => {
+    persistThemeMode(preference);
+    setModePreferenceState(preference);
+  }, []);
+
   const setFont = useCallback((nextFont: FontId) => {
     applyFont(nextFont);
     persistFont(nextFont);
@@ -74,8 +98,8 @@ export function ThemeProvider({
   }, []);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, setTheme, font, setFont, fontSize, setFontSize }),
-    [theme, setTheme, font, setFont, fontSize, setFontSize],
+    () => ({ theme, setTheme, mode, modePreference, setModePreference, font, setFont, fontSize, setFontSize }),
+    [theme, setTheme, mode, modePreference, setModePreference, font, setFont, fontSize, setFontSize],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

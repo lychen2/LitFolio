@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { Atom, Compass, Inbox, LibraryBig, Rss, Search } from "lucide-react";
+import { Atom, Compass, Inbox, LibraryBig, Rss, Search } from "@/components/icons";
 import { CoreFrame } from "@/features/reader/CoreFrame";
 import type { LibraryFrameCollections } from "@/features/reader/CoreFrame";
 import { api } from "@/lib/api";
@@ -16,34 +16,27 @@ export function LibraryPage() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [folderId, setFolderId] = useState<number | null>(null);
-  const [smartId, setSmartId] = useState<number | null>(null);
-  const filter = useCanonicalLibraryFilter(folderId, smartId);
-  const activeKey = folderId != null ? `folder:${folderId}` : smartId != null ? `smart:${smartId}` : null;
+  const filter = useCanonicalLibraryFilter(folderId);
+  const activeKey = folderId == null ? null : `folder:${folderId}`;
   const choices = useLibraryCollections();
   const { paperIds, pending, failed } = filter;
   const libraryCollections = useMemo(() => ({ choices, activeKey, paperIds, pending, failed }),
     [choices, activeKey, paperIds, pending, failed]);
   const selectCollection = useCallback((key: string | null) => {
     setFolderId(key?.startsWith("folder:") ? Number(key.slice(7)) : null);
-    setSmartId(key?.startsWith("smart:") ? Number(key.slice(6)) : null);
   }, []);
   const host = useLibraryHostActions({
     collections: {
       folderId,
-      smartId,
       onSelectFolder: setFolderId,
-      onSelectSmart: setSmartId,
     },
   });
 
-  /**
-   * `?panel=collections` and `?panel=queue-open` let another route (the
-   * reader) hand off a surface that host does not render itself.
-   */
+  // The reader links here to open the folder drawer.
   const panel = searchParams.get("panel");
   const { onAction } = host;
   useEffect(() => {
-    if (panel !== "collections" && panel !== "queue-open") return;
+    if (panel !== "collections") return;
     onAction({ type: "action", action: panel, paperIds: [] });
     setSearchParams(
       (next) => {
@@ -85,20 +78,17 @@ interface CanonicalLibraryFilter {
 const EMPTY_MEMBERSHIP: string[] = [];
 
 /**
- * `null` shows every paper. A folder or smart collection narrows the same
- * canonical list through the frame; while that membership loads the filter is
- * the empty set, because showing every paper under a collection heading would
- * misrepresent what the user selected.
+ * `null` shows every paper. A selected folder narrows the canonical list.
+ * While its membership loads the frame shows an empty set.
  *
  * Membership follows paper writes (folders, tags, read status, delete), so it
  * re-reads on the same signal that reloads the framed list.
  */
 function useCanonicalLibraryFilter(
   folderId: number | null,
-  smartId: number | null,
 ): CanonicalLibraryFilter {
   const queryClient = useQueryClient();
-  const selected = folderId != null || smartId != null;
+  const selected = folderId != null;
   useEffect(() => {
     if (!selected) return;
     return subscribeLibraryChanged(() => {
@@ -106,11 +96,8 @@ function useCanonicalLibraryFilter(
     });
   }, [queryClient, selected]);
   const query = useQuery({
-    queryKey: ["library-filter", folderId, smartId],
+    queryKey: ["library-filter", folderId],
     queryFn: async () => {
-      if (smartId != null) {
-        return (await api.smartCollectionQueryPapers(smartId)).map((paper) => paper.id);
-      }
       if (folderId != null) {
         return (await api.papersInFolder(folderId, Number.MAX_SAFE_INTEGER)).map((paper) => paper.id);
       }
@@ -131,7 +118,6 @@ function useCanonicalLibraryFilter(
 
 function useLibraryCollections() {
   const { data: folders } = useQuery({ queryKey: ["folders"], queryFn: api.foldersList });
-  const { data: smart } = useQuery({ queryKey: ["smart-collections"], queryFn: api.smartCollectionsList });
   return useMemo(() => {
     const choices: LibraryFrameCollections["choices"] = [];
     if (folders) {
@@ -151,11 +137,8 @@ function useLibraryCollections() {
       }
       append(null, 0);
     }
-    for (const collection of smart ?? []) {
-      choices.push({ key: `smart:${collection.id}`, title: collection.name });
-    }
     return choices;
-  }, [folders, smart]);
+  }, [folders]);
 }
 
 export function libraryEmptyActions(t: (key: Parameters<ReturnType<typeof useI18n>["t"]>[0]) => string) {

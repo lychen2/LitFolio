@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { Highlighter, Loader2 } from "lucide-react";
+import { Highlighter, Spinner } from "@/components/icons";
 import type { Highlight } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { HighlightRow } from "./highlight-list/HighlightRow";
@@ -62,7 +62,7 @@ function LoadingState() {
   const t = useT();
   return (
     <div className="text-xs text-litera-mute text-center mt-8 flex items-center justify-center gap-1.5">
-      <Loader2 className="h-3 w-3 animate-spin" /> {t("common.loading")}
+      <Spinner className="h-3 w-3 animate-spin" /> {t("common.loading")}
     </div>
   );
 }

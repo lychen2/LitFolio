@@ -8,7 +8,7 @@ import {
   type AiExecutionRecord,
 } from "./apiSchemaAi";
 import { parseNoteSaveResult, type NoteSaveResult } from "./apiSchemaProvenance";
-import { parseArray } from "./apiSchemaCore";
+import { parseArray, parseNullable, schemaError } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
   ArxivDraft,
@@ -41,6 +41,21 @@ export const aiReaderApi = {
       id,
       targetLang: targetLang ?? "Chinese",
       onStarted,
+    }),
+  literatureNetworkTranslateTitles: (titles: string[]) =>
+    invokeParsed("literature_network_translate_titles", { titles }, (value, path) => {
+      const translations = parseArray(value, path, (item, itemPath) =>
+        parseNullable(item, itemPath, (translation, translationPath) => {
+          if (typeof translation !== "string" || !translation.trim()) {
+            throw schemaError(translationPath, "nonempty string or null", translation);
+          }
+          return translation;
+        }),
+      );
+      if (translations.length !== titles.length) {
+        throw new Error("Title translation response did not match the requested title count");
+      }
+      return translations;
     }),
   draftTranslate: (draft: ArxivDraft, targetLang?: string) =>
     invoke<TranslationResult>("draft_translate", {

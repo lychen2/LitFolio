@@ -1,16 +1,9 @@
 //! IPC command surface exposed to the React frontend.
 
 pub(crate) mod ai_dispatch;
-#[cfg(feature = "plugin-library-ask")]
-pub mod ask;
 pub mod batch;
 #[cfg(feature = "plugin-candidate-inbox")]
 pub mod candidates;
-#[cfg(feature = "plugin-knowledge-graph")]
-pub mod concepts;
-pub mod custom_fields;
-pub mod discovery;
-pub mod duplicates;
 pub(crate) mod events;
 pub mod export;
 #[cfg(feature = "plugin-discovery-feeds")]
@@ -18,13 +11,14 @@ pub mod feed_metadata;
 #[cfg(feature = "plugin-discovery-feeds")]
 pub mod feeds;
 pub mod folders;
-#[cfg(feature = "plugin-knowledge-graph")]
-pub mod graph;
 pub mod highlights;
 pub mod imports;
 pub mod jobs;
 pub mod legacy_reader_notes;
-pub mod lit_review;
+#[cfg(feature = "plugin-literature-network")]
+pub mod literature_network;
+#[cfg(feature = "plugin-literature-network")]
+pub(crate) mod literature_network_translation;
 pub mod llm;
 pub mod notes;
 pub mod papers;
@@ -32,22 +26,17 @@ pub mod pdf;
 pub mod pdf_notes;
 pub mod plugin_host;
 pub mod provenance;
-pub mod queue;
 pub mod reader_ask;
 pub mod reader_terms;
 pub mod reader_translate;
 pub mod reading_service;
 pub mod search;
-pub mod smart_collections;
 pub mod summaries;
-pub mod supplements;
 #[cfg(feature = "plugin-discovery-feeds")]
 pub mod survey;
-pub mod sync;
 pub mod tags;
 pub mod term_filter;
 pub mod topic_alerts;
-pub mod zotero;
 
 use std::sync::Arc;
 
@@ -241,6 +230,7 @@ macro_rules! command_paths_imports_pdf {
             commands::imports::import_arxiv,
             commands::imports::import_bibtex,
             commands::pdf::import_files::import_pdf_files,
+            commands::pdf::import_files::pdf_document_names,
             commands::imports::search_papers,
             commands::imports::add_from_search,
             commands::imports::add_many_from_search,
@@ -284,18 +274,6 @@ macro_rules! command_paths_config_sync_ai {
             commands::plugin_host::plugin_host_list,
             commands::plugin_host::plugin_host_enable,
             commands::plugin_host::plugin_host_disable,
-            commands::sync::sync_get_config,
-            commands::sync::sync_save_config,
-            commands::sync::sync_test,
-            commands::sync::sync_preview_push_library,
-            commands::sync::sync_preview_pull_library,
-            commands::sync::sync_push_library,
-            commands::sync::sync_pull_library,
-            commands::zotero::zotero_get_config,
-            commands::zotero::zotero_save_config,
-            commands::zotero::zotero_test,
-            commands::zotero::zotero_list_targets,
-            commands::zotero::zotero_push,
             commands::summaries::paper_tldr,
             commands::summaries::paper_quick_read,
             commands::summaries::paper_translate,
@@ -376,12 +354,6 @@ macro_rules! command_paths_reader_notes {
             commands::notes::note_sections_save,
             commands::notes::note_sections_reorder,
             commands::notes::note_section_delete,
-            commands::supplements::paper_supplements_list,
-            commands::supplements::paper_supplement_add_file,
-            commands::supplements::paper_supplement_update_note,
-            commands::supplements::paper_supplement_delete,
-            commands::supplements::paper_supplement_open,
-            commands::supplements::paper_supplement_convert_docx_to_pdf,
             commands::search::search_expand_query,
         ])
     };
@@ -392,8 +364,6 @@ macro_rules! command_paths_feeds_discovery_graph {
     ([$($commands:tt)*]) => {
         $crate::commands::command_paths_collections_data!([
             $($commands)*
-            commands::discovery::paper_similar,
-            commands::discovery::paper_citations,
         ])
     };
 }
@@ -408,30 +378,9 @@ macro_rules! command_paths_collections_data {
             commands::export::export_markdown_set_dir,
             commands::export::export_markdown_all,
             commands::export::export_markdown_paper,
-            commands::export::obsidian_export_all,
             commands::export::export_citations,
             commands::diagnostics_export_log,
             commands::search::search_unified,
-            commands::queue::queue_list,
-            commands::queue::queue_add,
-            commands::queue::queue_remove,
-            commands::queue::queue_update,
-            commands::queue::queue_reorder,
-            commands::lit_review::generate_lit_review,
-            commands::smart_collections::smart_collections_list,
-            commands::smart_collections::smart_collection_create,
-            commands::smart_collections::smart_collection_update,
-            commands::smart_collections::smart_collection_delete,
-            commands::smart_collections::smart_collection_query_papers,
-            commands::duplicates::paper_find_duplicate,
-            commands::duplicates::paper_scan_duplicates,
-            commands::duplicates::paper_merge,
-            commands::custom_fields::custom_field_defs_list,
-            commands::custom_fields::custom_field_def_create,
-            commands::custom_fields::custom_field_def_delete,
-            commands::custom_fields::paper_custom_fields_get,
-            commands::custom_fields::paper_custom_field_set,
-            commands::custom_fields::paper_custom_field_delete,
         ])
     };
 }
@@ -439,7 +388,7 @@ macro_rules! command_paths_collections_data {
 #[allow(unused_macros)]
 macro_rules! command_paths_alerts_concepts {
     ([$($commands:tt)*]) => {
-        $crate::commands::stage_ask!([$($commands)*
+        $crate::commands::stage_literature_network!([$($commands)*
             commands::topic_alerts::topic_alerts_list,
             commands::topic_alerts::topic_alert_create,
             commands::topic_alerts::topic_alert_delete,
@@ -456,23 +405,18 @@ macro_rules! command_paths_alerts_concepts {
 // Plugin-owned command stages. Each stage appends its entries only when the
 // matching cargo feature is on, then chains to the next stage; the off variant
 // is a pure passthrough so core builds physically omit the commands.
-#[cfg(feature = "plugin-library-ask")]
-macro_rules! stage_ask {
+#[cfg(feature = "plugin-literature-network")]
+macro_rules! stage_literature_network {
     ([$($c:tt)*]) => {
         $crate::commands::stage_feeds!([$($c)*
-            commands::ask::ask_session_latest,
-            commands::ask::ask_session_save,
-            commands::ask::ask_capability_state,
-            commands::ask::library_ask,
-            commands::ask::ask_save_as_note,
+            commands::literature_network::literature_network,
+            commands::literature_network_translation::literature_network_translate_titles,
         ])
     };
 }
-#[cfg(not(feature = "plugin-library-ask"))]
-macro_rules! stage_ask {
-    ([$($c:tt)*]) => {
-        $crate::commands::stage_feeds!([$($c)*])
-    };
+#[cfg(not(feature = "plugin-literature-network"))]
+macro_rules! stage_literature_network {
+    ([$($c:tt)*]) => { $crate::commands::stage_feeds!([$($c)*]) };
 }
 
 #[cfg(feature = "plugin-discovery-feeds")]
@@ -504,48 +448,15 @@ macro_rules! stage_feeds {
 #[cfg(feature = "plugin-candidate-inbox")]
 macro_rules! stage_candidates {
     ([$($c:tt)*]) => {
-        $crate::commands::stage_graph!([$($c)*
+        tauri::generate_handler![$($c)*
             commands::candidates::candidates_list,
             commands::candidates::candidate_upsert,
             commands::candidates::candidate_set_status,
-        ])
+        ]
     };
 }
 #[cfg(not(feature = "plugin-candidate-inbox"))]
 macro_rules! stage_candidates {
-    ([$($c:tt)*]) => {
-        $crate::commands::stage_graph!([$($c)*])
-    };
-}
-
-#[cfg(feature = "plugin-knowledge-graph")]
-macro_rules! stage_graph {
-    ([$($c:tt)*]) => {
-        tauri::generate_handler![$($c)*
-            commands::graph::graph_data,
-            commands::graph::paper_link_create,
-            commands::graph::paper_link_create_or_get,
-            commands::graph::paper_link_delete,
-            commands::graph::paper_links_for_paper,
-            commands::graph::ai_discover_links,
-            commands::graph::ai_accept_link,
-            commands::graph::ai_reject_link,
-            commands::concepts::concepts_list,
-            commands::concepts::concept_create,
-            commands::concepts::concept_delete,
-            commands::concepts::concept_relations_list,
-            commands::concepts::concept_relation_create,
-            commands::concepts::concept_relation_delete,
-            commands::concepts::concept_link_paper,
-            commands::concepts::concept_unlink_paper,
-            commands::concepts::concept_for_paper,
-            commands::concepts::concept_extract_from_paper,
-            commands::concepts::concept_extract_and_store,
-        ]
-    };
-}
-#[cfg(not(feature = "plugin-knowledge-graph"))]
-macro_rules! stage_graph {
     ([$($c:tt)*]) => {
         tauri::generate_handler![$($c)*]
     };
@@ -581,13 +492,11 @@ pub(crate) use command_paths_projects_research;
 #[allow(unused_imports)]
 pub(crate) use command_paths_reader_notes;
 #[allow(unused_imports)]
-pub(crate) use stage_ask;
-#[allow(unused_imports)]
 pub(crate) use stage_candidates;
 #[allow(unused_imports)]
 pub(crate) use stage_feeds;
 #[allow(unused_imports)]
-pub(crate) use stage_graph;
+pub(crate) use stage_literature_network;
 
 #[cfg(test)]
 mod diagnostics_export_tests {

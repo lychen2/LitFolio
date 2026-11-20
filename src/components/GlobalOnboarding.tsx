@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, FolderOpen, FileText, Brain, X } from "lucide-react";
+import { Check, FolderOpen, FileText, Brain, X } from "@/components/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";

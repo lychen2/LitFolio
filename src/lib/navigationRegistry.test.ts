@@ -10,8 +10,7 @@ describe("navigation registry", () => {
       "/browse",
       "/feeds",
       "/topic",
-      "/ask",
-      "/graph",
+      "/literature-network",
       "/settings",
     ]);
   });
@@ -30,14 +29,17 @@ describe("navigation registry", () => {
     const hidden = visibleNavigation(undefined);
     expect(hidden.items.map((item) => item.to)).toEqual(["/library", "/import", "/settings"]);
     expect(hidden.groups.map((group) => group.id)).toEqual(["library", "system"]);
+    expect(visibleNavigation(new Set(["literature-network"])).items.map((item) => item.to)).toContain("/literature-network");
 
-    const askOnly = visibleNavigation(new Set(["library-ask"]));
-    expect(askOnly.items.map((item) => item.to)).toEqual([
+    const feedsOnly = visibleNavigation(new Set(["discovery-feeds"]));
+    expect(feedsOnly.items.map((item) => item.to)).toEqual([
       "/library",
       "/import",
-      "/ask",
+      "/browse",
+      "/feeds",
+      "/topic",
       "/settings",
     ]);
-    expect(askOnly.groups.map((group) => group.id)).toEqual(["library", "research", "system"]);
+    expect(feedsOnly.groups.map((group) => group.id)).toEqual(["library", "discover", "system"]);
   });
 });

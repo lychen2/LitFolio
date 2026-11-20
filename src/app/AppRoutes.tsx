@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Spinner } from "@/components/icons";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalOnboarding } from "@/components/GlobalOnboarding";
 import { Shell } from "@/components/Shell";
@@ -31,10 +31,11 @@ export function AppRoutes() {
 }
 
 function RouteShell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
   return (
-    <ErrorBoundary>
+    <ErrorBoundary key={pathname}>
       <Suspense fallback={<RouteFallback />}>
-        <div className="h-full litera-fade-in">{children}</div>
+        <div className="h-full litera-page-enter">{children}</div>
       </Suspense>
     </ErrorBoundary>
   );
@@ -44,8 +45,8 @@ function RouteFallback() {
   const t = useT();
   return (
     <div className="h-full w-full grid place-items-center text-sm text-litera-mute">
-      <div className="flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
+      <div role="status" className="flex items-center gap-2">
+        <Spinner aria-hidden="true" className="h-4 w-4 animate-spin" />
         {t("route.loading")}
       </div>
     </div>

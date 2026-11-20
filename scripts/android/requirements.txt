@@ -1,0 +1,18 @@
+# Android CPython 3.11. Keep the core's dependencies and their closure fixed.
+beautifulsoup4==4.15.0
+certifi==2026.10.23
+cffi==1.17.1
+chaquopy-freetype==2.9.1
+chaquopy-libffi==3.3
+chaquopy-libjpeg==1.5.3
+charset-normalizer==3.4.4
+cryptography==42.0.8
+pdfminer.six==20251230
+pdfplumber==0.11.9
+pillow==11.0.0+webp1
+pycparser==2.23
+pypdf==7.1.1
+pypdfium2==5.14.0
+soupsieve==2.8.1
+truststore==0.10.5
+typing-extensions==4.15.0

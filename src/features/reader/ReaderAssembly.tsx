@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { AlertTriangle, BookMarked, FileText, Highlighter, Languages, NotebookPen, Orbit, Search, X } from "lucide-react";
+import { AlertTriangle, BookMarked, FileText, Highlighter, Languages, NotebookPen, Orbit, Search, X } from "@/components/icons";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { libraryClient, type Paper } from "@/core/data";
-import { useT } from "@/i18n/I18nProvider";
+import { useI18n, useT } from "@/i18n/I18nProvider";
 import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 import { cn } from "@/lib/cn";
 import type { TKey } from "@/i18n/dict";
@@ -22,6 +22,7 @@ import { READER_SHORTCUTS, type ReaderShortcut, type ReadingHostAction } from "@
 import { isReaderMarginNote } from "@/pages/reader/pdfSelectionHelpers";
 import { useLibraryHostActions } from "@/pages/library/LibraryHostActions";
 import { CoreFrame } from "./CoreFrame";
+import "./ReaderAssembly.css";
 
 const HOST_SHORTCUTS: ReadonlySet<string> = new Set(READER_SHORTCUTS);
 const visibleHighlights = (highlights: Highlight[]) => highlights.filter((item) => !isReaderMarginNote(item));
@@ -40,6 +41,7 @@ export function ReaderAssembly() {
   const { paperId } = useParams<{ paperId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const splitId = searchParams.get("split");
+  const isNarrow = useNarrowLayout();
 
   const openSplit = useCallback((id: string) => {
     setSearchParams({ split: id }, { replace: true });
@@ -65,15 +67,19 @@ export function ReaderAssembly() {
           </button>
         </header>
         <div className="flex-1 min-h-0">
-          <PanelGroup direction="horizontal">
+          <PanelGroup direction={isNarrow ? "vertical" : "horizontal"}>
             <Panel defaultSize={50} minSize={30}>
-              <ReaderPane paperId={paperId} compact />
+              <ReaderPane paperId={paperId} compact isNarrow={isNarrow} />
             </Panel>
-            <PanelResizeHandle className="reader-resize-handle">
+            <PanelResizeHandle
+              className="reader-resize-handle reader-assembly-divider"
+              aria-label={t("reader.splitView")}
+              aria-orientation={isNarrow ? "horizontal" : "vertical"}
+            >
               <div className="reader-resize-grip" />
             </PanelResizeHandle>
             <Panel defaultSize={50} minSize={30}>
-              <ReaderPane paperId={splitId} compact onOpenSplit={openSplit} />
+              <ReaderPane paperId={splitId} compact isNarrow={isNarrow} onOpenSplit={openSplit} />
             </Panel>
           </PanelGroup>
         </div>
@@ -81,7 +87,7 @@ export function ReaderAssembly() {
     );
   }
 
-  return <ReaderPane paperId={paperId} onOpenSplit={openSplit} />;
+  return <ReaderPane paperId={paperId} isNarrow={isNarrow} onOpenSplit={openSplit} />;
 }
 
 type ExtrasTab = "notes" | "highlights" | "terms" | "translate" | "cached" | "pdf";
@@ -90,14 +96,15 @@ type ExtrasTab = "notes" | "highlights" | "terms" | "translate" | "cached" | "pd
 function ReaderPane({
   paperId,
   compact,
+  isNarrow,
   onOpenSplit,
 }: {
   paperId: string;
   compact?: boolean;
+  isNarrow: boolean;
   onOpenSplit?: (id: string) => void;
 }) {
   const t = useT();
-  const isNarrow = useNarrowLayout(1200);
   const effectiveCompact = compact || isNarrow;
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [tab, setTab] = useState<ExtrasTab>("notes");
@@ -123,10 +130,6 @@ function ReaderPane({
     select: visibleHighlights,
     enabled: Boolean(paperQ.data),
   });
-
-  useEffect(() => {
-    if (isNarrow) setExtrasOpen(false);
-  }, [isNarrow]);
 
   useEffect(() => {
     if (tab === "pdf") setPdfMounted(true);
@@ -247,7 +250,7 @@ function ReaderPane({
         </h2>
       )}
       <div className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal" autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
+        <PanelGroup direction={isNarrow ? "vertical" : "horizontal"} autoSaveId={effectiveCompact ? undefined : "litera-reader-layout"}>
           <Panel id="reader-document" order={1} defaultSize={extrasOpen ? 66 : 100} minSize={35}>
             <CoreFrame
               paperId={paperId}
@@ -262,7 +265,11 @@ function ReaderPane({
           </Panel>
           {extrasOpen && (
             <>
-              <PanelResizeHandle className="reader-resize-handle">
+              <PanelResizeHandle
+                className="reader-resize-handle reader-assembly-divider"
+                aria-label={t("reader.extrasTitle")}
+                aria-orientation={isNarrow ? "horizontal" : "vertical"}
+              >
                 <div className="reader-resize-grip" />
               </PanelResizeHandle>
               <Panel
@@ -337,10 +344,30 @@ function ExtrasPane({
   onTranslateSelection: (text: string) => void;
 }) {
   const t = useT();
+  const { lang } = useI18n();
   const tabs = useMemo(
     () => EXTRAS_TABS.filter((entry) => entry.id !== "cached" || Boolean(legacy.translation)),
     [legacy.translation],
   );
+  const [highlightPage, setHighlightPage] = useState<number | null>(null);
+  const highlightList = useRef<HTMLDivElement>(null);
+  const highlightPages = useMemo(() => {
+    const pages = new Map<number, { count: number; firstIndex: number }>();
+    for (const [index, highlight] of (highlights.data ?? []).entries()) {
+      if (!Number.isSafeInteger(highlight.page) || highlight.page < 1) continue;
+      const entry = pages.get(highlight.page);
+      if (entry) entry.count += 1;
+      else pages.set(highlight.page, { count: 1, firstIndex: index });
+    }
+    return [...pages.entries()].sort(([a], [b]) => a - b);
+  }, [highlights.data]);
+  const selectedPage = highlightPages.find(([page]) => page === highlightPage) ?? highlightPages[0];
+  const locateHighlight = () => {
+    if (!selectedPage) return;
+    // HighlightList renders one direct list item per query result in query order.
+    const row = highlightList.current?.querySelector("ul")?.children.item(selectedPage[1].firstIndex);
+    if (row instanceof HTMLElement) row.focus();
+  };
   return (
     <div id="reader-extras" className="reader-workspace h-full flex flex-col bg-litera-paper/30">
       <div className="reader-panel-header">
@@ -367,11 +394,29 @@ function ExtrasPane({
         </div>
       </div>
       <div className="flex-1 min-h-0 relative">
-        <div className={cn("h-full", tab !== "notes" && "hidden")}>
+        <div className={cn("reader-assembly-notes h-full", tab !== "notes" && "hidden")}>
           <NoteSectionsPane paperId={paperId} />
         </div>
-        <div className={cn("h-full absolute inset-0", tab !== "highlights" && "hidden")}>
-          <HighlightList paperId={paperId} onJump={onJump} list={highlights} />
+        <div className={cn("absolute inset-0 flex flex-col", tab !== "highlights" && "hidden")}>
+          {highlightPages.length > 1 && selectedPage !== undefined && !highlights.isError && (
+            <div className="reader-highlight-pages">
+              <select
+                value={selectedPage[0]}
+                onChange={(event) => setHighlightPage(Number(event.target.value))}
+                aria-label={lang === "en" ? "Pages with highlights" : "有高亮的页码"}
+              >
+                {highlightPages.map(([page, { count }]) => (
+                  <option key={page} value={page}>{t("reader.page", { page })} ({count})</option>
+                ))}
+              </select>
+              <button type="button" className="litera-btn text-xs" onClick={locateHighlight}>
+                {lang === "en" ? "Find highlight" : "定位高亮"}
+              </button>
+            </div>
+          )}
+          <div ref={highlightList} className="reader-assembly-highlight-list min-h-0 flex-1">
+            <HighlightList paperId={paperId} onJump={onJump} list={highlights} />
+          </div>
         </div>
         <div className={cn("h-full absolute inset-0", tab !== "terms" && "hidden")}>
           <TermsPane paperId={paperId} />

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { BookMarked, Languages, Loader2, Orbit, Quote } from "lucide-react";
+import { XCircle, BookMarked, Languages, Spinner, Orbit, Quote } from "@/components/icons";
 import { api, type ReaderTranslateResult } from "@/lib/api";
 import { errorMessage } from "@/lib/error";
 import { MarkdownView } from "@/components/MarkdownView";
@@ -40,7 +40,7 @@ export function SelectionTranslatePane({
     return (
       <div className="h-full grid place-items-center text-sm text-litera-mute">
         <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Spinner className="h-4 w-4 animate-spin" />
           {t("reader.translating")}
         </div>
       </div>
@@ -49,7 +49,7 @@ export function SelectionTranslatePane({
   if (translate.error) {
     return (
       <div className="p-4 text-sm text-litera-error">
-        <div className="break-all">✕ {t("reader.translateFailed")}: {errorMessage(translate.error)}</div>
+        <div className="break-all"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("reader.translateFailed")}: {errorMessage(translate.error)}</div>
         <button
           onClick={() => translate.mutate(selectionText)}
           className="litera-btn text-xs px-3 py-1 mt-2"

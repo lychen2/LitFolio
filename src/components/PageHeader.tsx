@@ -15,14 +15,14 @@ export function PageHeader({
 }) {
   return (
     <header className={`litera-page-header ${className}`}>
-      <div className="min-w-0">
-        <h1 className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight text-litera-text">
-          {icon}
-          <span className="truncate">{title}</span>
-        </h1>
-        {subtitle && <p className="mt-0.5 max-w-[70ch] truncate text-xs text-litera-mute">{subtitle}</p>}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {icon && <span className="litera-page-title-icon" aria-hidden="true">{icon}</span>}
+        <div className="min-w-0">
+          <h1 className="litera-page-title"><span className="truncate">{title}</span></h1>
+          {subtitle && <p className="mt-0.5 max-w-[70ch] truncate text-xs text-litera-mute">{subtitle}</p>}
+        </div>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }

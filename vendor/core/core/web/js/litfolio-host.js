@@ -1,6 +1,6 @@
 /* LitFolio 宿主桥（仅在 LITFOLIO_CORE_HOST=litfolio 时由后端注入到每个页面）。
  * 三件事：
- *   1. 跨页导航（阅读页、文献库首页、设置、问 AI）交给宿主路由，页面自己不再整页跳转；
+ *   1. 跨页导航（阅读页、文献库首页、设置）交给宿主路由，页面自己不再整页跳转；
  *   2. 文献库写入成功后通知宿主，让宿主按需重读 /api/host/catalog 补自己的索引；
  *   3. 接收宿主自己写入（例如系统拖放导入）后的通知，重读当前页面列表。
  * 消息不带 loopback token，也不带论文内容。宿主负责校验
@@ -9,6 +9,11 @@
   "use strict";
   if (window.__litfolioHostBridge) return;
   window.__litfolioHostBridge = true;
+
+  const icons = document.createElement("script");
+  icons.type = "module";
+  icons.src = "/web/js/litfolio-icons.js";
+  document.head.append(icons);
 
   const SOURCE = "litfolio-core";
   const parent = window.parent && window.parent !== window ? window.parent : null;
@@ -23,15 +28,24 @@
 
   /* 宿主主题是唯一来源；PR.applyTheme 仍可被上游排版/偏好恢复调用，但不再改配色。 */
   const root = document.documentElement;
+  const themeTokens = [
+    "bg", "paper", "panel", "subnav", "surface-1", "surface-2", "line", "text", "mute", "text-subtle",
+    "border", "border-strong", "accent", "accent-contrast", "accent2", "info", "success", "warn", "error",
+    "focus", "ink", "annotation-bg", "annotation-ink", "font-sans", "shadow-md", "shadow-lg",
+    "space-1", "space-2", "space-3", "space-4", "space-6", "control-sm", "control-md",
+    "radius-sm", "radius-md", "radius-lg", "radius-xl", "radius-full", "hover", "selected", "scrim",
+  ];
   const PR = window.PR;
+  if (!PR?.applyTheme) return; // The upstream tab container has no reader or library API.
   PR.applyTheme = () => {};
   PR.logo = () => "";
   document.querySelectorAll("#backBtn .mark, .ch-empty svg.hero, .welcome svg.hero").forEach((node) => node.remove());
+  document.getElementById("backBtn")?.classList.add("icon");
 
   /* ---------- 导航 ---------- */
   const READ = /^\/read\/[A-Za-z0-9_-]{1,64}$/;
   const route = (pathname) =>
-    pathname === "/" || pathname === "/settings" || pathname === "/ask" || READ.test(pathname) ? pathname : null;
+    pathname === "/" || pathname === "/settings" || READ.test(pathname) ? pathname : null;
   const navigate = (path) => emit({ type: "navigate", path });
   const ID = /^[A-Za-z0-9_-]{4,64}$/;
   const lib = PR.lib;
@@ -75,14 +89,6 @@
 
   // 文献库的双击、回车等入口直接设 location：改成只上报。
   if (lib) lib.openReader = openReader;
-
-  document.addEventListener("click", (event) => {
-    const hit = event.target && event.target.closest ? event.target.closest("#libraryAskBtn") : null;
-    if (!hit) return;
-    event.preventDefault();
-    event.stopImmediatePropagation(); // 页面自己的全库问答对话框不再打开
-    navigate("/ask");
-  }, true);
 
   const label = (zh, en) => PR.lang === "en" ? en : zh;
 
@@ -211,10 +217,7 @@
     return button;
   }
   const batch = [
-    ["review", "文献综述", "Literature review", "note"],
     ["export", "引用导出", "Export citations", "copy"],
-    ["zotero", "推送到 Zotero", "Push to Zotero", "book"],
-    ["queue-add", "加入阅读队列", "Add to reading queue", "plus"],
   ];
   function toolsButton(entries, paperIds) {
     const button = document.createElement("button");
@@ -242,6 +245,27 @@
     PR.openSettings = () => navigate("/settings");
     PR.openFolderImport = () => navigate("/import?tab=pdf");
     const form = PR.$("#importDlg .dialog");
+    const openImport = PR.openImport;
+    PR.openImport = (ref) => {
+      openImport(ref);
+      form.querySelector("h2").remove();
+      form.querySelector(".or").remove();
+      const pick = PR.$("#pick");
+      const files = PR.el("div", { class: "litfolio-import-files" });
+      files.append(pick, form.querySelector(".imp-bulk"));
+      const sources = PR.el("div", { class: "litfolio-import-sources" });
+      sources.append(files, PR.$("#arxivRef").closest(".field"));
+      const options = PR.el("details", { class: "litfolio-import-options" });
+      options.append(PR.el("summary", { text: label("导入设置", "Import settings") }), ...form.children);
+      form.replaceChildren(sources, options);
+      pick.setAttribute("role", "button");
+      pick.tabIndex = 0;
+      pick.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        pick.click();
+      });
+    };
     async function loadImport() {
       const status = PR.el("p", { role: "status", text: label("正在准备导入…", "Preparing import…") });
       form.replaceChildren(status);
@@ -252,14 +276,6 @@
         PR.importState.engineLabel = data.engine_label;
         if (!PR.ls.get("core-import", null)) PR.ls.set("core-import", { after: "none" });
         PR.openImport();
-        const pick = PR.$("#pick");
-        pick.setAttribute("role", "button");
-        pick.tabIndex = 0;
-        pick.addEventListener("keydown", (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          pick.click();
-        });
       } catch (error) {
         status.setAttribute("role", "alert");
         status.textContent = error.message;
@@ -270,6 +286,7 @@
   } else if (lib) {
     root.dataset.litfolioPage = "library";
     document.querySelector(".topbar > .brand")?.remove();
+    document.getElementById("libraryAskBtn")?.remove();
     const search = document.querySelector("#q");
     search.setAttribute("aria-label", search.placeholder);
     const side = document.querySelector("#side");
@@ -322,17 +339,16 @@
     let activeKey = null;
     let collectionStatus = null;
     const manage = () => action("collections", []);
-    const openQueue = () => action("queue-open", []);
     const renderSide = PR.renderSide;
     PR.renderSide = () => {
       renderSide();
       if (side.querySelector(".side-input") === document.activeElement) return;
       const group = PR.el("section", { class: "litfolio-collections" });
       const heading = PR.el("h3");
-      heading.textContent = label("文件夹与智能分组", "Folders and smart collections");
+      heading.textContent = label("文件夹", "Folders");
       const rows = PR.el("div", { class: "sgroup" });
       for (const choice of choices) {
-        const row = hostButton(choice.title, choice.key.startsWith("smart:") ? "sparkle" : "folder", () => {
+        const row = hostButton(choice.title, "folder", () => {
           emit({ type: "library-collection", key: choice.key });
           closeBrowse(true);
         }, "srow");
@@ -344,13 +360,10 @@
         }
         rows.append(row);
       }
-      rows.append(hostButton(label("管理文件夹与分组", "Manage folders and collections"), "gear", () => { closeBrowse(false); manage(); }, "srow"));
+      rows.append(hostButton(label("管理文件夹", "Manage folders"), "gear", () => { closeBrowse(false); manage(); }, "srow"));
       group.append(heading, rows);
-      const queue = PR.el("section", { class: "litfolio-collections" });
-      queue.setAttribute("aria-label", label("阅读队列", "Reading Queue"));
-      queue.append(hostButton(label("阅读队列", "Reading Queue"), "book", () => { closeBrowse(false); openQueue(); }, "srow"));
       side.querySelectorAll(".litfolio-collections").forEach((section) => section.remove());
-      side.append(group, queue);
+      side.append(group);
     };
     side.addEventListener("click", (event) => {
       if (!activeKey || event.target.closest("[data-more], [data-fold]")) return;
@@ -467,6 +480,10 @@
     }
     // Preserve the live textarea across responsive layout changes while the note is being edited.
     const renderMargin = PR.renderMargin;
+    const marginWide = PR.marginWide;
+    PR.marginWide = () => document.body.classList.contains("side-open")
+      ? document.body.classList.contains("litfolio-dock-margin")
+      : marginWide();
     PR.renderMargin = () => {
       const editor = document.activeElement;
       const card = editor?.closest("#margin .card[data-note], .inline-notes .card[data-note]");
@@ -474,12 +491,17 @@
         PR.layoutMargin();
         return;
       }
+      const body = document.body;
+      // 52px gutters, a 44px gap and a 272px note column leave 400px for text.
+      body.classList.toggle("litfolio-dock-margin", body.classList.contains("side-open") &&
+        !body.classList.contains("no-margin") &&
+        document.querySelector("#stage").clientWidth >= 820);
       renderMargin();
     };
     const settings = document.querySelector("#bar [data-act='settings']");
     const details = hostButton(label("论文详情", "Paper details"), "note", () => action("details", [readerId]), "btn line litfolio-reader-tool");
     const extras = hostButton(label("阅读工具", "Reading tools"), "sparkle", () => emit({ type: "reader-control", control: "extras" }), "btn line litfolio-reader-tool");
-    const split = hostButton(label("分屏", "Split view"), "book", () => emit({ type: "reader-control", control: "split" }), "btn line litfolio-reader-tool");
+    const split = hostButton(label("分屏", "Split view"), "panel", () => emit({ type: "reader-control", control: "split" }), "btn line litfolio-reader-tool");
     const dock = document.querySelector("#bar [data-act='dock']");
     const dockLabel = label("PDF 与笔记", "PDF and notes");
     const dockText = dock.querySelector("span");
@@ -627,13 +649,14 @@
     if (parentOrigin !== undefined && parentOrigin !== origin) return;
     parentOrigin = origin;
     if (data.type === "theme") {
-      if (!["violet", "warm", "blueprint"].includes(data.theme) || !data.tokens || typeof data.tokens !== "object") return;
-      const names = ["bg", "paper", "panel", "surface-2", "text", "mute", "text-subtle", "border", "border-strong", "accent", "accent-contrast", "accent2", "info", "success", "warn", "error", "focus", "ink", "font-sans", "shadow-md", "shadow-lg"];
-      if (names.some((name) => typeof data.tokens[name] !== "string" || !data.tokens[name])) return;
-      for (const name of names) root.style.setProperty("--litera-" + name, data.tokens[name]);
-      root.dataset.theme = data.colorScheme === "light" ? "light" : "dark";
-      root.dataset.litfolioTheme = data.theme;
-      root.style.colorScheme = data.colorScheme === "light" ? "light" : "dark";
+      const { theme, colorScheme, tokens } = data;
+      if (!["violet", "warm", "blueprint"].includes(theme) || !tokens || typeof tokens !== "object") return;
+      if (colorScheme !== "light" && colorScheme !== "dark") return;
+      if (themeTokens.some((name) => typeof tokens[name] !== "string" || !tokens[name])) return;
+      for (const name of themeTokens) root.style.setProperty("--litera-" + name, tokens[name]);
+      root.dataset.theme = colorScheme;
+      root.dataset.litfolioTheme = theme;
+      root.style.colorScheme = colorScheme;
       return;
     }
     if (data.type === "locale") { applyLocale(data.lang); return; }

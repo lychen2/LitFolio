@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path fill="none" stroke="var(--kubai-line, #324e64)" stroke-width="1.8" stroke-linecap="round" d="M9 2.2v3.6m6-3.6v3.6m-6 12.4v3.6m6-3.6v3.6M2.2 9h3.6m-3.6 6h3.6m12.4-6h3.6m-3.6 6h3.6"/>
+  <rect x="5.6" y="5.6" width="12.8" height="12.8" rx="2" fill="var(--kubai-face, #b9dbe4)" stroke="var(--kubai-edge, #38546c)" stroke-width="1.6"/>
+  <rect x="9.5" y="9.5" width="5" height="5" rx=".8" fill="var(--kubai-detail, #233b51)"/>
+</svg>

@@ -671,7 +671,6 @@ mod tests {
             host_network: crate::network_egress::HostNetworkState::new(Default::default()),
             ai_cancels: AsyncMutex::new(std::collections::HashMap::new()),
             batch_cancel: AsyncMutex::new(None::<CancellationToken>),
-            sync_lock: AsyncMutex::new(()),
             plugin_host: crate::plugin_host::PluginHostState::new(),
         };
         (state, root)

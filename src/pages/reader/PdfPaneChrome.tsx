@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Highlighter, Loader2, MessageSquarePlus, Minus, Moon, Plus, RotateCcw, Send, Sun } from "lucide-react";
+import { XCircle, ArrowLeft, Copy, Highlighter, Spinner, MessageSquarePlus, Minus, Moon, Plus, RotateCcw, Send, Sun } from "@/components/icons";
 import { useState, type ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -43,7 +43,7 @@ export function PdfToolbar({
   const t = useT();
   return (
     <>
-      <div className="absolute top-2 left-2 z-20 litera-overlay flex items-center gap-1 px-1.5 py-1">
+      <div className="litera-overlay flex max-w-full flex-wrap items-center gap-1 px-1.5 py-1 pointer-events-auto">
         <IconButton
           onClick={onReturn}
           title={t("reader.backToPreviousPositionTitle")}
@@ -58,7 +58,7 @@ export function PdfToolbar({
           active={noteActive}
         >
           {notePending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <MessageSquarePlus className="h-3.5 w-3.5" />
           )}
@@ -82,7 +82,7 @@ export function PdfToolbar({
       </div>
       <button
         onClick={onToggleDark}
-        className="absolute top-2 right-2 z-20 litera-btn text-xs"
+        className="litera-btn text-xs ml-auto pointer-events-auto"
         title={dark ? t("reader.lightModeTitle") : t("reader.darkModeTitle")}
       >
         {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -118,7 +118,7 @@ export function SelectionActions({
         {t("reader.translateSelection")}
       </button>
       <button onClick={onAddTerm} disabled={pending} className="litera-btn text-xs px-2 py-1">
-        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        {pending ? <Spinner className="h-3 w-3 animate-spin" /> : null}
         {t("reader.addTerm")}
       </button>
     </div>
@@ -154,7 +154,7 @@ export function PdfLoadError({ error, onRetry }: { error?: VisiblePdfError; onRe
   return (
     <div className="h-full grid place-items-center text-sm text-litera-error p-6 text-center">
       <div className="max-w-2xl w-full">
-        <div className="font-medium mb-1">✕ {t("reader.pdfRenderFailed")}</div>
+        <div className="font-medium mb-1"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("reader.pdfRenderFailed")}</div>
         <div className="text-xs text-litera-mute mb-3">{t("reader.pdfErrorHint")}</div>
         <div className="text-left rounded border border-litera-error/30 bg-litera-paper px-3 py-2 space-y-1">
           {fields.map(([label, value]) => (
@@ -208,7 +208,7 @@ export function PdfMutationError({
   if (!message) return null;
   return (
     <div className="absolute top-2 right-2 text-xs text-litera-error bg-litera-paper border border-litera-error/30 rounded px-2 py-1 max-w-[24rem] flex items-center gap-2">
-      <span>✕ {message}</span>
+      <span><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{message}</span>
       <button onClick={onRetry} className="text-litera-mute hover:text-litera-text transition-colors">
         {t("common.retry")}
       </button>

@@ -29,12 +29,7 @@ export const READING_ACTIONS = [
   "tldr",
   "quick-read",
   "translate-metadata",
-  "similar",
-  "review",
   "export",
-  "zotero",
-  "queue-add",
-  "queue-open",
   "collections",
   "selection-translate",
   "terms",
@@ -57,9 +52,6 @@ export interface ReadingHostAction {
   text?: string;
 }
 
-/** Panels that show no single paper and therefore take no IDs. */
-const EMPTY_ALLOWED: ReadonlySet<ReadingAction> = new Set<ReadingAction>(["queue-open", "collections"]);
-
 const PAPER_ID = /^[A-Za-z0-9_-]{4,64}$/;
 
 const ACTIONS: ReadonlySet<string> = new Set<string>(READING_ACTIONS);
@@ -68,7 +60,6 @@ const ACTIONS: ReadonlySet<string> = new Set<string>(READING_ACTIONS);
 export type ReadingHostRoute =
   | { kind: "library" }
   | { kind: "settings" }
-  | { kind: "ask" }
   | { kind: "import"; tab?: "pdf" | "arxiv_doi"; link?: string }
   | { kind: "reader"; paperId: string };
 
@@ -93,7 +84,7 @@ function parseAction(obj: Shape, path: string): ReadingHostAction {
   const ids = stringArrayField(obj, "paperIds", path);
   if (typed === "selection-translate") {
     if (ids.length !== 1) throw schemaError(`${path}.paperIds`, "exactly one paper ID", ids);
-  } else if (ids.length === 0 && !EMPTY_ALLOWED.has(typed)) {
+  } else if (ids.length === 0 && typed !== "collections") {
     throw schemaError(`${path}.paperIds`, "at least one paper ID", ids);
   }
   for (const id of ids) {
@@ -114,7 +105,6 @@ function parseAction(obj: Shape, path: string): ReadingHostAction {
 const STATIC_ROUTES: Record<string, ReadingHostRoute | undefined> = {
   "/": { kind: "library" },
   "/settings": { kind: "settings" },
-  "/ask": { kind: "ask" },
   "/import": { kind: "import" },
   "/import?tab=pdf": { kind: "import", tab: "pdf" },
   "/import?tab=arxiv_doi": { kind: "import", tab: "arxiv_doi" },
@@ -134,7 +124,7 @@ export function parseReadingHostMessage(value: unknown, path = "ReadingHostMessa
   if (type === "library-collection") {
     if (obj.key === null) return { type, key: null };
     const key = stringField(obj, "key", path);
-    if (!/^(folder|smart):\d+$/.test(key)) throw schemaError(`${path}.key`, "folder or smart collection key", key);
+    if (!/^folder:\d+$/.test(key)) throw schemaError(`${path}.key`, "folder key", key);
     return { type, key };
   }
   if (type === "reader-shortcut") {

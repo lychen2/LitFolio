@@ -1,20 +1,15 @@
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X } from "lucide-react";
-import { api, type FilterRule } from "@/lib/api";
+import { Spinner, X } from "@/components/icons";
+import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
-import { SmartCollectionEditor } from "@/components/SmartCollectionEditor";
 import { EmptyState, FolderButton, FolderTree, CreateButton } from "./FolderSidebarTree";
-import { SmartCollectionList } from "./SmartCollectionList";
 import { useNarrowLayout } from "@/hooks/useNarrowLayout";
 
 export function FolderSidebar({
-  selectedId, onSelect, selectedSmartId, onSelectSmart, compactOpen, onClose, embedded = false,
+  selectedId, onSelect, compactOpen, onClose, embedded = false,
 }: {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
-  selectedSmartId: number | null;
-  onSelectSmart: (id: number | null) => void;
   compactOpen: boolean;
   onClose: () => void;
   /** Renders inside a host drawer that already carries the title and close button. */
@@ -48,26 +43,6 @@ export function FolderSidebar({
   });
 
   const totalCount = folders.reduce((sum, f) => sum + f.paper_count, 0);
-
-  // Smart collections
-  const { data: smartCollections = [] } = useQuery({
-    queryKey: ["smart-collections"],
-    queryFn: api.smartCollectionsList,
-  });
-  const createSmart = useMutation({
-    mutationFn: ({ name, rules }: { name: string; rules: FilterRule }) =>
-      api.smartCollectionCreate(name, rules),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["smart-collections"] }),
-  });
-  const deleteSmart = useMutation({
-    mutationFn: (id: number) => api.smartCollectionDelete(id),
-    onSuccess: () => {
-      onSelectSmart(null);
-      qc.invalidateQueries({ queryKey: ["smart-collections"] });
-      qc.invalidateQueries({ queryKey: ["papers"] });
-    },
-  });
-  const [editorOpen, setEditorOpen] = useState(false);
 
   if (!embedded && isCompact && !compactOpen) return null;
 
@@ -116,7 +91,7 @@ export function FolderSidebar({
           </div>
         ) : isLoading ? (
           <div className="px-2 py-3 text-[11px] text-litera-mute flex items-center gap-1.5">
-            <Loader2 className="h-3 w-3 animate-spin" /> {t("common.loading")}
+            <Spinner className="h-3 w-3 animate-spin" /> {t("common.loading")}
           </div>
         ) : folders.length === 0 ? (
           <EmptyState onCreate={(name) => create.mutate({ name, parentId: null })} pending={create.isPending} />
@@ -138,29 +113,8 @@ export function FolderSidebar({
         </div>
       )}
 
-      {/* Smart Collections */}
-      <SmartCollectionList
-        collections={smartCollections}
-        selectedId={selectedSmartId}
-        onCreate={() => setEditorOpen(true)}
-        onDelete={(id) => deleteSmart.mutate(id)}
-        onSelect={(id) => {
-          onSelect(null);
-          onSelectSmart(id);
-        }}
-      />
-
       {create.error && <div className="px-3 py-2 text-xs text-litera-error">{String(create.error)}</div>}
       {del.error && <div className="px-3 py-2 text-xs text-litera-error">{String(del.error)}</div>}
-      {editorOpen && (
-        <SmartCollectionEditor
-          onSave={(name, rules) => {
-            createSmart.mutate({ name, rules });
-            setEditorOpen(false);
-          }}
-          onCancel={() => setEditorOpen(false)}
-        />
-      )}
     </aside>
   );
 }

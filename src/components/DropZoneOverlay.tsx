@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { FileUp, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { FileUp, Spinner, CheckCircle2, XCircle } from "@/components/icons";
 import { useT } from "@/i18n/I18nProvider";
 import type { PdfImportSummary } from "@/lib/api";
 
@@ -43,7 +43,7 @@ export function DropZoneOverlay({
 
       {importing && (
         <div className="pointer-events-auto bg-litera-paper/90 backdrop-blur-sm border border-litera-line rounded-2xl p-8 flex flex-col items-center gap-3 shadow-xl">
-          <Loader2 className="h-8 w-8 text-litera-accent animate-spin" />
+          <Spinner className="h-8 w-8 text-litera-accent animate-spin" />
           <div className="text-sm text-litera-text">{t("drop.importing")}</div>
         </div>
       )}

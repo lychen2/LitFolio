@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Paperclip, Plus, Tag as TagIcon, X } from "lucide-react";
+import { XCircle, Spinner, Paperclip, Plus, Tag as TagIcon, X } from "@/components/icons";
 import { api, pickSinglePdf, type Paper, type ReadStatus } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
@@ -59,12 +59,12 @@ export function PaperHostMeta({ paper }: { paper: Paper }) {
         className="litera-btn text-xs disabled:opacity-50"
         title={t("library.attachPdfTitle")}
       >
-        {attach.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+        {attach.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
         {t("library.attachPdf")}
       </button>
       <PaperTags paperId={paper.id} />
       <FolderPicker paperId={paper.id} />
-      {attach.error && <p className="w-full text-xs text-litera-error">✕ {t("library.attachPdfFailed")}</p>}
+      {attach.error && <p className="w-full text-xs text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("library.attachPdfFailed")}</p>}
       {status.error && <p role="alert" className="w-full text-xs text-litera-error">{t("library.statusUpdateFailed")}</p>}
     </div>
   );
@@ -140,7 +140,7 @@ function PaperTags({ paperId }: { paperId: string }) {
             title={t("paper.detail.category")}
             aria-label={t("paper.detail.category")}
           >
-            {attachNamed.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+            {attachNamed.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           </button>
         </span>
       ) : (

@@ -26,7 +26,7 @@ pub use binding::{HostAccessError, InstanceBinding, PluginHostState};
 /// Everything else defaults to disabled; the build profile still decides
 /// physical inclusion. ponytail: hardcoded policy set, move into manifests only
 /// if we ever need per-plugin opt-in defaults beyond the reading loop.
-const DEFAULT_ENABLED: &[&str] = &["candidate-inbox", "discovery-feeds"];
+const DEFAULT_ENABLED: &[&str] = &["candidate-inbox", "discovery-feeds", "literature-network"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum PluginHostError {
@@ -150,7 +150,6 @@ mod tests {
             http_external: reqwest::Client::new(),
             host_network: crate::network_egress::HostNetworkState::new(Default::default()),
             batch_cancel: tokio::sync::Mutex::new(None),
-            sync_lock: tokio::sync::Mutex::new(()),
             plugin_host: PluginHostState::new(),
         }
     }
@@ -208,7 +207,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fresh_install_enables_only_hot_topic_plugins() {
+    async fn fresh_install_enables_discovery_plugins() {
         let state = test_state().await;
         let plugins = list_plugins(&state).await.unwrap();
         let shown: Vec<(String, bool)> = plugins
@@ -216,12 +215,25 @@ mod tests {
             .filter(|(m, _, _)| !m.id.starts_with("fixture-"))
             .map(|(m, enabled, _)| (m.id, enabled))
             .collect();
-        assert_eq!(shown.iter().filter(|(_, e)| *e).count(), 2);
+        #[cfg(feature = "plugin-literature-network")]
+        assert!(shown.iter().any(|(id, enabled)| id == "literature-network" && *enabled));
         assert!(shown.iter().any(|(id, e)| id == "discovery-feeds" && *e));
         assert!(shown.iter().any(|(id, e)| id == "candidate-inbox" && *e));
         assert!(shown
             .iter()
-            .all(|(id, e)| id == "discovery-feeds" || id == "candidate-inbox" || !*e));
+            .all(|(id, enabled)| DEFAULT_ENABLED.contains(&id.as_str()) || !*enabled));
+    }
+
+    #[cfg(feature = "plugin-literature-network")]
+    #[tokio::test]
+    async fn literature_network_remembers_first_disable() {
+        let mut state = test_state().await;
+        crate::commands::literature_network::require_enabled(&state).await.unwrap();
+        disable_plugin(&state, "literature-network").await.unwrap();
+        state.plugin_host = PluginHostState::new();
+        assert!(crate::commands::literature_network::require_enabled(&state).await.is_err());
+        enable_plugin(&state, "literature-network").await.unwrap();
+        crate::commands::literature_network::require_enabled(&state).await.unwrap();
     }
 
     #[tokio::test]

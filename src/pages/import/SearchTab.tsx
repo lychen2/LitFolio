@@ -4,10 +4,11 @@ import {
   Archive,
   CheckCircle2,
   FolderOpen,
-  Loader2,
+  Spinner,
   Rocket,
   Search,
-} from "lucide-react";
+  XCircle,
+} from "@/components/icons";
 import { api, pickSinglePdf, type Paper, type SearchHit } from "@/lib/api";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
 import { useT } from "@/i18n/I18nProvider";
@@ -68,12 +69,12 @@ export function SearchTab() {
       </div>
       {error && (
         <div className="text-sm text-litera-error">
-          ✕ {(error as Error).message}
+          <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(error as Error).message}
         </div>
       )}
       {isFetching && (
         <div className="text-sm text-litera-mute flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />{" "}
+          <Spinner className="h-4 w-4 animate-spin" />{" "}
           {t("import.search.searching")}
         </div>
       )}
@@ -343,7 +344,7 @@ function SearchHitActions({
         title={t("candidate.add")}
       >
         {candidatePending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner className="h-3.5 w-3.5 animate-spin" />
         ) : (
           <Archive className="h-3.5 w-3.5" />
         )}
@@ -356,7 +357,7 @@ function SearchHitActions({
         title={t("import.search.pickSaveTitle")}
       >
         {savePending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner className="h-3.5 w-3.5 animate-spin" />
         ) : (
           <FolderOpen className="h-3.5 w-3.5" />
         )}
@@ -370,7 +371,7 @@ function SearchHitActions({
           title={t("import.search.arxivAutoTitle")}
         >
           {autoPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <Rocket className="h-3.5 w-3.5" />
           )}

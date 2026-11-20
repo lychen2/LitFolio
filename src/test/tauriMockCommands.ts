@@ -1,16 +1,15 @@
 import type {
-  AskCapabilityState,
-  AskSession,
+  FeedItem,
   JobRecord,
   LlmConfig,
   Paper,
   PdfTextNote,
   QuickReadResult,
 } from "@/lib/api";
-import type { SyncPreviewReport, SyncReport } from "@/lib/syncApi";
+import type { LiteratureNetwork } from "@/features/literature-network/network";
 import { pluginRegistry } from "@/host/profileRegistry";
 import { parseLlmConfig } from "@/lib/apiSchema";
-import { field, object } from "@/lib/apiSchemaCore";
+import { field, object, stringArrayField } from "@/lib/apiSchemaCore";
 
 const now = 1_779_999_999;
 
@@ -20,6 +19,7 @@ const now = 1_779_999_999;
  * listener on the developer machine, so the fixture stays on the discard port.
  */
 const READING_SERVICE_ORIGIN = "http://127.0.0.1:9";
+const PICKED_PDF_URI = "content://com.android.providers.downloads.documents/document/msf%3A42";
 
 function readingServiceUrl(paperId: string): string {
   return paperId ? `${READING_SERVICE_ORIGIN}/read/${paperId}` : `${READING_SERVICE_ORIGIN}/`;
@@ -53,6 +53,36 @@ export const mockPaper: Paper = {
   bibtex: null,
 };
 
+const mockLiteratureNetwork: LiteratureNetwork = {
+  nodes: [
+    {
+      id: "W1", title: mockPaper.title, authors: mockPaper.authors, year: mockPaper.year,
+      venue: mockPaper.venue, doi: mockPaper.doi, arxivId: null, url: "https://openalex.org/W1",
+      libraryPaperId: mockPaper.id, isSeed: true, groupId: "T1", citationCount: 10, score: 0,
+    },
+    {
+      id: "W2", title: "Related Network Paper", authors: ["Grace Hopper"], year: 2025,
+      venue: null, doi: null, arxivId: null, url: "https://openalex.org/W2",
+      libraryPaperId: null, isSeed: false, groupId: "T2", citationCount: 4, score: 9,
+    },
+  ],
+  edges: [
+    {
+      source: "W1", target: "W2", kind: "citation",
+      evidence: [{ id: "W1", title: mockPaper.title, url: "https://openalex.org/W1" }],
+    },
+    {
+      source: "W1", target: "W2", kind: "shared_reference",
+      evidence: [{ id: "W3", title: "Common Reference Paper", url: "https://openalex.org/W3" }],
+    },
+  ],
+  groups: [
+    { id: "T1", label: "Citation Networks", nodeIds: ["W1"] },
+    { id: "T2", label: "Reference Matching", nodeIds: ["W2"] },
+  ],
+  unresolvedSeedIds: [],
+};
+
 const mockReaderPaper: Paper = {
   ...mockPaper,
   id: "paper-reader",
@@ -80,27 +110,6 @@ export const mockLlmConfig: LlmConfig = {
   obsidian: { vault_dir: "", folder: "Papers" },
 };
 
-export const mockAskCapabilityState: AskCapabilityState = {
-  state: "needs_model",
-  has_model: false,
-  indexed_documents: 0,
-  failed_documents: 0,
-  total_documents: 0,
-  reason: "no LLM profile configured; add one in Settings",
-};
-
-export const mockAskSession: AskSession = {
-  id: "ask_01",
-  project_id: null,
-  title: "Test Ask session",
-  pinned_paper_ids: [],
-  model: null,
-  conversation: [],
-  saved_artifacts: [],
-  created_at: now,
-  updated_at: now,
-};
-
 export const mockPdfTextNote: PdfTextNote = {
   kind: "text-note",
   id: "pdf-note-1",
@@ -123,31 +132,6 @@ export const mockQuickReadResult: QuickReadResult = {
   model: "mock-model",
   prompt_tokens: 0,
   completion_tokens: 0,
-};
-
-export const mockSyncReport: SyncReport = {
-  remote_root: "https://dav.example.test/litfolio",
-  file_count: 1,
-  total_bytes: 2048,
-  skipped_count: 0,
-  skipped_bytes: 0,
-  restart_required: false,
-  backup_path: null,
-};
-
-export const mockSyncPreviewReport: SyncPreviewReport = {
-  direction: "push",
-  remote_root: "https://dav.example.test/litfolio",
-  add_count: 1,
-  update_count: 0,
-  delete_count: 0,
-  unchanged_count: 0,
-  transfer_bytes: 2048,
-  restart_required: false,
-  backup_path: null,
-  changes: [
-    { path: "papers/demo/original.pdf", action: "upload_new", size: 2048 },
-  ],
 };
 
 export const mockJobRecord: JobRecord = {
@@ -227,11 +211,76 @@ const mockSourceLink = {
   createdAt: now,
   updatedAt: now,
 };
-type MockResolver = () => unknown;
+type MockResolver = (args?: unknown) => unknown;
 const commandFixtures = new Map<string, MockResolver>([
   ["papers_recent", () => [mockPaper]],
+  ["pdf_document_names", (args) => {
+    const command = "pdf_document_names";
+    const uris = stringArrayField(object(args, command), "uris", command);
+    return uris.map((uri) => uri === PICKED_PDF_URI ? "reading-check.pdf" : null);
+  }],
+  ["import_pdf_files", (args) => {
+    const command = "import_pdf_files";
+    const paths = stringArrayField(object(args, command), "paths", command);
+    if (paths.length !== 1 || paths[0] !== PICKED_PDF_URI) {
+      throw new Error("PDF import must receive the selected content URI unchanged");
+    }
+    return { imported: [mockPaper], failed: [] };
+  }],
+  ["literature_network", (args) => {
+    const path = "literature_network";
+    const ids = stringArrayField(object(args, path), "paperIds", path);
+    const unresolvedSeedIds = ids.filter((id) => id !== mockPaper.id);
+    if (ids.includes(mockPaper.id)) return { ...mockLiteratureNetwork, unresolvedSeedIds };
+    return { nodes: [], edges: [], groups: [], unresolvedSeedIds } satisfies LiteratureNetwork;
+  }],
+  ["literature_network_translate_titles", (args) => {
+    const path = "literature_network_translate_titles";
+    const titles = stringArrayField(object(args, path), "titles", path);
+    const translations = new Map([
+      [mockPaper.title, "浏览器测试论文"],
+      ["Related Network Paper", "相关网络论文"],
+      ["Common Reference Paper", "共同参考文献"],
+    ]);
+    return titles.map((title) => translations.get(title) ?? null);
+  }],
+  ["feeds_list", () => Array.from({ length: 16 }, (_, index) => ({
+    id: index + 1,
+    url: `https://example.org/journal/${index + 1}/rss`,
+    title: index === 0 ? "Photonics and Nanostructures – Fundamentals and Applications" : `Journal ${index + 1}`,
+    description: null,
+    etag: null,
+    last_modified: null,
+    last_fetched_at: null,
+    last_error: null,
+    created_at: now,
+    total_items: index === 0 ? 2 : 0,
+    unread_items: index === 0 ? 2 : 0,
+    impact_factor: index === 0 ? 3.5 : null,
+  }))],
+  ["feed_items_list", (args) => {
+    const input = object(args, "feed_items_list");
+    if (input.feedId != null && input.feedId !== 1) return [];
+    const items: FeedItem[] = ["Newly added article", "Earlier article"].map((title, index) => ({
+      id: `rss-item-${index}`,
+      feed_id: 1,
+      entry_id: `rss-entry-${index}`,
+      title,
+      link: null,
+      summary: null,
+      authors: [],
+      published_at: null,
+      fetched_at: now - index,
+      seen: false,
+      imported_paper_id: null,
+      metadata: null,
+      metadata_source: null,
+      metadata_checked_at: null,
+    }));
+    return input.sort === "oldest" ? items.reverse() : items;
+  }],
   ["plugin_host_list", () =>
-    ["discovery-feeds", "candidate-inbox", "library-ask", "knowledge-graph"].map((id, i) => ({
+    ["discovery-feeds", "candidate-inbox", "literature-network", "updates"].map((id, i) => ({
       manifest: pluginRegistry.find((manifest) => manifest.id === id),
       enabled: true,
       generation: i + 1,
@@ -253,6 +302,7 @@ const commandFixtures = new Map<string, MockResolver>([
   ["provenance_remap", () => ({ schemaVersion: 1, paperIds: [], linksRecomputed: 0, changed: 0 })],
   ["provenance_export", () => ({ schemaVersion: 1, targetVersion: 1, papers: [] })],
   ["paper_get", () => mockPaper],
+  ["paper_delete", () => undefined],
   ["paper_quick_read", () => mockQuickReadResult],
   ["paper_find_by_doi", () => mockPaper],
   ["paper_translated_markdown_get", () => null],
@@ -262,7 +312,6 @@ const commandFixtures = new Map<string, MockResolver>([
   ["paper_terms_list", () => []],
   ["paper_set_pdf_text", () => null],
   ["note_sections_get", () => []],
-  ["paper_links_for_paper", () => []],
   ["paper_translate_markdown_estimate", () => ({
     source_chars: 1200,
     cleaned_chars: 1000,
@@ -305,83 +354,9 @@ const commandFixtures = new Map<string, MockResolver>([
     emptyDefaultSections: 0,
     rollbackState: "committed",
   })],
-  ["paper_supplements_list", () => []],
-  ["paper_supplement_add_file", () => ({
-    id: 1,
-    paper_id: "paper-1",
-    title: "supplement.pdf",
-    file_path: "/tmp/litfolio-test/papers/paper-1/supplements/supplement.pdf",
-    file_kind: "pdf",
-    note: "",
-    converted_pdf_path: null,
-    created_at: now,
-    updated_at: now,
-  })],
-  ["paper_supplement_update_note", () => ({
-    id: 1,
-    paper_id: "paper-1",
-    title: "supplement.pdf",
-    file_path: "/tmp/litfolio-test/papers/paper-1/supplements/supplement.pdf",
-    file_kind: "pdf",
-    note: "note",
-    converted_pdf_path: null,
-    created_at: now,
-    updated_at: now,
-  })],
-  ["paper_supplement_delete", () => null],
-  ["paper_supplement_open", () => null],
-  ["paper_supplement_convert_docx_to_pdf", () => ({
-    supplement: {
-      id: 1,
-      paper_id: "paper-1",
-      title: "supplement.docx",
-      file_path: "/tmp/litfolio-test/papers/paper-1/supplements/supplement.docx",
-      file_kind: "docx",
-      note: "",
-      converted_pdf_path: "/tmp/litfolio-test/papers/paper-1/supplements/supplement.pdf",
-      created_at: now,
-      updated_at: now,
-    },
-    pdf_path: "/tmp/litfolio-test/papers/paper-1/supplements/supplement.pdf",
-  })],
   ["papers_count", () => 1],
   ["library_root", () => "/tmp/litfolio-test"],
   ["diagnostics_export_log", () => "/tmp/litfolio-diagnostics.log"],
-  [
-    "sync_get_config",
-    () => ({
-      webdav: { base_url: "", remote_path: "", username: "", password: "" },
-    }),
-  ],
-  ["sync_save_config", () => null],
-  ["sync_test", () => ({ remote_root: mockSyncReport.remote_root })],
-  ["sync_preview_push_library", () => mockSyncPreviewReport],
-  [
-    "sync_preview_pull_library",
-    () => {
-      const report: SyncPreviewReport = {
-        ...mockSyncPreviewReport,
-        direction: "pull",
-        restart_required: true,
-        backup_path: "backups/pre-pull-20260613-litfolio/",
-        changes: [
-          {
-            path: "papers/demo/original.pdf",
-            action: "download_new",
-            size: 2048,
-          },
-        ],
-      };
-      return report;
-    },
-  ],
-  ["sync_push_library", () => mockSyncReport],
-  ["sync_pull_library", () => ({ ...mockSyncReport, restart_required: true })],
-  ["zotero_get_config", () => ({ target_id: null, target_name: null })],
-  ["zotero_save_config", () => null],
-  ["zotero_test", () => null],
-  ["zotero_list_targets", () => []],
-  ["zotero_push", () => ({ pushed: 1, skipped: [], session_ids: ["litfolio-test"] })],
   ["jobs_list", () => []],
   ["job_create", () => mockJobRecord],
   ["job_start", () => ({ ...mockJobRecord, status: "running" })],
@@ -391,13 +366,7 @@ const commandFixtures = new Map<string, MockResolver>([
   ["job_cancel", () => ({ ...mockJobRecord, status: "cancelled" })],
   ["job_retry", () => ({ ...mockJobRecord, attempts: 1 })],
   ["folders_list", () => []],
-  ["smart_collections_list", () => []],
-  ["queue_list", () => []],
-  ["queue_add", () => null],
   ["papers_batch_tags", () => ({})],
-  ["ask_capability_state", () => mockAskCapabilityState],
-  ["ask_session_latest", () => mockAskSession],
-  ["ask_session_save", () => mockAskSession],
   ["llm_get_config", () => mockLlmConfig],
   ["reading_service_sync", () => null],
   ["reading_service_position_note_ime", () => null],
@@ -409,6 +378,14 @@ const commandFixtures = new Map<string, MockResolver>([
 export const registeredMockCommands = [...commandFixtures.keys()].sort();
 
 export function invokeMockCommand<T = unknown>(command: string, args?: unknown): T {
+  if (command === "plugin:dialog|open") {
+    const options = object(field(object(args, command), "options", command), command);
+    return (options.multiple === true ? [PICKED_PDF_URI] : PICKED_PDF_URI) as T;
+  }
+  if (command === "plugin:opener|reveal_item_in_dir") {
+    stringArrayField(object(args, command), "paths", command);
+    return undefined as T;
+  }
   if (command === "reading_service_open") {
     const input = object(args, "reading_service_open");
     const id = input.id;
@@ -438,7 +415,7 @@ export function invokeMockCommand<T = unknown>(command: string, args?: unknown):
   if (!resolver) {
     throw unhandledTauriCommandError(command);
   }
-  return resolver() as T;
+  return resolver(args) as T;
 }
 
 export function unhandledTauriCommandError(command: string): Error {

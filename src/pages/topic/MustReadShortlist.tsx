@@ -1,4 +1,4 @@
-import { Star } from "lucide-react";
+import { Star } from "@/components/icons";
 import type { SurveyPaper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 

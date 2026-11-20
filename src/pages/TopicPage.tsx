@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { BookOpenText, Search } from "lucide-react";
+import * as Tabs from "@radix-ui/react-tabs";
+import { BookOpenText, Search } from "@/components/icons";
 import { TopicSurveyView } from "./topic/TopicSurveyView";
 import { TopicSearchView } from "./topic/TopicSearchView";
 import { useT } from "@/i18n/I18nProvider";
+import { PageHeader } from "@/components/PageHeader";
+import { PageToolbar } from "@/components/PageToolbar";
 
 const TAB_KEY = "litera-topic-tab";
 type Tab = "survey" | "search";
@@ -19,52 +22,30 @@ export function TopicPage() {
   }, [tab]);
 
   return (
-    <div className="h-full flex flex-col">
-      <nav className="flex gap-1 border-b border-litera-border bg-litera-paper/55 px-5 py-2" role="tablist" aria-label={t("nav.topic")}>
-        <TabBtn
-          active={tab === "survey"}
-          onClick={() => setTab("survey")}
-          icon={<BookOpenText className="h-4 w-4" />}
-        >
-          {t("topic.tab.survey")}
-        </TabBtn>
-        <TabBtn
-          active={tab === "search"}
-          onClick={() => setTab("search")}
-          icon={<Search className="h-4 w-4" />}
-        >
-          {t("topic.tab.search")}
-        </TabBtn>
-      </nav>
-      <div className="flex-1 min-h-0">
-        {tab === "survey" ? <TopicSurveyView /> : <TopicSearchView />}
-      </div>
-    </div>
-  );
-}
-
-function TabBtn({
-  active, onClick, icon, children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      className={
-        "flex min-h-8 items-center gap-2 rounded-[var(--litera-radius)] border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-litera-focus " +
-        (active
-          ? "border-litera-accent/60 bg-litera-accent/12 text-litera-accent"
-          : "border-transparent text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
-      }
-    >
-      {icon}
-      {children}
-    </button>
+    <Tabs.Root value={tab} onValueChange={(value) => setTab(value === "search" ? "search" : "survey")} className="flex h-full flex-col">
+      <PageHeader
+        icon={tab === "survey" ? <BookOpenText /> : <Search />}
+        title={t(tab === "survey" ? "topic.survey.heading" : "topic.search.heading")}
+        subtitle={t(tab === "survey" ? "topic.survey.subtitle" : "topic.search.subtitle")}
+      />
+      <PageToolbar>
+        <Tabs.List className="litera-tab-list max-w-full flex-wrap" aria-label={t("nav.topic")}>
+          <Tabs.Trigger value="survey" className="litera-tab">
+            <BookOpenText className="h-4 w-4" aria-hidden="true" />
+            {t("topic.tab.survey")}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="search" className="litera-tab">
+            <Search className="h-4 w-4" />
+            {t("topic.tab.search")}
+          </Tabs.Trigger>
+        </Tabs.List>
+      </PageToolbar>
+      <Tabs.Content value="survey" className="litera-tab-panel min-h-0 flex-1">
+        <TopicSurveyView />
+      </Tabs.Content>
+      <Tabs.Content value="search" className="litera-tab-panel min-h-0 flex-1">
+        <TopicSearchView />
+      </Tabs.Content>
+    </Tabs.Root>
   );
 }

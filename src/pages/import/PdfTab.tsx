@@ -1,8 +1,12 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Folder, Loader2, Upload } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { X, XCircle, FileText, Folder, Spinner, Upload } from "@/components/icons";
+import { Button, IconButton } from "@/components/ui";
 import { api, pickPdfFiles } from "@/lib/api";
-import { useT } from "@/i18n/I18nProvider";
+import { errorMessage } from "@/lib/error";
+import { useI18n, useT } from "@/i18n/I18nProvider";
 import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
 import {
@@ -13,8 +17,13 @@ import {
   upsertImportJob,
 } from "./importJobs";
 import { notifyRecentImportsChanged } from "./recentImports";
+import "./PdfTab.css";
 
-type ImportResult = { ok: number; failed: { path: string; error: string }[] };
+type PickedPdf = { path: string; name: string };
+
+type ImportResult =
+  | { ok: number; failed: { path: string; error: string }[] }
+  | { error: string };
 type FolderProgress = {
   phase: string;
   done: number;
@@ -26,22 +35,24 @@ type FolderProgressPayload = Omit<FolderProgress, "current"> & {
   current_file: string;
 };
 
-export function PdfTab() {
+export function PdfTab({ allowFolderImport }: { allowFolderImport: boolean }) {
   const t = useT();
   const qc = useQueryClient();
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<PickedPdf[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [folderProgress, setFolderProgress] = useState<FolderProgress | null>(
     null
   );
 
   const m = useMutation({
-    mutationFn: async (paths: string[]) => {
+    mutationFn: async (files: PickedPdf[]) => {
+      const paths = files.map(({ path }) => path);
+      setResult(null);
       upsertImportJob({
         id: importJobId("pdf", paths.join("|")),
         source: "pdf",
         title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
-        subtitle: paths.map(titleFromPath).join(" · "),
+        subtitle: files.map(({ name }) => name).join(" · "),
         status: "running",
         metadataStatus: "running",
         pdfStatus: "running",
@@ -50,8 +61,8 @@ export function PdfTab() {
       });
       return api.importPdfFiles(paths);
     },
-    onSuccess: (s, paths) => {
-      const id = importJobId("pdf", paths.join("|"));
+    onSuccess: (s, files) => {
+      const id = importJobId("pdf", files.map(({ path }) => path).join("|"));
       const failed = s.failed.map((item) => ({
         path: item.path,
         error: formatPdfImportError(item.error, t),
@@ -61,8 +72,8 @@ export function PdfTab() {
       upsertImportJob({
         id,
         source: "pdf",
-        title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
-        subtitle: paths.map(titleFromPath).join(" · "),
+        title: t("import.pdfTab.importBtn", { count: String(files.length) }),
+        subtitle: files.map(({ name }) => name).join(" · "),
         status: failed.length > 0 ? "failed" : "completed",
         metadataStatus: s.imported.length > 0 ? "completed" : "failed",
         pdfStatus: s.imported.length > 0 ? "completed" : "failed",
@@ -70,7 +81,7 @@ export function PdfTab() {
         error: failed[0]?.error,
         progress: {
           done: s.imported.length,
-          total: paths.length,
+          total: files.length,
           failed: failed.length,
         },
       });
@@ -78,73 +89,95 @@ export function PdfTab() {
       if (s.imported.length) notifyLibraryChanged();
       notifyRecentImportsChanged();
     },
-    onError: (e: Error, paths) => {
-      const error = formatPdfImportError(e.message, t);
-      setResult({ ok: 0, failed: [{ path: "(all)", error }] });
+    onError: (e, files) => {
+      const error = formatPdfImportError(errorMessage(e), t);
+      setResult({ error });
       upsertImportJob({
-        id: importJobId("pdf", paths.join("|")),
+        id: importJobId("pdf", files.map(({ path }) => path).join("|")),
         source: "pdf",
-        title: t("import.pdfTab.importBtn", { count: String(paths.length) }),
-        subtitle: paths.map(titleFromPath).join(" · "),
+        title: t("import.pdfTab.importBtn", { count: String(files.length) }),
+        subtitle: files.map(({ name }) => name).join(" · "),
         status: "failed",
         metadataStatus: "failed",
         pdfStatus: "failed",
         duplicateStatus: duplicateStatusFromFailures([{ error }]),
         error,
-        progress: { done: 0, total: paths.length, failed: paths.length },
+        progress: { done: 0, total: files.length, failed: files.length },
       });
     },
   });
   const folderMut = useFolderImportMutation(setFolderProgress, setResult, t);
   const dropRef = useRef<HTMLDivElement>(null);
-  usePdfDropTarget(dropRef, setPicked, !m.isPending && !folderMut.isPending);
+  const pickRef = useRef<HTMLButtonElement>(null);
+  const busy = m.isPending || folderMut.isPending;
+  usePdfDropTarget(dropRef, (paths) => {
+    setPicked(paths.map((path) => ({ path, name: titleFromPath(path) })));
+  }, !busy);
 
   async function pick() {
-    const files = await pickPdfFiles();
-    if (files && files.length) setPicked(files);
+    try {
+      const paths = await pickPdfFiles();
+      if (!paths?.length) return;
+      const names = paths.some((path) => path.startsWith("content://"))
+        ? await api.pdfDocumentNames(paths)
+        : [];
+      setPicked(paths.map((path, index) => ({ path, name: names[index] ?? titleFromPath(path) })));
+    } catch (e) {
+      const error = formatPdfImportError(errorMessage(e), t);
+      setResult({ error });
+    }
   }
 
   async function pickFolder() {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, multiple: false });
-    if (typeof selected === "string" && selected) folderMut.mutate(selected);
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (typeof selected === "string" && selected) folderMut.mutate(selected);
+    } catch (e) {
+      const error = formatPdfImportError(errorMessage(e), t);
+      setResult({ error });
+    }
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
-      <div ref={dropRef} className="litera-panel p-8 text-center">
-        <Upload className="h-10 w-10 mx-auto mb-3 text-litera-mute" />
-        <p className="text-sm text-litera-text">{t("import.pdfTab.desc")}</p>
-        <p className="text-xs text-litera-mute mt-1">
-          {t("import.pdfTab.hint", { path: "papers/<id>/original.pdf" })}
-        </p>
+    <div className="pdf-import max-w-3xl space-y-4">
+      <div ref={dropRef} className="litera-panel space-y-3 p-4">
         <PdfPickActions
+          pickRef={pickRef}
           pickedCount={picked.length}
           filePending={m.isPending}
           folderPending={folderMut.isPending}
           onPick={pick}
-          onPickFolder={pickFolder}
+          onPickFolder={allowFolderImport ? pickFolder : undefined}
           onImport={() => m.mutate(picked)}
         />
         {folderProgress && <FolderProgressView progress={folderProgress} />}
-        {picked.length > 0 && <PickedFiles paths={picked} />}
-        <p className="mt-4 text-xs text-litera-mute">
-          {t("import.pdfTab.dragHint")}
-        </p>
+        {picked.length > 0 && (
+          <PickedFiles
+            files={picked}
+            disabled={busy}
+            onRemove={(path) => setPicked((files) => files.filter((file) => file.path !== path))}
+            onEmpty={() => pickRef.current?.focus()}
+          />
+        )}
+        <details className="text-xs text-litera-mute">
+          <summary className="w-fit cursor-pointer hover:text-litera-text">{t("import.pdfTab.dragHint")}</summary>
+          <p className="mt-2 leading-relaxed">{t("import.pdfTab.hint", { path: "papers/<id>/original.pdf" })}</p>
+        </details>
       </div>
-      {result && <ImportResultView result={result} />}
+      <ImportResultView result={result} />
     </div>
   );
 }
 
 function useFolderImportMutation(
   setFolderProgress: (progress: FolderProgress | null) => void,
-  setResult: (result: ImportResult) => void,
+  setResult: (result: ImportResult | null) => void,
   t: ReturnType<typeof useT>
 ) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (dirPath: string) => {
+      setResult(null);
       upsertImportJob({
         id: importJobId("folder", dirPath),
         source: "folder",
@@ -220,7 +253,7 @@ function useFolderImportMutation(
     },
     onError: (e: Error, dirPath) => {
       const error = formatPdfImportError(e.message, t);
-      setResult({ ok: 0, failed: [{ path: "(folder)", error }] });
+      setResult({ error });
       setFolderProgress(null);
       upsertImportJob({
         id: importJobId("folder", dirPath),
@@ -238,6 +271,7 @@ function useFolderImportMutation(
 }
 
 function PdfPickActions({
+  pickRef,
   pickedCount,
   filePending,
   folderPending,
@@ -245,41 +279,62 @@ function PdfPickActions({
   onPickFolder,
   onImport,
 }: {
+  pickRef: RefObject<HTMLButtonElement>;
   pickedCount: number;
   filePending: boolean;
   folderPending: boolean;
   onPick: () => void;
-  onPickFolder: () => void;
+  onPickFolder?: () => void;
   onImport: () => void;
 }) {
-  const t = useT();
+  const { lang, t } = useI18n();
+  const labelId = useId();
+  const hintId = useId();
+  const busy = filePending || folderPending;
+  const dropHint = lang === "zh"
+    ? (pickedCount ? "拖入 PDF 可替换当前选择" : "拖入 PDF，确认清单后再导入")
+    : (pickedCount ? "Drop PDFs here to replace the current selection" : "Drop PDFs here to review them before importing");
   return (
-    <div className="mt-4 flex items-center justify-center gap-2">
-      <button onClick={onPick} className="litera-btn">
-        <Upload className="h-4 w-4" /> {t("import.pdfTab.pick")}
-      </button>
-      <button
-        onClick={onPickFolder}
-        disabled={folderPending}
-        className="litera-btn disabled:opacity-50"
+    <>
+      <Button
+        ref={pickRef}
+        className="pdf-import__picker"
+        onClick={onPick}
+        disabled={busy}
+        aria-labelledby={labelId}
+        aria-describedby={busy ? undefined : hintId}
       >
-        <Folder className="h-4 w-4" /> {t("import.pdfTab.pickFolder")}
-      </button>
-      {pickedCount > 0 && (
-        <button
-          onClick={onImport}
-          disabled={filePending}
-          className="litera-btn-primary disabled:opacity-50"
-        >
-          {filePending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <FileText className="h-4 w-4" />
+        <Upload className="pdf-import__picker-icon h-5 w-5 shrink-0" />
+        <span className="min-w-0">
+          <span id={labelId} className="block">{t("import.pdfTab.pick")}</span>
+          <span id={hintId} className="block text-xs font-normal text-litera-mute">
+            {busy ? t("drop.importing") : dropHint}
+          </span>
+        </span>
+      </Button>
+      {(onPickFolder || pickedCount > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {onPickFolder && (
+            <Button onClick={onPickFolder} disabled={busy}>
+              <Folder className="h-4 w-4" /> {t("import.pdfTab.pickFolder")}
+            </Button>
           )}
-          {t("import.pdfTab.importBtn", { count: String(pickedCount) })}
-        </button>
+          {pickedCount > 0 && (
+            <Button variant="primary" onClick={onImport} disabled={busy}>
+              {filePending ? (
+                <Spinner className="h-4 w-4 motion-safe:animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              {t("import.pdfTab.importBtn", { count: String(pickedCount) })}
+            </Button>
+          )}
+        </div>
       )}
-    </div>
+      <div role="status" className="sr-only">
+        {busy && t("drop.importing")}
+      </div>
+    </>
   );
 }
 
@@ -296,12 +351,12 @@ function FolderProgressView({ progress }: { progress: FolderProgress }) {
             total: String(progress.total),
           })}
       {progress.current && (
-        <span className="ml-2 font-mono truncate">{progress.current}</span>
+        <span className="block break-all font-mono">{progress.current}</span>
       )}
       {progress.total > 0 && progress.phase !== "done" && (
         <div className="mt-1 h-1.5 bg-litera-line rounded-full overflow-hidden">
           <div
-            className="h-full bg-litera-accent rounded-full transition-all"
+            className="h-full bg-litera-accent rounded-full motion-safe:transition-[width]"
             style={{ width: `${(progress.done / progress.total) * 100}%` }}
           />
         </div>
@@ -310,35 +365,90 @@ function FolderProgressView({ progress }: { progress: FolderProgress }) {
   );
 }
 
-function PickedFiles({ paths }: { paths: string[] }) {
+function PickedFiles({ files, disabled, onRemove, onEmpty }: {
+  files: PickedPdf[];
+  disabled: boolean;
+  onRemove: (path: string) => void;
+  onEmpty: () => void;
+}) {
+  const { lang } = useI18n();
   return (
-    <div className="mt-4 text-left text-xs text-litera-mute font-mono max-h-40 overflow-auto border border-litera-line rounded p-2">
-      {paths.map((p) => (
-        <div key={p} className="truncate">
-          {p}
-        </div>
-      ))}
-    </div>
+    <ul className="pdf-import__queue" aria-label={lang === "zh" ? "待导入的 PDF" : "PDFs to import"}>
+      {files.map(({ path, name }) => {
+        return (
+          <li key={path} className="pdf-import__file">
+            <FileText className="mt-1 h-4 w-4 shrink-0 text-litera-mute" />
+            <details className="min-w-0">
+              <summary className="pdf-import__file-name">{name}</summary>
+              <p className="mt-1 select-text break-all font-mono text-xs text-litera-mute">{path}</p>
+            </details>
+            <IconButton
+              className="pdf-import__remove"
+              label={lang === "zh" ? `从清单移除 ${name}` : `Remove ${name} from the list`}
+              disabled={disabled}
+              onClick={(event) => {
+                const row = event.currentTarget.closest("li");
+                const next = row?.nextElementSibling ?? row?.previousElementSibling;
+                const nextButton = next?.querySelector("button");
+                if (nextButton) nextButton.focus();
+                else onEmpty();
+                onRemove(path);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </IconButton>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-function ImportResultView({ result }: { result: ImportResult }) {
-  const t = useT();
+function ImportResultView({ result }: { result: ImportResult | null }) {
+  const { lang, t } = useI18n();
+  const counts = result && "ok" in result ? result : undefined;
+  const failedCount = counts?.failed.length ?? 0;
+  const error = result && "error" in result ? result.error : undefined;
+  let summary = "";
+  if (error !== undefined) {
+    summary = lang === "zh" ? "导入未完成" : "Import could not be completed";
+  } else if (counts) {
+    if (counts.ok === 0) {
+      if (failedCount) {
+        summary = lang === "zh" ? `${failedCount} 个文件导入失败` : `Failed files: ${failedCount}`;
+      } else {
+        summary = lang === "zh" ? "没有导入 PDF" : "No PDFs imported";
+      }
+    } else if (failedCount) {
+      summary = t("import.pdfTab.doneWithFail", { ok: String(counts.ok), fail: String(failedCount) });
+    } else {
+      summary = t("import.pdfTab.done", { ok: String(counts.ok) });
+    }
+  }
+
   return (
-    <div className="litera-panel p-4 text-sm space-y-2">
-      <div className="text-litera-text">
-        {result.failed.length === 0
-          ? t("import.pdfTab.done", { ok: String(result.ok) })
-          : t("import.pdfTab.doneWithFail", {
-              ok: String(result.ok),
-              fail: String(result.failed.length),
-            })}
-      </div>
-      {result.failed.map((f, i) => (
-        <div key={i} className="text-xs text-litera-error font-mono">
-          ✕ <span className="text-litera-mute">{f.path}</span> — {f.error}
+    <div className={result ? "litera-panel space-y-2 p-4 text-sm" : "sr-only"}>
+      <p className="pdf-import__receipt-label" role="status">{summary}</p>
+      {counts && counts.ok + failedCount > 0 && (
+        <div className="pdf-import__receipt-bar" aria-hidden="true">
+          {counts.ok > 0 && <span className="pdf-import__receipt-ok" style={{ flexGrow: counts.ok }} />}
+          {failedCount > 0 && <span className="pdf-import__receipt-failed" style={{ flexGrow: failedCount }} />}
         </div>
-      ))}
+      )}
+      {error !== undefined && <p className="pdf-import__failure">{error}</p>}
+      {counts && failedCount > 0 && (
+        <ul className="divide-y divide-litera-line">
+          {counts.failed.map((failure) => (
+            <li key={failure.path} className="flex items-start gap-2 py-2 text-xs">
+              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-litera-error" />
+              <div className="min-w-0">
+                <p className="break-all font-mono text-litera-mute">{failure.path}</p>
+                <p className="pdf-import__failure">{failure.error}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

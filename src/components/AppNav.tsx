@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { HardDrive, PanelLeftClose, PanelLeftOpen, Plus } from "@/components/icons";
 import { clsx } from "clsx";
 import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { useT } from "@/i18n/I18nProvider";
@@ -52,7 +52,7 @@ export function AppNav({
           </defs>
           <image href="/litera.svg" width="512" height="512" filter={`url(#${logoTintId})`} />
         </svg>
-        <span className="nav-label text-base font-semibold tracking-tight text-litera-text">LitFolio</span>
+        <span className="nav-label litera-wordmark">LitFolio</span>
         {showPinToggle && (
           <button
             onClick={onTogglePin}
@@ -61,17 +61,17 @@ export function AppNav({
             aria-label={pinned ? t("shell.unpinNav") : t("shell.pinNav")}
             aria-pressed={pinned}
           >
-            {pinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            {pinned ? <PanelLeftClose className="size-5" /> : <PanelLeftOpen className="size-5" />}
           </button>
         )}
       </div>
 
       <NavLink
         to="/import"
-        className="mb-5 hidden min-h-9 items-center justify-center gap-2 rounded-[var(--litera-radius)] border border-transparent bg-litera-accent px-3 py-1.5 text-sm font-semibold text-litera-accent-contrast shadow-[0_2px_10px_-1px_rgba(0,0,0,0.2)] transition-all hover:bg-litera-accent-strong hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] hover:scale-[1.01] active:scale-[0.97] max-[900px]:mx-auto max-[900px]:flex max-[900px]:h-9 max-[900px]:w-9 max-[900px]:p-0"
+        className="litera-btn-primary mb-5 hidden max-[900px]:mx-auto max-[900px]:inline-flex max-[900px]:h-9 max-[900px]:w-9 max-[900px]:p-0"
         title={t("nav.import")}
       >
-        <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <Plus className="size-5" aria-hidden="true" />
         <span className="nav-label">{t("nav.import")}</span>
       </NavLink>
 
@@ -86,27 +86,24 @@ export function AppNav({
                 const Icon = item.icon;
                 const active = isItemActive(path);
                 return (
-                  <NavLink
+                  <Link
                     key={path}
                     to={path}
                     className={clsx(
-                      "group relative flex min-h-9 items-center gap-2.5 rounded-[var(--litera-radius)] px-2.5 text-sm transition-all duration-150 max-[900px]:mx-auto max-[900px]:h-9 max-[900px]:w-9 max-[900px]:justify-center max-[900px]:p-0",
+                      "litera-nav-item min-h-9 max-[900px]:mx-auto max-[900px]:h-9 max-[900px]:w-9 max-[900px]:justify-center max-[900px]:p-0",
                       path === "/import" && "max-[900px]:hidden",
-                      active
-                        ? "bg-litera-accent/16 font-medium text-litera-accent shadow-sm ring-1 ring-litera-accent/25"
-                        : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text hover:translate-x-0.5",
                     )}
                     title={t(item.labelKey)}
                     aria-current={active ? "page" : undefined}
                   >
-                    <Icon className={clsx("h-4 w-4 shrink-0 transition-transform group-hover:scale-110", active && "text-litera-accent")} aria-hidden="true" />
+                    <Icon className="size-5" aria-hidden="true" />
                     <span className="nav-label min-w-0 truncate">{t(item.labelKey)}</span>
                     {path === "/topic" && unseenCount > 0 && (
-                      <span className="nav-label ml-auto rounded-full bg-litera-accent/20 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-litera-accent ring-1 ring-litera-accent/30">
+                      <span className="litera-badge ml-auto tabular-nums max-[900px]:hidden">
                         {unseenCount}
                       </span>
                     )}
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>
@@ -120,7 +117,7 @@ export function AppNav({
           {appVersion ? <span>v{appVersion}</span> : null}
           {storageBytes != null && (
             <span className="flex items-center gap-1 tabular-nums">
-              <HardDrive className="h-3 w-3" aria-hidden="true" />
+              <HardDrive className="size-4" aria-hidden="true" />
               {fmtBytes(storageBytes)}
             </span>
           )}
@@ -151,22 +148,26 @@ export function AutoHideNav(props: ComponentProps<typeof AppNav>) {
       <button
         ref={triggerRef}
         type="button"
-        onMouseEnter={() => setOpen(true)}
+        onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpen(true); }}
         onClick={() => setOpen(true)}
-        className={clsx("group absolute inset-y-0 left-0 z-40 w-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-litera-focus", open && "pointer-events-none opacity-0")}
+        className={clsx("litera-reader-nav-trigger group absolute inset-y-0 left-0 z-40 w-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-litera-focus", open && "pointer-events-none opacity-0")}
         title={t("shell.showNav")}
         aria-label={t("shell.showNav")}
         aria-expanded={open}
       >
+        <PanelLeftOpen aria-hidden="true" className="hidden size-5" />
         <span className="absolute inset-y-0 left-0 w-1 bg-litera-border/70 transition-colors group-hover:bg-litera-accent/70" />
       </button>
       {open && (
         <aside
           onMouseEnter={() => setOpen(true)}
           onMouseLeave={() => setOpen(false)}
-          className="litera-slide-in-left absolute inset-y-0 left-0 z-40 flex w-[232px] flex-col border-r border-litera-border bg-litera-paper px-3 py-4 shadow-xl"
+          className="litera-sidebar litera-slide-in-left absolute inset-y-0 left-0 z-40 flex w-[232px] flex-col px-3 py-4 shadow-xl"
         >
           <AppNav {...props} />
+          <button type="button" className="litera-btn mt-2" onClick={() => { setOpen(false); triggerRef.current?.focus(); }}>
+            {t("common.close")}
+          </button>
         </aside>
       )}
     </>

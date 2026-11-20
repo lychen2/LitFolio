@@ -1,7 +1,10 @@
-import { CandidateInboxPage } from "@/pages/CandidateInboxPage";
-import type { FrontendPluginEntry } from "@/host/pluginTypes";
+import { lazy } from "react";
+import type { PluginRoute } from "@/host/pluginTypes";
 
-export const pluginRoutes: FrontendPluginEntry["pluginRoutes"] = [
+// Profile registration reads the route without loading the page.
+const CandidateInboxPage = lazy(() => import("@/pages/CandidateInboxPage").then((module) => ({ default: module.CandidateInboxPage })));
+
+export const pluginRoutes: readonly PluginRoute[] = [
   { path: "/candidates", component: CandidateInboxPage },
 ];
 

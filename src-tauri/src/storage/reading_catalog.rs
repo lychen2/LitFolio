@@ -10,9 +10,9 @@
 //! * An existing paper row keeps its `added_at`, and an item whose metadata,
 //!   read state and tag links already match produces no write at all, so
 //!   `updated_at` (and the downstream "needs export" check) stays quiet.
-//! * Only title, authors, year, venue, DOI, arXiv id, abstract and read state
-//!   are refreshed. `pdf_path` is filled in when LitFolio has none and never
-//!   cleared, because a local copy of the PDF is user-owned data.
+//! * Only bibliographic fields and read state are refreshed. `pdf_path` is
+//!   filled in when LitFolio has none and never cleared, because a local copy
+//!   of the PDF is user-owned data.
 //! * Tags are matched by name. New names become ordinary tag definitions; tag
 //!   definitions are never deleted, and only this paper's links are replaced
 //!   to mirror the upstream list.
@@ -37,6 +37,8 @@ use super::models::ReadStatus;
 pub struct ReadingCatalogItem {
     pub id: String,
     pub title: String,
+    #[serde(default)]
+    pub original_title: Option<String>,
     #[serde(default)]
     pub authors: Vec<String>,
     #[serde(default)]
@@ -86,6 +88,7 @@ impl ReadingCatalogItem {
 /// Stored paper columns the projection compares against.
 struct StoredPaper {
     title: String,
+    original_title: Option<String>,
     authors: Vec<String>,
     year: Option<i32>,
     venue: Option<String>,
@@ -105,6 +108,7 @@ impl StoredPaper {
             .unwrap_or_default();
         Ok(Self {
             title: row.try_get("title")?,
+            original_title: optional_text(row, "original_title"),
             authors,
             year: row.try_get("year")?,
             venue: optional_text(row, "venue"),
@@ -142,7 +146,7 @@ pub async fn project_reading_catalog(pool: &Pool, items: &[ReadingCatalogItem]) 
     for item in items {
         let stored = sqlx::query(
             "SELECT title, authors_json, year, venue, doi, arxiv_id, abstract,
-                    pdf_path, read_status
+                    pdf_path, read_status, original_title
              FROM papers WHERE id = ?1",
         )
         .bind(&item.id)
@@ -188,8 +192,8 @@ async fn insert_new(
     sqlx::query(
         "INSERT INTO papers (id, title, authors_json, year, venue, doi, arxiv_id, abstract,
                              pdf_path, note_path, added_at, updated_at, read_status,
-                             key_findings_json)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL,?10,?10,?11,'[]')",
+                             key_findings_json, original_title)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL,?10,?10,?11,'[]',?12)",
     )
     .bind(&item.id)
     .bind(&item.title)
@@ -202,6 +206,7 @@ async fn insert_new(
     .bind(normalized(&item.pdf_path))
     .bind(now)
     .bind(item.read_status().as_str())
+    .bind(normalized(&item.original_title))
     .execute(&mut **tx)
     .await
     .with_context(|| format!("insert catalog paper {}", item.id))?;
@@ -215,6 +220,7 @@ async fn upsert_existing(
     now: i64,
 ) -> Result<()> {
     let read_status = item.read_status();
+    let original_title = normalized(&item.original_title);
     let venue = normalized(&item.venue);
     let abstract_text = normalized(&item.abstract_text);
     let pdf_path = normalized(&item.pdf_path);
@@ -237,6 +243,7 @@ async fn upsert_existing(
     .await?;
 
     let metadata_changed = stored.title != item.title
+        || stored.original_title.as_deref() != original_title
         || stored.authors != item.authors
         || stored.year != item.year
         || stored.venue.as_deref() != venue
@@ -257,8 +264,8 @@ async fn upsert_existing(
          SET title = ?1, authors_json = ?2, year = ?3, venue = ?4,
              abstract = ?5, doi = ?6, arxiv_id = ?7, read_status = ?8,
              pdf_path = COALESCE(NULLIF(pdf_path, ''), ?9),
-             updated_at = ?10
-         WHERE id = ?11",
+             updated_at = ?10, original_title = ?11
+         WHERE id = ?12",
     )
     .bind(&item.title)
     .bind(&authors_json)
@@ -270,6 +277,7 @@ async fn upsert_existing(
     .bind(read_status.as_str())
     .bind(pdf_path)
     .bind(now)
+    .bind(original_title)
     .bind(&item.id)
     .execute(&mut **tx)
     .await
@@ -413,6 +421,7 @@ mod tests {
         ReadingCatalogItem {
             id: id.into(),
             title: title.into(),
+            original_title: None,
             authors: vec!["Ada Lovelace".into()],
             year: Some(2024),
             venue: Some("NeurIPS".into()),

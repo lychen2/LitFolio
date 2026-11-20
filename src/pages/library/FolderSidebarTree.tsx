@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Folder, FolderPlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { Folder, FolderPlus, Spinner, Plus, Trash2 } from "@/components/icons";
 import type { FolderWithCount } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -43,7 +43,7 @@ export function EmptyState({
           disabled={pending || !name.trim()}
           className="litera-btn-primary text-[11px] px-2 py-0.5 disabled:opacity-50 shrink-0"
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : t("common.create")}
+          {pending ? <Spinner className="h-3 w-3 animate-spin" /> : t("common.create")}
         </button>
       </div>
     </div>
@@ -175,7 +175,7 @@ function CreateRootButton({ pending, onOpen }: { pending: boolean; onOpen: () =>
       title={t("folders.newRootTitle")}
     >
       {pending ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Spinner className="h-3 w-3 animate-spin" />
       ) : (
         <>
           <FolderPlus className="h-3 w-3" />
@@ -195,7 +195,7 @@ function CreateChildButton({ pending, onOpen }: { pending: boolean; onOpen: () =
       className="p-1 text-litera-mute hover:text-litera-text opacity-0 group-hover:opacity-100"
       title={t("folders.createChild")}
     >
-      {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+      {pending ? <Spinner className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
     </button>
   );
 }

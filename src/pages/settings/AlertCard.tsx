@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, ChevronDown, ChevronRight, Eye, Loader2, Play, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, ChevronDown, ChevronRight, Eye, Spinner, Play, Trash2 } from "@/components/icons";
 import { api, type TopicAlert } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -41,7 +41,7 @@ export function AlertCard({
         <span className="text-[10px] text-litera-mute">{freqLabel(alert.frequency)}</span>
         {unseenCount > 0 && <span className="text-[10px] bg-litera-accent/20 text-litera-accent px-1.5 py-0.5 rounded-full">{unseenCount}</span>}
         <button onClick={(e) => { e.stopPropagation(); onRun(); }} disabled={running} className="litera-btn text-[10px] px-1.5 py-0.5 disabled:opacity-50" title={t("alerts.run")}>
-          {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+          {running ? <Spinner className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
         </button>
         <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-litera-mute hover:text-litera-error" title={t("alerts.delete")}>
           <Trash2 className="h-3.5 w-3.5" />

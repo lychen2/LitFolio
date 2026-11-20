@@ -18,12 +18,20 @@ from . import host_config
 PACKAGE = Path(__file__).resolve().parent.parent
 WEB = PACKAGE / "web"
 _SOURCE = PACKAGE.parent
-_USER_HOME = Path.home() / "LitFolio"
-_LEGACY_USER_HOME = Path.home() / "EasyRead"
-_DEFAULT_HOME = _SOURCE if (_SOURCE / "pyproject.toml").exists() else _USER_HOME
-if _DEFAULT_HOME == _USER_HOME and not _USER_HOME.exists() and _LEGACY_USER_HOME.is_dir():
-    _DEFAULT_HOME = _LEGACY_USER_HOME
-HOME = Path(os.environ.get("LITFOLIO_CORE_HOME") or _DEFAULT_HOME)
+
+
+def _home() -> Path:
+    override = os.environ.get("LITFOLIO_CORE_HOME")
+    if override:
+        return Path(override)
+    if (_SOURCE / "pyproject.toml").exists():
+        return _SOURCE
+    user_home = Path.home() / "LitFolio"
+    legacy_home = user_home.with_name("EasyRead")
+    return legacy_home if not user_home.exists() and legacy_home.is_dir() else user_home
+
+
+HOME = _home()
 PROJECT = HOME  # 旧名，cli 里还在用
 CONFIG_PATH = HOME / "config.json"
 LOG_PATH = HOME / "core.log"
@@ -60,6 +68,17 @@ DEFAULTS = {
     # 阅读页右侧“问 AI”的模型名单和默认模型，见 chat_models.py
     "chat": copy.deepcopy(DEFAULT_CHAT),
 }
+
+
+def set_embedded_home(home: Path) -> None:
+    """Rebind paths after an embedded host has shut down its previous service."""
+    global HOME, PROJECT, CONFIG_PATH, LOG_PATH, SERVER_INFO
+    HOME = PROJECT = home
+    CONFIG_PATH = home / "config.json"
+    LOG_PATH = home / "core.log"
+    SERVER_INFO = home / ".server.json"
+    DEFAULTS["library_dir"] = str(home / "library")
+
 
 def _merge(base: dict, over: dict) -> dict:
     out = copy.deepcopy(base)

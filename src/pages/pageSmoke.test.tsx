@@ -6,11 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { invokeMockCommand } from "@/test/tauriMockCommands";
-import { AskPage } from "@/plugins/library-ask/AskPage";
 import { BrowsePage } from "./BrowsePage";
 import { CandidateInboxPage } from "./CandidateInboxPage";
 import { FeedsPage } from "./FeedsPage";
-import { GraphPage } from "./GraphPage";
 import { ImportPage } from "./ImportPage";
 import { LibraryPage } from "./LibraryPage";
 import { ReaderPage } from "./ReaderPage";
@@ -29,17 +27,13 @@ vi.mock("./reader/PdfPane", () => ({
   PdfPane: () => <div data-testid="pdf-pane" />,
 }));
 
-vi.mock("./graph/NetworkGraphView", () => ({
-  NetworkGraphView: () => <div data-testid="network-graph" />,
-}));
-
 describe("page smoke render", () => {
   it("renders the library shell", () => {
     expect(renderPage(<LibraryPage />, "/library")).toContain("文献库");
   });
 
   it("opens the inline paper and link import by default", () => {
-    expect(renderPage(<ImportPage />, "/import")).toContain('aria-pressed="true" class="litera-btn-primary text-sm">PDF 或链接');
+    expect(renderPage(<ImportPage />, "/import")).toMatch(/<button\b[^>]*aria-pressed="true"[^>]*>PDF 或链接<\/button>/);
   });
 
   it("keeps local PDF and folder import available at its direct route", () => {
@@ -49,7 +43,7 @@ describe("page smoke render", () => {
   it("shows the RSS source above the identifier form", () => {
     const html = renderPage(<ImportPage />, "/import?fromFeedItem=feed-1", "/import");
     expect(html).toContain("来自 RSS 订阅");
-    expect(html).toContain('aria-pressed="true" class="litera-btn-primary text-sm">arXiv 或 DOI');
+    expect(html).toMatch(/<button\b[^>]*aria-pressed="true"[^>]*>arXiv 或 DOI<\/button>/);
   });
 
   it("renders the DOI import route with a prefilled DOI", () => {
@@ -80,14 +74,6 @@ describe("page smoke render", () => {
 
   it("renders the candidate inbox shell", () => {
     expect(renderPage(<CandidateInboxPage />, "/candidates")).toContain("候选池");
-  });
-
-  it("renders the ask shell", () => {
-    expect(renderPage(<AskPage />, "/ask")).toContain("提问");
-  });
-
-  it("renders the graph shell", () => {
-    expect(renderPage(<GraphPage />, "/graph")).toContain("知识图谱");
   });
 
   it("renders the reader route while paper data is loading", () => {

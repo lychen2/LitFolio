@@ -235,7 +235,6 @@ struct FinalizePaperRequest<'a> {
     existing: Option<Paper>,
     pool: &'a sqlx::SqlitePool,
     paths: &'a crate::storage::LibraryPaths,
-    http: &'a reqwest::Client,
 }
 
 async fn finalize_paper(request: FinalizePaperRequest<'_>) -> Result<Paper, String> {
@@ -247,14 +246,13 @@ async fn finalize_paper(request: FinalizePaperRequest<'_>) -> Result<Paper, Stri
         existing,
         pool,
         paths,
-        http,
     } = request;
     if let Some(existing) = existing {
         let dest_str = pdf_path.display().to_string();
         repo.update_pdf_path(&existing.id, &dest_str)
             .await
             .map_err(|e| e.to_string())?;
-        generate_and_index_pdf_markdown_or_warn(pool, paths, http, &existing.id, pdf_path).await;
+        generate_and_index_pdf_markdown_or_warn(pool, paths, &existing.id, pdf_path).await;
         return repo
             .get(&existing.id)
             .await
@@ -266,7 +264,7 @@ async fn finalize_paper(request: FinalizePaperRequest<'_>) -> Result<Paper, Stri
     paper.pdf_path = Some(pdf_path.display().to_string());
     paper.bibtex = Some(generate_bibtex(&paper));
     repo.insert(&paper).await.map_err(|e| e.to_string())?;
-    generate_and_index_pdf_markdown_or_warn(pool, paths, http, &paper.id, pdf_path).await;
+    generate_and_index_pdf_markdown_or_warn(pool, paths, &paper.id, pdf_path).await;
     Ok(paper)
 }
 
@@ -319,7 +317,6 @@ async fn arxiv_add_with_pdf_inner(state: &AppState, arxiv_id: &str) -> Result<Pa
     generate_and_index_pdf_markdown_or_warn(
         &state.pool,
         &state.paths,
-        &state.http,
         &paper.id,
         &pdf_path,
     )
@@ -386,7 +383,6 @@ async fn doi_add_with_pdf_inner(state: &AppState, doi: &str) -> Result<Paper, St
                             existing,
                             pool: &state.pool,
                             paths: &state.paths,
-                            http: &state.http,
                         })
                         .await;
                     }
@@ -430,7 +426,6 @@ async fn doi_add_with_pdf_inner(state: &AppState, doi: &str) -> Result<Paper, St
                             existing,
                             pool: &state.pool,
                             paths: &state.paths,
-                            http: &state.http,
                         })
                         .await;
                     }

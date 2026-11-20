@@ -1,24 +1,19 @@
 //! OS keychain wrapper.
 //!
-//! We store user secrets (LLM API keys, WebDAV passwords) in the platform
-//! keychain — macOS Keychain, Windows Credential Manager, Secret Service on
-//! Linux — instead of leaving them in `litera.config.json` and `sync.json`
-//! where any process with read access (or WebDAV sync) would pick them up.
+//! We store API credentials in the platform keychain: macOS Keychain, Windows
+//! Credential Manager, or Secret Service on Linux.
 //!
 //! In tests we route through an in-memory `Mutex<HashMap>` instead. Tests
 //! should never write to the real system keychain, and the production keyring
 //! crate isn't available on most CI runners anyway.
 //!
-//! Keychain failures are not fatal. The caller (`ai/profile.rs`,
-//! `library_sync/config.rs`) should treat a failure as "fall back to keeping
-//! the value in the JSON file" and emit a `tracing::warn!`. This keeps the
-//! app usable on Linux setups without a Secret Service provider.
+//! Profile persistence handles keychain failures, logs a warning and retains
+//! the value in the local configuration when migration cannot proceed.
 
 pub fn llm_account(profile_name: &str) -> String {
     format!("llm/{profile_name}")
 }
 
-pub const WEBDAV_ACCOUNT: &str = "webdav/default";
 pub const MINERU_ACCOUNT: &str = "mineru/default";
 
 #[cfg(not(test))]
@@ -27,7 +22,7 @@ mod real {
 
     /// Service name registered under the platform keychain. One namespace per
     /// application is the recommended pattern; accounts inside that namespace
-    /// disambiguate which secret we mean (`llm/<profile>`, `webdav/default`).
+    /// disambiguate credentials such as `llm/<profile>` and `mineru/default`.
     const SERVICE: &str = "LitFolio";
 
     pub fn get(account: &str) -> Result<Option<String>> {

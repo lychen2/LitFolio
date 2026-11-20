@@ -1,17 +1,18 @@
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle, BookOpen, Compass, Layers, Loader2, Sparkles,
-  Wrench, X,
-} from "lucide-react";
+  AlertTriangle, BookOpen, Compass, Layers, Spinner, Sparkles,
+  Wrench,
+  XCircle,
+} from "@/components/icons";
 import { api, type Paper, type QuickReadResult } from "@/lib/api";
 import { errorMessageOr } from "@/lib/error";
 import { useI18n } from "@/i18n/I18nProvider";
-import { useDialogKeyboard } from "@/components/useDialogKeyboard";
+import { DetailDrawer } from "@/components/DetailDrawer";
 
-export function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () => void }) {
+export function QuickReadDrawer({ paper, onClose, notification }: { paper: Paper; onClose: () => void; notification?: ReactNode }) {
   const qc = useQueryClient();
   const { t } = useI18n();
-  const dialog = useDialogKeyboard(onClose);
   const { data: latest } = useQuery({
     queryKey: ["paper", paper.id],
     queryFn: () => api.paperGet(paper.id),
@@ -29,26 +30,29 @@ export function QuickReadDrawer({ paper, onClose }: { paper: Paper; onClose: () 
   const result = cachedQuickRead(current, hasCached) ?? m.data ?? null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-stretch justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
-      <div {...dialog} aria-label={t("reader.tabNotes")} onClick={(e) => e.stopPropagation()} className="w-[640px] max-w-[92vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter">
-        <DrawerHeader paper={current} onClose={onClose} />
+    <DetailDrawer
+      label={t("reader.tabNotes")}
+      heading={<QuickReadHeading paper={current} />}
+      size="compact"
+      onClose={onClose}
+      notification={notification}
+      actions={
         <DrawerToolbar
           hasCached={hasCached}
           modelPending={m.isPending}
           onGenerate={() => m.mutate()}
         />
-        <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
-          {!result && !m.isPending && <EmptyQuickRead />}
-          {m.isPending && !result && <GeneratingQuickRead />}
-          {result && <ResultBody r={result} />}
-          {m.error && (
-            <div className="text-sm text-litera-error border border-litera-error/30 rounded p-3">
-              ✕ {errorMessageOr(m.error, t("reader.unknownError"))}
-            </div>
-          )}
+      }
+    >
+      {!result && !m.isPending && <EmptyQuickRead />}
+      {m.isPending && !result && <GeneratingQuickRead />}
+      {result && <ResultBody r={result} />}
+      {m.error && (
+        <div className="text-sm text-litera-error border border-litera-error/30 rounded p-3">
+          <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{errorMessageOr(m.error, t("reader.unknownError"))}
         </div>
-      </div>
-    </div>
+      )}
+    </DetailDrawer>
   );
 }
 
@@ -69,30 +73,25 @@ function cachedQuickRead(paper: Paper, hasCached: boolean): QuickReadResult | nu
   };
 }
 
-function DrawerHeader({ paper, onClose }: { paper: Paper; onClose: () => void }) {
+function QuickReadHeading({ paper }: { paper: Paper }) {
   const { t } = useI18n();
   return (
-    <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-wider text-litera-accent2 flex items-center gap-1.5">
-          <BookOpen className="h-3.5 w-3.5" /> {t("library.deepRead")}
-        </div>
-        <div className="font-serif text-lg leading-snug mt-0.5">{paper.title}</div>
-        {paper.title_translated && (
-          <div className="text-xs text-litera-accent/90 mt-0.5 italic">
-            {t("library.translatedPrefix")} {paper.title_translated}
-          </div>
-        )}
-        <div className="text-xs text-litera-mute mt-1 truncate">
-          {paper.authors.slice(0, 4).join(", ")}{paper.authors.length > 4 ? " et al." : ""}
-          {paper.year ? ` · ${paper.year}` : ""}
-          {paper.venue ? ` · ${paper.venue}` : ""}
-        </div>
+    <>
+      <div className="text-[11px] uppercase tracking-wider text-litera-accent2 flex items-center gap-1.5">
+        <BookOpen className="h-3.5 w-3.5" /> {t("library.deepRead")}
       </div>
-      <button onClick={onClose} className="text-litera-mute hover:text-litera-text" aria-label={t("common.close")}>
-        <X className="h-5 w-5" />
-      </button>
-    </header>
+      <div className="font-serif text-lg leading-snug mt-0.5">{paper.title}</div>
+      {paper.title_translated && (
+        <div className="text-xs text-litera-accent/90 mt-0.5 italic">
+          {t("library.translatedPrefix")} {paper.title_translated}
+        </div>
+      )}
+      <div className="text-xs text-litera-mute mt-1 truncate">
+        {paper.authors.slice(0, 4).join(", ")}{paper.authors.length > 4 ? " et al." : ""}
+        {paper.year ? ` · ${paper.year}` : ""}
+        {paper.venue ? ` · ${paper.venue}` : ""}
+      </div>
+    </>
   );
 }
 
@@ -111,7 +110,7 @@ function DrawerToolbar({
       </div>
       <div className="flex items-center gap-2">
         <button onClick={onGenerate} disabled={modelPending} className="litera-btn-primary text-xs disabled:opacity-50">
-          {modelPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {modelPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
           {hasCached ? t("library.regenerate") : t("library.runDeepRead")}
         </button>
       </div>
@@ -134,7 +133,7 @@ function GeneratingQuickRead() {
   const { t } = useI18n();
   return (
     <div className="text-sm text-litera-mute flex items-center justify-center gap-2 py-12">
-      <Loader2 className="h-4 w-4 animate-spin" /> {t("library.generatingDeepRead")}
+      <Spinner className="h-4 w-4 animate-spin" /> {t("library.generatingDeepRead")}
     </div>
   );
 }

@@ -4,12 +4,10 @@ import {
   parseArxivDraft,
   parseJobRecord,
   parsePaper,
-  parsePaperSupplement,
   parsePdfImportSummary,
   parseStorageStats,
-  parseSupplementConversionResult,
 } from "./apiSchema";
-import { parseArray, parseNullable } from "./apiSchemaCore";
+import { parseArray, parseNullable, schemaError } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
   ArxivDraft,
@@ -86,6 +84,13 @@ export const libraryApi = {
     ),
   importPdfFiles: (paths: string[]) =>
     invokeParsed("import_pdf_files", { paths }, parsePdfImportSummary),
+  pdfDocumentNames: (uris: string[]) =>
+    invokeParsed("pdf_document_names", { uris }, (value, path) =>
+      parseArray(value, path, (item, itemPath) => {
+        if (item === null || typeof item === "string") return item;
+        throw schemaError(itemPath, "string|null", item);
+      }),
+    ),
   jobsList: (status?: JobStatus | null, limit?: number) =>
     invokeParsed("jobs_list", { status: status ?? null, limit }, (value, path) =>
       parseArray(value, path, parseJobRecord),
@@ -151,19 +156,6 @@ export const libraryApi = {
     invokeParsed("paper_attach_pdf", { id, sourcePdfPath }, parsePaper),
   paperOpenPdf: (id: string) => invoke<void>("paper_open_pdf", { id }),
   paperPdfAssetPath: (id: string) => invoke<string>("paper_pdf_asset_path", { id }),
-  paperSupplementsList: (paperId: string) =>
-    invokeParsed("paper_supplements_list", { paperId }, (value, path) =>
-      parseArray(value, path, parsePaperSupplement),
-    ),
-  paperSupplementAddFile: (paperId: string, sourcePath: string) =>
-    invokeParsed("paper_supplement_add_file", { paperId, sourcePath }, parsePaperSupplement),
-  paperSupplementUpdateNote: (id: number, note: string) =>
-    invokeParsed("paper_supplement_update_note", { id, note }, parsePaperSupplement),
-  paperSupplementDelete: (id: number) => invoke<void>("paper_supplement_delete", { id }),
-  paperSupplementOpen: (id: number, preferPdf?: boolean) =>
-    invoke<void>("paper_supplement_open", { id, preferPdf: preferPdf ?? null }),
-  paperSupplementConvertDocxToPdf: (id: number) =>
-    invokeParsed("paper_supplement_convert_docx_to_pdf", { id }, parseSupplementConversionResult),
   storageStats: () =>
     invokeParsed("storage_stats", {}, parseStorageStats),
 };

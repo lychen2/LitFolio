@@ -22,10 +22,14 @@ const imports = selected.map(({ id }) =>
   `import ${id.replaceAll("-", "_")} from "../../plugins/${id}/manifest.json";`
 ).join("\n");
 const values = selected.map(({ id }) => id.replaceAll("-", "_")).join(",\n  ");
-const loaders = selected.map(({ id }) =>
-  `  ${JSON.stringify(id)}: () => import("@/plugins/${id}/index"),`
+const routed = selected.filter(({ value }) => value.contributions.some(({ slot }) => slot === "app.routes"));
+const routeImports = routed.map(({ id }) =>
+  `import { pluginRoutes as ${id.replaceAll("-", "_")}_routes } from "@/plugins/${id}/index";`
 ).join("\n");
-const output = `${imports}\n\nimport type { FrontendPluginEntry } from "./pluginTypes";\n\nexport const selectedManifests = [${values}] as const;\nexport const selectedPluginLoaders: Record<string, () => Promise<FrontendPluginEntry>> = {\n${loaders}\n};\nexport const selectedProfile = ${JSON.stringify(profile)};\n`;
+const routes = routed.map(({ id }) =>
+  `  ${JSON.stringify(id)}: ${id.replaceAll("-", "_")}_routes,`
+).join("\n");
+const output = `${[imports, routeImports].filter(Boolean).join("\n")}\n\nimport type { PluginRoute } from "./pluginTypes";\n\nexport const selectedManifests = [${values}] as const;\nexport const selectedPluginRoutes: Readonly<Record<string, readonly PluginRoute[]>> = {\n${routes}\n};\nexport const selectedProfile = ${JSON.stringify(profile)};\n`;
 
 const target = join(root, "src/host/generatedProfileRegistry.ts");
 mkdirSync(join(root, "src/host"), { recursive: true });

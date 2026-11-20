@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  BookOpenText, Loader2, Compass, Sparkles, AlertCircle, Save, Trash2, Download,
-} from "lucide-react";
+  Spinner, Compass, Sparkles, AlertCircle, Save, Trash2, Download, Play, Check,
+} from "@/components/icons";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { PageEmptyState } from "@/components/PageEmptyState";
 import {
   api,
   subscribeTopicSurveyProgress,
@@ -11,7 +12,6 @@ import {
   type TopicSurveyProgress,
 } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
-import { PageHeader } from "@/components/PageHeader";
 import { SubareaCard } from "./SubareaCard";
 import { KeyPiList } from "./KeyPiList";
 import { MustReadShortlist } from "./MustReadShortlist";
@@ -124,12 +124,6 @@ export function TopicSurveyView() {
 
   return (
     <section className="h-full flex flex-col overflow-hidden">
-      <PageHeader
-        icon={<BookOpenText className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
-        title={t("topic.survey.heading")}
-        subtitle={t("topic.survey.subtitle")}
-      />
-
       <div className="border-b border-litera-border px-5 py-5 max-[900px]:px-4">
         <div className="litera-panel p-5 max-w-4xl">
           <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.survey.label")}</label>
@@ -156,7 +150,7 @@ export function TopicSurveyView() {
               className="litera-btn-primary disabled:opacity-50"
             >
               {run.isPending
-                ? <Loader2 className="h-4 w-4 animate-spin" />
+                ? <Spinner className="h-4 w-4 animate-spin" />
                 : <Compass className="h-4 w-4" />}
               {survey ? t("topic.survey.regenerate") : t("topic.survey.generate")}
             </button>
@@ -238,7 +232,7 @@ function SavedSurveyBar({
         </span>
       )}
       <button onClick={onSave} disabled={!canSave || isSaving} className="litera-btn text-xs disabled:opacity-50">
-        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+        {isSaving ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
         {t("topic.survey.save")}
       </button>
       <button onClick={onExportMarkdown} disabled={!canSave} className="litera-btn text-xs disabled:opacity-50">
@@ -308,8 +302,14 @@ function ProgressStepper({ progress }: { progress: TopicSurveyProgress }) {
           : i < activeIdx
             ? "text-litera-mute line-through opacity-70"
             : "text-litera-mute opacity-50";
-        const marker = i === activeIdx ? "▶" : i < activeIdx ? "✓" : "○";
-        return <li key={s.phase} className={cls}>{marker} {s.label}</li>;
+        return (
+          <li key={s.phase} className={`flex items-center gap-1.5 ${cls}`} aria-current={i === activeIdx ? "step" : undefined}>
+            {i === activeIdx ? <Play className="h-3 w-3" /> : i < activeIdx ? <Check className="h-3 w-3" /> : (
+              <span className="h-3 w-3 shrink-0 rounded-full border border-current" aria-hidden="true" />
+            )}
+            {s.label}
+          </li>
+        );
       })}
     </ol>
   );
@@ -320,16 +320,16 @@ function EmptyState({ pending }: { pending: boolean }) {
   if (pending) {
     return (
       <div className="p-12 text-center text-sm text-litera-mute">
-        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+        <Spinner className="h-6 w-6 animate-spin mx-auto" />
       </div>
     );
   }
   return (
-    <div className="p-12 text-center text-sm text-litera-mute max-w-md mx-auto">
-      <Compass className="h-12 w-12 mx-auto mb-4 opacity-30" />
-      <p className="mb-2">{t("topic.survey.emptyTitle")}</p>
-      <p className="text-xs opacity-70">{t("topic.survey.emptyHint")}</p>
-    </div>
+    <PageEmptyState
+      icon={<Compass className="h-7 w-7" />}
+      title={t("topic.survey.emptyTitle")}
+      description={t("topic.survey.emptyHint")}
+    />
   );
 }
 

@@ -1,11 +1,7 @@
 //! LLM client (OpenAI-compatible chat + embeddings) and Settings persistence.
 
 mod client;
-mod concept_extract;
 pub mod json_utils;
-mod library_qa;
-pub mod link_discover;
-pub mod lit_review;
 mod models;
 mod profile;
 pub mod prompts;
@@ -22,13 +18,6 @@ mod topic_survey_annotate;
 mod translate;
 
 pub use client::{chat_complete_for_task, chat_complete_with_task_kind, ChatMessage};
-pub use concept_extract::{extract_concepts, ExtractedConcept};
-pub use library_qa::{
-    answer_library_question, empty_result, local_search_result, AskLibraryResult, AskSource,
-    LibraryQuestionRequest,
-};
-pub use link_discover::discover_links;
-pub use lit_review::{generate_review, GroupingStrategy, LitReviewResult};
 pub use models::{list_models, pull_model};
 pub use profile::{
     active_profile, active_profile_for_task, active_reading_profile, load_config, save_config,

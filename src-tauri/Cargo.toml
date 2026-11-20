@@ -1,6 +1,6 @@
 [package]
 name = "litera"
-version = "0.5.1"
+version = "0.5.2"
 description = "LitFolio — local-first literature management"
 authors = ["litfolio"]
 license = "GPL-3.0-or-later"
@@ -38,7 +38,6 @@ dirs = "5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
 regex = "1"
 lopdf = "0.36"
-zip = "4.6.1"
 sha2 = "0.10"
 hex = "0.4"
 url = "2"
@@ -57,25 +56,27 @@ libc = "0.2"
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "2.0.2"
 
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+tempfile = "3"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 
 [features]
 default = [
     "custom-protocol",
-    "plugin-library-ask",
     "plugin-discovery-feeds",
     "plugin-candidate-inbox",
-    "plugin-knowledge-graph",
+    "plugin-literature-network",
 ]
 custom-protocol = ["tauri/custom-protocol"]
 # Plugin-owned command slices. The packaged core profile builds with
 # `--no-default-features --features custom-protocol` so optional plugin
 # backends are physically absent, not merely hidden.
-plugin-library-ask = []
 plugin-discovery-feeds = []
 plugin-candidate-inbox = []
-plugin-knowledge-graph = []
+plugin-literature-network = []
 
 [profile.release]
 codegen-units = 1

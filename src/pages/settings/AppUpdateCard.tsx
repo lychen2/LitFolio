@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, DownloadCloud, Loader2, RefreshCw } from "lucide-react";
+import { XCircle, AlertTriangle, DownloadCloud, Spinner, RefreshCw } from "@/components/icons";
+import { Button } from "@/components/ui";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
 import {
@@ -48,27 +49,26 @@ export function AppUpdateCard() {
     checking && progress ? now - progress.updatedAt >= UPDATE_STUCK_MS : false;
 
   return (
-    <section className="litera-panel p-5">
-      <div className="flex items-start justify-between gap-4">
+    <section className="litera-panel p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-litera-text font-medium mb-1 flex items-center gap-2">
-            <DownloadCloud className="h-4 w-4 text-litera-accent2" />
+          <h2 className="mb-1 flex items-center gap-2 font-medium text-litera-text">
+            <DownloadCloud className="size-4 text-litera-accent2" aria-hidden="true" />
             {t("update.section")}
-          </h3>
+          </h2>
           <p className="text-xs text-litera-mute">{t("update.sectionHint")}</p>
         </div>
-        <button
+        <Button size="sm"
           onClick={onCheck}
           disabled={checking}
-          className="litera-btn text-xs disabled:opacity-50"
         >
           {checking ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <RefreshCw className="h-3.5 w-3.5" />
           )}
           {checking ? t("update.checking") : t("update.check")}
-        </button>
+        </Button>
       </div>
       {checking && progress && (
         <UpdateProgressPanel progress={progress} stalled={stalled} t={t} />
@@ -104,7 +104,7 @@ function UpdateProgressPanel({
           </div>
         )}
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-litera-ink/70">
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-litera-ink/70">
         <div
           className={`h-full rounded-full bg-litera-accent ${
             hasPercent ? "" : "animate-pulse"
@@ -114,8 +114,8 @@ function UpdateProgressPanel({
       </div>
       {detail && <div className="mt-2 font-mono text-[11px]">{detail}</div>}
       {stalled && (
-        <div className="mt-3 flex items-start gap-2 rounded-[var(--litera-radius)] border border-litera-warn/20 bg-litera-warn/5 px-2.5 py-2 text-litera-warn">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <div className="mt-3 flex items-start gap-2 rounded-[var(--litera-radius)] border border-litera-warn/20 bg-litera-warn/5 px-3 py-2 text-litera-warn">
+          <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
           <span>{t("update.stalled")}</span>
         </div>
       )}
@@ -127,14 +127,14 @@ function OutcomeLine({ outcome }: { outcome: UpdateOutcome }) {
   const t = useT();
   if (outcome.status === "error") {
     return (
-      <div className="mt-3 text-xs text-litera-error">
-        ✕ {t("update.failed", { message: outcome.message })}
+      <div role="alert" className="mt-3 text-xs text-litera-error">
+        <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("update.failed", { message: outcome.message })}
       </div>
     );
   }
   const text = lineFor(outcome, t);
   if (!text) return null;
-  return <div className="mt-3 text-xs text-litera-mute">{text}</div>;
+  return <div role="status" className="mt-3 text-xs text-litera-mute">{text}</div>;
 }
 
 function lineFor(outcome: UpdateOutcome, t: Translate): string {

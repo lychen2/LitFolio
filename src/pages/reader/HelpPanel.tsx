@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@/components/icons";
 import { useT } from "@/i18n/I18nProvider";
 
 export function HelpPanel({ onClose }: { onClose: () => void }) {

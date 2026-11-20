@@ -78,7 +78,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {autoHide ? (
           <AutoHideNav {...navProps} />
         ) : (
-          <aside className="flex w-[232px] shrink-0 flex-col border-r border-litera-border bg-litera-paper px-3 py-4 max-[900px]:w-14 max-[900px]:px-1">
+          <aside className="litera-sidebar flex w-[232px] shrink-0 flex-col px-3 py-4 max-[900px]:w-14 max-[900px]:px-1">
             <AppNav {...navProps} />
           </aside>
         )}

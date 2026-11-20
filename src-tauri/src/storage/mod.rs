@@ -3,13 +3,8 @@
 #![allow(dead_code, unused_imports)]
 
 mod ai_executions;
-mod ask_sessions;
 mod candidates;
-pub mod concepts;
-pub mod custom_fields;
 mod db;
-pub mod dedup;
-pub mod embeddings;
 mod feed_defaults;
 pub mod feeds;
 mod folders;
@@ -21,31 +16,21 @@ mod models;
 mod note_sections;
 pub mod notes;
 mod paper_documents;
-mod paper_links;
-mod paper_supplements;
 mod paper_terms;
 mod papers;
 mod paths;
 mod pdf_notes;
 mod plugin_state;
 mod provenance;
-pub mod queue;
 pub mod reading_catalog;
 pub(crate) mod reading_document;
 pub mod retrieval;
-pub mod smart_collections;
 mod tags;
 pub mod topic_alerts;
-mod zotero_pushes;
 
 pub use ai_executions::{AiExecutionRepo, ExecutionRecord};
-pub use ask_sessions::{AskSession, AskSessionDraft, AskSessionRepo};
 pub use candidates::{CandidateDraft, CandidatePaper, CandidateRepo};
-pub use concepts::{Concept, ConceptRelation, ConceptRepo, PaperConcept};
-pub use custom_fields::{CustomFieldDef, CustomFieldRepo, PaperCustomField};
 pub use db::{open_pool, run_migrations, Pool};
-pub use dedup::{find_duplicate, merge_papers, scan_all_duplicates, DuplicatePair};
-pub use embeddings::EmbeddingRepo;
 pub use feeds::{Feed, FeedItem, FeedRepo, FeedWithCounts, NewFeedItem};
 pub use folders::{FolderRepo, FolderWithCount};
 pub use highlights::{
@@ -58,12 +43,12 @@ pub use legacy_reader_notes::{
 };
 pub use models::{Folder, Highlight, Paper, PaperTerm, ReadStatus, RelatedPaperTerm, Tag};
 pub use note_sections::{NoteSection, NoteSectionRepo};
-pub use paper_documents::{PaperDocumentIndexCounts, PaperDocumentIndexStatus, PaperDocumentRepo};
-pub use paper_links::{GraphData, GraphEdge, GraphFilter, GraphNode, PaperLink, PaperLinkRepo};
-pub use paper_supplements::{NewPaperSupplement, PaperSupplement, PaperSupplementRepo};
+pub use paper_documents::{PaperDocumentIndexStatus, PaperDocumentRepo};
 pub use paper_terms::{NewPaperTerm, PaperTermRepo};
 pub use papers::PaperRepo;
-pub use paths::{default_library_root, LibraryPaths};
+#[cfg(not(target_os = "android"))]
+pub use paths::default_library_root;
+pub use paths::LibraryPaths;
 pub use pdf_notes::{
     PdfNote, PdfNoteCreateInput, PdfNoteError, PdfNotePatch, PdfNoteRect, PdfNoteRepo,
     PdfNoteSearchResult,
@@ -75,10 +60,7 @@ pub use provenance::{
     ProvenanceRepo, RemapReport, SourceLink, SourceSegment, PROVENANCE_SCHEMA_VERSION,
     PROVENANCE_TARGET_VERSION,
 };
-pub use queue::{QueueEntry, QueueRepo};
 pub use reading_catalog::{project_reading_catalog, CatalogReadStatus, ReadingCatalogItem};
 pub use retrieval::{unified_search, UnifiedSearchResult};
-pub use smart_collections::{FilterRule, SmartCollection, SmartCollectionRepo};
 pub use tags::{TagRepo, TagWithCount};
 pub use topic_alerts::{TopicAlert, TopicAlertRepo, TopicAlertResult, TopicAlertResultInsert};
-pub use zotero_pushes::{get_pushed_at, record_push};

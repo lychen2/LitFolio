@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="5.9 2.7 19.66 19.66" width="24" height="24" fill="none">
+  <path d="M8.3 8.7h7.2m-7.2 3.8h5.5m-5.5 3.8h3.8" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke="var(--kubai-line, #36445e)"/>
+  <path d="M19 7.85Q19 7.5 19.35 7.5L20.65 7.5Q21 7.5 21 7.85L21 13.65Q21 14 21.35 14L22.95 14Q23.3 14 23.067 14.261L20.233 17.439Q20 17.7 19.767 17.439L16.933 14.261Q16.7 14 17.05 14L18.65 14Q19 14 19 13.65Z" fill="var(--kubai-line, #36445e)"/>
+</svg>

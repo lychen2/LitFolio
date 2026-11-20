@@ -3,8 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use crate::secret;
 use crate::storage::LibraryPaths;
 
-use super::LlmConfig;
-use crate::mineru::PdfMarkdownEngine;
+use super::{LlmConfig, PdfMarkdownEngine};
 
 pub fn config_file(paths: &LibraryPaths) -> std::path::PathBuf {
     paths.config_file()

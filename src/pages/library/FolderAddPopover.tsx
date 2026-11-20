@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Folder, FolderPlus, Loader2 } from "lucide-react";
+import { Check, Folder, FolderPlus, Spinner } from "@/components/icons";
 import { type FolderWithCount } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -75,7 +75,7 @@ export function FolderAddPopover({
         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border border-dashed border-litera-line text-litera-mute hover:text-litera-text hover:border-litera-text"
         title={t("folders.addTitle")}
       >
-        {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <FolderPlus className="h-2.5 w-2.5" />}
+        {busy ? <Spinner className="h-2.5 w-2.5 animate-spin" /> : <FolderPlus className="h-2.5 w-2.5" />}
         {empty ? t("folders.createCategoryBtn") : t("folders.addCategoryBtn")}
       </button>
       {open && coords && createPortal(

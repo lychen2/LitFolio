@@ -1,7 +1,7 @@
 """宿主显式修改；与首次挂接的旧快照分开，所有工作区写入仍由 Python 持锁完成。"""
 from __future__ import annotations
 
-from .host_library import META_FIELDS, _authors
+from .host_library import META_FIELDS, _authors, original_title
 from .library import Library
 from .store import dir_lock, now_iso, write_json_atomic
 
@@ -17,9 +17,12 @@ def metadata(lib: Library, body: dict) -> dict:
         raise ValueError("title is required")
     with dir_lock(ws.root):
         paper = ws.load("paper")
-        paper.setdefault("meta", {}).update(fields)
+        meta = paper.setdefault("meta", {})
         item = ws.load("item")
         overrides = item.setdefault("meta_override", {})
+        meta["host_original_title"] = original_title(ws.id, meta, overrides)
+        meta["host_metadata_title"] = fields["title_en"]
+        meta.update(fields)
         overrides.update(fields)
         overrides["display_title"] = fields["title_en"]
         item["updated"] = now_iso()

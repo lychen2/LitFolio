@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, type Paper } from "@/lib/api";
+import { Check } from "@/components/icons";
 
 const CITE_STYLES = [
   { value: "apa", label: "APA" },
@@ -35,7 +36,7 @@ export function CopyCitationDropdown({
           onClick={() => handleCopy(style.value)}
           className="w-full px-3 py-1.5 text-xs text-left text-litera-text hover:bg-litera-panel transition-colors"
         >
-          {copied ? "✓" : style.label}
+          {copied ? <Check className="h-4 w-4" aria-label={style.label} /> : style.label}
         </button>
       ))}
     </div>

@@ -1,5 +1,5 @@
 import { UseMutationResult } from "@tanstack/react-query";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Spinner, RefreshCw } from "@/components/icons";
 import { type FeedRefreshAllSummary } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -18,7 +18,7 @@ export function RefreshAllButton({
         className="litera-btn-primary text-xs flex items-center gap-1.5 disabled:opacity-60"
       >
         {refresh.isPending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner className="h-3.5 w-3.5 animate-spin" />
         ) : (
           <RefreshCw className="h-3.5 w-3.5" />
         )}

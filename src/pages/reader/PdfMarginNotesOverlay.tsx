@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
-import { Loader2, MessageSquare, RotateCcw, Trash2, Type } from "lucide-react";
+import { Spinner, MessageSquare, RotateCcw, Trash2, Type } from "@/components/icons";
 import type { ScaledPosition } from "react-pdf-highlighter";
 
 import type { PdfAnnotationRect, PdfTextNote } from "@/core/contracts";
@@ -80,7 +80,6 @@ type PdfMarginNotesOverlayProps = {
     noteId: string,
     patch: Partial<Pick<PdfTextNote, "color" | "fontSize" | "opacity">>,
   ) => Promise<void>;
-  onToggleDrawMode: (enabled: boolean) => void;
   onUpdateRect: (noteId: string, rect: PdfAnnotationRect) => Promise<void>;
 };
 
@@ -116,10 +115,8 @@ export function PdfMarginNotesOverlay({
   onSaveTextNote,
   onSelect,
   onStyleTextNote,
-  onToggleDrawMode,
   onUpdateRect,
 }: PdfMarginNotesOverlayProps) {
-  const t = useT();
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [pendingRects, setPendingRects] = useState<Record<string, PdfAnnotationRect>>({});
 
@@ -290,18 +287,6 @@ export function PdfMarginNotesOverlay({
 
   return (
     <div className="absolute inset-0 z-[19] pointer-events-none">
-      {noteDrawMode && (
-        <button
-          type="button"
-          className="litera-pdf-note-draw-cancel litera-btn text-xs"
-          onClick={() => {
-            onCancelDraft();
-            onToggleDrawMode(false);
-          }}
-        >
-          {t("common.cancel")}
-        </button>
-      )}
       {draftOverlayRect && <div className="litera-pdf-note-draft" style={draftOverlayRect} />}
       {linkedNoteBoxes.map(({ note, rect }) => (
         <PdfLinkedNoteBox
@@ -379,6 +364,9 @@ function PdfPageNoteBox({
     void onStyle(note.id, patch).catch(() => undefined);
   }
 
+  // The stored default is a pale accent. Use PDF-theme ink for it on the page.
+  const ink = note.color.toLowerCase() === "#fff3a3" ? undefined : note.color;
+
   if (!active) {
     const text = visiblePdfNoteText(note.content);
     if (!text) return null;
@@ -386,7 +374,7 @@ function PdfPageNoteBox({
       <button
         type="button"
         className="litera-pdf-note-text"
-        style={pageNoteTextStyle(rect, note)}
+        style={{ ...pageNoteTextStyle(rect, note), color: ink }}
         onClick={(event) => {
           stopPdfEvent(event);
           onSelect();
@@ -419,7 +407,7 @@ function PdfPageNoteBox({
     >
       <div
         className="litera-pdf-page-note-toolbar"
-        style={{ color: note.color }}
+        style={{ color: ink }}
         onPointerDown={(event) => onStartAdjust(note, "move", event)}
       >
         <span className="inline-flex items-center gap-1">
@@ -486,7 +474,7 @@ function PdfPageNoteBox({
             void onDelete(note.id).finally(() => setDeleting(false));
           }}
         >
-          {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+          {deleting ? <Spinner className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
         </button>
       </div>
       <textarea
@@ -496,10 +484,10 @@ function PdfPageNoteBox({
         placeholder={t("reader.linkedNotePlaceholder")}
         aria-label={t("reader.standaloneNote")}
         className="litera-pdf-page-note-textarea"
-        style={{ color: note.color }}
+        style={{ color: ink }}
       />
       <div className={status.state === "error" ? "litera-pdf-page-note-status text-litera-error" : "litera-pdf-page-note-status"}>
-        {status.state === "pending" && <Loader2 className="h-3 w-3 animate-spin" />}
+        {status.state === "pending" && <Spinner className="h-3 w-3 animate-spin" />}
         {statusLabel}
       </div>
       <button
@@ -519,7 +507,6 @@ function pageNoteTextStyle(rect: OverlayRect, note: PdfTextNote): CSSProperties 
     width: rect.width,
     minHeight: rect.height,
     fontSize: pdfNoteFontSizePx(rect.scale, note.fontSize),
-    color: note.color,
     opacity: note.opacity,
   };
 }

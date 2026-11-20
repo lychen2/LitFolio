@@ -1,26 +1,25 @@
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BookOpen, Download, ExternalLink, FileText, Languages, LibraryBig, ListPlus, Sparkles, X,
-} from "lucide-react";
+  BookOpen, Download, ExternalLink, FileText, Languages, Sparkles,
+} from "@/components/icons";
 import type { Paper } from "@/lib/api";
 import type { ReadingAction } from "@/lib/apiReadingService";
 import { useT } from "@/i18n/I18nProvider";
-import { useDialogKeyboard } from "@/components/useDialogKeyboard";
+import { DetailDrawer } from "@/components/DetailDrawer";
 import { DoiEnrichRow } from "./DoiEnrichRow";
-import { CustomFieldsSection } from "./PaperCustomFieldsSection";
-import { PaperSupplementsSection } from "./PaperSupplementsSection";
 import { PaperHostMeta } from "./PaperHostMeta";
 
 export function PaperDetailDrawer({
-  paper: paperProp, onClose, onAction,
+  paper: paperProp, onClose, onAction, notification,
 }: {
   paper: Paper;
   onClose: () => void;
   onAction: (action: ReadingAction) => void;
+  notification?: ReactNode;
 }) {
   const t = useT();
-  const dialog = useDialogKeyboard(onClose);
   // Metadata enrichment (manual DOI fetch) returns an updated paper; show it
   // immediately rather than waiting for the parent list to re-feed the prop.
   const [override, setOverride] = useState<Paper | null>(null);
@@ -32,24 +31,13 @@ export function PaperDetailDrawer({
   const paper = override ?? paperProp;
 
   return (
-    <div className="fixed inset-0 z-30 flex justify-end bg-litera-ink/40 backdrop-blur-sm litera-drawer-backdrop" onClick={onClose}>
-      <div
-        {...dialog}
-        aria-label={paper.title}
-        onClick={(e) => e.stopPropagation()}
-        className="w-[760px] max-w-[94vw] h-full bg-litera-paper border-l border-litera-line shadow-2xl flex flex-col litera-drawer-enter"
-      >
-        <header className="px-5 py-4 border-b border-litera-line flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-litera-accent2">{t("paper.detail.metadata")}</div>
-            <h2 className="font-serif text-xl leading-tight mt-1">{paper.title}</h2>
-            {paper.title_translated && <p className="text-sm text-litera-accent mt-2">{paper.title_translated}</p>}
-          </div>
-          <button onClick={onClose} aria-label={t("common.close")} className="text-litera-mute hover:text-litera-text">
-            <X className="h-5 w-5" />
-          </button>
-        </header>
-
+    <DetailDrawer
+      title={paper.title}
+      eyebrow={t("paper.detail.metadata")}
+      translatedTitle={paper.title_translated}
+      onClose={onClose}
+      notification={notification}
+      actions={
         <div className="px-5 py-3 border-b border-litera-line flex items-center gap-2 flex-wrap">
           <button onClick={() => onAction("tldr")} className="litera-btn text-xs">
             <Sparkles className="h-3.5 w-3.5" /> {t("paper.detail.quickRead")}
@@ -64,22 +52,8 @@ export function PaperDetailDrawer({
               <button type="button" className="litera-btn text-xs" onClick={() => onAction("translate-metadata")}>
                 <Languages className="h-3.5 w-3.5" /> {t("paper.detail.translateTitleAbstract")}
               </button>
-              <button type="button" className="litera-btn text-xs" onClick={() => onAction("similar")}>
-                <Sparkles className="h-3.5 w-3.5" /> {t("similar.find")}
-              </button>
-              <button type="button" className="litera-btn text-xs" onClick={() => onAction("review")}>
-                <FileText className="h-3.5 w-3.5" /> {t("litReview.title")}
-              </button>
-              <p className="px-2 pt-1 text-xs text-litera-mute">{t("paper.detail.exportGroup")}</p>
-              <button type="button" className="litera-btn text-xs" onClick={() => onAction("zotero")}>
-                <LibraryBig className="h-3.5 w-3.5" /> {t("library.sendToZotero")}
-              </button>
               <button type="button" className="litera-btn text-xs" onClick={() => onAction("export")}>
                 <Download className="h-3.5 w-3.5" /> {t("citations.title")}
-              </button>
-              <p className="px-2 pt-1 text-xs text-litera-mute">{t("paper.detail.organizeGroup")}</p>
-              <button type="button" className="litera-btn text-xs" onClick={() => onAction("queue-add")}>
-                <ListPlus className="h-3.5 w-3.5" /> {t("queue.add")}
               </button>
             </div>
           </details>
@@ -89,19 +63,15 @@ export function PaperDetailDrawer({
             </Link>
           )}
         </div>
-
-        <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
-          <Meta paper={paper} onEnriched={setOverride} />
-          <Section title={t("paper.detail.abstract")} body={paper.abstract_text ?? t("paper.detail.noAbstract")} />
-          {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
-          {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
-          {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
-          <PaperHostMeta paper={paper} />
-          <PaperSupplementsSection paperId={paper.id} />
-          <CustomFieldsSection paperId={paper.id} />
-        </div>
-      </div>
-    </div>
+      }
+    >
+      <Meta paper={paper} onEnriched={setOverride} />
+      <Section title={t("paper.detail.abstract")} body={paper.abstract_text ?? t("paper.detail.noAbstract")} />
+      {paper.abstract_translated && <Section title={t("paper.detail.abstractTranslation")} body={paper.abstract_translated} accent />}
+      {paper.tldr && <Section title={t("paper.detail.quickRead")} body={paper.tldr} accent />}
+      {paper.key_findings.length > 0 && <Section title={t("paper.detail.keyFindings")} body={paper.key_findings.join("\n")} />}
+      <PaperHostMeta paper={paper} />
+    </DetailDrawer>
   );
 }
 

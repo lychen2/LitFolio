@@ -1,74 +1,75 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, NotebookPen, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Database, ExternalLink, FileText, Info, Network, NotebookPen, Quote, Settings, Sparkles, Spinner, Trash2, Type } from "@/components/icons";
+import type { AppIcon } from "@/components/icons";
 import { api, type NoteSection } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { nextSectionDraft } from "./noteSectionState";
 import type { TKey } from "@/i18n/dict";
 
-const SECTION_META: Record<string, { icon: string; labelKey: TKey; placeholderKey: TKey }> = {
+const SECTION_META: Record<string, { icon: AppIcon; labelKey: TKey; placeholderKey: TKey }> = {
   problem: {
-    icon: "❓",
+    icon: Info,
     labelKey: "reader.card.problem",
     placeholderKey: "reader.card.problemPlaceholder",
   },
   method: {
-    icon: "⚙️",
+    icon: Settings,
     labelKey: "reader.card.method",
     placeholderKey: "reader.card.methodPlaceholder",
   },
   key_findings: {
-    icon: "✦",
+    icon: Sparkles,
     labelKey: "reader.card.keyFindings",
     placeholderKey: "reader.card.keyFindingsPlaceholder",
   },
   evidence: {
-    icon: "§",
+    icon: FileText,
     labelKey: "reader.card.evidence",
     placeholderKey: "reader.card.evidencePlaceholder",
   },
   limitations: {
-    icon: "⚠️",
+    icon: AlertTriangle,
     labelKey: "reader.card.limitations",
     placeholderKey: "reader.card.limitationsPlaceholder",
   },
   datasets: {
-    icon: "▦",
+    icon: Database,
     labelKey: "reader.card.datasets",
     placeholderKey: "reader.card.datasetsPlaceholder",
   },
   metrics: {
-    icon: "#",
+    icon: Type,
     labelKey: "reader.card.metrics",
     placeholderKey: "reader.card.metricsPlaceholder",
   },
   project_relation: {
-    icon: "↗",
+    icon: Network,
     labelKey: "reader.card.projectRelation",
     placeholderKey: "reader.card.projectRelationPlaceholder",
   },
   quotes: {
-    icon: "“”",
+    icon: Quote,
     labelKey: "reader.card.quotes",
     placeholderKey: "reader.card.quotesPlaceholder",
   },
   open_questions: {
-    icon: "?",
+    icon: Info,
     labelKey: "reader.card.openQuestions",
     placeholderKey: "reader.card.openQuestionsPlaceholder",
   },
   numbers: {
-    icon: "#",
+    icon: Type,
     labelKey: "reader.card.metrics",
     placeholderKey: "reader.card.metricsPlaceholder",
   },
   limits: {
-    icon: "⚠️",
+    icon: AlertTriangle,
     labelKey: "reader.card.limitations",
     placeholderKey: "reader.card.limitationsPlaceholder",
   },
   thoughts: {
-    icon: "↗",
+    icon: ExternalLink,
     labelKey: "reader.card.projectRelation",
     placeholderKey: "reader.card.projectRelationPlaceholder",
   },
@@ -108,7 +109,7 @@ export function NoteSectionsPane({ paperId }: { paperId: string }) {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-litera-mute" />
+        <Spinner className="h-5 w-5 animate-spin text-litera-mute" />
       </div>
     );
   }
@@ -179,7 +180,7 @@ function SectionCard({
 
   const t = useT();
   const meta = SECTION_META[section.section_key];
-  const icon = meta?.icon ?? "📝";
+  const Icon = meta?.icon ?? NotebookPen;
   const label = meta ? t(meta.labelKey) : section.section_key;
   const placeholder = meta ? t(meta.placeholderKey) : t("reader.card.defaultPlaceholder");
   const sourceBadge =
@@ -200,7 +201,7 @@ function SectionCard({
         ) : (
           <ChevronDown className="h-3.5 w-3.5 text-litera-mute" />
         )}
-        <span className="text-sm">{icon}</span>
+        <Icon className="h-4 w-4" />
         <span className="text-sm font-medium text-litera-text flex-1">{label}</span>
         {sourceBadge}
         {dirty && <span className="text-[10px] text-litera-warn">●</span>}

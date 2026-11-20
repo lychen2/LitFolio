@@ -99,6 +99,8 @@ jobs:
             bundles: "--bundles deb,rpm,appimage"
           - platform: windows-2025
             bundles: "--bundles nsis,msi"
+          - platform: macos-15
+            bundles: "--bundles app,dmg"
 
     runs-on: ${{ matrix.platform }}
     env:

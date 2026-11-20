@@ -243,13 +243,15 @@ def catalog(lib: Library) -> list[dict]:
 
 def _item(ws: Workspace) -> dict:
     paper = ws.load("paper") or {}
-    meta = dict(paper.get("meta") or {})
+    source_meta = paper.get("meta") or {}
     item = ws.load("item") or {}
-    meta.update({k: v for k, v in (item.get("meta_override") or {}).items() if v or k == "doi"})
+    overrides = item.get("meta_override") or {}
+    meta = {**source_meta, **{k: v for k, v in overrides.items() if v or k == "doi"}}
     status = item.get("status")
     return {
         "id": ws.id,
         "title": meta.get("display_title") or meta.get("title_zh") or meta.get("title_en") or ws.id,
+        "original_title": original_title(ws.id, source_meta, overrides),
         "authors": _split_authors(meta.get("authors")),
         "year": _int(meta.get("year") or meta.get("date")),
         "venue": _text(meta.get("venue")),
@@ -261,6 +263,27 @@ def _item(ws: Workspace) -> dict:
         "starred": bool(item.get("starred")),
         "tags": [str(t) for t in item.get("tags") or [] if str(t).strip()],
     }
+
+
+def original_title(pid: str, meta: dict, overrides: dict) -> str | None:
+    # title_en holds the original-language title, except in legacy attachments
+    # that copied SQLite's display title with no source provenance.
+    if meta.get("source_type") == "host-reference" or "source_pdf_stat" in meta:
+        return None
+    title = _text(meta.get("title_en"))
+    # New host write-back records both titles. Older write-back set both
+    # overrides, and a later edit may have changed only one of them.
+    if "host_metadata_title" in meta:
+        if title == _text(meta.get("host_metadata_title")):
+            return _text(meta.get("host_original_title"))
+    elif "display_title" in overrides and "title_en" in overrides and title in (
+        _text(overrides["display_title"]), _text(overrides["title_en"])
+    ):
+        return None
+    source = _text(meta.get("source"))
+    if not title or title == pid or (source and title in (Path(source).name, Path(source).stem)):
+        return None
+    return title
 
 
 def _pdf_path(ws: Workspace, meta: dict) -> str | None:

@@ -4,19 +4,18 @@ import {
   Compass,
   Inbox,
   LibraryBig,
-  MessagesSquare,
   Network,
   Rss,
   Settings,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+} from "@/components/icons";
 import type { TKey } from "@/i18n/dict";
 import { isPluginBuilt } from "@/host/registry";
 
 export interface NavigationRegistryItem {
   to: string;
   labelKey: TKey;
-  icon: LucideIcon;
+  icon: AppIcon;
   keywords: readonly string[];
   pluginId?: string;
 }
@@ -29,8 +28,7 @@ export interface NavigationGroup {
 
 const ALL_NAVIGATION_GROUPS: readonly NavigationGroup[] = [
   { id: "library", labelKey: "nav.group.library", paths: ["/library", "/import", "/candidates"] },
-  { id: "discover", labelKey: "nav.group.discover", paths: ["/browse", "/feeds", "/topic"] },
-  { id: "research", labelKey: "nav.group.research", paths: ["/ask", "/graph"] },
+  { id: "discover", labelKey: "nav.group.discover", paths: ["/browse", "/feeds", "/topic", "/literature-network"] },
   { id: "system", labelKey: "nav.group.system", paths: ["/settings"] },
 ];
 
@@ -41,8 +39,7 @@ const ALL_NAVIGATION_ITEMS: readonly NavigationRegistryItem[] = [
   { to: "/browse", labelKey: "nav.browse", icon: Atom, keywords: ["browse", "arxiv", "浏览"], pluginId: "discovery-feeds" },
   { to: "/feeds", labelKey: "nav.feeds", icon: Rss, keywords: ["feeds", "rss", "订阅"], pluginId: "discovery-feeds" },
   { to: "/topic", labelKey: "nav.topic", icon: Compass, keywords: ["topic", "discover", "主题"], pluginId: "discovery-feeds" },
-  { to: "/ask", labelKey: "nav.ask", icon: MessagesSquare, keywords: ["ask", "qa", "提问"], pluginId: "library-ask" },
-  { to: "/graph", labelKey: "nav.graph", icon: Network, keywords: ["graph", "network", "图谱"], pluginId: "knowledge-graph" },
+  { to: "/literature-network", labelKey: "nav.literatureNetwork", icon: Network, keywords: ["related papers", "citation network", "相关文献", "引用网络"], pluginId: "literature-network" },
   { to: "/settings", labelKey: "nav.settings", icon: Settings, keywords: ["settings", "config", "设置"] },
 ];
 

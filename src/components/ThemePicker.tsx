@@ -1,12 +1,13 @@
-import { Check, Moon, Type, Sparkles } from "lucide-react";
+import { Check, Moon, Type, Sparkles } from "@/components/icons";
 import { useI18n } from "@/i18n/I18nProvider";
+import { AppearanceMode } from "./AppearanceMode";
 import { useTheme } from "./ThemeProvider";
 import type { ThemeId, FontId, FontSizeId } from "@/lib/theme";
 
-const THEMES: Array<{ id: ThemeId; labelKey: "theme.violet" | "theme.warm" | "theme.blueprint"; hintKey: "theme.violetHint" | "theme.warmHint" | "theme.blueprintHint"; swatches: string[] }> = [
-  { id: "violet", labelKey: "theme.violet", hintKey: "theme.violetHint", swatches: ["#cba6f7", "#89dceb", "#1c1d21"] },
-  { id: "warm", labelKey: "theme.warm", hintKey: "theme.warmHint", swatches: ["#fab387", "#94e2d5", "#2b231e"] },
-  { id: "blueprint", labelKey: "theme.blueprint", hintKey: "theme.blueprintHint", swatches: ["#74c7ec", "#89dceb", "#1d2537"] },
+const THEMES: Array<{ id: ThemeId; labelKey: "theme.violet" | "theme.warm" | "theme.blueprint"; hintKey: "theme.violetHint" | "theme.warmHint" | "theme.blueprintHint" }> = [
+  { id: "violet", labelKey: "theme.violet", hintKey: "theme.violetHint" },
+  { id: "warm", labelKey: "theme.warm", hintKey: "theme.warmHint" },
+  { id: "blueprint", labelKey: "theme.blueprint", hintKey: "theme.blueprintHint" },
 ];
 
 const FONTS: Array<{
@@ -58,7 +59,7 @@ const FONT_SIZES: Array<{
 ];
 
 export function ThemePicker() {
-  const { theme, setTheme, font, setFont, fontSize, setFontSize } = useTheme();
+  const { theme, setTheme, mode, modePreference, setModePreference, font, setFont, fontSize, setFontSize } = useTheme();
   const { t } = useI18n();
 
   return (
@@ -70,6 +71,7 @@ export function ThemePicker() {
           {t("theme.title")}
         </legend>
         <p className="max-w-2xl text-xs leading-relaxed text-litera-mute">{t("theme.description")}</p>
+        <AppearanceMode preference={modePreference} onChange={setModePreference} />
         <div className="grid gap-2 md:grid-cols-3" role="radiogroup" aria-label={t("theme.title")}>
           {THEMES.map((option, index) => {
             const selected = theme === option.id;
@@ -101,16 +103,15 @@ export function ThemePicker() {
                   radios?.[targetIndex]?.focus();
                 }}
                 className={
-                  "group flex min-h-[76px] items-start gap-3 rounded-[var(--litera-radius)] border p-3 text-left transition-all " +
+                  "grid min-h-[76px] grid-cols-[2.75rem_1fr] items-center gap-3 rounded-[var(--litera-radius)] border p-3 text-left transition-colors " +
                   (selected
-                    ? "border-litera-accent bg-litera-accent/15 shadow-[0_0_12px_rgba(0,0,0,0.2)] ring-1 ring-litera-accent/30"
-                    : "border-litera-border bg-litera-surface hover:border-litera-border-strong hover:bg-litera-surface2 hover:translate-y-[-1px]")
+                    ? "border-litera-accent bg-[var(--litera-selected)]"
+                    : "border-litera-border bg-litera-paper hover:border-litera-border-strong")
                 }
               >
-                <span className="flex shrink-0 gap-1.5 pt-0.5" aria-hidden="true">
-                  {option.swatches.map((swatch) => (
-                    <span key={swatch} className="h-4 w-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: swatch }} />
-                  ))}
+                <span className="litera-theme-swatch" data-theme={option.id} data-mode={mode} aria-hidden="true">
+                  <span />
+                  <span />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2 text-sm font-medium text-litera-text">
@@ -146,7 +147,7 @@ export function ThemePicker() {
                 className={
                   "group flex flex-col justify-between rounded-[var(--litera-radius)] border p-3 text-left transition-all " +
                   (selected
-                    ? "border-litera-accent bg-litera-accent/15 shadow-[0_0_12px_rgba(0,0,0,0.2)] ring-1 ring-litera-accent/30"
+                    ? "border-litera-accent bg-litera-accent/15"
                     : "border-litera-border bg-litera-surface hover:border-litera-border-strong hover:bg-litera-surface2 hover:translate-y-[-1px]")
                 }
               >
@@ -185,7 +186,7 @@ export function ThemePicker() {
                 className={
                   "group flex min-h-[56px] items-center justify-between rounded-[var(--litera-radius)] border px-3.5 py-2.5 text-left transition-all " +
                   (selected
-                    ? "border-litera-accent bg-litera-accent/15 shadow-[0_0_12px_rgba(0,0,0,0.2)] ring-1 ring-litera-accent/30"
+                    ? "border-litera-accent bg-litera-accent/15"
                     : "border-litera-border bg-litera-surface hover:border-litera-border-strong hover:bg-litera-surface2 hover:translate-y-[-1px]")
                 }
               >

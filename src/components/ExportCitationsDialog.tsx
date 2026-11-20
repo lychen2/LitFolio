@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ClipboardCopy, Download, FileText, Loader2, X } from "lucide-react";
+import { ClipboardCopy, Download, FileText, Spinner, X } from "@/components/icons";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { useDialogKeyboard } from "./useDialogKeyboard";
@@ -107,7 +107,7 @@ export function ExportCitationsDialog({
             className="litera-btn text-xs flex-1 disabled:opacity-50"
           >
             {exportMut.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Spinner className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <ClipboardCopy className="h-3.5 w-3.5" />
             )}
@@ -119,7 +119,7 @@ export function ExportCitationsDialog({
             className="litera-btn-primary text-xs flex-1 disabled:opacity-50"
           >
             {exportMut.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Spinner className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Download className="h-3.5 w-3.5" />
             )}

@@ -2,13 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
+  Check,
   ExternalLink,
   Eye,
   EyeOff,
   Languages,
-  Loader2,
+  Inbox,
+  Spinner,
   Search,
-} from "lucide-react";
+  XCircle,
+} from "@/components/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type FeedItem, type TranslationResult } from "@/lib/api";
 import { useI18n, useT } from "@/i18n/I18nProvider";
@@ -24,12 +27,14 @@ import { upsertFeedImportJob } from "./feedImportJobs";
 export function FeedItemRow({
   item,
   feedTitle,
+  impactFactor,
   translation,
   onOpen,
   onTranslated,
 }: {
   item: FeedItem;
   feedTitle: string;
+  impactFactor: number | null;
   translation: TranslationResult | null;
   onOpen: () => void;
   onTranslated: (t: TranslationResult) => void;
@@ -96,12 +101,12 @@ export function FeedItemRow({
   return (
     <li
       className={
-        "px-5 py-4 hover:bg-litera-panel/30 group " +
+        "px-4 py-2.5 hover:bg-litera-panel/30 group " +
         (item.seen ? "opacity-70" : "")
       }
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-[1_1_16rem]">
           <button
             onClick={onOpen}
             className="text-sm font-medium text-litera-text leading-snug text-left hover:text-litera-accent"
@@ -112,7 +117,8 @@ export function FeedItemRow({
             )}
             {meta.title}
             {item.imported_paper_id && (
-              <span className="ml-2 text-[10px] text-litera-success align-middle">
+              <span className="ml-2 inline-flex items-center gap-1 align-middle text-[10px] text-litera-success">
+                <Check className="h-3 w-3" />
                 {t("feeds.imported")}
               </span>
             )}
@@ -129,6 +135,7 @@ export function FeedItemRow({
           )}
           <ItemMetaLine
             feedTitle={feedTitle}
+            impactFactor={impactFactor}
             published={meta.published}
             authors={meta.authors}
           />
@@ -144,7 +151,7 @@ export function FeedItemRow({
           )}
           {translate.error && (
             <div className="mt-1 text-[11px] text-litera-error">
-              ✕{" "}
+              <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />
               {t("feeds.translateFailedPrefix", {
                 message: (translate.error as Error).message,
               })}
@@ -152,7 +159,7 @@ export function FeedItemRow({
           )}
           {fetchMeta.error && (
             <div className="mt-1 text-[11px] text-litera-error">
-              ✕ {(fetchMeta.error as Error).message || "Failed to fetch metadata"}
+              <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(fetchMeta.error as Error).message || "Failed to fetch metadata"}
             </div>
           )}
         </div>
@@ -174,7 +181,7 @@ export function FeedItemRow({
       </div>
       {candidate.error && (
         <div className="ml-0 mt-1 text-[11px] text-litera-error">
-          ✕ {(candidate.error as Error).message}
+          <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(candidate.error as Error).message}
         </div>
       )}
     </li>
@@ -192,23 +199,27 @@ function itemRowMeta(item: FeedItem) {
     authors: item.metadata?.authors?.length
       ? item.metadata.authors
       : item.authors,
-    summary: item.metadata?.abstract_text ?? item.summary,
+    summary: item.metadata?.abstract_text?.trim() || item.summary?.trim(),
     published: item.published_at ? new Date(item.published_at * 1000) : null,
   };
 }
 
 function ItemMetaLine({
   feedTitle,
+  impactFactor,
   published,
   authors,
 }: {
   feedTitle: string;
+  impactFactor: number | null;
   published: Date | null;
   authors: string[];
 }) {
+  const t = useT();
   return (
     <div className="text-[11px] text-litera-mute mt-1 flex items-center gap-2 flex-wrap">
-      <span className="truncate max-w-[200px]">{feedTitle}</span>
+      {feedTitle && <span className="truncate max-w-[200px]">{feedTitle}</span>}
+      {impactFactor != null && <span>{t("feeds.impactFactor", { value: impactFactor.toFixed(1) })}</span>}
       {published && <span>· {published.toISOString().slice(0, 10)}</span>}
       {authors.length > 0 && (
         <span className="truncate max-w-[280px]">
@@ -247,18 +258,18 @@ function ItemActions({
 }) {
   const t = useT();
   return (
-    <div className="shrink-0 flex items-center gap-1.5">
+    <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
       {!item.metadata && !item.imported_paper_id && (
         <button
           onClick={onFetchMeta}
           disabled={metaPending}
-          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          className="litera-btn px-2 py-0.5 text-xs whitespace-nowrap"
           title={t("feeds.fetchMeta")}
         >
           {metaPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="size-5" />
           ) : (
-            <Search className="h-3.5 w-3.5" />
+            <Search className="size-5" />
           )}
           {metaPending ? t("feeds.fetchingMeta") : t("feeds.fetchMeta")}
         </button>
@@ -266,36 +277,36 @@ function ItemActions({
       <button
         onClick={onTranslate}
         disabled={translatePending}
-        className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+        className="litera-btn px-2 py-0.5 text-xs whitespace-nowrap"
         title={t("feeds.translateTooltip")}
       >
         {translatePending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner className="size-5" />
         ) : (
-          <Languages className="h-3.5 w-3.5" />
+          <Languages className="size-5" />
         )}
         {t("common.translate")}
       </button>
       {item.link && (
         <button
           onClick={onOpenExternal}
-          className="litera-btn text-xs whitespace-nowrap"
+          className="litera-btn px-2 py-0.5 text-xs whitespace-nowrap"
           title={t("feeds.openExternal")}
         >
-          <ExternalLink className="h-3.5 w-3.5" /> {t("common.open")}
+          <ExternalLink className="size-5" /> {t("common.open")}
         </button>
       )}
       {!item.imported_paper_id && (
         <button
           onClick={onCandidate}
           disabled={candidatePending}
-          className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+          className="litera-btn px-2 py-0.5 text-xs whitespace-nowrap"
           title={t("candidate.add")}
         >
           {candidatePending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="size-5" />
           ) : (
-            <Archive className="h-3.5 w-3.5" />
+            <Archive className="size-5" />
           )}
           {t("candidate.addShort")}
         </button>
@@ -303,24 +314,25 @@ function ItemActions({
       {!item.imported_paper_id && (
         <button
           onClick={onImport}
-          className="litera-btn-primary text-xs whitespace-nowrap"
+          className="litera-btn-primary px-2 py-0.5 text-xs whitespace-nowrap"
           title={t("feeds.importGo")}
         >
+          <Inbox className="size-5" />
           {t("feeds.importBtn")}
         </button>
       )}
       <button
         onClick={onToggleSeen}
         disabled={seenPending}
-        className="text-[11px] text-litera-mute hover:text-litera-text flex items-center gap-1 px-1 py-0.5"
+        className="litera-icon-btn"
         title={item.seen ? t("feeds.markUnread") : t("feeds.markRead")}
       >
         {seenPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Spinner className="size-5" />
         ) : item.seen ? (
-          <EyeOff className="h-3 w-3" />
+          <EyeOff className="size-5" />
         ) : (
-          <Eye className="h-3 w-3" />
+          <Eye className="size-5" />
         )}
       </button>
     </div>

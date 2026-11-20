@@ -1,4 +1,4 @@
-import { Languages, Lightbulb, Loader2, MessageSquare, Trash2 } from "lucide-react";
+import { Languages, Lightbulb, Spinner, MessageSquare, Trash2 } from "@/components/icons";
 import type { ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -48,17 +48,17 @@ export function ActionRow({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-litera-mute">
       <ActionButton disabled={isExplaining} onClick={onExplain}>
-        {isExplaining ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lightbulb className="h-3 w-3" />}
+        {isExplaining ? <Spinner className="h-3 w-3 animate-spin" /> : <Lightbulb className="h-3 w-3" />}
         {hasExplanation ? t("reader.reExplain") : t("reader.explain")}
       </ActionButton>
       {canSummarize && (
         <ActionButton disabled={isSummarizing} onClick={onSummarize}>
-          {isSummarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          {isSummarizing ? <Spinner className="h-3 w-3 animate-spin" /> : null}
           {hasSummary ? t("reader.redoSummary") : t("reader.summarize")}
         </ActionButton>
       )}
       <ActionButton disabled={isTranslating} onClick={onTranslate}>
-        {isTranslating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Languages className="h-3 w-3" />}
+        {isTranslating ? <Spinner className="h-3 w-3 animate-spin" /> : <Languages className="h-3 w-3" />}
         {hasTranslation ? t("reader.retranslate") : t("common.translate")}
       </ActionButton>
       {hasCondensed && (
@@ -70,7 +70,7 @@ export function ActionRow({
         <MessageSquare className="h-3 w-3" /> {t("reader.comment")}
       </ActionButton>
       <ActionButton disabled={isDeleting} onClick={onDelete}>
-        {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+        {isDeleting ? <Spinner className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
         {t("common.delete")}
       </ActionButton>
     </div>

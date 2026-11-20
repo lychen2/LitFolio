@@ -1,4 +1,5 @@
-import { Plus, KeyRound } from "lucide-react";
+import { Plus } from "@/components/icons";
+import { Button } from "@/components/ui";
 import { type LlmConfig, type LlmProfile } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { ProfileCard } from "./ProfileCard";
@@ -31,28 +32,28 @@ export function ProfilesTab({
 }) {
   const t = useT();
   return (
-    <>
-      <div className="mb-4">
-        <p className="text-xs text-litera-mute">{t("settings.llmHint")}</p>
-      </div>
-      <div className="flex gap-2 flex-wrap mb-5">
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
         {PRESETS.map((preset) => (
-          <button key={preset.label} onClick={() => onUpsert(blankProfile(preset.profile))} className="litera-btn text-xs">
+          <Button key={preset.label} size="sm" onClick={() => onUpsert(blankProfile(preset.profile))}>
             <Plus className="h-3.5 w-3.5" /> {preset.label}
-          </button>
+          </Button>
         ))}
       </div>
+      <details className="text-xs text-litera-mute">
+        <summary className="w-fit cursor-pointer hover:text-litera-text">{t("settings.llmConfig")}</summary>
+        <p className="mt-2 leading-relaxed">{t("settings.llmHint")}</p>
+      </details>
       {isLoading ? (
-        <div className="text-litera-mute text-sm">{t("common.loading")}</div>
+        <div className="text-sm text-litera-mute">{t("common.loading")}</div>
       ) : draft.profiles.length === 0 ? (
-        <div className="litera-panel p-8 text-center">
-          <KeyRound className="h-8 w-8 mx-auto mb-2 text-litera-mute" />
+        <div className="litera-panel p-4">
           <p className="text-sm text-litera-text">{t("settings.emptyTitle")}</p>
-          <p className="text-xs text-litera-mute mt-1">{t("settings.emptyHint")}</p>
+          <p className="mt-1 text-xs text-litera-mute">{t("settings.emptyHint")}</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          <ul className="space-y-3 litera-stagger">
+        <div className="space-y-4">
+          <ul className="space-y-4 litera-stagger">
             {draft.profiles.map((profile, index) => (
               <ProfileCard
                 key={`profile-${index}`}
@@ -72,11 +73,11 @@ export function ProfilesTab({
         </div>
       )}
       {activeMissing && (
-        <div className="mt-3 text-sm text-litera-error">
+        <div className="text-sm text-litera-error">
           {t("settings.activeMissing", { profile: draft.active })}
         </div>
       )}
-    </>
+    </div>
   );
 }
 

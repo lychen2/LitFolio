@@ -1,4 +1,4 @@
-import { Users, Info } from "lucide-react";
+import { Users, Info } from "@/components/icons";
 import type { SurveyKeyPi } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 

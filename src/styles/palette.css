@@ -1,0 +1,264 @@
+/* 50 is the palest ink, 900 the deepest. The intermediate neutrals separate
+   adjacent reading surfaces without outlines or tinted shadows. */
+:root {
+  --litera-steel-50: #EFF5F9;
+  --litera-steel-100: #DCE9F2;
+  --litera-steel-200: #C3D8E7;
+  --litera-steel-300: #A4C6DE;
+  --litera-steel-400: #7EA8C6;
+  --litera-steel-500: #608CAC;
+  --litera-steel-600: #497491;
+  --litera-steel-700: #355F7C;
+  --litera-steel-800: #2C4C66;
+  --litera-steel-900: #223A4F;
+
+  --litera-sage-50: #EFF4EE;
+  --litera-sage-100: #DFE8DB;
+  --litera-sage-200: #C6D5BF;
+  --litera-sage-300: #B1C8AA;
+  --litera-sage-400: #89A382;
+  --litera-sage-500: #70896B;
+  --litera-sage-600: #586F54;
+  --litera-sage-700: #415B40;
+  --litera-sage-800: #354934;
+  --litera-sage-900: #293A2A;
+
+  --litera-ochre-50: #F7EFE7;
+  --litera-ochre-100: #EEDCCA;
+  --litera-ochre-200: #DDC0A0;
+  --litera-ochre-300: #DCB791;
+  --litera-ochre-400: #B58B63;
+  --litera-ochre-500: #96714F;
+  --litera-ochre-600: #805C3F;
+  --litera-ochre-700: #6C4C34;
+  --litera-ochre-800: #573E2C;
+  --litera-ochre-900: #413024;
+
+  --litera-brick-50: #F7EEEE;
+  --litera-brick-100: #EDDCDA;
+  --litera-brick-200: #DCC1BC;
+  --litera-brick-300: #DAB6B1;
+  --litera-brick-400: #B98882;
+  --litera-brick-500: #9F6F69;
+  --litera-brick-600: #885853;
+  --litera-brick-700: #704440;
+  --litera-brick-800: #5E3D3A;
+  --litera-brick-900: #442E2D;
+}
+
+:root, [data-theme="violet"] {
+  --litera-neutral-50: #FBFAF7;
+  --litera-neutral-75: #EFEEED;
+  --litera-neutral-100: #EAE6EC;
+  --litera-neutral-150: #E3DFE6;
+  --litera-neutral-200: #D4CED9;
+  --litera-neutral-300: #BBB4C3;
+  --litera-neutral-400: #ACA5B4;
+  --litera-neutral-500: #857D8E;
+  --litera-neutral-550: #675E70;
+  --litera-neutral-600: #584F61;
+  --litera-neutral-700: #51495A;
+  --litera-neutral-750: #46404E;
+  --litera-neutral-800: #413C46;
+  --litera-neutral-825: #3B373F;
+  --litera-neutral-850: #363239;
+  --litera-neutral-875: #302D32;
+  --litera-neutral-900: #252429;
+
+  --litera-pigment-50: #F5F1F9;
+  --litera-pigment-100: #E7DEEF;
+  --litera-pigment-200: #D5C4E4;
+  --litera-pigment-300: #BDA4D3;
+  --litera-pigment-400: #AB8DBF;
+  --litera-pigment-500: #9273A9;
+  --litera-pigment-600: #7B5D95;
+  --litera-pigment-700: #694D80;
+  --litera-pigment-800: #513761;
+  --litera-pigment-900: #392B46;
+
+  --litera-marker-50: #EDF7F2;
+  --litera-marker-100: #D6EBE1;
+  --litera-marker-200: #B6DACC;
+  --litera-marker-300: #95C8B4;
+  --litera-marker-400: #72A993;
+  --litera-marker-500: #538B79;
+  --litera-marker-600: #37745F;
+  --litera-marker-700: #2D6554;
+  --litera-marker-800: #284B40;
+  --litera-marker-900: #1F362F;
+
+  --litera-sidebar: #211A2E;
+  --litera-subnav: #302B38;
+  --litera-selected: #4B3A5B;
+}
+
+[data-theme="warm"] {
+  --litera-neutral-50: #FCF8EB;
+  --litera-neutral-75: #F1ECDF;
+  --litera-neutral-100: #EBE5D6;
+  --litera-neutral-150: #E5DDCB;
+  --litera-neutral-200: #D7CDB9;
+  --litera-neutral-300: #C4B9A5;
+  --litera-neutral-400: #B4AA95;
+  --litera-neutral-500: #8C8171;
+  --litera-neutral-550: #675E4E;
+  --litera-neutral-600: #584F43;
+  --litera-neutral-700: #534C40;
+  --litera-neutral-750: #484339;
+  --litera-neutral-800: #413C34;
+  --litera-neutral-825: #3B382F;
+  --litera-neutral-850: #35332C;
+  --litera-neutral-875: #302F29;
+  --litera-neutral-900: #252521;
+
+  --litera-pigment-50: #F4F2E8;
+  --litera-pigment-100: #E5E1D1;
+  --litera-pigment-200: #D4CCB6;
+  --litera-pigment-300: #C7BEA3;
+  --litera-pigment-400: #A89E87;
+  --litera-pigment-500: #8B826F;
+  --litera-pigment-600: #686454;
+  --litera-pigment-700: #534F42;
+  --litera-pigment-800: #403D33;
+  --litera-pigment-900: #2F3029;
+
+  --litera-marker-50: #FAF2DD;
+  --litera-marker-100: #F4E2B2;
+  --litera-marker-200: #E8CD90;
+  --litera-marker-300: #DFBC7C;
+  --litera-marker-400: #C39C57;
+  --litera-marker-500: #A38241;
+  --litera-marker-600: #8D6A2E;
+  --litera-marker-700: #75551F;
+  --litera-marker-800: #544226;
+  --litera-marker-900: #3E3220;
+
+  --litera-sidebar: #25231B;
+  --litera-subnav: #363126;
+  --litera-selected: #4C4330;
+}
+
+[data-theme="blueprint"] {
+  --litera-neutral-50: #F7F9F8;
+  --litera-neutral-75: #EDF1F2;
+  --litera-neutral-100: #E4ECEF;
+  --litera-neutral-150: #D9E4EA;
+  --litera-neutral-200: #C6D6DF;
+  --litera-neutral-300: #B4C6D0;
+  --litera-neutral-400: #A3B6C3;
+  --litera-neutral-500: #7F95A4;
+  --litera-neutral-550: #556A79;
+  --litera-neutral-600: #465F70;
+  --litera-neutral-700: #3E5262;
+  --litera-neutral-750: #354A5B;
+  --litera-neutral-800: #314450;
+  --litera-neutral-825: #2D3D48;
+  --litera-neutral-850: #29363F;
+  --litera-neutral-875: #25313A;
+  --litera-neutral-900: #1B252C;
+
+  --litera-pigment-50: var(--litera-steel-50);
+  --litera-pigment-100: var(--litera-steel-100);
+  --litera-pigment-200: var(--litera-steel-200);
+  --litera-pigment-300: var(--litera-steel-300);
+  --litera-pigment-400: var(--litera-steel-400);
+  --litera-pigment-500: var(--litera-steel-500);
+  --litera-pigment-600: var(--litera-steel-600);
+  --litera-pigment-700: var(--litera-steel-700);
+  --litera-pigment-800: var(--litera-steel-800);
+  --litera-pigment-900: var(--litera-steel-900);
+
+  --litera-marker-50: #E8F5F4;
+  --litera-marker-100: #CFE9E7;
+  --litera-marker-200: #ABD8D4;
+  --litera-marker-300: #8AC5C2;
+  --litera-marker-400: #65A7A4;
+  --litera-marker-500: #4D8A8B;
+  --litera-marker-600: #377375;
+  --litera-marker-700: #276366;
+  --litera-marker-800: #24494D;
+  --litera-marker-900: #19373B;
+
+  --litera-sidebar: #152434;
+  --litera-subnav: #213446;
+  --litera-selected: #2D485D;
+}
+
+:root[data-mode="light"], [data-theme="violet"][data-mode="light"] {
+  --litera-sidebar: #DED5E8;
+  --litera-subnav: #EAE6ED;
+  --litera-selected: #D2C0E1;
+}
+
+[data-theme="warm"][data-mode="light"] {
+  --litera-sidebar: #E2D3B2;
+  --litera-subnav: #EEE5D0;
+  --litera-selected: #D8CAAB;
+}
+
+[data-theme="blueprint"][data-mode="light"] {
+  --litera-sidebar: #CFDFEA;
+  --litera-subnav: #DFE9EF;
+  --litera-selected: #BCD3E3;
+}
+
+/* Resolve roles at each palette boundary, including the live swatches in Settings. */
+:root, [data-theme] {
+  color-scheme: dark;
+
+  --litera-bg: var(--litera-neutral-900);
+  --litera-paper: var(--litera-neutral-875);
+  --litera-panel: var(--litera-neutral-825);
+  --litera-surface-1: var(--litera-neutral-850);
+  --litera-surface-2: var(--litera-neutral-825);
+  --litera-surface-3: var(--litera-neutral-800);
+  --litera-border: var(--litera-neutral-750);
+  --litera-line: var(--litera-neutral-700);
+  --litera-border-strong: var(--litera-neutral-500);
+  --litera-text: var(--litera-neutral-100);
+  --litera-mute: var(--litera-neutral-300);
+  --litera-text-subtle: var(--litera-neutral-400);
+  --litera-accent: var(--litera-pigment-300);
+  --litera-accent-strong: var(--litera-pigment-200);
+  --litera-accent-contrast: var(--litera-neutral-900);
+  --litera-accent2: var(--litera-marker-300);
+  --litera-annotation-bg: var(--litera-marker-800);
+  --litera-info: var(--litera-steel-300);
+  --litera-success: var(--litera-sage-300);
+  --litera-warn: var(--litera-ochre-300);
+  --litera-error: var(--litera-brick-300);
+
+  --litera-ink: var(--litera-neutral-900);
+  --litera-focus: var(--litera-accent);
+  --litera-annotation-ink: var(--litera-accent2);
+
+  --litera-shadow-color: color-mix(in srgb, var(--litera-ink) 48%, transparent);
+}
+
+[data-mode="light"] {
+  color-scheme: light;
+
+  --litera-bg: var(--litera-neutral-75);
+  --litera-paper: var(--litera-neutral-50);
+  --litera-panel: var(--litera-neutral-50);
+  --litera-surface-1: var(--litera-neutral-100);
+  --litera-surface-2: var(--litera-neutral-150);
+  --litera-surface-3: var(--litera-neutral-200);
+  --litera-border: var(--litera-neutral-200);
+  --litera-line: var(--litera-neutral-300);
+  --litera-border-strong: var(--litera-neutral-550);
+  --litera-text: var(--litera-neutral-900);
+  --litera-mute: var(--litera-neutral-600);
+  --litera-text-subtle: var(--litera-neutral-550);
+  --litera-accent: var(--litera-pigment-700);
+  --litera-accent-strong: var(--litera-pigment-800);
+  --litera-accent-contrast: var(--litera-neutral-50);
+  --litera-accent2: var(--litera-marker-700);
+  --litera-annotation-bg: var(--litera-marker-100);
+  --litera-info: var(--litera-steel-700);
+  --litera-success: var(--litera-sage-700);
+  --litera-warn: var(--litera-ochre-700);
+  --litera-error: var(--litera-brick-700);
+
+  --litera-shadow-color: color-mix(in srgb, var(--litera-ink) 18%, transparent);
+}

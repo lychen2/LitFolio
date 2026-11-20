@@ -1,13 +1,28 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
+use std::sync::LazyLock;
 use ulid::Ulid;
 
 use crate::ingest::PaperDraft;
+use crate::storage::feed_defaults::DEFAULT_FEEDS;
 
 use super::rows::row_to_feed_item;
-use super::{FeedItem, FeedRepo, NewFeedItem};
+use super::{FeedItem, FeedItemSort, FeedRepo, NewFeedItem};
 
 const FEED_ITEMS_KEEP_PER_FEED: i64 = 1000;
+
+static IMPACT_FACTORS: LazyLock<String> = LazyLock::new(|| {
+    let factors: serde_json::Map<_, _> = DEFAULT_FEEDS
+        .iter()
+        .filter_map(|feed| feed.impact_factor.map(|factor| (feed, factor)))
+        .flat_map(|(feed, factor)| {
+            std::iter::once(feed.url)
+                .chain(feed.legacy_urls.iter().copied())
+                .map(move |url| (url.to_owned(), serde_json::Value::from(factor)))
+        })
+        .collect();
+    serde_json::Value::Object(factors).to_string()
+});
 
 impl FeedRepo<'_> {
     /// Upsert a batch of entries for a feed, returning the count of NEW rows.
@@ -109,12 +124,16 @@ impl FeedRepo<'_> {
         feed_id: Option<i64>,
         only_unread: bool,
         keyword: Option<&str>,
+        sort: FeedItemSort,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<FeedItem>> {
         let keyword = keyword.map(str::trim).filter(|value| !value.is_empty());
-        let sql = item_list_sql(feed_id.is_some(), only_unread, keyword.is_some());
+        let sql = item_list_sql(feed_id.is_some(), only_unread, keyword.is_some(), sort);
         let mut q = sqlx::query(&sql);
+        if sort == FeedItemSort::ImpactFactor {
+            q = q.bind(IMPACT_FACTORS.as_str());
+        }
         if let Some(fid) = feed_id {
             q = q.bind(fid);
         }
@@ -193,13 +212,30 @@ impl FeedRepo<'_> {
     }
 }
 
-fn item_list_sql(has_feed: bool, only_unread: bool, has_keyword: bool) -> String {
-    let mut sql = String::from(
+fn item_list_sql(
+    has_feed: bool,
+    only_unread: bool,
+    has_keyword: bool,
+    sort: FeedItemSort,
+) -> String {
+    let mut sql = String::new();
+    if sort == FeedItemSort::ImpactFactor {
+        sql.push_str(
+            "WITH ranked_feeds AS MATERIALIZED (
+                 SELECT f.id AS ranked_id, factors.value AS impact_factor
+                 FROM json_each(?) factors JOIN feeds f ON f.url = factors.key
+             ) ",
+        );
+    }
+    sql.push_str(
         "SELECT id, feed_id, entry_id, title, link, summary, authors_json,
                 published_at, fetched_at, seen, imported_paper_id,
                 metadata_json, metadata_source, metadata_checked_at
          FROM feed_items",
     );
+    if sort == FeedItemSort::ImpactFactor {
+        sql.push_str(" LEFT JOIN ranked_feeds ON ranked_id = feed_items.feed_id");
+    }
     let mut clauses: Vec<&'static str> = Vec::new();
     if has_feed {
         clauses.push("feed_id = ?");
@@ -211,9 +247,15 @@ fn item_list_sql(has_feed: bool, only_unread: bool, has_keyword: bool) -> String
         clauses.push("instr(lower(title), lower(?)) > 0");
     }
     append_where(&mut sql, &clauses);
-    sql.push_str(
-        " ORDER BY fetched_at DESC, id DESC LIMIT ? OFFSET ?",
-    );
+    sql.push_str(" ORDER BY ");
+    sql.push_str(match sort {
+        FeedItemSort::Newest => "fetched_at DESC, id DESC",
+        FeedItemSort::Oldest => "fetched_at ASC, id ASC",
+        FeedItemSort::Title => "title COLLATE NOCASE ASC, fetched_at DESC, id DESC",
+        FeedItemSort::Unread => "seen ASC, fetched_at DESC, id DESC",
+        FeedItemSort::ImpactFactor => "impact_factor DESC NULLS LAST, fetched_at DESC, id DESC",
+    });
+    sql.push_str(" LIMIT ? OFFSET ?");
     sql
 }
 

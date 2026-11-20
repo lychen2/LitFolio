@@ -60,7 +60,9 @@ impl<'a> PluginStateRepo<'a> {
 
     pub async fn disable(&self, plugin_id: &str) -> Result<()> {
         sqlx::query(
-            "UPDATE plugin_state SET enabled = 0, updated_at = unixepoch() WHERE plugin_id = ?1",
+            "INSERT INTO plugin_state (plugin_id, enabled, generation, updated_at)
+             VALUES (?1, 0, 0, unixepoch())
+             ON CONFLICT(plugin_id) DO UPDATE SET enabled = 0, updated_at = unixepoch()",
         )
         .bind(plugin_id)
         .execute(self.pool)

@@ -11,7 +11,7 @@ describe("parseReadingHostMessage action messages", () => {
 
   it("keeps every declared action addressable", () => {
     for (const action of READING_ACTIONS) {
-      const paperIds = action === "queue-open" || action === "collections" ? [] : ["abc12345"];
+      const paperIds = action === "collections" ? [] : ["abc12345"];
       const payload: Record<string, unknown> = { type: "action", action, paperIds };
       if (action === "selection-translate") payload.text = "Selected sentence";
       expect(parseReadingHostMessage(envelope(payload))).toEqual({
@@ -20,9 +20,7 @@ describe("parseReadingHostMessage action messages", () => {
     }
   });
 
-  it("allows queue and collection panels without paper IDs", () => {
-    expect(parseReadingHostMessage(envelope({ type: "action", action: "queue-open", paperIds: [] })))
-      .toEqual({ type: "action", action: "queue-open", paperIds: [] });
+  it("allows the collection panel without paper IDs", () => {
     expect(parseReadingHostMessage(envelope({ type: "action", action: "collections", paperIds: [] })))
       .toEqual({ type: "action", action: "collections", paperIds: [] });
   });
@@ -39,6 +37,13 @@ describe("parseReadingHostMessage action messages", () => {
       .toThrow("upstream paper IDs");
     expect(() => parseReadingHostMessage(envelope({ type: "action", action: "tldr", paperIds: "abc12345" })))
       .toThrow("expected array, got string");
+  });
+
+  it("rejects removed plugin actions", () => {
+    for (const action of ["review", "similar", "zotero", "queue-open", "queue-add"]) {
+      expect(() => parseReadingHostMessage(envelope({ type: "action", action, paperIds: ["abc12345"] })))
+        .toThrow("ReadingHostMessage.action");
+    }
   });
 
   it("requires selected text for selection translation", () => {

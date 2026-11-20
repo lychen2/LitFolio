@@ -15,7 +15,7 @@ use tauri::{AppHandle, State};
 
 use super::events::emit_or_warn;
 use crate::ingest::fetch_feed;
-use crate::storage::{FeedItem, FeedRepo, FeedWithCounts};
+use crate::storage::{feeds::FeedItemSort, FeedItem, FeedRepo, FeedWithCounts};
 use crate::AppState;
 
 const MAX_PAGE_LIMIT: i64 = 200;
@@ -177,6 +177,7 @@ pub async fn feed_items_list(
     feed_id: Option<i64>,
     only_unread: Option<bool>,
     keyword: Option<String>,
+    sort: Option<FeedItemSort>,
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<Vec<FeedItem>, String> {
@@ -187,6 +188,7 @@ pub async fn feed_items_list(
             feed_id,
             only_unread.unwrap_or(false),
             keyword.as_deref(),
+            sort.unwrap_or_default(),
             limit,
             offset,
         )

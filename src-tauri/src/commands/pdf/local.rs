@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tauri::{AppHandle, State};
@@ -11,13 +11,56 @@ use crate::reading_service::ReadingService;
 use crate::storage::{Paper, PaperRepo};
 use crate::AppState;
 
+enum LocalPdfSource {
+    File(PathBuf),
+    #[cfg(target_os = "android")]
+    Document(super::android_source::StagedPdf),
+}
+
+impl LocalPdfSource {
+    async fn open(_app: &AppHandle, state: &AppState, source: &str) -> anyhow::Result<Self> {
+        #[cfg(target_os = "android")]
+        {
+            if source.starts_with("content://") {
+                return super::android_source::StagedPdf::open(_app, source)
+                    .await
+                    .map(Self::Document);
+            }
+            if source.starts_with("file://") {
+                let path = super::android_source::file_uri_path(source)?;
+                return state.paths.validate_external_pdf(&path).map(Self::File);
+            }
+        }
+        state
+            .paths
+            .validate_external_pdf(Path::new(source))
+            .map(Self::File)
+    }
+
+    fn path(&self) -> &Path {
+        match self {
+            Self::File(path) => path,
+            #[cfg(target_os = "android")]
+            Self::Document(pdf) => pdf.path(),
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn paper_save_with_pdf(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     draft: PaperDraft,
     source_pdf_path: String,
 ) -> Result<Paper, String> {
-    match paper_save_with_pdf_inner(state.inner().as_ref(), draft, &source_pdf_path).await {
+    let result = async {
+        let source = LocalPdfSource::open(&app, &state, &source_pdf_path)
+            .await
+            .map_err(|e| format!("拒绝导入: {e:#}"))?;
+        paper_save_with_pdf_inner(&state, draft, source.path()).await
+    }
+    .await;
+    match result {
         Ok(paper) => {
             tracing::info!(
                 import_source = "pdf_manual",
@@ -44,18 +87,14 @@ pub async fn paper_save_with_pdf(
 async fn paper_save_with_pdf_inner(
     state: &AppState,
     draft: PaperDraft,
-    source_pdf_path: &str,
+    source_pdf: &Path,
 ) -> Result<Paper, String> {
-    let canon_source = state
-        .paths
-        .validate_external_pdf(Path::new(&source_pdf_path))
-        .map_err(|e| format!("拒绝导入: {e}"))?;
     let paper_id = Ulid::new().to_string();
     let dest = state.paths.paper_dir(&paper_id).join("original.pdf");
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::copy(&canon_source, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    std::fs::copy(source_pdf, &dest).map_err(|e| format!("copy PDF: {e}"))?;
     let mut paper = draft.into_paper();
     paper.id = paper_id;
     paper.pdf_path = Some(dest.display().to_string());
@@ -67,7 +106,6 @@ async fn paper_save_with_pdf_inner(
     generate_and_index_pdf_markdown_or_warn(
         &state.pool,
         &state.paths,
-        &state.http,
         &paper.id,
         &dest,
     )
@@ -87,23 +125,22 @@ pub async fn paper_attach_pdf(
     if repo.get(&id).await.map_err(|e| e.to_string())?.is_none() {
         return Err(format!("paper {id} not found"));
     }
-    let canon_source = state
-        .paths
-        .validate_external_pdf(Path::new(&source_pdf_path))
-        .map_err(|e| format!("拒绝绑定: {e}"))?;
+    let source = LocalPdfSource::open(&app, &state, &source_pdf_path)
+        .await
+        .map_err(|e| format!("拒绝绑定: {e:#}"))?;
     let dest = state.paths.paper_dir(&id).join("original.pdf");
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create paper dir: {e}"))?;
     }
-    std::fs::copy(&canon_source, &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    std::fs::copy(source.path(), &dest).map_err(|e| format!("copy PDF: {e}"))?;
+    drop(source);
     let dest_str = dest.display().to_string();
     repo.update_pdf_path(&id, &dest_str)
         .await
         .map_err(|e| e.to_string())?;
     service.refresh_pdf(&app, &state, &id)
         .await.map_err(|e| format!("{e:#}"))?;
-    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &state.http, &id, &dest)
-        .await;
+    generate_and_index_pdf_markdown_or_warn(&state.pool, &state.paths, &id, &dest).await;
     repo.get(&id)
         .await
         .map_err(|e| e.to_string())?
@@ -195,7 +232,8 @@ mod tests {
             abstract_text: Some("A command-level integration fixture.".into()),
         };
 
-        let paper = paper_save_with_pdf_inner(&state, draft, source_pdf.to_str().unwrap())
+        let source_pdf = state.paths.validate_external_pdf(&source_pdf).unwrap();
+        let paper = paper_save_with_pdf_inner(&state, draft, &source_pdf)
             .await
             .unwrap();
         let stored = PaperRepo::new(&state.pool)
@@ -254,7 +292,6 @@ mod tests {
             host_network: crate::network_egress::HostNetworkState::new(Default::default()),
             ai_cancels: AsyncMutex::new(std::collections::HashMap::new()),
             batch_cancel: AsyncMutex::new(None::<CancellationToken>),
-            sync_lock: AsyncMutex::new(()),
             plugin_host: crate::plugin_host::PluginHostState::new(),
         };
         (state, library_root, source_root)

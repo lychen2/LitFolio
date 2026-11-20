@@ -14,13 +14,6 @@ pub struct PaperDocumentIndexStatus {
     pub indexed_at: Option<i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PaperDocumentIndexCounts {
-    pub indexed: i64,
-    pub failed: i64,
-    pub total: i64,
-}
-
 pub struct PaperDocumentRepo<'a> {
     pool: &'a Pool,
 }
@@ -71,23 +64,6 @@ impl<'a> PaperDocumentRepo<'a> {
         Ok(())
     }
 
-    pub async fn index_counts(&self) -> Result<PaperDocumentIndexCounts> {
-        let row = sqlx::query(
-            "SELECT
-                COALESCE(SUM(CASE WHEN index_status = 'indexed' THEN 1 ELSE 0 END), 0) AS indexed,
-                COALESCE(SUM(CASE WHEN index_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed,
-                COUNT(*) AS total
-             FROM paper_documents",
-        )
-        .fetch_one(self.pool)
-        .await?;
-        Ok(PaperDocumentIndexCounts {
-            indexed: row.try_get("indexed")?,
-            failed: row.try_get("failed")?,
-            total: row.try_get("total")?,
-        })
-    }
-
     pub async fn index_status_for_papers(
         &self,
         paper_ids: &[String],
@@ -114,26 +90,6 @@ impl<'a> PaperDocumentRepo<'a> {
                     indexed_at: row.try_get("indexed_at")?,
                 },
             );
-        }
-        Ok(out)
-    }
-
-    pub async fn markdown_for_papers(
-        &self,
-        paper_ids: &[String],
-    ) -> Result<HashMap<String, String>> {
-        let mut out = HashMap::with_capacity(paper_ids.len());
-        for paper_id in paper_ids {
-            let row = sqlx::query("SELECT markdown FROM paper_documents WHERE paper_id = ?1")
-                .bind(paper_id)
-                .fetch_optional(self.pool)
-                .await?;
-            if let Some(row) = row {
-                let markdown: String = row.try_get("markdown")?;
-                if !markdown.trim().is_empty() {
-                    out.insert(paper_id.clone(), markdown);
-                }
-            }
         }
         Ok(out)
     }

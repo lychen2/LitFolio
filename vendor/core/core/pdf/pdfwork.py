@@ -378,7 +378,10 @@ def warm_variants(root: Path, width: int = PANEL_WIDTH) -> None:
 
 def prepare(root: Path) -> list[dict]:
     """渲染原页 + 抽文字，返回 meta.pages。"""
-    from .prepare_worker import prepare_isolated
+    from ..app.host_config import embedded
+    from .prepare_worker import prepare_embedded, prepare_isolated
     # Serialize with in-process PDF work, too, rather than doubling peak memory.
     with _PDFIUM_LOCK:
+        if embedded():
+            return prepare_embedded(root)
         return prepare_isolated(root)

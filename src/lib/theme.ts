@@ -5,6 +5,13 @@ export type ThemeId = (typeof THEME_IDS)[number];
 export const THEME_STORAGE_KEY = "litfolio.theme";
 export const DEFAULT_THEME: ThemeId = "violet";
 
+export type ThemeMode = "dark" | "light";
+export const THEME_MODE_PREFERENCES = ["light", "dark", "system"] as const;
+export type ThemeModePreference = (typeof THEME_MODE_PREFERENCES)[number];
+
+export const THEME_MODE_STORAGE_KEY = "litfolio.theme-mode";
+export const DEFAULT_THEME_MODE: ThemeMode = "dark";
+
 export const FONT_IDS = ["rounded", "system", "serif", "mono"] as const;
 export type FontId = (typeof FONT_IDS)[number];
 
@@ -50,12 +57,52 @@ export function readStoredTheme(storage?: Storage): ThemeId {
 export function applyTheme(theme: ThemeId, root?: HTMLElement): void {
   const target = root ?? document.documentElement;
   target.dataset.theme = theme;
-  target.style.colorScheme = "dark";
+  // Restore the effective mode before the app renders, then keep it across palette changes.
+  target.dataset.mode ??= resolveThemeMode(readStoredThemeMode());
 }
 
 export function persistTheme(theme: ThemeId, storage?: Storage): void {
   try {
     (storage ?? window.localStorage).setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Private mode and embedded webviews can disable localStorage.
+  }
+}
+
+export function readStoredThemeMode(storage?: Storage): ThemeModePreference {
+  try {
+    const mode = (storage ?? window.localStorage).getItem(THEME_MODE_STORAGE_KEY);
+    return mode === "light" || mode === "dark" || mode === "system" ? mode : DEFAULT_THEME_MODE;
+  } catch {
+    return DEFAULT_THEME_MODE;
+  }
+}
+
+function systemColorScheme() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null;
+  return window.matchMedia("(prefers-color-scheme: dark)");
+}
+
+export function resolveThemeMode(preference: ThemeModePreference): ThemeMode {
+  if (preference !== "system") return preference;
+  const media = systemColorScheme();
+  return media ? (media.matches ? "dark" : "light") : DEFAULT_THEME_MODE;
+}
+
+export function subscribeToSystemTheme(onChange: () => void) {
+  const media = systemColorScheme();
+  media?.addEventListener("change", onChange);
+  return () => media?.removeEventListener("change", onChange);
+}
+
+export function applyThemeMode(mode: ThemeMode, root?: HTMLElement): void {
+  const target = root ?? document.documentElement;
+  target.dataset.mode = mode;
+}
+
+export function persistThemeMode(mode: ThemeModePreference, storage?: Storage): void {
+  try {
+    (storage ?? window.localStorage).setItem(THEME_MODE_STORAGE_KEY, mode);
   } catch {
     // Private mode and embedded webviews can disable localStorage.
   }

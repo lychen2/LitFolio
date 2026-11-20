@@ -6,14 +6,13 @@ mod bibtex;
 mod cluster;
 mod commands;
 mod diagnostics;
-mod discovery;
 mod export;
 mod http;
 mod index;
 mod ingest;
 mod legacy_conversion;
-mod library_sync;
-mod mineru;
+#[cfg(feature = "plugin-literature-network")]
+mod literature_network;
 pub mod mono_contracts;
 pub mod network_egress;
 mod plugin_host;
@@ -21,7 +20,6 @@ mod reading_service;
 mod secret;
 mod startup;
 mod storage;
-mod zotero;
 
 use std::collections::HashMap;
 #[cfg(not(test))]
@@ -57,7 +55,6 @@ pub struct AppState {
     /// guard around `.await` points (sqlx writes, HTTP calls). A blocking
     /// guard there would pin a tokio worker thread.
     pub batch_cancel: AsyncMutex<Option<CancellationToken>>,
-    pub sync_lock: AsyncMutex<()>,
     /// Plugin host authority registry: live instance bindings keyed by
     /// opaque binding id. Disable revokes here before any cleanup.
     pub plugin_host: plugin_host::PluginHostState,
@@ -77,10 +74,14 @@ fn backend_log_filter() -> EnvFilter {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[cfg(not(test))]
 pub fn run() {
+    #[cfg(not(target_os = "android"))]
     diagnostics::init(backend_log_filter());
     diagnostics::install_panic_hook();
 
-    let application = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(reading_service::android_plugin());
+    let application = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
@@ -90,6 +91,7 @@ pub fn run() {
         .manage(reading_service::ReadingService::default())
         .invoke_handler(commands::command_handlers!())
         .setup(|app| {
+            #[cfg(not(target_os = "android"))]
             let resources = app
                 .path()
                 .resource_dir()
@@ -97,12 +99,24 @@ pub fn run() {
                     tracing::warn!(%error, "optional startup task failed: locate bundled manuals");
                 })
                 .ok();
-            let state =
-                tauri::async_runtime::block_on(startup::bootstrap_state(resources.as_deref()))
-                    .map_err(|e| {
-                        diagnostics::write_fatal(&format!("bootstrap failed: {e}"));
-                        Box::<dyn std::error::Error>::from(e)
-                    })?;
+            #[cfg(target_os = "android")]
+            let resources: Option<std::path::PathBuf> = None;
+            let state = (|| -> anyhow::Result<_> {
+                #[cfg(not(target_os = "android"))]
+                let root = storage::default_library_root()?;
+                #[cfg(target_os = "android")]
+                let root = {
+                    let root = app.path().app_data_dir()?.join("Litera-Library");
+                    let log = storage::LibraryPaths::new(&root).app_log_file();
+                    diagnostics::init_at(backend_log_filter(), Some(log));
+                    root
+                };
+                tauri::async_runtime::block_on(startup::bootstrap_state(root, resources.as_deref()))
+            })()
+            .map_err(|e| {
+                diagnostics::write_fatal(&format!("bootstrap failed: {e}"));
+                Box::<dyn std::error::Error>::from(e)
+            })?;
             app.manage(state);
             tracing::info!("LitFolio backend booted");
             Ok(())

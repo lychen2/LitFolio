@@ -1,0 +1,51 @@
+name: Android build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: ARM64 and x86_64 debug APK
+    runs-on: ubuntu-24.04
+    env:
+      LITFOLIO_PROFILE: all
+      NDK_VERSION: 27.1.12297006
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and NDK
+        run: |
+          sdkmanager "platforms;android-36" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Install native wheel build tools
+        run: sudo apt-get install -y cmake ninja-build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri android init --ci --skip-targets-install
+      - run: pnpm tauri android build --ci --debug --apk --target aarch64 x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: litfolio-android-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

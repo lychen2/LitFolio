@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_THEME, THEME_STORAGE_KEY, applyTheme, parseTheme, persistTheme, readStoredTheme } from "./theme";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  DEFAULT_THEME,
+  THEME_MODE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  applyTheme,
+  applyThemeMode,
+  parseTheme,
+  persistTheme,
+  persistThemeMode,
+  readStoredTheme,
+  readStoredThemeMode,
+} from "./theme";
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(initial));
@@ -14,10 +25,27 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 }
 
 describe("theme preferences", () => {
-  it("falls back to violet for missing or invalid values", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("defaults to violet and dark for missing or invalid preferences", () => {
     expect(parseTheme(null)).toBe(DEFAULT_THEME);
     expect(parseTheme("neon")).toBe(DEFAULT_THEME);
     expect(readStoredTheme(memoryStorage())).toBe("violet");
+    expect(readStoredThemeMode(memoryStorage())).toBe("dark");
+    expect(readStoredThemeMode(memoryStorage({ [THEME_MODE_STORAGE_KEY]: "invalid" }))).toBe("dark");
+  });
+
+  it("retains the system preference independently of the effective mode", () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("window", {
+      localStorage: storage,
+      matchMedia: () => ({ matches: false }),
+    });
+    persistThemeMode("system", storage);
+    const root = { dataset: {}, style: {} } as unknown as HTMLElement;
+    applyTheme(readStoredTheme(), root);
+    expect(root.dataset).toEqual({ theme: "violet", mode: "light" });
+    expect(readStoredThemeMode(storage)).toBe("system");
   });
 
   it("persists and reads a supported theme", () => {
@@ -27,10 +55,22 @@ describe("theme preferences", () => {
     expect(readStoredTheme(storage)).toBe("blueprint");
   });
 
-  it("applies the theme to the root dataset", () => {
+  it("restores both preferences and lets the same palette switch modes", () => {
+    const storage = memoryStorage({ [THEME_STORAGE_KEY]: "warm" });
+    vi.stubGlobal("window", { localStorage: storage });
     const root = { dataset: {}, style: {} } as unknown as HTMLElement;
-    applyTheme("warm", root);
-    expect(root.dataset.theme).toBe("warm");
-    expect(root.style.colorScheme).toBe("dark");
+    applyTheme(readStoredTheme(), root);
+    expect(root.dataset).toEqual({ theme: "warm", mode: "dark" });
+
+    applyThemeMode("light", root);
+    persistThemeMode("light");
+    expect(root.dataset).toEqual({ theme: "warm", mode: "light" });
+
+    const reopenedRoot = { dataset: {}, style: {} } as unknown as HTMLElement;
+    applyTheme(readStoredTheme(), reopenedRoot);
+    expect(reopenedRoot.dataset).toEqual({ theme: "warm", mode: "light" });
+    applyTheme("blueprint", reopenedRoot);
+    expect(reopenedRoot.dataset).toEqual({ theme: "blueprint", mode: "light" });
+    expect(reopenedRoot.style.colorScheme).toBeUndefined();
   });
 });

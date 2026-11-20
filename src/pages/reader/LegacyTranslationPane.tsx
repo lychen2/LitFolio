@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/icons";
+import { ChoiceButton } from "@/components/ChoiceButton";
 import { MarkdownView } from "@/components/MarkdownView";
 import { readerClient } from "@/core/data";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { llmLanguageNameFor } from "@/i18n/dict";
 import { errorMessage } from "@/lib/error";
-import { cn } from "@/lib/cn";
 import { parseReadingDocument, type ReadingBlock, type ReadingDocument } from "./readingDocument";
 
 /** Shared with the PDF text cache, which invalidates it once extraction changes. */
@@ -88,21 +88,19 @@ export function LegacyTranslationPane({
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-1.5 border-b border-litera-line px-3 py-1.5">
-        {(["translation", "source"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={view === option}
-            disabled={option === "source" ? !original : !translation}
-            onClick={() => setView(option)}
-            className={cn(
-              "litera-btn text-[11px]",
-              view === option && "border-litera-accent/40 bg-litera-accent/12 text-litera-accent",
-            )}
-          >
-            {option === "translation" ? t("reader.legacyTranslation") : t("reader.legacySource")}
-          </button>
-        ))}
+        <div className="litera-tab-list flex-wrap" role="group" aria-label={t("reader.tabTranslate")}>
+          {(["translation", "source"] as const).map((option) => (
+            <ChoiceButton
+              key={option}
+              aria-pressed={view === option}
+              disabled={option === "source" ? !original : !translation}
+              onClick={() => setView(option)}
+              className="text-[11px]"
+            >
+              {option === "translation" ? t("reader.legacyTranslation") : t("reader.legacySource")}
+            </ChoiceButton>
+          ))}
+        </div>
         {translation && (
           <span className="ml-auto truncate text-[11px] text-litera-mute" title={translation.targetLang}>
             {translation.targetLang}
@@ -112,7 +110,7 @@ export function LegacyTranslationPane({
       <div className="flex-1 min-h-0 overflow-auto">
         {isLoading ? (
           <div className="grid h-full place-items-center">
-            <Loader2 className="h-4 w-4 animate-spin text-litera-mute" aria-hidden="true" />
+            <Spinner className="h-4 w-4 animate-spin text-litera-mute" aria-hidden="true" />
           </div>
         ) : active ? (
           <ReadableBlocks

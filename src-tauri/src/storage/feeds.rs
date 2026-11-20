@@ -33,12 +33,24 @@ pub struct Feed {
     pub created_at: i64,
 }
 
+#[derive(Debug, Default, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedItemSort {
+    #[default]
+    Newest,
+    Oldest,
+    Title,
+    Unread,
+    ImpactFactor,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct FeedWithCounts {
     #[serde(flatten)]
     pub feed: Feed,
     pub total_items: i64,
     pub unread_items: i64,
+    pub impact_factor: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -15,7 +15,10 @@ export interface Feed {
 export interface FeedWithCounts extends Feed {
   total_items: number;
   unread_items: number;
+  impact_factor: number | null;
 }
+
+export type FeedItemSort = "newest" | "oldest" | "title" | "unread" | "impact_factor";
 
 export interface FeedItem {
   id: string;

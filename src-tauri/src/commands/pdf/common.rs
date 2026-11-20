@@ -1,9 +1,6 @@
 use std::path::Path;
 
-use crate::ai::load_config;
-use crate::export::markdown::{configured_obsidian_dir, export_paper_md, MarkdownExportMode};
 use crate::ingest::PaperDraft;
-use crate::mineru::{MineruClient, PdfMarkdownEngine};
 use crate::storage::{LibraryPaths, Paper, PaperDocumentRepo, PaperRepo, Pool};
 
 #[derive(serde::Serialize)]
@@ -60,97 +57,17 @@ pub async fn attach_imported_pdf_to_existing(
 pub async fn generate_and_index_pdf_markdown(
     pool: &Pool,
     paths: &LibraryPaths,
-    http: &reqwest::Client,
     paper_id: &str,
     pdf_path: &Path,
 ) -> anyhow::Result<()> {
     let canonical = paths.ensure_inside_root(pdf_path)?;
-    let markdown = markdown_for_configured_engine(paths, http, &canonical, paper_id).await?;
+    let markdown = extract_local_markdown(&canonical).await?;
     let trimmed = markdown.trim();
     paths.write_paper_markdown(paper_id, trimmed)?;
     PaperDocumentRepo::new(pool)
         .upsert_markdown(paper_id, trimmed)
         .await?;
-
-    if let Ok(config) = load_config(paths) {
-        match configured_obsidian_dir(&config.obsidian.vault_dir, &config.obsidian.folder) {
-            Ok(Some(export_dir)) => {
-                let repo = PaperRepo::new(pool);
-                match repo.get(paper_id).await {
-                    Ok(Some(paper)) => {
-                        if let Err(error) = export_paper_md(
-                            pool,
-                            paths,
-                            &paper,
-                            &export_dir,
-                            MarkdownExportMode::Obsidian,
-                        )
-                        .await
-                        {
-                            tracing::warn!(
-                                paper_id,
-                                error = %error,
-                                "failed to sync converted PDF Markdown to Obsidian"
-                            );
-                        }
-                    }
-                    Ok(None) => {
-                        tracing::warn!(paper_id, "paper missing during Obsidian Markdown sync")
-                    }
-                    Err(error) => {
-                        tracing::warn!(paper_id, error = %error, "failed to load paper for Obsidian Markdown sync")
-                    }
-                }
-            }
-            Ok(None) => {}
-            Err(error) => {
-                tracing::warn!(paper_id, error = %error, "invalid Obsidian configuration; skipping Markdown sync")
-            }
-        }
-    }
     Ok(())
-}
-
-async fn markdown_for_configured_engine(
-    paths: &LibraryPaths,
-    http: &reqwest::Client,
-    pdf_path: &Path,
-    paper_id: &str,
-) -> anyhow::Result<String> {
-    let config = match load_config(paths) {
-        Ok(config) => config.pdf_markdown,
-        Err(error) => {
-            tracing::warn!(paper_id, error = %error, "failed to load PDF Markdown engine config; using local text fallback");
-            return extract_local_markdown(pdf_path).await;
-        }
-    };
-    match config.engine {
-        PdfMarkdownEngine::Local => extract_local_markdown(pdf_path).await,
-        PdfMarkdownEngine::MineruAgent => {
-            match MineruClient::new(http.clone())
-                .parse_agent_file(pdf_path)
-                .await
-            {
-                Ok(markdown) => Ok(markdown),
-                Err(error) => {
-                    tracing::warn!(paper_id, error = %error, "MinerU Agent PDF Markdown conversion failed; falling back to local text conversion");
-                    extract_local_markdown(pdf_path).await
-                }
-            }
-        }
-        PdfMarkdownEngine::MineruPrecise => {
-            match MineruClient::new(http.clone())
-                .parse_precise_file(pdf_path, &config.mineru_token)
-                .await
-            {
-                Ok(markdown) => Ok(markdown),
-                Err(error) => {
-                    tracing::warn!(paper_id, error = %error, "MinerU precise PDF Markdown conversion failed; falling back to local text conversion");
-                    extract_local_markdown(pdf_path).await
-                }
-            }
-        }
-    }
 }
 
 async fn extract_local_markdown(pdf_path: &Path) -> anyhow::Result<String> {
@@ -162,12 +79,10 @@ async fn extract_local_markdown(pdf_path: &Path) -> anyhow::Result<String> {
 pub async fn generate_and_index_pdf_markdown_or_warn(
     pool: &Pool,
     paths: &LibraryPaths,
-    http: &reqwest::Client,
     paper_id: &str,
     pdf_path: &Path,
 ) {
-    if let Err(error) = generate_and_index_pdf_markdown(pool, paths, http, paper_id, pdf_path).await
-    {
+    if let Err(error) = generate_and_index_pdf_markdown(pool, paths, paper_id, pdf_path).await {
         let error_message = error.to_string();
         if let Err(status_error) = PaperDocumentRepo::new(pool)
             .mark_index_failed(paper_id, &error_message)

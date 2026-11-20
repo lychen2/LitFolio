@@ -48,7 +48,7 @@ async fn create_list_upsert_roundtrip() {
     assert_eq!(listed[0].unread_items, 2);
 
     let entries = repo
-        .list_items(Some(feed.id), false, None, 10, 0)
+        .list_items(Some(feed.id), false, None, FeedItemSort::Newest, 10, 0)
         .await
         .unwrap();
     assert_eq!(entries.len(), 2);
@@ -62,7 +62,7 @@ async fn create_list_upsert_roundtrip() {
 
     repo.set_item_seen(&first.id, true).await.unwrap();
     let unread = repo
-        .list_items(Some(feed.id), true, None, 10, 0)
+        .list_items(Some(feed.id), true, None, FeedItemSort::Newest, 10, 0)
         .await
         .unwrap();
     assert_eq!(unread.len(), 1);
@@ -111,31 +111,104 @@ async fn list_items_sorts_by_first_fetch_and_filters_before_pagination() {
         .await
         .unwrap();
 
-    let entries = repo.list_items(None, false, None, 10, 0).await.unwrap();
+    let entries = repo
+        .list_items(None, false, None, FeedItemSort::Newest, 10, 0)
+        .await
+        .unwrap();
     assert_eq!(entries[0].entry_id, "newer-fetch");
     assert_eq!(entries[1].entry_id, "older-fetch");
 
     repo.set_item_seen(&entries[0].id, true).await.unwrap();
-    let entries = repo.list_items(None, false, None, 10, 0).await.unwrap();
+    let entries = repo
+        .list_items(None, false, None, FeedItemSort::Newest, 10, 0)
+        .await
+        .unwrap();
     assert_eq!(entries[0].entry_id, "newer-fetch");
     let filtered = repo
-        .list_items(Some(feed.id), true, Some("  OLDER  "), 1, 0)
+        .list_items(
+            Some(feed.id),
+            true,
+            Some("  OLDER  "),
+            FeedItemSort::Newest,
+            1,
+            0,
+        )
         .await
         .unwrap();
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].entry_id, "older-fetch");
     let filtered = repo
-        .list_items(Some(feed.id), true, Some("newer"), 1, 0)
+        .list_items(
+            Some(feed.id),
+            true,
+            Some("newer"),
+            FeedItemSort::Newest,
+            1,
+            0,
+        )
         .await
         .unwrap();
     assert!(filtered.is_empty());
     let filtered = repo
-        .list_items(None, false, Some("older"), 1, 0)
+        .list_items(None, false, Some("older"), FeedItemSort::Newest, 1, 0)
         .await
         .unwrap();
     assert_eq!(filtered[0].entry_id, "older-fetch");
 
     std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
+async fn impact_factor_sorts_before_pagination_and_keeps_unranked_items() {
+    let (pool, dir) = temp().await;
+    let repo = FeedRepo::new(&pool);
+    for (url, entry_id, fetched_at) in [
+        ("https://www.nature.com/nphoton.rss", "high", 10_i64),
+        ("https://opg.optica.org/optica/rss.cfm", "legacy", 20),
+        ("https://example.com/rss", "unknown", 30),
+    ] {
+        let feed = repo.create(url, "Generic channel", None).await.unwrap();
+        repo.upsert_items(
+            feed.id,
+            &[NewFeedItem {
+                entry_id: entry_id.into(),
+                title: format!("Optics {entry_id}"),
+                link: None,
+                summary: None,
+                authors: vec![],
+                published_at: None,
+            }],
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE feed_items SET fetched_at = ? WHERE feed_id = ?")
+            .bind(fetched_at)
+            .bind(feed.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    for (offset, expected) in [(0, "high"), (1, "legacy"), (2, "unknown")] {
+        let page = repo
+            .list_items(
+                None,
+                true,
+                Some("optics"),
+                FeedItemSort::ImpactFactor,
+                1,
+                offset,
+            )
+            .await
+            .unwrap();
+        assert_eq!(page[0].entry_id, expected);
+    }
+    let feeds = repo.list().await.unwrap();
+    assert!(feeds
+        .iter()
+        .any(|row| row.feed.title == "Optica" && row.impact_factor == Some(8.8)));
+    pool.close().await;
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[tokio::test]
@@ -228,6 +301,35 @@ async fn seed_defaults_imports_dsh_optics_feeds_once() {
         );
     }
     assert_eq!(repo.seed_defaults_if_empty().await.unwrap(), 0);
+
+    pool.close().await;
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
+async fn subscriptions_keep_known_journal_names_after_refresh() {
+    let (pool, dir) = temp().await;
+    let repo = FeedRepo::new(&pool);
+    let known = repo
+        .create(
+            "https://www.nature.com/nphoton.rss",
+            "Nature Photonics",
+            None,
+        )
+        .await
+        .unwrap();
+    repo.update_metadata(known.id, Some("Latest Results"), None, None, None)
+        .await
+        .unwrap();
+    repo.create("https://example.org/rss", "Independent Journal", None)
+        .await
+        .unwrap();
+
+    let feeds = repo.list().await.unwrap();
+    assert!(feeds.iter().any(|row| row.feed.title == "Nature Photonics"));
+    assert!(feeds
+        .iter()
+        .any(|row| row.feed.title == "Independent Journal"));
 
     pool.close().await;
     std::fs::remove_dir_all(&dir).unwrap();

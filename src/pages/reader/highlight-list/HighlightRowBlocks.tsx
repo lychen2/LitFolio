@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Languages, Lightbulb, Loader2, MessageSquare, Check } from "lucide-react";
+import { XCircle, Languages, Lightbulb, Spinner, MessageSquare, Check } from "@/components/icons";
 import { MarkdownView } from "@/components/MarkdownView";
 import { useT } from "@/i18n/I18nProvider";
 import { WESTERN_TEXT_STYLE } from "../HighlightList";
@@ -163,14 +163,14 @@ function NoteSaveStatus({
   if (error) {
     return (
       <span className="text-[11px] text-litera-error">
-        ✕ {t("reader.saveFailed")}: {error.message}
+        <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("reader.saveFailed")}: {error.message}
       </span>
     );
   }
   if (status === "saving") {
     return (
       <span className="text-[11px] text-litera-accent2 flex items-center gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" /> {t("reader.saving")}
+        <Spinner className="h-3 w-3 animate-spin" /> {t("reader.saving")}
       </span>
     );
   }
@@ -191,7 +191,7 @@ function NoteSaveStatus({
 export function ErrorText({ message }: { message: string }) {
   return (
     <div className="mt-2 text-[11px] text-litera-error break-all">
-      ✕ {message || "Unknown error"}
+      <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{message || "Unknown error"}
     </div>
   );
 }

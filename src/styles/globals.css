@@ -1,96 +1,30 @@
 @import "./fonts.css";
+@import "./palette.css";
+@import "./icons.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root,
-  [data-theme="violet"] {
-    color-scheme: dark;
-    --litera-ink: oklch(0.105 0.014 286);
-    --litera-bg: #1c1d21;
-    --litera-paper: #222328;
-    --litera-panel: #2c2d33;
-    --litera-surface-1: #27282e;
-    --litera-surface-2: #303138;
-    --litera-surface-3: #383942;
-    --litera-line: #41424a;
-    --litera-border: #393a42;
-    --litera-border-strong: #656671;
-    --litera-mute: oklch(0.785 0.016 284);
-    --litera-text-subtle: oklch(0.720 0.016 284);
-    --litera-text: oklch(0.955 0.011 284);
-    --litera-accent: oklch(0.775 0.128 298);
-    --litera-accent-strong: oklch(0.845 0.122 300);
-    --litera-accent-contrast: oklch(0.155 0.035 298);
-    --litera-accent2: oklch(0.820 0.095 205);
-    --litera-info: oklch(0.780 0.105 230);
-    --litera-success: oklch(0.810 0.130 150);
-    --litera-warn: oklch(0.850 0.120 85);
-    --litera-error: oklch(0.740 0.150 18);
-    --litera-focus: oklch(0.775 0.128 298);
-  }
-
-  [data-theme="warm"] {
-    color-scheme: dark;
-    --litera-ink: oklch(0.105 0.006 65);
-    --litera-bg: oklch(0.15 0.007 65);
-    --litera-paper: oklch(0.172 0.008 65);
-    --litera-panel: oklch(0.215 0.009 65);
-    --litera-surface-1: oklch(0.192 0.008 65);
-    --litera-surface-2: oklch(0.232 0.010 65);
-    --litera-surface-3: oklch(0.272 0.011 65);
-    --litera-line: oklch(0.305 0.011 65);
-    --litera-border: oklch(0.275 0.010 65);
-    --litera-border-strong: oklch(0.4 0.014 65);
-    --litera-mute: oklch(0.740 0.009 78);
-    --litera-text-subtle: oklch(0.600 0.009 78);
-    --litera-text: oklch(0.955 0.005 78);
-    --litera-accent: oklch(0.800 0.125 72);
-    --litera-accent-strong: oklch(0.865 0.120 78);
-    --litera-accent-contrast: oklch(0.170 0.030 65);
-    --litera-accent2: oklch(0.800 0.085 180);
-    --litera-info: oklch(0.780 0.090 200);
-    --litera-success: oklch(0.810 0.125 145);
-    --litera-warn: oklch(0.850 0.125 88);
-    --litera-error: oklch(0.740 0.145 25);
-    --litera-focus: oklch(0.800 0.125 72);
-  }
-
-  [data-theme="blueprint"] {
-    color-scheme: dark;
-    --litera-ink: oklch(0.105 0.019 245);
-    --litera-bg: oklch(0.15 0.022 245);
-    --litera-paper: oklch(0.172 0.024 245);
-    --litera-panel: oklch(0.215 0.028 245);
-    --litera-surface-1: oklch(0.192 0.025 245);
-    --litera-surface-2: oklch(0.232 0.030 245);
-    --litera-surface-3: oklch(0.272 0.034 245);
-    --litera-line: oklch(0.305 0.034 245);
-    --litera-border: oklch(0.275 0.031 245);
-    --litera-border-strong: oklch(0.4 0.043 245);
-    --litera-mute: oklch(0.740 0.026 240);
-    --litera-text-subtle: oklch(0.600 0.026 240);
-    --litera-text: oklch(0.955 0.014 240);
-    --litera-accent: oklch(0.775 0.125 238);
-    --litera-accent-strong: oklch(0.850 0.115 232);
-    --litera-accent-contrast: oklch(0.160 0.035 245);
-    --litera-accent2: oklch(0.820 0.100 190);
-    --litera-info: oklch(0.780 0.110 220);
-    --litera-success: oklch(0.810 0.125 152);
-    --litera-warn: oklch(0.850 0.120 85);
-    --litera-error: oklch(0.740 0.145 20);
-    --litera-focus: oklch(0.775 0.125 238);
-  }
-
   :root {
-    --litera-radius: 8px;
-    --litera-radius-sm: 5px;
-    --litera-radius-md: 8px;
-    --litera-radius-lg: 12px;
-    --litera-radius-xl: 16px;
+    --litera-space-1: 4px;
+    --litera-space-2: calc(2 * var(--litera-space-1));
+    --litera-space-3: calc(3 * var(--litera-space-1));
+    --litera-space-4: calc(4 * var(--litera-space-1));
+    --litera-space-6: calc(6 * var(--litera-space-1));
+    --litera-page-inset: var(--litera-space-6);
+    --litera-control-sm: calc(8 * var(--litera-space-1));
+    --litera-control-md: calc(9 * var(--litera-space-1));
+    --litera-target-touch: calc(11 * var(--litera-space-1));
+    --litera-radius-sm: var(--litera-space-1);
+    --litera-radius-md: var(--litera-space-2);
+    --litera-radius-lg: var(--litera-space-3);
+    --litera-radius-xl: var(--litera-space-4);
+    --litera-radius: var(--litera-radius-md);
     --litera-radius-full: 9999px;
+    --litera-hover: color-mix(in srgb, var(--litera-text) 7%, transparent);
+    --litera-scrim: color-mix(in srgb, var(--litera-ink) 55%, transparent);
 
     --litera-font-size: 16px;
     --litera-font-cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC";
@@ -117,12 +51,12 @@
     --litera-hairline: color-mix(in srgb, var(--litera-text) 9%, transparent);
     --litera-accent-soft: color-mix(in srgb, var(--litera-accent) 13%, transparent);
     --litera-accent-line: color-mix(in srgb, var(--litera-accent) 34%, transparent);
-    /* A 1px lit top edge: the cheapest convincing cue that a surface is raised. */
-    --litera-highlight: inset 0 1px 0 0 color-mix(in srgb, white 5%, transparent);
-    --litera-shadow-sm: 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 55%, transparent);
-    --litera-shadow-md: 0 8px 20px -6px color-mix(in srgb, var(--litera-ink) 70%, transparent), 0 2px 5px -2px color-mix(in srgb, var(--litera-ink) 60%, transparent);
-    --litera-shadow-lg: 0 28px 64px -16px color-mix(in srgb, var(--litera-ink) 88%, transparent), 0 10px 24px -10px color-mix(in srgb, var(--litera-ink) 75%, transparent);
-    --litera-shadow-glow: 0 0 0 1px var(--litera-accent-line), 0 6px 22px -6px color-mix(in srgb, var(--litera-accent) 40%, transparent);
+    --litera-shadow-sm: 0 1px 2px var(--litera-shadow-color);
+    --litera-shadow-md: 0 4px 12px -3px var(--litera-shadow-color);
+    --litera-shadow-lg: 0 12px 32px -8px var(--litera-shadow-color);
+  }
+  @media (max-width: 900px) {
+    :root { --litera-page-inset: var(--litera-space-4); }
   }
   html, body, #root { height: 100%; }
   html {
@@ -237,12 +171,6 @@
     }
   }
 
-  /* <select> dropdown items: browsers ignore parent CSS for the popup, so without
-     this rule every <option> renders white-on-white in the dark theme. The select
-     element itself picks up .litera-input; this fixes the rendered popup list. */
-  select {
-    color-scheme: dark;
-  }
   select option, select optgroup {
     background-color: var(--litera-paper);
     color: var(--litera-text);
@@ -287,83 +215,103 @@
 }
 
 @layer components {
+  .kubai-icon, .litera-spinner {
+    @apply inline-block h-6 w-6 shrink-0;
+  }
+
+  :where(.litera-btn, .litera-btn-primary) > :is(.kubai-icon, .litera-spinner) {
+    width: 1.1em;
+    height: 1.1em;
+  }
+  :where(.litera-icon-btn) > :is(.kubai-icon, .litera-spinner) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .litera-spinner {
+    @apply animate-spin rounded-full border-2 border-current border-r-transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .litera-spinner { animation: none; }
+  }
+
   /* ---- Surfaces ---------------------------------------------------- */
   .litera-panel {
     border: 1px solid var(--litera-border);
     border-radius: var(--litera-radius-lg);
-    background-color: var(--litera-surface-1);
-    box-shadow: var(--litera-highlight), var(--litera-shadow-sm);
+    background-color: var(--litera-paper);
+  }
+  .litera-theme-swatch {
+    display: flex;
+    align-items: flex-start;
+    gap: 3px;
+    height: 2rem;
+    padding: 7px 4px 0 6px;
+    border: 1px solid var(--litera-border-strong);
+    border-inline-start: 10px solid var(--litera-sidebar);
+    border-radius: var(--litera-radius-sm);
+    background: var(--litera-paper);
+  }
+  .litera-theme-swatch > span:first-child {
+    flex: 1;
+    height: 4px;
+    border-radius: 1px;
+    background: var(--litera-accent);
+  }
+  .litera-theme-swatch > span:last-child {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--litera-accent2);
   }
   .litera-overlay {
     border: 1px solid var(--litera-border-strong);
     border-radius: var(--litera-radius-lg);
-    background-color: var(--litera-surface-2);
-    box-shadow: var(--litera-highlight), var(--litera-shadow-lg);
+    background-color: var(--litera-panel);
+    box-shadow: var(--litera-shadow-md);
   }
   .litera-card {
     @apply litera-panel p-4;
-    transition: border-color 160ms var(--ease-out-quart),
-                background-color 160ms var(--ease-out-quart),
-                box-shadow 160ms var(--ease-out-quart);
+    transition: border-color 140ms var(--ease-out-quart), background-color 140ms var(--ease-out-quart);
   }
   .litera-card:hover {
-    border-color: color-mix(in srgb, var(--litera-accent) 30%, var(--litera-border-strong));
-    background-color: color-mix(in srgb, var(--litera-surface-2) 55%, var(--litera-surface-1));
-    box-shadow: var(--litera-highlight), var(--litera-shadow-md);
+    border-color: var(--litera-border-strong);
+    background-color: var(--litera-surface-2);
   }
 
-  /* ---- Buttons -----------------------------------------------------
-     Depth comes from box-shadow only: these classes are routinely combined
-     with `bg-*` utilities, which a background-image gradient would hide. */
+  /* Action recipes shared by buttons, links, and primitive triggers. */
   .litera-btn {
-    @apply inline-flex min-h-8 items-center justify-center gap-1.5 px-3 py-1 text-sm font-medium text-litera-text;
+    @apply inline-flex items-center justify-center text-sm font-medium text-litera-text;
+    min-height: var(--litera-control-sm);
+    gap: var(--litera-space-2);
+    padding: var(--litera-space-1) var(--litera-space-3);
     border: 1px solid var(--litera-border);
     border-radius: var(--litera-radius);
-    background-color: var(--litera-surface-2);
-    box-shadow: var(--litera-highlight), var(--litera-shadow-sm);
+    background-color: var(--litera-paper);
     cursor: pointer;
     user-select: none;
-    transition: background-color 140ms var(--ease-out-quart),
-                border-color 140ms var(--ease-out-quart),
-                color 140ms var(--ease-out-quart),
-                box-shadow 140ms var(--ease-out-quart),
-                transform 90ms var(--ease-out-quart);
+    transition: background-color 140ms var(--ease-out-quart), border-color 140ms var(--ease-out-quart);
   }
   .litera-btn:hover {
     border-color: var(--litera-border-strong);
-    background-color: var(--litera-surface-3);
-  }
-  .litera-btn:active {
-    transform: scale(0.98);
-    box-shadow: none;
+    background-color: var(--litera-surface-2);
   }
   .litera-btn-primary {
-    @apply inline-flex min-h-8 items-center justify-center gap-1.5 px-3 py-1 text-sm;
+    @apply inline-flex items-center justify-center text-sm font-semibold;
+    min-height: var(--litera-control-sm);
+    gap: var(--litera-space-2);
+    padding: var(--litera-space-1) var(--litera-space-3);
     border: 1px solid transparent;
     border-radius: var(--litera-radius);
     background-color: var(--litera-accent);
     color: var(--litera-accent-contrast);
-    font-weight: 620;
-    box-shadow: inset 0 1px 0 0 color-mix(in srgb, white 32%, transparent),
-                inset 0 -1px 0 0 color-mix(in srgb, var(--litera-accent-contrast) 22%, transparent),
-                0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
-                0 6px 16px -6px color-mix(in srgb, var(--litera-accent) 55%, transparent);
     cursor: pointer;
     user-select: none;
-    transition: background-color 140ms var(--ease-out-quart),
-                box-shadow 140ms var(--ease-out-quart),
-                transform 90ms var(--ease-out-quart);
+    transition: background-color 140ms var(--ease-out-quart);
   }
   .litera-btn-primary:hover {
     background-color: var(--litera-accent-strong);
-    box-shadow: inset 0 1px 0 0 color-mix(in srgb, white 38%, transparent),
-                inset 0 -1px 0 0 color-mix(in srgb, var(--litera-accent-contrast) 22%, transparent),
-                0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
-                0 8px 22px -6px color-mix(in srgb, var(--litera-accent) 70%, transparent);
-  }
-  .litera-btn-primary:active {
-    transform: scale(0.98);
-    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-accent-contrast) 30%, transparent);
   }
   .litera-btn:disabled,
   .litera-btn-primary:disabled,
@@ -374,20 +322,68 @@
     transform: none;
     box-shadow: none;
   }
+  .litera-btn-ghost {
+    @apply litera-btn;
+    border-color: transparent;
+    background-color: transparent;
+  }
+  .litera-btn-ghost:hover {
+    border-color: transparent;
+    background-color: var(--litera-hover);
+  }
+  .litera-btn[aria-pressed="true"] {
+    background-color: var(--litera-selected);
+    border-color: var(--litera-accent-line);
+    color: var(--litera-accent-strong);
+  }
+  .litera-control-md { min-height: var(--litera-control-md); }
+  .litera-icon-control-md { width: var(--litera-control-md); height: var(--litera-control-md); }
+
+  .litera-menu {
+    @apply litera-overlay;
+    z-index: var(--z-dropdown);
+    max-width: var(--radix-dropdown-menu-content-available-width);
+    max-height: var(--radix-dropdown-menu-content-available-height);
+    overflow-y: auto;
+    padding: var(--litera-space-1);
+  }
+  .litera-menu-item {
+    @apply flex cursor-default select-none items-center justify-between text-sm outline-none;
+    min-height: var(--litera-control-sm);
+    gap: var(--litera-space-2);
+    padding: var(--litera-space-1) var(--litera-space-2);
+    border-radius: calc(var(--litera-radius-lg) - var(--litera-space-1));
+  }
+  .litera-menu-item[data-highlighted] { background: var(--litera-hover); }
+  .litera-menu-item[data-state="checked"] { color: var(--litera-accent-strong); }
+
+  .litera-tooltip {
+    @apply litera-overlay text-xs;
+    z-index: var(--z-tooltip);
+    border-radius: var(--litera-radius-md);
+    padding: var(--litera-space-1) var(--litera-space-2);
+    max-width: min(18rem, calc(100vw - 24px));
+  }
   .litera-icon-btn {
-    @apply inline-flex h-8 w-8 items-center justify-center text-litera-mute;
+    @apply inline-flex shrink-0 items-center justify-center text-litera-mute;
+    width: var(--litera-control-sm);
+    height: var(--litera-control-sm);
     border-radius: var(--litera-radius);
     cursor: pointer;
-    transition: background-color 140ms var(--ease-out-quart),
-                color 140ms var(--ease-out-quart),
-                transform 90ms var(--ease-out-quart);
+    transition: color 140ms var(--ease-out-quart);
+  }
+  .litera-icon-btn,
+  :is(button[aria-label], .litera-btn):has(> .kubai-icon:only-child):not(.litera-btn-primary),
+  .reader-toolbar .litera-btn:has(> .kubai-icon) {
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .litera-icon-btn:not(:hover, :focus-visible, [aria-pressed="true"]) > .kubai-icon {
+    opacity: .8;
   }
   .litera-icon-btn:hover {
-    background-color: color-mix(in srgb, var(--litera-text) 8%, transparent);
     color: var(--litera-text);
-  }
-  .litera-icon-btn:active {
-    transform: scale(0.94);
   }
   .litera-icon-btn:disabled {
     cursor: not-allowed;
@@ -397,15 +393,13 @@
 
   /* ---- Fields ------------------------------------------------------ */
   .litera-input {
-    @apply min-h-8 px-3 py-1.5 text-sm text-litera-text placeholder:text-litera-subtle;
-    border: 1px solid var(--litera-border);
+    @apply text-sm text-litera-text placeholder:text-litera-subtle;
+    min-height: var(--litera-control-sm);
+    padding: var(--litera-space-1) var(--litera-space-3);
+    border: 1px solid var(--litera-border-strong);
     border-radius: var(--litera-radius);
-    /* A well: darker than whatever panel it sits in. */
-    background-color: color-mix(in srgb, var(--litera-ink) 45%, var(--litera-bg));
-    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent);
-    transition: border-color 140ms var(--ease-out-quart),
-                box-shadow 140ms var(--ease-out-quart),
-                background-color 140ms var(--ease-out-quart);
+    background-color: var(--litera-bg);
+    transition: border-color 140ms var(--ease-out-quart), box-shadow 140ms var(--ease-out-quart);
   }
   .litera-input:hover {
     border-color: var(--litera-border-strong);
@@ -415,16 +409,15 @@
     opacity: 0.5;
   }
   .litera-input:focus {
-    outline: none;
+    outline: 2px solid var(--litera-focus);
+    outline-offset: 2px;
     border-color: var(--litera-focus);
-    box-shadow: inset 0 1px 2px 0 color-mix(in srgb, var(--litera-ink) 60%, transparent),
-                0 0 0 3px color-mix(in srgb, var(--litera-focus) 22%, transparent);
   }
   .litera-btn:focus-visible,
   .litera-btn-primary:focus-visible,
   .litera-icon-btn:focus-visible {
     outline: 2px solid var(--litera-focus);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 
   /* ---- Labels and pills -------------------------------------------- */
@@ -442,8 +435,8 @@
   .litera-badge-success,
   .litera-badge-warn {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
-    --badge: var(--litera-accent);
-    background: color-mix(in srgb, var(--badge) 13%, transparent);
+    --badge: var(--litera-mute);
+    background: color-mix(in srgb, var(--badge) 8%, transparent);
     color: var(--badge);
     border: 1px solid color-mix(in srgb, var(--badge) 26%, transparent);
   }
@@ -452,71 +445,108 @@
 
   /* ---- Page chrome -------------------------------------------------- */
   .litera-page-header {
-    @apply relative flex min-h-[68px] items-center justify-between gap-4 px-6 py-3;
+    @apply relative flex min-h-16 shrink-0 items-center justify-between max-[540px]:flex-wrap;
+    gap: var(--litera-space-3);
+    padding: var(--litera-space-3) var(--litera-page-inset);
     border-bottom: 1px solid var(--litera-border);
-    background-color: var(--litera-bg);
-    /* A breath of the accent in the top-left corner; opaque so sticky
-       headers still cover whatever scrolls beneath them. */
-    background-image: radial-gradient(120% 220% at 0% 0%, color-mix(in srgb, var(--litera-accent) 9%, transparent) 0%, transparent 58%);
+    background-color: var(--litera-paper);
   }
   .litera-page-title {
-    @apply flex min-w-0 items-center gap-3 text-litera-text;
+    @apply flex min-w-0 text-litera-text;
     font-size: 1.3125rem;
     font-weight: 640;
     line-height: 1.25;
     letter-spacing: -0.012em;
   }
-  /* Whatever icon a page passes becomes a tinted tile. */
   .litera-page-title-icon {
-    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center text-litera-accent;
-    border-radius: 10px;
-    background: linear-gradient(145deg, color-mix(in srgb, var(--litera-accent) 22%, transparent), color-mix(in srgb, var(--litera-accent) 7%, transparent));
-    box-shadow: inset 0 0 0 1px var(--litera-accent-line), var(--litera-highlight);
+    @apply relative inline-flex h-8 w-8 shrink-0 items-center justify-center;
+    isolation: isolate;
+    color: var(--litera-mute);
   }
-  .litera-page-title-icon > svg {
-    width: 1.125rem;
-    height: 1.125rem;
+  .litera-page-title-icon::before,
+  .litera-page-title-icon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--litera-border);
+    border-radius: var(--litera-radius-sm);
+    pointer-events: none;
+  }
+  .litera-page-title-icon::before {
+    z-index: -2;
+    background: var(--litera-selected);
+    transform: translate(-2px, 1px) rotate(-9deg);
+  }
+  .litera-page-title-icon::after {
+    z-index: -1;
+    background: var(--litera-paper);
+  }
+  .litera-page-title-icon > .kubai-icon {
+    width: 1.75rem;
+    height: 1.75rem;
   }
   .litera-toolbar {
-    @apply flex min-h-12 flex-wrap items-center gap-2 px-6 py-2;
+    @apply flex min-h-12 shrink-0 flex-wrap items-center;
+    gap: var(--litera-space-2);
+    padding: var(--litera-space-2) var(--litera-page-inset);
     border-bottom: 1px solid var(--litera-border);
     background-color: var(--litera-bg);
   }
 
-  /* Segmented tabs: quiet until selected. */
+  /* Segmented list and raised selection, adapted to the LitFolio palette. */
+  .litera-tab-list {
+    @apply inline-flex items-center border border-litera-border bg-litera-bg;
+    --litera-inset: var(--litera-space-1);
+    border-radius: var(--litera-radius-lg);
+    padding: var(--litera-inset);
+    gap: var(--litera-inset);
+  }
+  .litera-settings-nav {
+    background-color: var(--litera-subnav);
+  }
+  .litera-settings-nav .litera-tab-list {
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .litera-settings-nav .litera-tab[data-state="active"] {
+    font-weight: 650;
+  }
   .litera-tab {
-    @apply relative inline-flex min-h-8 items-center gap-1.5 px-3 py-1 text-sm font-medium text-litera-mute;
+    @apply relative inline-flex min-h-8 items-center justify-center gap-2 whitespace-nowrap px-3 py-1 text-sm font-medium text-litera-mute;
     border: 1px solid transparent;
-    border-radius: var(--litera-radius);
+    border-radius: calc(var(--litera-radius-lg) - var(--litera-inset, var(--litera-space-1)));
     cursor: pointer;
     transition: background-color 140ms var(--ease-out-quart),
                 color 140ms var(--ease-out-quart),
                 border-color 140ms var(--ease-out-quart);
   }
-  .litera-tab:hover {
+  .litera-tab:enabled:hover {
     background-color: color-mix(in srgb, var(--litera-text) 6%, transparent);
     color: var(--litera-text);
   }
-  .litera-tab[aria-selected="true"],
-  .litera-tab[aria-pressed="true"],
-  .litera-tab[data-active="true"] {
-    border-color: var(--litera-accent-line);
-    background-color: var(--litera-accent-soft);
+  .litera-tab[data-state="active"],
+  .litera-tab[aria-pressed="true"] {
+    background-color: var(--litera-selected);
     color: var(--litera-accent-strong);
-    box-shadow: var(--litera-highlight);
   }
   .litera-tab:focus-visible {
     outline: 2px solid var(--litera-focus);
-    outline-offset: 2px;
+    outline-offset: -2px;
+  }
+  .litera-tab:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .litera-tab-panel:focus-visible {
+    outline: 2px solid var(--litera-focus);
+    outline-offset: -2px;
   }
 
   /* ---- App navigation ----------------------------------------------- */
   .litera-sidebar {
     border-right: 1px solid var(--litera-border);
-    background-color: var(--litera-paper);
-    background-image:
-      radial-gradient(140% 42% at 0% 0%, color-mix(in srgb, var(--litera-accent) 13%, transparent) 0%, transparent 70%),
-      linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--litera-ink) 45%, transparent) 100%);
+    background-color: var(--litera-sidebar);
   }
   .litera-wordmark {
     font-family: var(--litera-font-serif);
@@ -527,41 +557,45 @@
     color: var(--litera-text);
   }
   .litera-nav-item {
-    @apply relative flex min-h-[34px] items-center gap-2.5 px-2.5 text-sm text-litera-mute;
+    @apply relative flex min-h-9 items-center gap-2 px-2 text-sm text-litera-mute;
     border-radius: var(--litera-radius);
     transition: background-color 140ms var(--ease-out-quart), color 140ms var(--ease-out-quart);
-  }
-  .litera-nav-item > svg {
-    color: var(--litera-text-subtle);
-    transition: color 140ms var(--ease-out-quart);
   }
   .litera-nav-item:hover {
     background-color: color-mix(in srgb, var(--litera-text) 6%, transparent);
     color: var(--litera-text);
   }
-  .litera-nav-item:hover > svg {
-    color: var(--litera-text);
-  }
   .litera-nav-item[aria-current="page"] {
-    background-color: var(--litera-accent-soft);
-    color: var(--litera-text);
+    background-color: var(--litera-selected);
+    color: var(--litera-accent-strong);
     font-weight: 600;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--litera-accent) 20%, transparent);
   }
-  .litera-nav-item[aria-current="page"] > svg {
-    color: var(--litera-accent);
-  }
-  /* The marker sits in the gutter, outside the pill. */
   .litera-nav-item[aria-current="page"]::before {
     content: "";
     position: absolute;
-    left: -12px;
-    top: 7px;
-    bottom: 7px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: var(--litera-accent);
-    box-shadow: 0 0 12px 0 color-mix(in srgb, var(--litera-accent) 70%, transparent);
+    inset-block-start: 0;
+    inset-inline-end: var(--litera-space-2);
+    width: var(--litera-space-2);
+    height: var(--litera-space-3);
+    background: var(--litera-accent-strong);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+    pointer-events: none;
+  }
+  @media (forced-colors: active) {
+    .litera-nav-item[aria-current="page"]::before {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .litera-nav-item[aria-current="page"]::before {
+      transform-origin: top;
+      animation: litera-bookmark-in 180ms var(--ease-out-quart) both;
+    }
+  }
+  @keyframes litera-bookmark-in {
+    from { transform: scaleY(.35); }
+    to { transform: scaleY(1); }
   }
   .litera-nav-item:focus-visible {
     outline: 2px solid var(--litera-focus);
@@ -578,10 +612,9 @@
 
   /* ---- Empty states ------------------------------------------------- */
   .litera-empty-icon {
-    @apply inline-flex h-14 w-14 items-center justify-center text-litera-accent;
-    border-radius: 16px;
-    background: linear-gradient(145deg, color-mix(in srgb, var(--litera-accent) 20%, transparent), color-mix(in srgb, var(--litera-accent) 4%, transparent));
-    box-shadow: inset 0 0 0 1px var(--litera-accent-line), var(--litera-highlight), 0 14px 34px -14px color-mix(in srgb, var(--litera-accent) 60%, transparent);
+    @apply inline-flex h-12 w-12 items-center justify-center text-litera-accent;
+    border-radius: var(--litera-radius-lg);
+    background: var(--litera-selected);
   }
 
   /* ---- Motion ------------------------------------------------------- */
@@ -617,8 +650,10 @@
     background-size: 200% 100%;
     animation: litera-shimmer 1.8s ease-in-out infinite;
   }
-  .litera-stagger > * {
-    animation: litera-stagger-in 260ms var(--ease-out-expo) both;
+  @media (prefers-reduced-motion: no-preference) {
+    .litera-stagger > *, .litera-feed-sources > * {
+      animation: litera-stagger-in 260ms var(--ease-out-expo) both;
+    }
   }
   .litera-stagger > *:nth-child(1) { animation-delay: 0ms; }
   .litera-stagger > *:nth-child(2) { animation-delay: 35ms; }
@@ -642,9 +677,32 @@
     animation: litera-fade-in 180ms var(--ease-out-quart) both;
   }
 
-  /* Page content: subtle fade+slide on route change */
   .litera-page-enter {
-    animation: litera-fade-in 180ms var(--ease-out-quart) both,
-               litera-slide-up 220ms var(--ease-out-expo) both;
+    animation: litera-fade-in 200ms var(--ease-out-quart) backwards;
   }
+  @media (prefers-reduced-motion: reduce) {
+    .litera-page-enter { animation: none; }
+  }
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .litera-sidebar :is(nav a, a.litera-btn-primary, button),
+  .litera-import :is(button, summary),
+  .litera-settings-nav [role="tab"],
+  .litera-frame-status :is(summary, button) {
+    min-width: var(--litera-target-touch);
+    min-height: var(--litera-target-touch);
+  }
+  .litera-import summary, .litera-frame-status summary {
+    align-content: center;
+  }
+  .litera-reader-nav-trigger {
+    position: static;
+    width: var(--litera-target-touch);
+    height: var(--litera-target-touch);
+    flex-shrink: 0;
+    color: var(--litera-text);
+  }
+  .litera-reader-nav-trigger > span { display: none; }
+  .litera-reader-nav-trigger > .kubai-icon { display: inline-block; }
 }

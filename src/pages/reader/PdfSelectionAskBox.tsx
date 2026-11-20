@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Send, X } from "lucide-react";
+import { Spinner, Send, X } from "@/components/icons";
 import { useState } from "react";
 import { MarkdownView } from "@/components/MarkdownView";
 import { api, type ReaderAskResult } from "@/lib/api";
@@ -64,7 +64,7 @@ export function PdfSelectionAskBox({ paperId, selection, onClose }: PdfSelection
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-litera-mute">{t("reader.askSelectionHint")}</span>
           <button type="button" className="litera-btn-primary text-xs" disabled={ask.isPending} onClick={submit}>
-            {ask.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            {ask.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             {t("reader.askSelectionSend")}
           </button>
         </div>

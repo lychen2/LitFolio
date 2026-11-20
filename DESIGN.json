@@ -4,83 +4,77 @@
   "title": "Design System: LitFolio",
   "extensions": {
     "colorMeta": {
-      "deep-ink": {
+      "violet-ground": {
         "role": "neutral",
-        "displayName": "Deep Ink",
-        "canonical": "oklch(8% 0.008 280)",
-        "tonalRamp": ["#0a0a0f", "#141419", "#1e1e26", "#282833", "#3a3a47", "#52525e", "#6b6b78", "#8a8a96"]
+        "displayName": "Violet / reading surfaces",
+        "canonical": "#252429",
+        "tonalRamp": ["#FBFAF7", "#EAE6EC", "#D4CED9", "#BBB4C3", "#ACA5B4", "#857D8E", "#584F61", "#51495A", "#413C46", "#252429"]
       },
-      "warm-paper": {
+      "paper-ground": {
         "role": "neutral",
-        "displayName": "Warm Paper",
-        "canonical": "oklch(12% 0.008 280)",
-        "tonalRamp": ["#0e0e14", "#121218", "#1a1a22", "#24242e", "#30303c", "#464652", "#5e5e6a", "#7a7a86"]
+        "displayName": "Graphite paper / reading surfaces",
+        "canonical": "#252521",
+        "tonalRamp": ["#FCF8EB", "#EBE5D6", "#D7CDB9", "#C4B9A5", "#B4AA95", "#8C8171", "#584F43", "#534C40", "#413C34", "#252521"]
       },
-      "elevated-panel": {
+      "blueprint-ground": {
         "role": "neutral",
-        "displayName": "Elevated Panel",
-        "canonical": "oklch(15% 0.008 280)",
-        "tonalRamp": ["#101016", "#16161e", "#1a1a23", "#24242f", "#30303d", "#484856", "#606070", "#7c7c8c"]
+        "displayName": "Cold blueprint / reading surfaces",
+        "canonical": "#1B252C",
+        "tonalRamp": ["#F7F9F8", "#E4ECEF", "#C6D6DF", "#B4C6D0", "#A3B6C3", "#7F95A4", "#465F70", "#3E5262", "#314450", "#1B252C"]
       },
-      "quiet-line": {
-        "role": "neutral",
-        "displayName": "Quiet Line",
-        "canonical": "oklch(20% 0.008 280)",
-        "tonalRamp": ["#16161e", "#1e1e27", "#26262f", "#32323d", "#40404d", "#585866", "#70707e", "#8e8e9c"]
-      },
-      "muted-ink": {
-        "role": "neutral",
-        "displayName": "Muted Ink",
-        "canonical": "oklch(46% 0.008 280)",
-        "tonalRamp": ["#2a2a34", "#3a3a46", "#4a4a58", "#5a5a68", "#6b6b78", "#80808e", "#9696a4", "#b0b0bc"]
-      },
-      "primary-text": {
-        "role": "neutral",
-        "displayName": "Primary Text",
-        "canonical": "oklch(93% 0.008 280)",
-        "tonalRamp": ["#5a5a66", "#7a7a86", "#9a9aa6", "#b8b8c4", "#d0d0dc", "#e8e8ee", "#f0f0f4", "#f6f6f8"]
-      },
-      "violet-mist": {
+      "violet-ink": {
         "role": "primary",
-        "displayName": "Violet Mist",
-        "canonical": "oklch(68% 0.18 290)",
-        "tonalRamp": ["#2d1f5e", "#4a3580", "#6b52a8", "#8b6fd0", "#a78bfa", "#bca4fb", "#d0bffd", "#e5dbfe"]
+        "displayName": "Muted violet",
+        "canonical": "#BDA4D3",
+        "tonalRamp": ["#F5F1F9", "#E7DEEF", "#D5C4E4", "#BDA4D3", "#AB8DBF", "#9273A9", "#7B5D95", "#694D80", "#513761", "#392B46"]
       },
-      "arctic-blue": {
+      "graphite-ink": {
+        "role": "primary",
+        "displayName": "Graphite",
+        "canonical": "#C7BEA3",
+        "tonalRamp": ["#F4F2E8", "#E5E1D1", "#D4CCB6", "#C7BEA3", "#A89E87", "#8B826F", "#686454", "#534F42", "#403D33", "#2F3029"]
+      },
+      "steel-ink": {
+        "role": "primary",
+        "displayName": "Steel blue / information",
+        "canonical": "#A4C6DE",
+        "tonalRamp": ["#EFF5F9", "#DCE9F2", "#C3D8E7", "#A4C6DE", "#7EA8C6", "#608CAC", "#497491", "#355F7C", "#2C4C66", "#223A4F"]
+      },
+      "jade-mark": {
         "role": "secondary",
-        "displayName": "Arctic Blue",
-        "canonical": "oklch(82% 0.10 230)",
-        "tonalRamp": ["#1a3a50", "#2a5570", "#3d7494", "#5494b8", "#7dd3fc", "#96dcfd", "#b2e6fe", "#d0f0ff"]
+        "displayName": "Jade annotation",
+        "canonical": "#95C8B4",
+        "tonalRamp": ["#EDF7F2", "#D6EBE1", "#B6DACC", "#95C8B4", "#72A993", "#538B79", "#37745F", "#2D6554", "#284B40", "#1F362F"]
       },
-      "signal-amber": {
+      "amber-mark": {
+        "role": "secondary",
+        "displayName": "Amber annotation",
+        "canonical": "#DFBC7C",
+        "tonalRamp": ["#FAF2DD", "#F4E2B2", "#E8CD90", "#DFBC7C", "#C39C57", "#A38241", "#8D6A2E", "#75551F", "#544226", "#3E3220"]
+      },
+      "cyan-mark": {
+        "role": "secondary",
+        "displayName": "Cyan data",
+        "canonical": "#8AC5C2",
+        "tonalRamp": ["#E8F5F4", "#CFE9E7", "#ABD8D4", "#8AC5C2", "#65A7A4", "#4D8A8B", "#377375", "#276366", "#24494D", "#19373B"]
+      },
+      "sage": {
         "role": "tertiary",
-        "displayName": "Signal Amber",
-        "canonical": "oklch(80% 0.16 85)",
-        "tonalRamp": ["#4a3000", "#6b4a00", "#8c6600", "#b08500", "#fbbf24", "#fcce54", "#fddd84", "#feeeb4"]
+        "displayName": "Success",
+        "canonical": "#B1C8AA",
+        "tonalRamp": ["#EFF4EE", "#DFE8DB", "#C6D5BF", "#B1C8AA", "#89A382", "#70896B", "#586F54", "#415B40", "#354934", "#293A2A"]
       },
-      "signal-emerald": {
+      "ochre": {
         "role": "tertiary",
-        "displayName": "Signal Emerald",
-        "canonical": "oklch(76% 0.17 160)",
-        "tonalRamp": ["#003a28", "#005a3e", "#007c56", "#1aa070", "#34d399", "#5ce0ad", "#88ecc2", "#b8f5da"]
+        "displayName": "Warning",
+        "canonical": "#DCB791",
+        "tonalRamp": ["#F7EFE7", "#EEDCCA", "#DDC0A0", "#DCB791", "#B58B63", "#96714F", "#805C3F", "#6C4C34", "#573E2C", "#413024"]
       },
-      "signal-red": {
+      "brick": {
         "role": "tertiary",
-        "displayName": "Signal Red",
-        "canonical": "oklch(65% 0.22 25)",
-        "tonalRamp": ["#4a0000", "#6e0000", "#940000", "#bc1010", "#f87171", "#f99090", "#fbb0b0", "#fdd0d0"]
-      },
-      "plum-glow": {
-        "role": "neutral",
-        "displayName": "Plum Glow",
-        "canonical": "oklch(14% 0.02 300)",
-        "tonalRamp": ["#0e0a14", "#14101c", "#1b1623", "#252030", "#322c40", "#4a4258", "#625a72", "#7e7690"]
-      },
-      "pdf-dark-bg": {
-        "role": "neutral",
-        "displayName": "PDF Dark Background",
-        "canonical": "oklch(12% 0.01 290)",
-        "tonalRamp": ["#0c0a12", "#110f18", "#15131d", "#1f1d28", "#2b2936", "#433f50", "#5b5768", "#777386"]
+        "displayName": "Error",
+        "canonical": "#DAB6B1",
+        "tonalRamp": ["#F7EEEE", "#EDDCDA", "#DCC1BC", "#DAB6B1", "#B98882", "#9F6F69", "#885853", "#704440", "#5E3D3A", "#442E2D"]
       }
     },
     "typographyMeta": {
@@ -140,57 +134,57 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The single primary action per view. Violet background, near-black text.",
-      "html": "<button class=\"ds-btn-primary\">Import Paper</button>",
-      "css": ".ds-btn-primary { background: #a78bfa; color: #0a0a0f; padding: 6px 12px; border-radius: 6px; border: 1px solid #a78bfa; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; cursor: pointer; transition: background-color 150ms, border-color 150ms; } .ds-btn-primary:hover { background: #b497fd; border-color: #b497fd; } .ds-btn-primary:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.4); outline-offset: 2px; }"
+      "description": "Use Button with variant=primary for the main action in a visible task group.",
+      "html": "<button type=\"button\" class=\"litera-btn-primary\">Import paper</button>",
+      "css": ".litera-btn-primary { min-height: var(--litera-control-sm); padding: var(--litera-space-1) var(--litera-space-3); border-radius: var(--litera-radius-md); background-color: var(--litera-accent); color: var(--litera-accent-contrast); }"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Workhorse button for secondary actions. Warm paper with quiet line border.",
-      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
-      "css": ".ds-btn-secondary { background: #121218; color: #e8e8ee; padding: 6px 12px; border-radius: 6px; border: 1px solid #26262f; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; cursor: pointer; transition: background-color 150ms; } .ds-btn-secondary:hover { background: #1a1a23; } .ds-btn-secondary:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.4); outline-offset: 2px; }"
+      "description": "Use the default Button for a secondary action and ghost for a low-emphasis toolbar action.",
+      "html": "<button type=\"button\" class=\"litera-btn\">Cancel</button>",
+      "css": ".litera-btn { min-height: var(--litera-control-sm); padding: var(--litera-space-1) var(--litera-space-3); border: 1px solid var(--litera-border); border-radius: var(--litera-radius-md); background-color: var(--litera-paper); color: var(--litera-text); }"
     },
     {
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input-field",
-      "description": "Standard text input. Warm paper background, focus ring in violet.",
-      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search papers...\" />",
-      "css": ".ds-input { background: #121218; color: #e8e8ee; padding: 6px 10px; border-radius: 6px; border: 1px solid #26262f; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; outline: none; transition: box-shadow 150ms; } .ds-input::placeholder { color: #6b6b78; } .ds-input:focus { box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.4); }"
+      "description": "Use Input with a visible label. A placeholder can show an example value.",
+      "html": "<label for=\"ds-doi\">DOI</label><input id=\"ds-doi\" class=\"litera-input\" placeholder=\"10.1234/example\" />",
+      "css": ".litera-input { border: 1px solid var(--litera-border); border-radius: var(--litera-radius-md); background-color: var(--litera-bg); color: var(--litera-text); padding: var(--litera-space-1) var(--litera-space-3); }"
     },
     {
       "name": "Card Panel",
       "kind": "card",
       "refersTo": "card-panel",
-      "description": "Elevated surface with glassmorphism. Used for workflow cards, profile cards, content containers.",
-      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Quick Read</h3><p class=\"ds-card-body\">Summarize the key findings of this paper.</p></div>",
-      "css": ".ds-card { background: rgba(26, 26, 35, 0.8); backdrop-filter: blur(12px); border: 1px solid #26262f; border-radius: 10px; padding: 16px 20px; } .ds-card-title { font-family: Lora, ui-serif, Georgia, serif; font-size: 18px; font-weight: 400; line-height: 1.3; color: #e8e8ee; margin: 0 0 8px 0; } .ds-card-body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: #e8e8ee; margin: 0; opacity: 0.85; }"
+      "description": "Group related fields and their associated action. Use a flat list for repeated records.",
+      "html": "<section class=\"litera-panel p-4\"><h2>Export location</h2><p>Library folder</p></section>",
+      "css": ".litera-panel { border: 1px solid var(--litera-border); border-radius: var(--litera-radius-lg); background-color: var(--litera-surface-1); } .p-4 { padding: var(--litera-space-4); }"
     },
     {
       "name": "Navigation Item",
       "kind": "nav",
       "refersTo": "nav-item",
-      "description": "Sidebar navigation link. Active state uses violet tint background.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\">Library</a><a class=\"ds-nav-item\" href=\"#\">Ask</a></nav>",
-      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; } .ds-nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: rgba(232, 232, 238, 0.8); text-decoration: none; transition: background-color 150ms, color 150ms; } .ds-nav-item:hover { background: #1a1a23; color: #e8e8ee; } .ds-nav-item-active { background: rgba(167, 139, 250, 0.09); color: #a78bfa; } .ds-nav-item-active:hover { background: rgba(167, 139, 250, 0.14); color: #a78bfa; }"
+      "description": "Use links between routes and aria-current for the current page.",
+      "html": "<nav aria-label=\"Main\"><a class=\"litera-nav-item\" href=\"/library\" aria-current=\"page\">Library</a><a class=\"litera-nav-item\" href=\"/import\">Import</a></nav>",
+      "css": ".litera-nav-item { display: flex; align-items: center; min-height: var(--litera-control-md); padding-inline: var(--litera-space-2); border-radius: var(--litera-radius-md); color: var(--litera-mute); } .litera-nav-item[aria-current=page] { background-color: var(--litera-selected); color: var(--litera-text); }"
     },
     {
       "name": "Section Label",
       "kind": "custom",
       "refersTo": "label",
-      "description": "Uppercase field/section label with wide tracking. The hierarchy signal for metadata.",
-      "html": "<span class=\"ds-label\">Reading Status</span>",
-      "css": ".ds-label { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 11px; line-height: 1.45; letter-spacing: 0.05em; text-transform: uppercase; color: #6b6b78; }"
+      "description": "Use for secondary group headings. Associate each form control with its own label.",
+      "html": "<h2 class=\"litera-section-label\">Reading status</h2>",
+      "css": ".litera-section-label { color: var(--litera-text-subtle); font-size: 11px; font-weight: 600; }"
     },
     {
       "name": "Page Header",
       "kind": "custom",
       "refersTo": "card-panel",
-      "description": "Standard page header with serif heading and muted subtitle. One per page.",
-      "html": "<header class=\"ds-page-header\"><h1 class=\"ds-page-heading\">Library</h1><p class=\"ds-page-subtitle\">42 papers imported</p></header>",
-      "css": ".ds-page-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid #26262f; } .ds-page-heading { font-family: Lora, ui-serif, Georgia, serif; font-size: 24px; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; color: #e8e8ee; margin: 0; } .ds-page-subtitle { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: #6b6b78; margin: 0; }"
+      "description": "Use PageHeader for the title and page-wide actions. Put list filters and sorting in PageToolbar.",
+      "html": "<header class=\"litera-page-header\"><h1 class=\"litera-page-title\">Library</h1></header>",
+      "css": ".litera-page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--litera-space-3); padding: var(--litera-space-3) var(--litera-page-inset); border-bottom: 1px solid var(--litera-border); } .litera-page-title { color: var(--litera-text); font-size: 1.3125rem; font-weight: 640; line-height: 1.25; }"
     },
     {
       "name": "Search Term Chip",
@@ -198,85 +192,60 @@
       "refersTo": "card-panel",
       "description": "Monospace chip for search terms and keywords. Distinct from metadata chips by typeface.",
       "html": "<span class=\"ds-chip-term\">transformer attention</span>",
-      "css": ".ds-chip-term { font-family: JetBrains Mono, ui-monospace, monospace; font-size: 12px; line-height: 1.5; color: #e8e8ee; padding: 2px 8px; border-radius: 6px; border: 1px solid #26262f; background: rgba(38, 38, 47, 0.2); }"
+      "css": ".ds-chip-term { font-family: var(--litera-font-mono); font-size: 12px; color: var(--litera-text); padding: var(--litera-space-1) var(--litera-space-2); border-radius: var(--litera-radius-sm); border: 1px solid var(--litera-border); background-color: var(--litera-hover); }"
     }
   ],
   "narrative": {
     "northStar": "The Research Desk",
-    "overview": "A well-lit surface in a dim room. Papers spread flat, annotations visible, tools within reach. LitFolio's interface is a reading desk, not a dashboard: the content (papers, highlights, evidence) occupies the foreground, and the chrome recedes into near-darkness. Density is deliberate; every pixel serves the researcher's flow of import, read, ask, and retain.\n\nThis system rejects the patterns PRODUCT.md names explicitly: generic chatbot shells where output disappears into scrolling transcripts, dashboard-heavy SaaS styling that prioritizes decoration over reading, and magic-looking AI flows that hide source provenance. It also rejects the visual cliches of its category: no neon-on-black 'AI tool' aesthetic, no white-space-heavy 'productivity app' template. The reference benchmark is Linear: dense, keyboard-driven, minimal chrome, information-first with precise spacing.\n\nGlassmorphism is used deliberately on elevated surfaces (drawers, overlays, floating panels) to maintain the layered desk metaphor. Main content surfaces use tonal depth (paper, panel, ink) rather than blur.",
+    "overview": "LitFolio is a research desk for finding, organizing and reading papers. src/styles/palette.css defines the three palettes and their day and night roles. CoreFrame passes the active colors to the library and reader.",
     "keyCharacteristics": [
-      "Content-forward: the reading surface dominates; navigation and controls are narrow and quiet",
-      "Tonal depth through three background layers (ink, paper, panel), not through shadows",
-      "Violet accent used sparingly for state and emphasis, never for decoration",
-      "Functional transitions only; no entrance choreography or decorative motion",
-      "Dense typography with strong serif/sans contrast for hierarchy"
+      "Keep papers, metadata and notes visually ahead of navigation and controls.",
+      "Use the current theme's semantic surfaces, text, accent and status colors.",
+      "Use a 4 px space scale and derive nested corners from the parent inset.",
+      "Keep titles, field labels, errors and the actions needed to proceed visible."
     ],
     "rules": [
       {
-        "name": "The Rarity Rule",
-        "body": "The violet accent is the only color that signals interactivity. Its rarity is the point. If every other element is violet, the system has failed.",
+        "name": "Color roles",
+        "body": "Use --litera-sidebar for app navigation, --litera-subnav for section navigation, --litera-bg for the workspace and --litera-paper for reading surfaces. Pair --litera-accent with --litera-accent-contrast for the main action and --litera-annotation-bg with --litera-annotation-ink for highlights. Use the selected surface and a shape cue for the current item.",
         "section": "colors"
       },
       {
-        "name": "The Tinted Neutral Rule",
-        "body": "No pure black (#000) or pure white (#fff) anywhere. Every neutral leans toward the plum undertone of the body gradient.",
-        "section": "colors"
-      },
-      {
-        "name": "The Serif Anchor Rule",
-        "body": "Every page has exactly one serif heading at text-2xl in the header. If a view has no serif heading, it has no visual anchor; add one.",
-        "section": "typography"
-      },
-      {
-        "name": "The Label Case Rule",
-        "body": "Section labels and field labels are always uppercase with 0.05em tracking. Never sentence case, never bold. The transform itself is the hierarchy signal.",
-        "section": "typography"
-      },
-      {
-        "name": "The Three-Layer Rule",
-        "body": "Every surface maps to ink, paper, or panel. If you need a fourth depth, you're over-nesting. Flatten.",
-        "section": "elevation"
-      },
-      {
-        "name": "The Blur Boundary Rule",
-        "body": "Backdrop blur belongs to overlays and floating surfaces only. Main content never uses blur.",
-        "section": "elevation"
-      },
-      {
-        "name": "The One Accent Button Rule",
-        "body": "Each view has at most one Primary button visible at a time. If two primary actions compete, one must be downgraded to Secondary.",
+        "name": "Spacing and corners",
+        "body": "Use 4 px for tight repeats, 8 px between related controls, 12 px between subgroups, 16 px inside panels and 24 px between page regions. Use equal padding on all sides where children share one boundary. For concentric corners subtract the inset from the outer radius. A 12 px tab list radius with a 4 px inset yields an 8 px tab radius.",
         "section": "components"
       },
       {
-        "name": "The Dense Row Rule",
-        "body": "List rows use px-6 py-3.5 padding. They are tighter than cards because they are content, not containers.",
+        "name": "Touch targets",
+        "body": "On narrow screens or with a coarse pointer, give navigation items, action buttons and disclosures independent hit areas of at least 44 by 44 CSS pixels using --litera-target-touch. Keep icons at their normal size and allow labels to wrap.",
+        "section": "components"
+      },
+      {
+        "name": "Interaction semantics",
+        "body": "Use Radix Tabs for sections, Dropdown Menu radio items for immediate sorting, Select for a form value and Radio Group for visible mutually exclusive options. Use DetailDrawer for a focused inspection task that needs explicit dismissal and focus restoration.",
+        "section": "components"
+      },
+      {
+        "name": "Help and feedback",
+        "body": "Keep labels, values, constraints and destructive consequences visible. Use a tooltip for a short control hint, a disclosure for optional instructions and an alert for a condition requiring attention.",
         "section": "components"
       }
     ],
     "dos": [
-      "Use the three-layer tonal system (ink, paper, panel) for all depth decisions",
-      "Keep the violet accent to interactive elements and active states only",
-      "Use serif (Lora) for exactly one heading per page view, at text-2xl with tight tracking",
-      "Use text-[11px] uppercase tracking-wider for all section labels and field labels",
-      "Use backdrop blur on overlays and floating surfaces only",
-      "Use transition-colors duration-150 on all interactive state changes",
-      "Use Muted Ink (#6b6b78) for all secondary text, metadata, and timestamps",
-      "Use Signal Amber for dirty/unsaved state and Signal Emerald for saved state"
+      "Emphasize Import in the DOI form. Use secondary or ghost buttons for accompanying actions.",
+      "Use menu radio items for RSS sorting. The menu exposes the selected option and supports arrow keys, Enter and Escape.",
+      "Give a compact action such as Refresh an accessible name and a tooltip.",
+      "Use DetailDrawer for article details so the user can return to the same article list.",
+      "Give an empty state an action when the user can add content or clear a filter.",
+      "Keep model setting labels visible and put API compatibility help in a disclosure."
     ],
     "donts": [
-      "Use generic chatbot shells where output disappears into a scrolling transcript",
-      "Use dashboard-heavy SaaS styling that prioritizes decoration over reading and evidence",
-      "Use magic-looking AI flows that hide source provenance or silently degrade on failure",
-      "Use pure black (#000) or pure white (#fff)",
-      "Use gradient text (background-clip: text)",
-      "Use side-stripe borders (colored border-left > 1px) on cards, list items, or callouts",
-      "Use identical card grids with icon + heading + text repeated endlessly",
-      "Use modals as the first solution",
-      "Animate layout properties",
-      "Use bounce or elastic easing curves",
-      "Apply backdrop blur to main content areas",
-      "Use more than one Primary button per visible view",
-      "Use the violet accent for decoration, backgrounds, or large surfaces"
+      "Give every action, tab or repeated row its own filled accent surface.",
+      "Implement sorting as a group of pressed buttons with custom keyboard logic.",
+      "Use tooltip text as the only accessible name or hide blocking errors in a tooltip.",
+      "Present a short list as a stack of elevated cards or reserve blank rows for absent metadata.",
+      "Set a local hex color, 10 px gutter or 6 px radius where a shared token applies.",
+      "Repeat a title, field label or visible action in a permanent explanatory paragraph."
     ]
   }
 }

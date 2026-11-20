@@ -77,6 +77,18 @@ impl<'a> PaperRepo<'a> {
         row.map(row_to_paper).transpose()
     }
 
+    pub(crate) async fn get_literature_seed(&self, id: &str) -> Result<Option<(Paper, Option<String>)>> {
+        let row = sqlx::query("SELECT * FROM papers WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await?;
+        row.map(|row| {
+            let original_title = row.try_get("original_title")?;
+            Ok((row_to_paper(row)?, original_title))
+        })
+        .transpose()
+    }
+
     pub async fn find_by_arxiv_id(&self, arxiv_id: &str) -> Result<Option<Paper>> {
         let row = sqlx::query("SELECT * FROM papers WHERE arxiv_id = ?1")
             .bind(arxiv_id)

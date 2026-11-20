@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Spinner } from "@/components/icons";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { errorMessage } from "@/lib/error";
 import { parseReadingHostMessage, readingServiceApi } from "@/lib/apiReadingService";
@@ -11,7 +11,13 @@ import type { ReaderShortcut, ReadingHostAction } from "@/lib/apiReadingService"
 import { subscribeLibraryChanged } from "@/lib/libraryRefresh";
 import { api } from "@/lib/api";
 
-const THEME_VARS = ["bg", "paper", "panel", "surface-2", "text", "mute", "text-subtle", "border", "border-strong", "accent", "accent-contrast", "accent2", "info", "success", "warn", "error", "focus", "ink", "font-sans", "shadow-md", "shadow-lg"];
+const THEME_VARS = [
+  "bg", "paper", "panel", "subnav", "surface-1", "surface-2", "line", "text", "mute", "text-subtle",
+  "border", "border-strong", "accent", "accent-contrast", "accent2", "info", "success", "warn", "error",
+  "focus", "ink", "annotation-bg", "annotation-ink", "font-sans", "shadow-md", "shadow-lg",
+  "space-1", "space-2", "space-3", "space-4", "space-6", "control-sm", "control-md",
+  "radius-sm", "radius-md", "radius-lg", "radius-xl", "radius-full", "hover", "selected", "scrim",
+];
 
 export interface LibraryFrameCollections {
   choices: Array<{ key: string; title: string; depth?: number }>;
@@ -84,7 +90,7 @@ export function CoreFrame({
   useEffect(() => {
     if (!url) return;
     const observer = new MutationObserver(publishTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "style", "class"] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-mode", "style", "class"] });
     publishTheme();
     return () => observer.disconnect();
   }, [url, publishTheme]);
@@ -212,7 +218,6 @@ export function CoreFrame({
             queryClient.invalidateQueries({ queryKey: ["papers"] }),
             queryClient.invalidateQueries({ queryKey: ["paper", message.paperId] }),
             queryClient.invalidateQueries({ queryKey: ["library-filter"] }),
-            queryClient.invalidateQueries({ queryKey: ["queue"] }),
           ]);
         } catch (error) {
           if (active) setSyncError(errorMessage(error));
@@ -238,7 +243,6 @@ export function CoreFrame({
           case "reader": navigate(`/reader/${message.route.paperId}`); break;
           case "library": navigate("/library"); break;
           case "settings": navigate("/settings?tab=profiles"); break;
-          case "ask": navigate("/ask"); break;
         }
       } catch (error) {
         if (active) setSyncError(errorMessage(error));
@@ -252,7 +256,7 @@ export function CoreFrame({
   }, [url, navigate, queryClient, onAction, paperId, onSelectCollection, onRetryCollection, onShortcut, onReaderControl, publishHostState]);
 
   if (session.isLoading) {
-    return <FrameStatus icon={<Loader2 className="h-4 w-4 animate-spin" />} title={t("reader.reading.loading")} />;
+    return <FrameStatus icon={<Spinner className="h-4 w-4 animate-spin" />} title={t("reader.reading.loading")} />;
   }
   if (session.error || !url) {
     return (
@@ -281,12 +285,18 @@ export function CoreFrame({
 }
 
 function FrameStatus({ icon, title, detail, action }: { icon: ReactNode; title: string; detail?: string; action?: ReactNode }) {
+  const t = useT();
   return (
-    <div className="grid h-full place-items-center px-6 text-center">
-      <div className="max-w-md space-y-2">
+    <div className="litera-frame-status grid h-full overflow-auto place-items-center px-6 text-center">
+      <div className="min-w-0 max-w-md space-y-2">
         <div className="flex justify-center">{icon}</div>
         <div className="text-sm text-litera-text">{title}</div>
-        {detail && <div className="break-words text-xs text-litera-mute">{detail}</div>}
+        {detail && (
+          <details className="text-xs text-litera-mute">
+            <summary className="mx-auto w-fit cursor-pointer">{t("reader.reading.details")}</summary>
+            <p className="mt-2 break-words text-left">{detail}</p>
+          </details>
+        )}
         {action && <div className="flex justify-center pt-1">{action}</div>}
       </div>
     </div>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2.5 -5.5 36 36" width="96" height="96" fill="none"><defs><linearGradient id="ki-atom-loS-i89" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BEB8DF"></stop><stop offset="1" stop-color="#B2ABD9"></stop></linearGradient><linearGradient id="ki-atom-upS-i89" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0DEF0"></stop><stop offset="1" stop-color="#CEC9E7"></stop></linearGradient>
+  <filter id="ki-atom-sh-i89" x="-40%" y="-40%" width="180%" height="190%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2"></feGaussianBlur><feOffset dy="2" result="o"></feOffset>
+    <feColorMatrix in="o" type="matrix" values="0 0 0 0 0.725 0 0 0 0 0.702 0 0 0 0 0.863 0 0 0 0.21 0"></feColorMatrix>
+    <feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+  </filter>
+  <filter id="ki-atom-hi-i89" x="-10%" y="-10%" width="120%" height="130%" color-interpolation-filters="sRGB">
+    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="a"></feColorMatrix>
+    <feOffset in="a" dy="0.7"></feOffset><feGaussianBlur stdDeviation="0.35"></feGaussianBlur>
+    <feComposite in2="a" operator="arithmetic" k2="-1" k3="1"></feComposite>
+    <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0"></feColorMatrix>
+    <feBlend in2="SourceGraphic" mode="overlay"></feBlend>
+  </filter><mask id="ki-atom-ol-i89-0" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109"><rect x="-40" y="-40" width="111" height="109" fill="#fff"></rect><path fill="#000" fill-rule="nonzero" d="M12.3 12.5A3.2 3.2 0 1 0 18.7 12.5A3.2 3.2 0 1 0 12.3 12.5Z"></path></mask></defs><ellipse cx="15.5" cy="12.5" rx="11.3" ry="3.9" transform="rotate(0 15.5 12.5)" fill="none" stroke-width="2.2" stroke="#766EA6"></ellipse><ellipse cx="15.5" cy="12.5" rx="11.3" ry="3.9" transform="rotate(60 15.5 12.5)" fill="none" stroke-width="2.2" stroke="#766EA6"></ellipse><ellipse cx="15.5" cy="12.5" rx="11.3" ry="3.9" transform="rotate(120 15.5 12.5)" fill="none" stroke-width="2.2" stroke="#766EA6"></ellipse><g filter="url(#ki-atom-sh-i89)"><g filter="url(#ki-atom-hi-i89)"><path d="M12.3 12.5A3.2 3.2 0 1 0 18.7 12.5A3.2 3.2 0 1 0 12.3 12.5Z" fill="url(#ki-atom-upS-i89)"></path></g></g><path d="M12.3 12.5A3.2 3.2 0 1 0 18.7 12.5A3.2 3.2 0 1 0 12.3 12.5Z" mask="url(#ki-atom-ol-i89-0)" stroke="#766EA6" fill="none" stroke-width="2"></path><circle cx="15.5" cy="12.5" r="1.4" fill="#5D4983"></circle></svg>

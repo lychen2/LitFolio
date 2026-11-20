@@ -21,21 +21,15 @@ describe("planLibraryAction", () => {
       surface: "translate-metadata",
       paperId: "p1",
     });
-    expect(planLibraryAction(action({ action: "similar", paperIds: ["p1"] }))).toEqual({
-      surface: "similar",
-      paperId: "p1",
-    });
     expect(planLibraryAction(action({ action: "details", paperIds: ["p1"] }))).toEqual({
       surface: "details",
       paperId: "p1",
     });
   });
 
-  it("keeps the whole selection for batch tools", () => {
+  it("keeps the whole selection for citation export", () => {
     const paperIds = ["p1", "p2", "p3"];
-    for (const batch of ["review", "export", "zotero", "queue-add"] as const) {
-      expect(planLibraryAction(action({ action: batch, paperIds }))).toEqual({ surface: batch, paperIds });
-    }
+    expect(planLibraryAction(action({ action: "export", paperIds }))).toEqual({ surface: "export", paperIds });
   });
 
   it("routes reader-owned panels to the reader without consuming a paper ID", () => {
@@ -48,7 +42,6 @@ describe("planLibraryAction", () => {
   });
 
   it("plans the panels that need no paper and the selection translation", () => {
-    expect(planLibraryAction(action({ action: "queue-open", paperIds: [] }))).toEqual({ surface: "queue-open" });
     expect(planLibraryAction(action({ action: "collections", paperIds: [] }))).toEqual({ surface: "collections" });
     expect(planLibraryAction(action({ action: "selection-translate", paperIds: ["p1"], text: "  quote  " })))
       .toEqual({ surface: "selection-translate", paperId: "p1", text: "quote" });
@@ -56,7 +49,7 @@ describe("planLibraryAction", () => {
 
   it("rejects plans the surface cannot honour", () => {
     expect(() => planLibraryAction(action({ action: "tldr", paperIds: [] }))).toThrow(/needs a paper ID/);
-    expect(() => planLibraryAction(action({ action: "review", paperIds: [] }))).toThrow(/needs paper IDs/);
+    expect(() => planLibraryAction(action({ action: "export", paperIds: [] }))).toThrow(/needs paper IDs/);
     expect(() => planLibraryAction(action({ action: "selection-translate", paperIds: ["p1"], text: "   " })))
       .toThrow(/selected text/);
     expect(() => planLibraryAction(action({ action: "selection-translate", paperIds: [], text: "quote" })))

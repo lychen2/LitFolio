@@ -126,6 +126,10 @@ def hosted() -> bool:
     return HOSTED
 
 
+def embedded() -> bool:
+    return hosted() and os.environ.get("LITFOLIO_CORE_EMBEDDED") == "1"
+
+
 def has_profile() -> bool:
     with _lock:
         return _profile is not None

@@ -1,0 +1,9 @@
+/* The img source carries light-mode ink. Filled buttons use the opposite ink. */
+:root:not([data-mode="light"]) .kubai-icon,
+:root[data-mode="light"] .litera-btn-primary .kubai-icon {
+  content: var(--kubai-dark-image);
+}
+
+:root:not([data-mode="light"]) .litera-btn-primary .kubai-icon {
+  content: normal;
+}

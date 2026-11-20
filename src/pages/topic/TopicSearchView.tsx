@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  Compass, Loader2, Search, Sparkles, Quote, Calendar, Wand2,
-} from "lucide-react";
+  Spinner, Search, Sparkles, Quote, Calendar, Wand2,
+  XCircle,
+} from "@/components/icons";
 import { api, type TopicReport } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { Column } from "./TopicSearchResults";
 import { loadCurrentTopicReport, saveCurrentTopicReport } from "./topicSearchStorage";
-import { PageHeader } from "@/components/PageHeader";
 
 export function TopicSearchView() {
   const t = useT();
@@ -46,12 +46,6 @@ export function TopicSearchView() {
 
   return (
     <section className="h-full flex flex-col">
-      <PageHeader
-        icon={<Compass className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
-        title={t("topic.search.heading")}
-        subtitle={t("topic.search.subtitle")}
-      />
-
       <div className="border-b border-litera-border px-5 py-5 max-[900px]:px-4">
         <div className="litera-panel p-5 max-w-4xl">
           <label className="text-xs uppercase tracking-wider text-litera-mute">{t("topic.search.label")}</label>
@@ -69,7 +63,7 @@ export function TopicSearchView() {
               className="litera-btn text-sm disabled:opacity-50"
               title={t("topic.search.expandTitle")}
             >
-              {expand.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              {expand.isPending ? <Spinner className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
               {t("topic.search.expand")}
             </button>
             <div className="flex items-center gap-1.5 text-sm text-litera-mute border border-litera-line rounded-md px-2.5 bg-litera-paper">
@@ -91,7 +85,7 @@ export function TopicSearchView() {
               disabled={discover.isPending || !query.trim()}
               className="litera-btn-primary disabled:opacity-50"
             >
-              {discover.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {discover.isPending ? <Spinner className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               {t("topic.search.discover")}
             </button>
           </div>
@@ -108,7 +102,7 @@ export function TopicSearchView() {
           )}
           {expand.error && (
             <div className="mt-2 text-xs text-litera-error">
-              ✕ {t("topic.search.expandFailed", { message: (expand.error as Error).message })}
+              <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("topic.search.expandFailed", { message: (expand.error as Error).message })}
             </div>
           )}
           {!report && (
@@ -126,7 +120,7 @@ export function TopicSearchView() {
             </div>
           )}
           {discover.error && (
-            <div className="mt-3 text-sm text-litera-error">✕ {(discover.error as Error).message}</div>
+            <div className="mt-3 text-sm text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(discover.error as Error).message}</div>
           )}
         </div>
       </div>

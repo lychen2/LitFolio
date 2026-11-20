@@ -25,32 +25,13 @@ const EMBEDDED_MANIFESTS: &[(&str, &str)] = &[
         include_str!("../../../plugins/discovery-feeds/manifest.json"),
     ),
     (
-        "document-services",
-        include_str!("../../../plugins/document-services/manifest.json"),
-    ),
-    (
         "fixture-local",
         include_str!("../../../plugins/fixture-local/manifest.json"),
     ),
+    #[cfg(feature = "plugin-literature-network")]
     (
-        "knowledge-graph",
-        include_str!("../../../plugins/knowledge-graph/manifest.json"),
-    ),
-    (
-        "library-ask",
-        include_str!("../../../plugins/library-ask/manifest.json"),
-    ),
-    (
-        "library-plus",
-        include_str!("../../../plugins/library-plus/manifest.json"),
-    ),
-    (
-        "source-connectors",
-        include_str!("../../../plugins/source-connectors/manifest.json"),
-    ),
-    (
-        "sync-integrations",
-        include_str!("../../../plugins/sync-integrations/manifest.json"),
+        "literature-network",
+        include_str!("../../../plugins/literature-network/manifest.json"),
     ),
     (
         "updates",
@@ -131,20 +112,11 @@ mod tests {
         let registry = load_registry().expect("embedded manifests validate");
         assert_eq!(registry.len(), EMBEDDED_MANIFESTS.len());
         let ids: Vec<&str> = registry.iter().map(|m| m.id.as_str()).collect();
-        assert!(ids.contains(&"fixture-local"));
-        assert!(ids.contains(&"library-ask"));
-    }
-
-    #[test]
-    fn library_ask_grants_declared_operations_only() {
-        let registry = load_registry().unwrap();
-        let ask = registry.iter().find(|m| m.id == "library-ask").unwrap();
-        let ops = granted_operations(ask);
-        assert!(ops.contains("ai.chat"));
-        assert!(ops.contains("papers.search"));
-        assert!(ops.contains("network.request"));
-        assert!(!ops.contains("annotations.write"));
-        assert!(!ops.contains("secrets.read"));
+        let mut expected = vec!["candidate-inbox", "discovery-feeds", "fixture-local"];
+        #[cfg(feature = "plugin-literature-network")]
+        expected.push("literature-network");
+        expected.push("updates");
+        assert_eq!(ids, expected);
     }
 
     #[test]

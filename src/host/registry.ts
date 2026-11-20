@@ -5,7 +5,6 @@
 //! One source of truth; no second manifest set.
 
 import {
-  pluginEntryLoaders,
   pluginRegistry,
   isPluginBuilt,
 } from "./profileRegistry";
@@ -18,7 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { invokeParsed } from "@/lib/apiInvoke";
 import { parseArray } from "@/lib/apiSchemaCore";
 
-export { isPluginBuilt, pluginEntryLoaders, pluginRegistry };
+export { isPluginBuilt, pluginRegistry };
 
 export interface PluginHostEntry {
   manifest: PluginManifestV1;

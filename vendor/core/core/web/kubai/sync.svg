@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <g fill="none" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="var(--kubai-line, #324e64)" d="M3 10a9 9 0 0 1 15-4l2.5 2.5M20.5 3.5v5h-5"/>
+    <path stroke="var(--kubai-soft-line, #4a758f)" d="M21 14a9 9 0 0 1-15 4l-2.5-2.5m0 5v-5h5"/>
+  </g>
+</svg>

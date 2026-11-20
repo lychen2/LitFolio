@@ -1,4 +1,4 @@
-"""Run memory-heavy PDF preparation outside the long-lived application process."""
+"""Prepare PDF pages in a desktop child process or an embedded host worker."""
 from __future__ import annotations
 
 import json
@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 OOM_EXIT = 73
+RENDER_SCALES = (2.4, 1.2)
 
 
 def is_memory_error(error):
@@ -27,7 +28,7 @@ def prepare_isolated(root: Path) -> list[dict]:
     package_root = Path(__file__).resolve().parents[2]
     with tempfile.TemporaryDirectory(prefix="core-prepare-") as tmp:
         result = Path(tmp) / "result.json"
-        for scale in (2.4, 1.2):
+        for scale in RENDER_SCALES:
             result.unlink(missing_ok=True)
             completed = subprocess.run(
                 prefix + ["--pdf-prepare-worker", str(root.resolve()), str(result), str(scale)],
@@ -42,23 +43,42 @@ def prepare_isolated(root: Path) -> list[dict]:
             if not oom:
                 raise RuntimeError(data.get("error") or completed.stderr[-800:] or
                                    f"PDF preparation worker exited ({completed.returncode})")
-        from ..app.i18n import tr
-        raise MemoryError(tr("PDF 处理内存不足，降低清晰度重试后仍未完成。请关闭占用内存较多的程序后重试。"))
+        raise _memory_error()
+
+
+def prepare_embedded(root: Path) -> list[dict]:
+    """Retry with fresh native handles inside the host's background worker."""
+    for scale in RENDER_SCALES:
+        try:
+            return _prepare(root, scale)
+        except (MemoryError, OSError) as error:
+            if not is_memory_error(error):
+                raise
+    raise _memory_error()
+
+
+def _memory_error() -> MemoryError:
+    from ..app.i18n import tr
+    return MemoryError(tr("PDF 处理内存不足，降低清晰度重试后仍未完成。请关闭占用内存较多的程序后重试。"))
 
 
 def main(args):
     root, result, scale = Path(args[0]), Path(args[1]), float(args[2])
-    from . import pdfwork
     try:
-        # Reopen the document between rendered pages so native caches cannot
-        # accumulate throughout a scanned book before the first text pass.
-        pages = pdfwork.render_pages(root_source(root), root / "pages", scale=scale, reopen=True)
-        pdfwork.extract_text(root_source(root), root / "extract")
-        result.write_text(json.dumps({"pages": pages}), encoding="utf-8")
+        result.write_text(json.dumps({"pages": _prepare(root, scale)}), encoding="utf-8")
     except Exception as error:
         result.write_text(json.dumps({"error": f"{type(error).__name__}: {error}"}), encoding="utf-8")
         return OOM_EXIT if is_memory_error(error) else 1
     return 0
+
+
+def _prepare(root: Path, scale: float) -> list[dict]:
+    from . import pdfwork
+    source = root_source(root)
+    # Reopen between renders so caches cannot accumulate across scanned pages.
+    pages = pdfwork.render_pages(source, root / "pages", scale=scale, reopen=True)
+    pdfwork.extract_text(source, root / "extract")
+    return pages
 
 
 def root_source(root):

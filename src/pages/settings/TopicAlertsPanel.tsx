@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Play, Plus } from "lucide-react";
+import { Spinner, Play, Plus } from "@/components/icons";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
@@ -49,16 +49,16 @@ export function TopicAlertsPanel() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <section className="litera-panel space-y-4 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-litera-text">{t("alerts.title")}</h3>
+          <h2 className="font-medium text-litera-text">{t("alerts.title")}</h2>
           <p className="text-xs text-litera-mute">{t("alerts.description")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {alerts.length > 0 && (
             <button onClick={() => runAllMut.mutate()} disabled={runAllMut.isPending} className="litera-btn text-xs disabled:opacity-50">
-              {runAllMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              {runAllMut.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
               {t("alerts.runAll")}
             </button>
           )}
@@ -68,20 +68,20 @@ export function TopicAlertsPanel() {
         </div>
       </div>
       {showCreate && (
-        <div className="border border-litera-line rounded-lg p-3 space-y-2">
+        <div className="space-y-2 rounded-[var(--litera-radius)] border border-litera-border p-3">
           <input value={newQuery} onChange={(e) => setNewQuery(e.target.value)} placeholder={t("alerts.query")} className="litera-input text-xs w-full" />
           <div className="flex gap-2 items-center">
             <select value={newFreq} onChange={(e) => setNewFreq(e.target.value)} className="litera-input text-xs w-32">
               {FREQUENCIES.map((frequency) => <option key={frequency.value} value={frequency.value}>{t(frequency.labelKey)}</option>)}
             </select>
             <label className="flex items-center gap-1 text-xs text-litera-mute">
-              <input type="checkbox" checked={newAutoImport} onChange={(e) => setNewAutoImport(e.target.checked)} className="rounded" />
+              <input type="checkbox" checked={newAutoImport} onChange={(e) => setNewAutoImport(e.target.checked)} className="size-4 rounded-[var(--litera-radius-sm)]" />
               {t("alerts.autoImport")}
             </label>
           </div>
           <div className="flex gap-2">
             <button onClick={() => createMut.mutate()} disabled={!newQuery.trim() || createMut.isPending} className="litera-btn-primary text-xs disabled:opacity-50">
-              {createMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : t("common.create")}
+              {createMut.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : t("common.create")}
             </button>
             <button onClick={() => setShowCreate(false)} className="litera-btn text-xs">{t("common.cancel")}</button>
           </div>
@@ -106,6 +106,6 @@ export function TopicAlertsPanel() {
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }

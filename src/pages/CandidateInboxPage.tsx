@@ -3,14 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   Archive,
+  ClipboardCopy,
   DownloadCloud,
   ExternalLink,
   ListPlus,
-  Loader2,
-  SearchX,
+  Spinner,
   Star,
   Trash2,
-} from "lucide-react";
+  XCircle,
+} from "@/components/icons";
 import {
   api,
   type ArxivDraft,
@@ -20,7 +21,9 @@ import {
 } from "@/lib/api";
 import { extractSourceIdentifier } from "@/lib/identifier";
 import { useT } from "@/i18n/I18nProvider";
+import { PageEmptyState } from "@/components/PageEmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { PageToolbar } from "@/components/PageToolbar";
 import { CandidateStatusPill } from "@/components/candidates/CandidateStatusPill";
 import {
   duplicateStatusFromError,
@@ -57,7 +60,7 @@ export function CandidateInboxPage() {
   return (
     <section className="h-full flex flex-col overflow-hidden">
       <PageHeader
-        icon={<Archive className="h-5 w-5 text-litera-accent" aria-hidden="true" />}
+        icon={<Archive />}
         title={t("candidate.title")}
         subtitle={t("candidate.subtitle")}
       />
@@ -70,7 +73,7 @@ export function CandidateInboxPage() {
       <div className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="h-full grid place-items-center text-litera-mute">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Spinner className="h-5 w-5 animate-spin" />
           </div>
         ) : data && data.length > 0 ? (
           <ul className="divide-y divide-litera-line">
@@ -86,7 +89,9 @@ export function CandidateInboxPage() {
             ))}
           </ul>
         ) : (
-          <EmptyState />
+          <div className="grid h-full place-items-center">
+            <PageEmptyState icon={<ClipboardCopy className="h-7 w-7" />} title={t("candidate.empty")} />
+          </div>
         )}
       </div>
     </section>
@@ -114,62 +119,60 @@ function CandidateBatchToolbar({
   const disabled = candidates.length === 0 || batch.isPending;
 
   return (
-    <div className="sticky top-0 z-20 border-b border-litera-border bg-litera-paper/95 px-5 py-2.5 shadow-lg">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-litera-mute">
-          {t("candidate.selected", { count: candidates.length })}
-        </span>
-        <button
-          onClick={() => batch.mutate("shortlisted")}
-          disabled={disabled}
-          className="litera-btn text-xs disabled:opacity-50"
-        >
-          <Star className="h-3.5 w-3.5" />
-          {t("candidate.batchShortlist")}
-        </button>
-        <button
-          onClick={() => batch.mutate("queued")}
-          disabled={disabled}
-          className="litera-btn text-xs disabled:opacity-50"
-        >
-          <ListPlus className="h-3.5 w-3.5" />
-          {t("candidate.batchQueue")}
-        </button>
-        <button
-          onClick={() => batch.mutate("imported")}
-          disabled={disabled}
-          className="litera-btn text-xs disabled:opacity-50"
-        >
-          {batch.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <DownloadCloud className="h-3.5 w-3.5" />
-          )}
-          {t("candidate.batchImport")}
-        </button>
-        <button
-          onClick={() => batch.mutate("ignored")}
-          disabled={disabled}
-          className="litera-btn text-xs disabled:opacity-50"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {t("candidate.batchIgnore")}
-        </button>
-        {candidates.length > 0 && (
-          <button
-            onClick={onClear}
-            className="text-litera-mute hover:text-litera-text px-1"
-          >
-            {t("common.cancel")}
-          </button>
+    <PageToolbar className="text-xs">
+      <span className="text-litera-mute">
+        {t("candidate.selected", { count: candidates.length })}
+      </span>
+      <button
+        onClick={() => batch.mutate("shortlisted")}
+        disabled={disabled}
+        className="litera-btn text-xs disabled:opacity-50"
+      >
+        <Star className="h-3.5 w-3.5" />
+        {t("candidate.batchShortlist")}
+      </button>
+      <button
+        onClick={() => batch.mutate("queued")}
+        disabled={disabled}
+        className="litera-btn text-xs disabled:opacity-50"
+      >
+        <ListPlus className="h-3.5 w-3.5" />
+        {t("candidate.batchQueue")}
+      </button>
+      <button
+        onClick={() => batch.mutate("imported")}
+        disabled={disabled}
+        className="litera-btn text-xs disabled:opacity-50"
+      >
+        {batch.isPending ? (
+          <Spinner className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <DownloadCloud className="h-3.5 w-3.5" />
         )}
-      </div>
+        {t("candidate.batchImport")}
+      </button>
+      <button
+        onClick={() => batch.mutate("ignored")}
+        disabled={disabled}
+        className="litera-btn text-xs disabled:opacity-50"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        {t("candidate.batchIgnore")}
+      </button>
+      {candidates.length > 0 && (
+        <button
+          onClick={onClear}
+          className="text-litera-mute hover:text-litera-text px-1"
+        >
+          {t("common.cancel")}
+        </button>
+      )}
       {batch.error && (
-        <div className="mt-1.5 text-xs text-litera-error">
-          ✕ {(batch.error as Error).message}
+        <div className="w-full text-litera-error">
+          <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(batch.error as Error).message}
         </div>
       )}
-    </div>
+    </PageToolbar>
   );
 }
 
@@ -229,7 +232,7 @@ function CandidateRow({
           )}
           {status.error && (
             <div className="mt-1.5 text-xs text-litera-error">
-              ✕ {(status.error as Error).message}
+              <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(status.error as Error).message}
             </div>
           )}
         </div>
@@ -261,7 +264,7 @@ function CandidateRow({
             title={t("candidate.ignore")}
           >
             {status.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Spinner className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Trash2 className="h-3.5 w-3.5" />
             )}
@@ -269,18 +272,6 @@ function CandidateRow({
         </div>
       </div>
     </li>
-  );
-}
-
-function EmptyState() {
-  const t = useT();
-  return (
-    <div className="h-full grid place-items-center text-center text-litera-mute">
-      <div>
-        <SearchX className="h-10 w-10 mx-auto mb-3 opacity-50" />
-        <p className="text-sm">{t("candidate.empty")}</p>
-      </div>
-    </div>
   );
 }
 

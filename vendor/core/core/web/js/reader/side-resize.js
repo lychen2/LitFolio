@@ -40,24 +40,36 @@
     saved = clamp(widths[e.key]); setW(saved); PR.ls.set(KEY, saved);
     describeWidth(); relayout(position);
   });
-  let anchor;
+  let drag;
   grip.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    anchor = anchorPosition();
+    const viewport = root.clientWidth;
+    const width = PR.$("#readerDock").getBoundingClientRect().width;
+    drag = { anchor: anchorPosition(), viewport, width, startX: e.clientX, pending: width };
     grip.setPointerCapture(e.pointerId);
     body.classList.add("resizing");
   });
   grip.addEventListener("pointermove", e => {
-    if (!grip.hasPointerCapture(e.pointerId)) return;
-    saved = clamp(root.clientWidth - (e.clientX < 6 ? 0 : e.clientX));
-    setW(saved);
+    if (!drag || !grip.hasPointerCapture(e.pointerId)) return;
+    drag.pending = Math.round(Math.min(drag.viewport, Math.max(320, drag.width + drag.startX - e.clientX)));
+    // Move only the separator until release. Changing --side-w reflows both panes.
+    grip.style.transform = `translateX(${drag.width - drag.pending}px)`;
+  });
+  grip.addEventListener("pointercancel", () => {
+    if (drag) drag.pending = drag.width;
   });
   grip.addEventListener("lostpointercapture", () => {
+    const completed = drag;
+    drag = undefined;
     body.classList.remove("resizing");
+    grip.style.removeProperty("transform");
+    if (!completed || completed.pending === completed.width) return;
+    saved = clamp(completed.pending);
+    setW(saved);
     PR.ls.set(KEY, saved);
     describeWidth();
-    relayout(anchor);
+    relayout(completed.anchor);
   });
   grip.addEventListener("dblclick", () => {
     const position = anchorPosition();

@@ -1,0 +1,31 @@
+.feed-unread-track {
+  display: block;
+  overflow: hidden;
+  block-size: var(--litera-space-1);
+  border-radius: var(--litera-radius-full);
+  background: var(--litera-border);
+}
+
+.feed-unread-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--litera-accent);
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .feed-source-button {
+    min-block-size: var(--litera-target-touch);
+  }
+}
+
+@media (forced-colors: active) {
+  .feed-unread-track {
+    outline: 1px solid CanvasText;
+  }
+
+  .feed-unread-fill {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}

@@ -1,35 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { Cpu, Download, FolderSync, Loader2, Puzzle, Save, Search, ShieldCheck } from "lucide-react";
+import * as Tabs from "@radix-ui/react-tabs";
+import { Cpu, Download, Spinner, Puzzle, Save, Wrench, Settings, ShieldCheck } from "@/components/icons";
 import { api, type LlmConfig, type LlmProfile } from "@/lib/api";
+import { Button } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { ThemePicker } from "@/components/ThemePicker";
 import { useT } from "@/i18n/I18nProvider";
 import type { TKey } from "@/i18n/dict";
-import { CustomFieldsManager } from "./settings/CustomFieldsManager";
 import { AppUpdateCard } from "./settings/AppUpdateCard";
 import { DataPrivacyPanel } from "./settings/DataPrivacyPanel";
-import { DuplicatesPanel } from "./settings/DuplicatesPanel";
 import { ExportPanel } from "./settings/ExportPanel";
 import { PluginsPanel } from "./settings/PluginsPanel";
 import { ProfilesTab } from "./settings/ProfilesTab";
-import { SyncPanel } from "./settings/SyncPanel";
-import { ZoteroPanel } from "./settings/ZoteroPanel";
-import { PdfMarkdownSettings } from "./settings/PdfMarkdownSettings";
-import { ObsidianSettings } from "./settings/ObsidianSettings";
 import { TopicAlertsPanel } from "./settings/TopicAlertsPanel";
 
-type SettingsTab = "privacy" | "plugins" | "profiles" | "sync" | "export" | "tools";
+type SettingsTab = "privacy" | "plugins" | "profiles" | "export" | "tools";
 
 const TAB_DEFS: { key: SettingsTab; labelKey: TKey; icon: typeof Cpu }[] = [
   { key: "privacy", labelKey: "settings.tab.privacy", icon: ShieldCheck },
   { key: "plugins", labelKey: "settings.tab.plugins", icon: Puzzle },
   { key: "profiles", labelKey: "settings.tab.profiles", icon: Cpu },
-  { key: "sync", labelKey: "settings.tab.sync", icon: FolderSync },
   { key: "export", labelKey: "export.title", icon: Download },
-  { key: "tools", labelKey: "settings.tab.tools", icon: Search },
+  { key: "tools", labelKey: "settings.tab.tools", icon: Wrench },
 ];
+const DESKTOP_TABS = "(width > 900px)";
 
 function settingsTabFrom(value: string | null): SettingsTab {
   return TAB_DEFS.find((tab) => tab.key === value)?.key ?? "profiles";
@@ -39,6 +35,20 @@ export function SettingsPage() {
   const t = useT();
   const [params] = useSearchParams();
   const [tab, setTab] = useState<SettingsTab>(() => settingsTabFrom(params.get("tab")));
+  const [verticalTabs, setVerticalTabs] = useState(() => typeof window !== "undefined" && window.matchMedia(DESKTOP_TABS).matches);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia(DESKTOP_TABS);
+    const update = () => setVerticalTabs(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!verticalTabs) {
+      activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [tab, verticalTabs]);
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["llm", "config"],
     queryFn: api.llmGetConfig,
@@ -106,63 +116,59 @@ export function SettingsPage() {
   return (
     <section className="flex h-full flex-col overflow-hidden">
       <PageHeader
+        icon={<Settings />}
         title={t("settings.title")}
+        subtitle={saveState && (
+          <span className={save.error ? "text-litera-error" : save.isSuccess && !isDirty ? "text-litera-success" : undefined} role="status">
+            {saveState}
+          </span>
+        )}
         actions={showsSave && (
-          <>
-            {saveState && (
-              <span className={`text-xs ${save.error ? "text-litera-error" : save.isSuccess && !isDirty ? "text-litera-success" : "text-litera-mute"}`} role="status">
-                {saveState}
-              </span>
-            )}
-            <button
-              onClick={() => save.mutate(draft)}
-              disabled={save.isPending || !isDirty}
-              className="litera-btn-primary text-sm disabled:opacity-50"
-            >
-              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {t("common.save")}
-            </button>
-          </>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => save.mutate(draft)}
+            disabled={save.isPending || !isDirty}
+          >
+            {save.isPending ? <Spinner className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {t("common.save")}
+          </Button>
         )}
       />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden max-[900px]:flex-col">
-        <nav className="w-48 shrink-0 overflow-y-auto border-r border-litera-border bg-litera-paper/35 px-3 py-4 max-[900px]:w-full max-[900px]:shrink-0 max-[900px]:overflow-x-auto max-[900px]:overflow-y-hidden max-[900px]:border-r-0 max-[900px]:border-b max-[900px]:py-2" aria-label={t("settings.title")} role="tablist">
-          <div className="space-y-1 max-[900px]:flex max-[900px]:w-max max-[900px]:gap-1">
-            {TAB_DEFS.map(({ key, labelKey, icon: Icon }) => {
-              const active = tab === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTab(key)}
-                  role="tab"
-                  aria-selected={active}
-                  className={
-                    "flex min-h-9 w-full items-center gap-2 rounded-[var(--litera-radius)] px-2.5 text-left text-sm transition-colors max-[900px]:w-auto max-[900px]:whitespace-nowrap " +
-                    (active
-                      ? "bg-litera-accent/12 text-litera-accent"
-                      : "text-litera-mute hover:bg-litera-surface2 hover:text-litera-text")
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span>{t(labelKey)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+      <Tabs.Root
+        value={tab}
+        onValueChange={(value) => setTab(settingsTabFrom(value))}
+        orientation={verticalTabs ? "vertical" : "horizontal"}
+        className="flex min-h-0 flex-1 overflow-hidden max-[900px]:flex-col"
+      >
+        <div className="litera-settings-nav w-48 shrink-0 overflow-y-auto border-r border-litera-border px-3 py-4 max-[900px]:max-h-[45%] max-[900px]:w-full max-[900px]:border-b max-[900px]:border-r-0 max-[900px]:px-[var(--litera-page-inset)] max-[900px]:py-2">
+          <Tabs.List
+            className="litera-tab-list w-full flex-col items-stretch max-[900px]:flex-row max-[900px]:flex-wrap"
+            aria-label={t("settings.title")}
+          >
+            {TAB_DEFS.map(({ key, labelKey, icon: Icon }) => (
+              <Tabs.Trigger
+                key={key}
+                ref={key === tab ? activeTabRef : undefined}
+                value={key}
+                className="litera-tab min-h-9 justify-start"
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{t(labelKey)}</span>
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
 
-        <div className="min-w-0 flex-1 overflow-auto px-6 py-6 max-[900px]:px-4 max-[900px]:py-4">
-          <div className="mx-auto max-w-5xl space-y-5">
-            {tab === "privacy" && (
-              <div className="space-y-5">
-                <DataPrivacyPanel />
-                <AppUpdateCard />
-              </div>
-            )}
-            {tab === "plugins" && <PluginsPanel />}
-            {tab === "profiles" && (
+        <div className="min-w-0 flex-1 overflow-auto px-[var(--litera-page-inset)] py-4">
+          <div className="mx-auto w-full max-w-5xl">
+            <Tabs.Content value="privacy" className="litera-tab-panel space-y-4">
+              <DataPrivacyPanel />
+              <AppUpdateCard />
+            </Tabs.Content>
+            <Tabs.Content value="plugins" className="litera-tab-panel"><PluginsPanel /></Tabs.Content>
+            <Tabs.Content value="profiles" className="litera-tab-panel space-y-4">
               <ProfilesTab
                 draft={draft}
                 isLoading={isLoading}
@@ -172,31 +178,19 @@ export function SettingsPage() {
                 onSetActive={(name) => setDraft((current) => ({ ...current, active: name }))}
                 onUpdateTaskAssignments={(assignments) => setDraft((current) => ({ ...current, task_assignments: assignments }))}
               />
-            )}
-            {tab === "sync" && (
-              <div className="space-y-5">
-                <SyncPanel />
-                <ZoteroPanel />
-              </div>
-            )}
-            {tab === "export" && <ExportPanel />}
-            {tab === "tools" && (
-              <div className="space-y-6">
-                <section className="border-b border-litera-border pb-6">
-                  <ThemePicker />
-                </section>
-                <PdfMarkdownSettings draft={draft} onChange={setDraft} />
-                <ObsidianSettings draft={draft} onChange={setDraft} />
-                <TopicAlertsPanel />
-                <DuplicatesPanel />
-                <CustomFieldsManager />
-              </div>
-            )}
-
-            {showsSave && save.error && <div role="alert" className="text-sm text-litera-error">{save.error.message}</div>}
+              {save.error && <div role="alert" className="text-sm text-litera-error">{save.error.message}</div>}
+            </Tabs.Content>
+            <Tabs.Content value="export" className="litera-tab-panel"><ExportPanel /></Tabs.Content>
+            <Tabs.Content value="tools" className="litera-tab-panel space-y-4">
+              <section className="litera-panel p-4">
+                <ThemePicker />
+              </section>
+              <TopicAlertsPanel />
+              {save.error && <div role="alert" className="text-sm text-litera-error">{save.error.message}</div>}
+            </Tabs.Content>
           </div>
         </div>
-      </div>
+      </Tabs.Root>
     </section>
   );
 }

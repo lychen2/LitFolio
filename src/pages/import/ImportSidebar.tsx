@@ -3,10 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   LibraryBig,
-  ListPlus,
-  Loader2,
+  Spinner,
   Sparkles,
-} from "lucide-react";
+} from "@/components/icons";
 import { useNavigate } from "react-router-dom";
 import { api, type Paper } from "@/lib/api";
 import { errorMessageOr } from "@/lib/error";
@@ -79,15 +78,6 @@ function RecentPaperCard({ paper }: { paper: Paper }) {
     onError: (error) =>
       setActionError(error, setMessage, t("import.sidebar.actionFailed")),
   });
-  const queue = useMutation({
-    mutationFn: () => api.queueAdd(paper.id),
-    onSuccess: () => {
-      setMessage({ kind: "ok", text: t("import.sidebar.queueDone") });
-      qc.invalidateQueries({ queryKey: ["queue"] });
-    },
-    onError: (error) =>
-      setActionError(error, setMessage, t("import.sidebar.actionFailed")),
-  });
 
   return (
     <article className="rounded-lg border border-litera-line/70 bg-litera-ink/15 p-3">
@@ -119,24 +109,11 @@ function RecentPaperCard({ paper }: { paper: Paper }) {
           className="litera-btn px-2 py-1 text-[11px] disabled:opacity-50"
         >
           {quickRead.isPending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Spinner className="h-3 w-3 animate-spin" />
           ) : (
             <Sparkles className="h-3 w-3" />
           )}
           {t("import.sidebar.quickRead")}
-        </button>
-        <button
-          type="button"
-          onClick={() => queue.mutate()}
-          disabled={queue.isPending}
-          className="litera-btn px-2 py-1 text-[11px] disabled:opacity-50"
-        >
-          {queue.isPending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <ListPlus className="h-3 w-3" />
-          )}
-          {t("queue.add")}
         </button>
       </div>
       {message && (

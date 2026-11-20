@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
-import { Loader2, MessageSquare, X } from "lucide-react";
+import { Spinner, MessageSquare, X } from "@/components/icons";
 import { useT } from "@/i18n/I18nProvider";
 import {
   highlightNoteUpdateValue,
@@ -143,7 +143,7 @@ export function PdfLinkedNoteBox({
         className="litera-pdf-note-textarea"
       />
       <div className={saveError ? "litera-pdf-note-status text-litera-error" : "litera-pdf-note-status"}>
-        {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+        {saving && <Spinner className="h-3 w-3 animate-spin" />}
         {status}
       </div>
     </div>

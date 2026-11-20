@@ -1,0 +1,79 @@
+.reader-assembly-divider[data-panel-group-direction="vertical"] {
+  width: auto;
+  height: var(--litera-space-2);
+  cursor: row-resize;
+}
+
+.reader-assembly-divider[data-panel-group-direction="vertical"] .reader-resize-grip {
+  inset: 50% 0 auto;
+  width: auto;
+  height: 1px;
+  transform: translateY(-50%);
+  transition: background-color 150ms var(--ease-out-quart);
+}
+
+.reader-assembly-divider[data-panel-group-direction="vertical"]:is(:hover, :focus-visible) .reader-resize-grip {
+  width: auto;
+  height: 2px;
+}
+
+.reader-highlight-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--litera-space-2);
+  border-block-end: 1px solid var(--litera-border);
+  padding: var(--litera-space-1) var(--litera-space-2);
+  background: var(--litera-panel);
+  color: var(--litera-mute);
+  font-size: 0.75rem;
+}
+
+.reader-highlight-pages select {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  min-block-size: var(--litera-control-sm);
+  border: 1px solid var(--litera-border);
+  border-radius: var(--litera-radius-sm);
+  padding-inline: var(--litera-space-2);
+  background: var(--litera-paper);
+  color: var(--litera-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.reader-highlight-pages select:focus-visible {
+  outline: 2px solid var(--litera-focus);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .reader-highlight-pages select,
+  .reader-highlight-pages button {
+    min-block-size: var(--litera-target-touch);
+  }
+}
+
+.reader-assembly-highlight-list > aside ul > li:focus {
+  outline: 2px solid var(--litera-focus);
+  outline-offset: -2px;
+}
+
+.reader-assembly-notes textarea:focus {
+  --reader-note-line-height: 1.25rem;
+  line-height: var(--reader-note-line-height);
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--litera-accent-line) 0);
+  background-size: 100% var(--reader-note-line-height);
+  background-origin: content-box;
+  background-clip: content-box;
+  background-attachment: local;
+  outline: 2px solid var(--litera-focus);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-assembly-divider,
+  .reader-assembly-divider .reader-resize-grip {
+    transition: none;
+  }
+}

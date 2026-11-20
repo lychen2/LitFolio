@@ -3,17 +3,11 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::storage::{
     notes, FolderRepo, HighlightRepo, LibraryPaths, Paper, PaperRepo, PaperTermRepo, TagRepo,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MarkdownExportMode {
-    Standard,
-    Obsidian,
-}
 
 /// Summary of an export run.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -32,7 +26,6 @@ pub async fn export_paper_md(
     paths: &LibraryPaths,
     paper: &Paper,
     export_dir: &Path,
-    mode: MarkdownExportMode,
 ) -> Result<PathBuf> {
     let filename = sanitize_filename(paper);
     let out_path = export_dir.join(&filename);
@@ -54,12 +47,7 @@ pub async fn export_paper_md(
         .for_paper(&paper.id)
         .await
         .unwrap_or_default();
-    let mut note_content = notes::read(paths, &paper.id).unwrap_or_default();
-    if mode == MarkdownExportMode::Obsidian {
-        if let Some(existing_notes) = read_existing_notes(&out_path) {
-            note_content = existing_notes;
-        }
-    }
+    let note_content = notes::read(paths, &paper.id).unwrap_or_default();
     let document_markdown = paths.read_paper_markdown(&paper.id).unwrap_or_default();
 
     // Build Markdown.
@@ -127,8 +115,7 @@ pub async fn export_paper_md(
         md.push_str("\n\n");
     }
 
-    // Keep the converted paper readable in Obsidian while ensuring its
-    // extracted title cannot override the canonical library metadata title.
+    // Use the canonical library title in place of the extracted title.
     if !document_markdown.trim().is_empty() {
         md.push_str("## Paper\n\n");
         md.push_str(&without_leading_h1(&document_markdown));
@@ -168,11 +155,9 @@ pub async fn export_paper_md(
     }
     std::fs::write(&out_path, &md).with_context(|| format!("write {}", out_path.display()))?;
 
-    if mode == MarkdownExportMode::Standard {
-        PaperRepo::new(pool)
-            .update_last_exported_at(&paper.id, Utc::now().timestamp())
-            .await?;
-    }
+    PaperRepo::new(pool)
+        .update_last_exported_at(&paper.id, Utc::now().timestamp())
+        .await?;
 
     Ok(out_path)
 }
@@ -218,7 +203,6 @@ pub async fn export_all_md(
     paths: &LibraryPaths,
     export_dir: &Path,
     incremental: bool,
-    mode: MarkdownExportMode,
 ) -> Result<ExportSummary> {
     let repo = PaperRepo::new(pool);
     let papers = if incremental {
@@ -232,7 +216,7 @@ pub async fn export_all_md(
     let mut errors = Vec::new();
 
     for p in &papers {
-        match export_paper_md(pool, paths, p, export_dir, mode).await {
+        match export_paper_md(pool, paths, p, export_dir).await {
             Ok(_) => exported += 1,
             Err(e) => {
                 errors.push(format!("{}: {}", p.title, e));
@@ -282,30 +266,6 @@ fn sanitize_filename(paper: &Paper) -> String {
     format!("{author}_{year}_{first_word}.md")
 }
 
-fn read_existing_notes(path: &Path) -> Option<String> {
-    let markdown = std::fs::read_to_string(path).ok()?;
-    let mut in_notes = false;
-    let mut lines = Vec::new();
-    for line in markdown.lines() {
-        if !in_notes {
-            if line.trim() == "## Notes" {
-                in_notes = true;
-            }
-            continue;
-        }
-        if line.trim_start().starts_with("## ") {
-            break;
-        }
-        lines.push(line);
-    }
-    let notes = lines.join("\n").trim().to_string();
-    if notes.is_empty() || notes == "_(no notes yet)_" {
-        None
-    } else {
-        Some(notes)
-    }
-}
-
 /// Escape special YAML characters in a string value.
 fn escape_yaml(s: &str) -> String {
     s.replace('"', "\\\"").replace('\\', "\\\\")
@@ -338,26 +298,6 @@ fn without_leading_h1(markdown: &str) -> String {
 
     prefix.extend(lines);
     prefix.join("\n").trim_start_matches('\n').to_string()
-}
-
-/// Resolve the configured Obsidian subfolder without allowing it to escape the vault.
-pub fn configured_obsidian_dir(vault_dir: &str, folder: &str) -> Result<Option<PathBuf>> {
-    let vault = vault_dir.trim();
-    if vault.is_empty() {
-        return Ok(None);
-    }
-    let folder_path = Path::new(folder.trim());
-    if folder_path.is_absolute()
-        || folder_path.components().any(|component| {
-            matches!(
-                component,
-                Component::ParentDir | Component::RootDir | Component::Prefix(_)
-            )
-        })
-    {
-        anyhow::bail!("Obsidian folder must be a relative path inside the vault");
-    }
-    Ok(Some(PathBuf::from(vault).join(folder_path)))
 }
 
 #[cfg(test)]
@@ -444,23 +384,6 @@ mod tests {
     }
 
     #[test]
-    fn preserves_existing_obsidian_notes() {
-        let path =
-            std::env::temp_dir().join(format!("litera-obsidian-notes-{}.md", ulid::Ulid::new()));
-        std::fs::write(
-            &path,
-            "# Paper\n\n## Notes\n\nMy Obsidian note\n\n### Detail\nKeep this\n\n## Highlights\n",
-        )
-        .unwrap();
-
-        assert_eq!(
-            read_existing_notes(&path).as_deref(),
-            Some("My Obsidian note\n\n### Detail\nKeep this")
-        );
-        std::fs::remove_file(path).ok();
-    }
-
-    #[test]
     fn removes_converter_title_but_keeps_document_body() {
         let markdown = "\n# Extracted PDF title\n\n## Abstract\nBody";
         assert_eq!(without_leading_h1(markdown), "## Abstract\nBody");
@@ -472,12 +395,4 @@ mod tests {
         assert_eq!(without_leading_h1(markdown), markdown);
     }
 
-    #[test]
-    fn resolves_obsidian_folder_inside_vault() {
-        let dir = configured_obsidian_dir("/vault", "Research/Papers")
-            .unwrap()
-            .unwrap();
-        assert_eq!(dir, PathBuf::from("/vault/Research/Papers"));
-        assert!(configured_obsidian_dir("/vault", "../outside").is_err());
-    }
 }

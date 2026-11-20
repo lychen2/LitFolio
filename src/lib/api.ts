@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -30,46 +29,23 @@ export type {
 
 export type {
   ArxivDraft,
-  AskCapabilityKind,
-  AskCapabilityState,
-  AskSession,
-  AskSessionDraft,
-  AskLibraryResult,
-  AskSource,
   BatchError,
   BatchSummary,
-  CitationGraph,
-  CitationPaper,
   CandidateDraft,
   CandidatePaper,
   CandidateStatus,
-  Concept,
-  ConceptRelation,
-  CustomFieldDef,
-  DuplicatePair,
   ExpandedQuery,
   ExportSummary,
-  ExtractedConcept,
-  ExtractedRelation,
   Feed,
   FeedItem,
   FeedRefreshAllSummary,
   FeedRefreshResult,
   FeedWithCounts,
-  FilterRule,
-  FilterRuleCondition,
-  FilterRuleGroup,
   Folder,
   FolderImportProgress,
   FolderWithCount,
-  GraphData,
-  GraphEdge,
-  GraphFilter,
-  GraphNode,
   Highlight,
-  LinkBatchSummary,
   LinkedPaper,
-  LitReviewResult,
   LlmConfig,
   ObsidianConfig,
   JobDraft,
@@ -79,29 +55,20 @@ export type {
   LlmTestResult,
   NoteSection,
   Paper,
-  PaperSupplement,
   PdfMarkdownConfig,
   PdfMarkdownEngine,
-  PaperConcept,
-  PaperCustomField,
-  PaperLink,
   PaperTerm,
   PdfImportSummary,
   ProjectRadarCandidate,
   ProjectUnreadReminder,
-  QueueEntry,
   QuickReadResult,
   ReadStatus,
   ReaderPaperTerm,
   ReaderTranslateResult,
   ReaderMarkdownTranslationResult,
-  Recommendation,
   RelatedPaperTerm,
-  SaveAskNoteInput,
-  SaveAskNoteResult,
   SaveTopicSurveyResult,
   SearchHit,
-  SmartCollection,
   SurveyKeyPi,
   SurveyPaper,
   SurveySubareaResult,
@@ -117,45 +84,16 @@ export type {
   TopicSurvey,
   TopicSurveyPhase,
   TopicSurveyProgress,
-  SupplementConversionResult,
   TranslationResult,
   UnifiedSearchResult,
   StorageStats,
 } from "./types/api";
-
-export interface ZoteroConfig {
-  target_id: string | null;
-  target_name: string | null;
-}
-
-export interface ZoteroTarget {
-  id: string;
-  name: string;
-  level: number;
-}
-
-export interface ZoteroPushResult {
-  pushed: number;
-  skipped: string[];
-  session_ids: string[];
-}
-
-export const zoteroApi = {
-  zoteroGetConfig: () => invoke<ZoteroConfig>("zotero_get_config"),
-  zoteroSaveConfig: (config: ZoteroConfig) => invoke<void>("zotero_save_config", { cfg: config }),
-  zoteroTest: () => invoke<void>("zotero_test"),
-  zoteroListTargets: () => invoke<ZoteroTarget[]>("zotero_list_targets"),
-  zoteroPush: (paperIds: string[], force = false) =>
-    invoke<ZoteroPushResult>("zotero_push", { paperIds, force }),
-};
 
 export const api = {
   ...libraryClient,
   ...aiReadingClient,
   ...readerClient,
   ...knowledgeApi,
-  ...zoteroApi,
-  // Temporary adapter: plugin-owned AI capabilities pending plugin-host extraction.
   ...aiPluginApi,
 };
 

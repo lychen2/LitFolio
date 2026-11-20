@@ -1,35 +1,41 @@
 use anyhow::Result;
 use sqlx::Row;
 
+use crate::storage::feed_defaults::DEFAULT_FEEDS;
+
 use super::{Feed, FeedItem, FeedWithCounts};
 
 pub(super) fn row_to_feed(row: sqlx::sqlite::SqliteRow) -> Result<Feed> {
-    Ok(Feed {
-        id: row.try_get("id")?,
-        url: row.try_get("url")?,
-        title: row.try_get("title")?,
-        description: row.try_get("description").ok(),
-        etag: row.try_get("etag").ok(),
-        last_modified: row.try_get("last_modified").ok(),
-        last_fetched_at: row.try_get("last_fetched_at").ok(),
-        last_error: row.try_get("last_error").ok(),
-        created_at: row.try_get("created_at")?,
-    })
+    row_to_feed_inline(&row)
 }
 
 pub(super) fn row_to_feed_with_counts(row: sqlx::sqlite::SqliteRow) -> Result<FeedWithCounts> {
+    let row_url: &str = row.try_get("url")?;
     Ok(FeedWithCounts {
         feed: row_to_feed_inline(&row)?,
         total_items: row.try_get("total_items")?,
         unread_items: row.try_get("unread_items")?,
+        impact_factor: DEFAULT_FEEDS
+            .iter()
+            .find(|feed| feed.url == row_url || feed.legacy_urls.contains(&row_url))
+            .and_then(|feed| feed.impact_factor),
     })
 }
 
 fn row_to_feed_inline(row: &sqlx::sqlite::SqliteRow) -> Result<Feed> {
+    let url: String = row.try_get("url")?;
+    // Publishers sometimes reuse a generic channel title across several journals.
+    let title = match DEFAULT_FEEDS.iter().find(|feed| {
+        let url = url.as_str();
+        feed.url == url || feed.legacy_urls.contains(&url)
+    }) {
+        Some(feed) => feed.title.to_owned(),
+        None => row.try_get("title")?,
+    };
     Ok(Feed {
         id: row.try_get("id")?,
-        url: row.try_get("url")?,
-        title: row.try_get("title")?,
+        url,
+        title,
         description: row.try_get("description").ok(),
         etag: row.try_get("etag").ok(),
         last_modified: row.try_get("last_modified").ok(),

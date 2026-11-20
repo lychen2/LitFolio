@@ -16,8 +16,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::mineru::PdfMarkdownConfig;
-
 mod persistence;
 #[cfg(test)]
 mod tests;
@@ -117,6 +115,24 @@ impl<'de> Deserialize<'de> for TaskBinding {
     }
 }
 
+// Preserve the on-disk format of existing profiles after removing the parser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PdfMarkdownEngine {
+    Local,
+    #[default]
+    MineruAgent,
+    MineruPrecise,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PdfMarkdownConfig {
+    #[serde(default)]
+    pub engine: PdfMarkdownEngine,
+    #[serde(default)]
+    pub mineru_token: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObsidianConfig {
     #[serde(default)]
@@ -186,10 +202,8 @@ pub enum TaskKind {
     QuickRead,
     Translate,
     Tag,
-    Link,
     TopicSurvey,
     Ask,
-    LitReview,
 }
 
 impl TaskKind {
@@ -199,10 +213,8 @@ impl TaskKind {
             Self::QuickRead => "quick_read",
             Self::Translate => "translate",
             Self::Tag => "tag",
-            Self::Link => "link",
             Self::TopicSurvey => "topic_survey",
             Self::Ask => "ask",
-            Self::LitReview => "lit_review",
         }
     }
 }
@@ -252,10 +264,8 @@ pub fn active_profile_for_task(cfg: &LlmConfig, task: TaskKind) -> Result<LlmPro
         TaskKind::QuickRead => cfg.task_assignments.quick_read.as_ref(),
         TaskKind::Translate => cfg.task_assignments.translate.as_ref(),
         TaskKind::Tag => cfg.task_assignments.tag.as_ref(),
-        TaskKind::Link => cfg.task_assignments.link.as_ref(),
         TaskKind::TopicSurvey => cfg.task_assignments.topic_survey.as_ref(),
         TaskKind::Ask => cfg.task_assignments.ask.as_ref(),
-        TaskKind::LitReview => cfg.task_assignments.lit_review.as_ref(),
     };
     if let Some(b) = binding {
         let mut p = match cfg.profiles.iter().find(|x| x.name == b.profile) {

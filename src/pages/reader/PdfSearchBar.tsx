@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, X } from "@/components/icons";
 import { useT } from "@/i18n/I18nProvider";
 
 interface PdfSearchBarProps {
@@ -126,7 +126,7 @@ export function PdfSearchBar({ containerRef, openSignal }: PdfSearchBarProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="absolute top-2 right-[5.25rem] z-20 litera-btn text-xs"
+        className="litera-btn text-xs pointer-events-auto"
         title={t("reader.searchPdfTitle")}
       >
         <Search className="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@ export function PdfSearchBar({ containerRef, openSignal }: PdfSearchBarProps) {
   const goPrev = () => focusHit(activeIdx - 1);
 
   return (
-    <div className="absolute top-2 right-[5.25rem] z-20 litera-overlay flex items-center gap-1 px-2 py-1 litera-scale-in">
+    <div className="litera-overlay flex max-w-full flex-wrap items-center gap-1 px-2 py-1 litera-scale-in pointer-events-auto">
       <Search className="h-3.5 w-3.5 text-litera-mute" />
       <input
         ref={inputRef}
@@ -157,7 +157,7 @@ export function PdfSearchBar({ containerRef, openSignal }: PdfSearchBarProps) {
           }
         }}
         placeholder={t("reader.searchPlaceholder")}
-        className="litera-input text-xs px-2 py-0.5 w-44"
+        className="litera-input text-xs px-2 py-0.5 w-44 max-w-full"
       />
       <span className="text-[11px] text-litera-mute min-w-[3rem] text-right">
         {matchCount === 0 ? (query ? "0/0" : "—") : `${activeIdx + 1}/${matchCount}`}

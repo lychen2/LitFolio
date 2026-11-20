@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  Trash2, Loader2, Globe, Eye, EyeOff, CheckCircle2, XCircle, Download,
-} from "lucide-react";
+  Trash2, Spinner, Globe, Eye, EyeOff, CheckCircle2, XCircle, Download,
+} from "@/components/icons";
+import { Button, IconButton, Input } from "@/components/ui";
 import { api, type LlmProfile } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -42,87 +43,91 @@ export function ProfileCard({
       "litera-panel p-4 transition-colors " +
       (isActive ? "border-litera-accent/50 bg-litera-accent/5" : "")
     }>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
-          <input
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Input
             value={local.name}
             onChange={(e) => field("name", e.target.value)}
-            className="litera-input text-sm font-medium w-40"
+            aria-label={t("settings.llmConfig")}
+            className="w-full font-medium sm:w-40"
           />
           {isActive ? (
-            <span className="px-2 py-0.5 text-[11px] rounded border border-litera-accent/40 bg-litera-accent/10 text-litera-accent">
+            <span className="litera-badge text-[11px]">
               {t("settings.profile.current")}
             </span>
           ) : (
-            <button onClick={onActivate} className="text-[11px] text-litera-mute hover:text-litera-text">
+            <Button variant="ghost" size="sm" onClick={onActivate}>
               {t("settings.profile.setCurrent")}
-            </button>
+            </Button>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
             onClick={() => test.mutate(local)}
             disabled={test.isPending}
-            className="litera-btn text-xs disabled:opacity-50"
           >
-            {test.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+            {test.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
             {t("settings.profile.test")}
-          </button>
+          </Button>
           {confirmingDelete ? (
-            <div className="flex items-center gap-1.5 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-litera-error">{t("settings.profile.deleteConfirm")}</span>
-              <button onClick={() => { onRemove(); setConfirmingDelete(false); }} className="litera-btn-primary text-[11px] px-2 py-0.5">{t("settings.profile.confirm")}</button>
-              <button onClick={() => setConfirmingDelete(false)} className="litera-btn text-[11px] px-2 py-0.5">{t("common.cancel")}</button>
+              <Button variant="primary" size="sm" onClick={() => { onRemove(); setConfirmingDelete(false); }}>{t("settings.profile.confirm")}</Button>
+              <Button size="sm" onClick={() => setConfirmingDelete(false)}>{t("common.cancel")}</Button>
             </div>
           ) : (
-            <button onClick={() => setConfirmingDelete(true)} className="litera-btn text-xs text-litera-error hover:text-litera-error">
+            <IconButton label={t("common.delete")} size="sm" onClick={() => setConfirmingDelete(true)} className="text-litera-error hover:text-litera-error">
               <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
+      <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
         <Field label={t("settings.profile.apiBaseUrl")}>
-          <input value={local.base_url} onChange={(e) => field("base_url", e.target.value)}
-            className="litera-input w-full font-mono text-xs" placeholder="https://api.openai.com/v1" />
+          <Input value={local.base_url} onChange={(e) => field("base_url", e.target.value)}
+            className="w-full font-mono text-xs" placeholder="https://api.openai.com/v1" />
         </Field>
         <Field label={t("settings.profile.apiKey")}>
           <div className="relative">
-            <input value={local.api_key} onChange={(e) => field("api_key", e.target.value)}
+            <Input value={local.api_key} onChange={(e) => field("api_key", e.target.value)}
               type={showKey ? "text" : "password"}
-              className="litera-input w-full font-mono text-xs pr-9" placeholder="sk-…" />
-            <button onClick={() => setShowKey(!showKey)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-litera-mute">
+              className="w-full pr-10 font-mono text-xs" placeholder="sk-…" />
+            <IconButton onClick={() => setShowKey(!showKey)}
+              label={t("settings.profile.apiKey")}
+              size="sm"
+              aria-pressed={showKey}
+              className="absolute right-1 top-1/2 -translate-y-1/2">
               {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            </button>
+            </IconButton>
           </div>
         </Field>
         <Field label={t("settings.profile.chatModel")}>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex gap-2">
-              <input
+              <Input
                 value={local.chat_model}
                 onChange={(e) => field("chat_model", e.target.value)}
                 list={`models-${profile.name}`}
-                className="litera-input w-full font-mono text-xs"
+                className="min-w-0 flex-1 font-mono text-xs"
                 placeholder={t("settings.profile.chatModelPlaceholder")}
               />
               <datalist id={`models-${profile.name}`}>
                 {fetchedModels?.map((m) => <option key={m} value={m} />)}
               </datalist>
-              <button
+              <Button
                 onClick={() => listModels.mutate(local)}
                 disabled={listModels.isPending}
-                className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+                className="whitespace-nowrap"
                 title={t("settings.profile.fetchModelsTitle")}
               >
-                {listModels.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {listModels.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                 {t("settings.profile.fetchModels")}
-              </button>
+              </Button>
             </div>
             {listModels.error && (
-              <div className="text-[11px] text-litera-error">✕ {(listModels.error as Error).message}</div>
+              <div className="text-[11px] text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(listModels.error as Error).message}</div>
             )}
             {fetchedModels && (
               <div className="text-[11px] text-litera-mute">
@@ -135,23 +140,22 @@ export function ProfileCard({
         </Field>
         <Field label={t("settings.profile.embedModel")}>
           <div className="flex gap-2">
-            <input
+            <Input
               value={local.embed_model ?? ""}
               onChange={(e) => field("embed_model", e.target.value || null)}
-              className="litera-input w-full font-mono text-xs"
+              className="min-w-0 flex-1 font-mono text-xs"
               placeholder="all-MiniLM-L6-v2"
             />
             {local.embed_model && (
-              <button
-                type="button"
+              <Button
                 onClick={() => pullModel.mutate(local.embed_model!)}
                 disabled={pullModel.isPending}
-                className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
+                className="whitespace-nowrap"
                 title={t("settings.profile.pullModelTitle")}
               >
-                {pullModel.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {pullModel.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                 {t("settings.profile.pullModel")}
-              </button>
+              </Button>
             )}
           </div>
           {pullModel.isSuccess && (
@@ -161,19 +165,19 @@ export function ProfileCard({
           )}
           {pullModel.isError && (
             <div className="text-[11px] text-litera-error">
-              ✕ {(pullModel.error as Error).message}
+              <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{(pullModel.error as Error).message}
             </div>
           )}
         </Field>
         <Field label={t("settings.profile.maxTokens")}>
-          <input type="number" step="1" min={1} value={local.max_tokens}
+          <Input type="number" step="1" min={1} value={local.max_tokens}
             onChange={(e) => { const value = Number(e.target.value); if (Number.isInteger(value) && value > 0) field("max_tokens", value); }}
-            className="litera-input w-full" />
+            className="w-full" />
         </Field>
         <Field label={t("settings.profile.temperature")}>
-          <input type="number" step="0.1" value={local.temperature}
+          <Input type="number" step="0.1" value={local.temperature}
             onChange={(e) => field("temperature", parseFloat(e.target.value || "0"))}
-            className="litera-input w-full" min={0} max={2} />
+            className="w-full" min={0} max={2} />
         </Field>
       </div>
 
@@ -233,7 +237,7 @@ export function ProfileCard({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] uppercase tracking-wider text-litera-mute">{label}</span>
+      <span className="text-xs font-medium text-litera-mute">{label}</span>
       {children}
     </label>
   );

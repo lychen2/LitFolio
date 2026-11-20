@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Inbox, Loader2 } from "lucide-react";
+import { Inbox, Spinner } from "@/components/icons";
 import { type FeedItem, type FeedWithCounts, type TranslationResult } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { FeedItemDetailDrawer } from "./FeedItemDetailDrawer";
@@ -40,6 +40,7 @@ export function ItemsList({
             key={it.id}
             item={it}
             feedTitle={feedMap.get(it.feed_id)?.title ?? ""}
+            impactFactor={feedMap.get(it.feed_id)?.impact_factor ?? null}
             translation={translations.get(it.id) ?? null}
             onOpen={() => setOpenItem(it)}
             onTranslated={(result) => applyTranslation(it.id, result)}
@@ -63,7 +64,7 @@ function LoadingItems() {
   const t = useT();
   return (
     <div className="p-6 text-sm text-litera-mute flex items-center gap-2">
-      <Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}
+      <Spinner className="h-4 w-4 animate-spin" /> {t("common.loading")}
     </div>
   );
 }

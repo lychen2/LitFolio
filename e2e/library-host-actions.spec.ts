@@ -54,9 +54,9 @@ function hostMessages(page: Page) {
 }
 
 test("opens a host panel handed over by another route and clears the handoff", async ({ page }) => {
-  await boot(page, "/library?panel=queue-open");
+  await boot(page, "/library?panel=collections");
 
-  await expect(page.getByText("Queue is empty — add papers from the library")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Folders" })).toBeVisible();
   await expect(page).toHaveURL(/\/library$/);
 });
 
@@ -70,22 +70,15 @@ test("keeps the library on the hosted page with host entry points", async ({ pag
   await expect.poll(async () => (await hostMessages(page)).includes("library-collections")).toBe(true);
 });
 
-test("tells the framed page that a host write changed the paper set", async ({ page }) => {
-  await boot(page, "/reader/paper-reader");
-  await expect(page.locator(`iframe[src="${SERVICE_ORIGIN}/read/paper-reader"]`)).toBeVisible();
-  await expect.poll(async () => (await hostMessages(page)).length).toBeGreaterThan(0);
+test("acknowledges a paper deletion requested by the framed page", async ({ page }) => {
+  await boot(page, "/library");
+  await expect.poll(async () => (await hostMessages(page)).includes("library-collections")).toBe(true);
 
-  // The reader offers the queue action; the host writes through `queue_add`
-  // and must then publish the change back to the framed page.
-  await expect.poll(async () => (await hostMessages(page)).includes("library-changed")).toBe(false);
-  await hostFrame(page).evaluate(() =>
-    (window as unknown as { __emit: (message: unknown) => void }).__emit({
-      type: "action",
-      action: "queue-add",
-      paperIds: ["paper-reader"],
-    }),
-  );
-  await expect.poll(async () => (await hostMessages(page)).includes("library-changed")).toBe(true);
+  await emitFromFrame(page, { type: "delete", paperId: "paper-reader", requestId: "1" });
+  await expect.poll(() => hostFrame(page).evaluate(() => {
+    const frame = window as unknown as { __hostMessages: Array<{ type?: string; requestId?: string; ok?: boolean }> };
+    return frame.__hostMessages.find((message) => message.type === "delete-result");
+  })).toMatchObject({ requestId: "1", ok: true });
 });
 
 function emitFromFrame(page: Page, message: unknown) {
@@ -94,15 +87,6 @@ function emitFromFrame(page: Page, message: unknown) {
     message,
   );
 }
-
-test("keeps the outcome of a host action on screen after it settles", async ({ page }) => {
-  await boot(page, "/library");
-
-  await emitFromFrame(page, { type: "action", action: "queue-add", paperIds: ["paper-reader"] });
-
-  const notice = page.getByRole("status").filter({ hasText: "Added to reading queue." });
-  await expect(notice).toBeVisible();
-});
 
 test("translates a reader selection in the extension panel instead of a second drawer", async ({ page }) => {
   await boot(page, "/reader/paper-reader");
@@ -133,6 +117,23 @@ test("opens the matching import form from each framed library entry", async ({ p
   await expect(page.getByRole("button", { name: "arXiv or DOI" })).toHaveAttribute("aria-pressed", "true");
 });
 
+test.describe("Android PDF import", () => {
+  test.use({ userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel) AppleWebKit/537.36" });
+
+  test("passes a selected provider URI unchanged to the host importer", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("litfolio.lang", "en");
+      window.localStorage.setItem("litera.onboarding.completed", "1");
+    });
+    await page.goto("/import");
+    await expect(page.getByRole("button", { name: "Import Folder…" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Select PDF files…" }).click();
+    await expect(page.getByText("reading-check.pdf", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Import 1 file(s)" }).click();
+    await expect(page.getByText("✓ Imported 1 paper(s)", { exact: true })).toBeVisible();
+  });
+});
+
 test("takes focus from the iframe and closes only after IME composition", async ({ page }) => {
   await boot(page, "/library");
   await hostFrame(page).getByText("Upstream library fixture").click();
@@ -142,6 +143,20 @@ test("takes focus from the iframe and closes only after IME composition", async 
   await emitFromFrame(page, { type: "action", action: "details", paperIds: ["paper-reader"] });
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeFocused();
+  await dialog.getByText("More", { exact: true }).click();
+  const addToQueue = dialog.getByRole("button", { name: "Add to Queue" });
+  await addToQueue.focus();
+  await page.keyboard.press("Escape");
+  await expect(addToQueue).toBeHidden();
+  await expect(dialog.getByText("More", { exact: true })).toBeFocused();
+
+  await dialog.getByText("More", { exact: true }).click();
+  await addToQueue.click();
+  const notice = dialog.getByRole("status").filter({ hasText: "Added to reading queue." });
+  await expect(notice).toBeVisible();
+  await notice.getByRole("button", { name: "Close" }).click();
+  await expect(notice).toBeHidden();
+
   await dialog.dispatchEvent("keydown", { key: "Escape", isComposing: true, bubbles: true });
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");

@@ -1,0 +1,169 @@
+.relationship-graph {
+  --network-year-old: var(--litera-info);
+  --network-year-middle: var(--litera-accent);
+  --network-year-new: var(--litera-accent2);
+  --network-year-unknown: var(--litera-text-subtle);
+  --network-edge-direct: var(--litera-mute);
+  --network-edge-co: var(--litera-info);
+  --network-edge-shared: var(--litera-accent2);
+  --network-field: color-mix(in srgb, var(--litera-bg) 72%, var(--litera-paper));
+  min-width: 0;
+}
+
+.relationship-graph__viewport {
+  position: relative;
+  isolation: isolate;
+  border-block: 1px solid var(--litera-border);
+  background: var(--network-field);
+}
+
+.relationship-graph__svg {
+  display: block;
+  width: 100%;
+  height: clamp(360px, 47vh, 520px);
+  overflow: hidden;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--litera-line) 60%, transparent) 1px, transparent 1px);
+  background-size: 20px 20px;
+  user-select: none;
+  touch-action: none;
+}
+
+[data-sparse="true"] .relationship-graph__svg { height: clamp(248px, 32vh, 340px); }
+
+.relationship-graph__backdrop { fill: transparent; cursor: grab; }
+[data-dragging="true"] .relationship-graph__svg * { cursor: grabbing; }
+
+.relationship-graph__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--litera-space-1);
+  padding: var(--litera-space-1) var(--litera-space-3);
+  background: var(--litera-paper);
+  border-top: 1px solid var(--litera-border);
+}
+
+.relationship-graph__controls output {
+  min-width: 4ch;
+  color: var(--litera-mute);
+  font-size: .8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.relationship-graph__empty {
+  position: absolute;
+  inset: var(--litera-space-3) var(--litera-space-3) auto;
+  margin: 0;
+  color: var(--litera-mute);
+  font-size: .8125rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.relationship-graph__line {
+  --edge-color: var(--network-edge-direct);
+  fill: none;
+  stroke: var(--edge-color);
+  stroke-width: 1.5;
+  opacity: .62;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.relationship-graph__arrow { fill: var(--network-edge-direct); }
+.relationship-graph__line[data-kind="co_citation"] { --edge-color: var(--network-edge-co); stroke-dasharray: 5 3; }
+.relationship-graph__line[data-kind="shared_reference"] { --edge-color: var(--network-edge-shared); stroke-dasharray: 1 4; stroke-linecap: round; stroke-width: 2; }
+[data-dense="true"] .relationship-graph__line[data-emphasis="normal"] { opacity: .29; }
+.relationship-graph__line[data-emphasis="dim"] { opacity: .16; }
+.relationship-graph__line[data-emphasis="neighbor"] { opacity: .85; }
+.relationship-graph__line[data-emphasis="strong"] { opacity: 1; stroke-width: 3; }
+
+.relationship-graph__edge-hit {
+  cursor: pointer;
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+
+.relationship-graph__edge-hit:focus-visible {
+  outline: none;
+  stroke: var(--litera-focus);
+  stroke-width: 2.5;
+}
+
+.relationship-graph__paper { cursor: grab; }
+.relationship-graph__mark { stroke: var(--network-field); stroke-width: 1.5; }
+.relationship-graph__seed-ring { fill: none; stroke: var(--litera-text); stroke-width: 1.5; }
+.relationship-graph__focus-ring { fill: none; stroke: transparent; stroke-width: 2; }
+.relationship-graph__paper[data-state="dim"] { opacity: .32; }
+.relationship-graph__paper[data-state="selected"] .relationship-graph__focus-ring,
+.relationship-graph__paper:focus-visible .relationship-graph__focus-ring { stroke: var(--litera-focus); }
+.relationship-graph__paper:is(:hover, :focus-visible) { opacity: 1; outline: none; }
+.relationship-graph__paper foreignObject { pointer-events: none; }
+.relationship-graph__paper[data-state="selected"] .relationship-graph__label { color: var(--litera-accent-strong); }
+
+.relationship-graph__label {
+  display: -webkit-box;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 1px var(--litera-space-1);
+  border-radius: var(--litera-radius-sm);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  background: color-mix(in srgb, var(--network-field) 94%, transparent);
+  color: var(--litera-text);
+  font-size: 12px;
+  line-height: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.relationship-graph__legend {
+  display: grid;
+  gap: var(--litera-space-2);
+  padding: var(--litera-space-3) var(--litera-space-4);
+  color: var(--litera-mute);
+  font-size: .75rem;
+  line-height: 1.5;
+}
+
+.relationship-graph__legend > div { display: flex; flex-wrap: wrap; align-items: center; gap: var(--litera-space-1) var(--litera-space-3); }
+.relationship-graph__legend span { display: inline-flex; align-items: center; gap: var(--litera-space-1); }
+.relationship-graph__years { font-variant-numeric: tabular-nums; }
+.relationship-graph__years i,
+.relationship-graph__related-key,
+.relationship-graph__seed-key { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.relationship-graph__unknown { background: var(--network-year-unknown); }
+.relationship-graph__seed-key { border: 1.5px solid var(--litera-text); }
+.relationship-graph__related-key { background: var(--network-year-middle); }
+.relationship-graph__edge-key { width: 1rem; border-top: 2px dashed var(--network-edge-co); }
+.relationship-graph__edge-key[data-kind="citation"] { position: relative; border-top: 1.5px solid var(--network-edge-direct); }
+.relationship-graph__edge-key[data-kind="citation"]::after { content: ""; position: absolute; right: 0; top: -0.75px; width: 0.35rem; height: 0.35rem; border: solid var(--network-edge-direct); border-width: 1.5px 1.5px 0 0; transform: translateY(-50%) rotate(45deg); }
+.relationship-graph__edge-key[data-kind="shared_reference"] { border-top-style: dotted; border-top-color: var(--network-edge-shared); }
+
+@media (max-width: 560px) {
+  .relationship-graph__svg { height: clamp(340px, 46vh, 420px); }
+}
+
+@media (pointer: coarse) {
+  .relationship-graph__controls button { min-height: 44px; min-width: 44px; }
+}
+
+@media (forced-colors: active) {
+  .relationship-graph { --network-field: Canvas; --network-edge-direct: GrayText; --network-edge-co: LinkText; --network-edge-shared: ButtonText; }
+  .relationship-graph__line,
+  .relationship-graph__arrow,
+  .relationship-graph__mark,
+  .relationship-graph__seed-ring,
+  .relationship-graph__focus-ring { forced-color-adjust: none; }
+  .relationship-graph__mark { fill: LinkText; }
+  .relationship-graph__seed-ring { stroke: CanvasText; }
+  .relationship-graph__paper[data-state="selected"] .relationship-graph__focus-ring,
+  .relationship-graph__paper:focus-visible .relationship-graph__focus-ring { stroke: Highlight; }
+}

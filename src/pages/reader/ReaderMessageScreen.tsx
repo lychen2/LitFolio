@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@/components/icons";
 import type { ReactNode } from "react";
 import { useT } from "@/i18n/I18nProvider";
 

@@ -151,7 +151,7 @@ export function renderMarkdown(md: string): string {
       i++; // skip closing ```
       const code = escapeHtml(codeLines.join("\n"));
       html.push(
-        `<pre class="bg-litera-ink/40 rounded-md p-3 text-xs overflow-auto my-2"><code>${code}</code></pre>`,
+        `<pre class="bg-litera-surface2 rounded-md p-3 text-xs overflow-auto my-2"><code>${code}</code></pre>`,
       );
       continue;
     }

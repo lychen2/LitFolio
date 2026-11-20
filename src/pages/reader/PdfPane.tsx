@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/icons";
 import { PdfLoader, PdfHighlighter } from "react-pdf-highlighter";
 import type {
   IHighlight,
@@ -618,7 +618,7 @@ export const PdfPane = memo(function PdfPane({
   if (!pdfUrl) {
     return (
       <Center>
-        <Loader2 className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
+        <Spinner className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
         {t("reader.loadingPdf")}
       </Center>
     );
@@ -629,32 +629,46 @@ export const PdfPane = memo(function PdfPane({
       ref={containerRef}
       className={
         "h-full w-full bg-litera-ink relative " +
-        (dark ? "litera-pdf-dark" : "")
+        (dark ? "litera-pdf-dark " : "") +
+        (noteDrawMode ? "litera-pdf-drawing" : "")
       }
       tabIndex={-1}
     >
-      <PdfToolbar
-        dark={dark}
-        zoomLabel={zoomLabel}
-        canReturn={navigationStack.length > 0}
-        notePending={annotationSnapshot.creating}
-        noteActive={noteDrawMode}
-        onReturn={returnToPreviousPosition}
-        onAddNote={() => void createStandaloneNote()}
-        onZoomOut={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
-        onZoomReset={() => setZoom(DEFAULT_ZOOM)}
-        onZoomIn={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
-        onZoomFit={() => setZoom("page-width")}
-        onToggleDark={() => setDark((d) => !d)}
-      />
-      <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
-      {noteDrawMode && <div className="litera-pdf-note-draw-hint">{t("reader.noteDrawHint")}</div>}
+      <div className="absolute inset-x-2 top-2 z-20 flex flex-wrap items-start gap-1.5 pointer-events-none">
+        <PdfToolbar
+          dark={dark}
+          zoomLabel={zoomLabel}
+          canReturn={navigationStack.length > 0}
+          notePending={annotationSnapshot.creating}
+          noteActive={noteDrawMode}
+          onReturn={returnToPreviousPosition}
+          onAddNote={() => void createStandaloneNote()}
+          onZoomOut={() => setZoom((current) => nextZoom(current, -ZOOM_STEP))}
+          onZoomReset={() => setZoom(DEFAULT_ZOOM)}
+          onZoomIn={() => setZoom((current) => nextZoom(current, ZOOM_STEP))}
+          onZoomFit={() => setZoom("page-width")}
+          onToggleDark={() => setDark((d) => !d)}
+        />
+        <PdfSearchBar containerRef={containerRef} openSignal={searchSignal} />
+        {noteDrawMode && (
+          <div className="flex basis-full flex-wrap items-center gap-2">
+            <div className="litera-pdf-note-draw-hint">{t("reader.noteDrawHint")}</div>
+            <button
+              type="button"
+              className="litera-btn text-xs pointer-events-auto"
+              onClick={() => void createStandaloneNote()}
+            >
+              {t("common.cancel")}
+            </button>
+          </div>
+        )}
+      </div>
       <PdfLoader
         url={pdfUrl}
         workerSrc={workerUrl}
         beforeLoad={
           <Center>
-            <Loader2 className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
+            <Spinner className="h-4 w-4 animate-spin inline mr-1.5" />{" "}
             {t("reader.renderingPdf")}
           </Center>
         }
@@ -835,7 +849,6 @@ export const PdfPane = memo(function PdfPane({
         onSaveTextNote={saveTextNote}
         onSelect={setActiveNoteHighlightId}
         onStyleTextNote={saveTextNoteStyle}
-        onToggleDrawMode={setNoteDrawMode}
         onUpdateRect={saveTextNoteRect}
       />
       {askSelection && (

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Download, Loader2 } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { XCircle, Download, Spinner } from "@/components/icons";
+import { Button, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -25,51 +27,56 @@ export function ExportPanel() {
   });
 
   async function handleBrowse() {
-    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, multiple: false });
     if (typeof selected === "string" && selected) setDir.mutate(selected);
   }
 
   return (
-    <div className="space-y-5">
+    <section className="litera-panel space-y-4 p-4">
       <div>
-        <h3 className="text-sm font-medium text-litera-text mb-1">{t("export.title")}</h3>
-        <p className="text-xs text-litera-mute">{t("export.subtitle")}</p>
+        <h2 className="flex items-center gap-2 font-medium text-litera-text">
+          <Download className="size-4 text-litera-accent2" aria-hidden="true" />
+          {t("export.title")}
+        </h2>
+        <p className="mt-1 text-xs text-litera-mute">{t("export.subtitle")}</p>
       </div>
       <div className="space-y-2">
-        <label className="text-xs text-litera-mute">{t("export.dirLabel")}</label>
+        <label htmlFor="settings-export-directory" className="block text-xs font-medium text-litera-mute">{t("export.dirLabel")}</label>
         <div className="flex items-center gap-2">
-          <input
+          <Input
+            id="settings-export-directory"
             type="text"
             value={exportDir ?? ""}
             readOnly
             placeholder={t("export.dirPlaceholder")}
-            className="flex-1 px-3 py-1.5 text-sm bg-litera-panel border border-litera-line rounded-md text-litera-text placeholder:text-litera-mute"
+            className="min-w-0 flex-1"
           />
-          <button onClick={handleBrowse} className="litera-btn text-xs">{t("export.browse")}</button>
+          <Button size="sm" onClick={handleBrowse}>{t("export.browse")}</Button>
         </div>
-        <p className="text-[11px] text-litera-mute">{t("export.dirHint")}</p>
       </div>
-      <div className="flex gap-2">
-        <button
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => exportAll.mutate(false)}
           disabled={exportAll.isPending || !exportDir}
-          className="litera-btn-primary text-xs disabled:opacity-50"
+          className="disabled:opacity-50"
         >
-          {exportAll.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          {exportAll.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {t("export.exportAll")}
-        </button>
-        <button
+        </Button>
+        <Button
+          size="sm"
           onClick={() => exportAll.mutate(true)}
           disabled={exportAll.isPending || !exportDir}
-          className="litera-btn text-xs disabled:opacity-50"
+          className="disabled:opacity-50"
         >
           {t("export.exportIncremental")}
-        </button>
+        </Button>
       </div>
-      {exportAll.error && <div className="text-sm text-litera-error">✕ {(exportAll.error as Error).message}</div>}
-      {result && <div className="text-sm text-litera-accent">{result}</div>}
+      {exportAll.error && <div role="alert" className="text-sm text-litera-error"><XCircle className="mr-1 size-4 align-text-bottom" />{exportAll.error.message}</div>}
+      {result && <div role="status" className="text-sm text-litera-success">{result}</div>}
       {!exportDir && <div className="text-xs text-litera-mute">{t("export.noDir")}</div>}
-    </div>
+    </section>
   );
 }

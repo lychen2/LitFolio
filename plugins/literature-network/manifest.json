@@ -1,0 +1,96 @@
+{
+  "apiVersion": 1,
+  "id": "literature-network",
+  "version": "1.0.0",
+  "coreApi": "^1.0.0",
+  "displayName": "Literature Network",
+  "activation": {
+    "frontend": {
+      "export": "activateLiteratureNetwork"
+    }
+  },
+  "dependencies": [],
+  "requestedCapabilities": [
+    {
+      "capability": "papers",
+      "operations": [
+        "papers.read"
+      ],
+      "required": true,
+      "scope": {
+        "resourceDomains": [
+          "paper"
+        ],
+        "contributionSlots": [
+          "app.routes"
+        ],
+        "jobKinds": []
+      },
+      "limits": {
+        "maxUnitsPerRequest": 100,
+        "maxUnitsPerWindow": 1000
+      }
+    },
+    {
+      "capability": "network",
+      "operations": [
+        "network.request"
+      ],
+      "required": true,
+      "scope": {
+        "resourceDomains": [
+          "paper"
+        ],
+        "contributionSlots": [
+          "app.routes"
+        ],
+        "jobKinds": []
+      },
+      "limits": {
+        "maxUnitsPerRequest": 100,
+        "maxUnitsPerWindow": 1000
+      }
+    },
+    {
+      "capability": "ai",
+      "operations": [
+        "ai.chat"
+      ],
+      "required": false,
+      "scope": {
+        "resourceDomains": [
+          "paper"
+        ],
+        "contributionSlots": [
+          "app.routes"
+        ],
+        "jobKinds": []
+      },
+      "limits": {
+        "maxUnitsPerRequest": 100,
+        "maxUnitsPerWindow": 1000
+      }
+    }
+  ],
+  "contributions": [
+    {
+      "id": "network-route",
+      "slot": "app.routes",
+      "frontendExport": "renderNetworkRoute",
+      "requiredOperations": [
+        "papers.read",
+        "network.request"
+      ],
+      "order": 0
+    }
+  ],
+  "storage": {
+    "kind": "none",
+    "schemaVersion": 0,
+    "retention": "preserve-on-disable"
+  },
+  "migrations": [],
+  "build": {
+    "frontendEntry": "./src/plugins/literature-network/index.ts"
+  }
+}

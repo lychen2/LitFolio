@@ -4,10 +4,6 @@
 //! - `activateFixtureLocal` — activation entry (activation.frontend.export)
 //! - `renderToolbarButton`  — library.toolbarActions contribution
 
-import type { FrontendPluginEntry } from "@/host/pluginTypes";
-
-export const pluginRoutes: FrontendPluginEntry["pluginRoutes"] = [];
-
 export interface FixtureActivation {
   pluginId: string;
   deactivate: () => void;

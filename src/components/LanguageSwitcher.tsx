@@ -1,4 +1,4 @@
-import { Languages } from "lucide-react";
+import { Languages } from "@/components/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -26,7 +26,7 @@ export function LanguageSwitcher() {
 
   return (
     <div className="flex items-center gap-1 text-xs max-[900px]:flex-col" role="group" aria-label={t("lang.label")}>
-      <Languages className="h-3.5 w-3.5 text-litera-mute max-[900px]:hidden" aria-hidden="true" />
+      <Languages className="size-[1.125rem] max-[900px]:hidden" aria-hidden="true" />
       <button
         type="button"
         onClick={() => switchTo("zh")}

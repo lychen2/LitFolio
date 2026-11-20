@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Archive, CheckCircle2, FlaskConical, Loader2, Rocket } from "lucide-react";
+import { XCircle, Archive, CheckCircle2, FlaskConical, Spinner, Rocket } from "@/components/icons";
 import { api, type Paper, type SearchHit } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { useImportedArxivIds } from "@/hooks/useImportedArxivIds";
@@ -34,7 +34,7 @@ export function Column({
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="p-8 text-center text-sm text-litera-mute flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> {t("topic.search.loading")}
+            <Spinner className="h-4 w-4 animate-spin" /> {t("topic.search.loading")}
           </div>
         ) : hits.length === 0 ? (
           <div className="p-8 text-center text-sm text-litera-mute">
@@ -134,7 +134,7 @@ function HitBody({
         </p>
       )}
       {errorMessage(error) && (
-        <div className="mt-1.5 text-xs text-litera-error">✕ {errorMessage(error)}</div>
+        <div className="mt-1.5 text-xs text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{errorMessage(error)}</div>
       )}
     </div>
   );
@@ -179,7 +179,7 @@ function HitAction({
         className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
         title={t("candidate.add")}
       >
-        {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+        {candidatePending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
         {t("candidate.addShort")}
       </button>
     );
@@ -192,7 +192,7 @@ function HitAction({
         className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
         title={t("candidate.add")}
       >
-        {candidatePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+        {candidatePending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
         {t("candidate.addShort")}
       </button>
       <button
@@ -201,7 +201,7 @@ function HitAction({
         className="litera-btn text-xs whitespace-nowrap disabled:opacity-50"
         title={t("topic.search.downloadAndImportTitle")}
       >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+        {pending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
         {t("topic.search.downloadAndImport")}
       </button>
     </div>

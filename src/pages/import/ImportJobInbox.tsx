@@ -4,11 +4,10 @@ import {
   Clock3,
   FileText,
   Inbox,
-  Loader2,
-  Radio,
+  Spinner,
   RefreshCw,
   XCircle,
-} from "lucide-react";
+} from "@/components/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type JobRecord, type JobStatus } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
@@ -158,7 +157,7 @@ function ImportJobCard({ job }: { job: ImportJob }) {
             <p className="break-words text-litera-mute">{job.evidence}</p>
           )}
           {job.error && (
-            <p className="break-words text-litera-error">✕ {job.error}</p>
+            <p className="break-words text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{job.error}</p>
           )}
         </div>
       )}
@@ -216,7 +215,7 @@ function PersistedJobCard({ job }: { job: JobRecord }) {
       {(job.error || canMutatePersistedJob(job)) && (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
           {job.error ? (
-            <p className="min-w-0 flex-1 break-words text-litera-error">✕ {job.error}</p>
+            <p className="min-w-0 flex-1 break-words text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{job.error}</p>
           ) : (
             <span className="text-litera-mute" />
           )}
@@ -301,13 +300,13 @@ function PersistedJobStatusIcon({ status }: { status: JobStatus }) {
   }
   if (status === "running") {
     return (
-      <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-litera-accent" />
+      <Spinner className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-litera-accent" />
     );
   }
   if (status === "cancelled") {
     return <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-litera-mute" />;
   }
-  return <Radio className="mt-0.5 h-4 w-4 shrink-0 text-litera-mute" />;
+  return <Clock3 className="mt-0.5 size-4" />;
 }
 
 function persistedJobKindLabel(kind: string): string {
@@ -355,13 +354,13 @@ function JobStatusIcon({ status }: { status: ImportJobStatus }) {
   }
   if (status === "running") {
     return (
-      <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-litera-accent" />
+      <Spinner className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-litera-accent" />
     );
   }
   if (status === "waiting") {
     return <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-litera-warn" />;
   }
-  return <Radio className="mt-0.5 h-4 w-4 shrink-0 text-litera-mute" />;
+  return <FileText className="mt-0.5 size-4" />;
 }
 
 function JobProgress({ progress }: { progress?: ImportJobProgress }) {

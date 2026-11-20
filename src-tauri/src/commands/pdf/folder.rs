@@ -238,7 +238,6 @@ async fn import_one_folder_pdf(
             generate_and_index_pdf_markdown_or_warn(
                 &pool,
                 &library,
-                &http,
                 &paper.id,
                 Path::new(pdf_path),
             )
@@ -252,7 +251,6 @@ async fn import_one_folder_pdf(
         generate_and_index_pdf_markdown_or_warn(
             &pool,
             &library,
-            &http,
             &paper.id,
             &imported.stored_path,
         )

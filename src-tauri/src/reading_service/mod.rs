@@ -2,14 +2,18 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "android"))]
 use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+#[cfg(not(target_os = "android"))]
 use tauri_plugin_shell::ShellExt;
+#[cfg(not(target_os = "android"))]
 use tokio::io::{AsyncBufReadExt, BufReader};
+#[cfg(not(target_os = "android"))]
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
@@ -20,6 +24,11 @@ use crate::storage::reading_catalog::{project_reading_catalog, ReadingCatalogIte
 use crate::storage::reading_document::DocumentProjection;
 use crate::AppState;
 
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(target_os = "android")]
+pub(crate) use android::init as android_plugin;
+
 mod mutations;
 pub use mutations::TagChange;
 
@@ -29,19 +38,24 @@ pub struct ReadingService {
 }
 
 struct Runtime {
+    #[cfg(not(target_os = "android"))]
     process: ServiceProcess,
+    #[cfg(target_os = "android")]
+    plugin: android::AndroidReadingPlugin,
     url: String,
     token: String,
     http: reqwest::Client,
     documents: DocumentProjection,
 }
 
+#[cfg(not(target_os = "android"))]
 // Dropping an unsuccessful startup must also reap the frozen interpreter child.
 struct ServiceProcess {
     child: Child,
     pid: u32,
 }
 
+#[cfg(not(target_os = "android"))]
 impl ServiceProcess {
     fn terminate_tree(&mut self) {
         #[cfg(unix)]
@@ -61,6 +75,7 @@ impl ServiceProcess {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 impl Drop for ServiceProcess {
     fn drop(&mut self) {
         if !matches!(self.child.try_wait(), Ok(Some(_))) {
@@ -145,15 +160,22 @@ impl ReadingService {
     pub async fn open(&self, app: &AppHandle, state: &AppState, id: Option<&str>) -> Result<ReadingSession> {
         // Serializes startup, legacy attachment and catalog projection across frames.
         let mut guard = self.runtime.lock().await;
+        #[cfg(not(target_os = "android"))]
         if let Some(runtime) = guard.as_mut() {
             if runtime.process.child.try_wait()?.is_some() {
                 *guard = None;
             }
         }
         if guard.is_none() {
+            #[cfg(not(target_os = "android"))]
             let command: std::process::Command = app.shell().sidecar("core")?.into();
+            let library = state.paths.root.join("reading");
             let home = reading_home(&app.path().app_config_dir()?)?;
-            *guard = Some(Runtime::start(command, &home, &state.paths.root.join("reading")).await?);
+            #[cfg(not(target_os = "android"))]
+            let runtime = Runtime::start(command, &home, &library).await?;
+            #[cfg(target_os = "android")]
+            let runtime = app.state::<android::AndroidReadingPlugin>().start(&home, &library).await?;
+            *guard = Some(runtime);
         }
         let runtime = guard.as_mut().context("reading service did not start")?;
         runtime.configure(state).await?;
@@ -189,6 +211,14 @@ impl ReadingService {
         Ok(())
     }
 
+    #[cfg(target_os = "android")]
+    pub async fn stop(&self) {
+        if let Some(runtime) = self.runtime.lock().await.take() {
+            runtime.plugin.stop().await;
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
     pub async fn stop(&self) {
         if let Some(mut runtime) = self.runtime.lock().await.take() {
             // Use the service's own exit path so the frozen bootloader can reap it.
@@ -219,6 +249,7 @@ impl ReadingService {
 }
 
 impl Runtime {
+    #[cfg(not(target_os = "android"))]
     async fn start(mut command: std::process::Command, home: &Path, library: &Path) -> Result<Self> {
         std::fs::create_dir_all(home)?;
         command
@@ -267,6 +298,14 @@ impl Runtime {
         tauri::async_runtime::spawn(async move {
             while matches!(lines.next_line().await, Ok(Some(_))) {}
         });
+        Self::connect(process, url).await
+    }
+
+    async fn connect(
+        #[cfg(not(target_os = "android"))] process: ServiceProcess,
+        #[cfg(target_os = "android")] plugin: android::AndroidReadingPlugin,
+        url: String,
+    ) -> Result<Self> {
         let http = reqwest::Client::builder()
             .no_proxy()
             .timeout(Duration::from_secs(15))
@@ -278,7 +317,16 @@ impl Runtime {
             .error_for_status()?
             .json()
             .await?;
-        Ok(Self { process, url, token: session.token, http, documents: DocumentProjection::default() })
+        Ok(Self {
+            #[cfg(not(target_os = "android"))]
+            process,
+            #[cfg(target_os = "android")]
+            plugin,
+            url,
+            token: session.token,
+            http,
+            documents: DocumentProjection::default(),
+        })
     }
 
     async fn post(&self, path: &str, body: &impl Serialize) -> Result<reqwest::Response> {
@@ -398,5 +446,8 @@ impl Runtime {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "android")))]
+mod original_title_test;
+
+#[cfg(all(test, not(target_os = "android")))]
 mod tests;

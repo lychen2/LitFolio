@@ -1,4 +1,8 @@
 import { useSearchParams } from "react-router-dom";
+import { Inbox } from "@/components/icons";
+import { ChoiceButton } from "@/components/ChoiceButton";
+import { PageHeader } from "@/components/PageHeader";
+import { PageToolbar } from "@/components/PageToolbar";
 import { CoreFrame } from "@/features/reader/CoreFrame";
 import { useT } from "@/i18n/I18nProvider";
 import { extractIdentifier } from "@/lib/identifier";
@@ -17,6 +21,7 @@ const TABS = [
 export function ImportPage() {
   const t = useT();
   const [params, setParams] = useSearchParams();
+  const isAndroid = typeof navigator !== "undefined" && /\bAndroid\b/.test(navigator.userAgent);
   const link = params.get("link")?.trim() || null;
   const fromFeedItem = params.get("fromFeedItem");
   const candidate = params.get("candidateId");
@@ -29,7 +34,8 @@ export function ImportPage() {
   };
   const requestedTab = params.get("tab");
   const tab = requestedTab === "pdf" || requestedTab === "paper" ? requestedTab
-    : requestedTab === "arxiv_doi" || link || fromFeedItem || candidate ? "arxiv_doi" : "paper";
+    : requestedTab === "arxiv_doi" || link || fromFeedItem || candidate ? "arxiv_doi"
+    : isAndroid ? "pdf" : "paper";
 
   function setTab(nextTab: (typeof TABS)[number][0]) {
     setParams((current) => {
@@ -40,31 +46,25 @@ export function ImportPage() {
   }
 
   return (
-    <section className="flex h-full flex-col">
-      <header className="border-b border-litera-line px-6 py-4">
-        <h1 className="font-serif text-xl text-litera-text">{t("import.title")}</h1>
-        <details key={tab} open={tab === "paper" ? undefined : true} className="mt-2">
+    <section className="litera-import flex h-full flex-col">
+      <PageHeader icon={<Inbox />} title={t("import.title")} />
+      <PageToolbar>
+        <details key={tab} open={tab === "paper" ? undefined : true}>
           <summary className="w-fit cursor-pointer text-sm text-litera-mute">{t("import.advanced")}</summary>
-          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t("import.advanced")}>
+          <div className="litera-tab-list mt-2 flex-wrap" role="group" aria-label={t("import.advanced")}>
             {TABS.map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={tab === id}
-                onClick={() => setTab(id)}
-                className={tab === id ? "litera-btn-primary text-sm" : "litera-btn text-sm"}
-              >
+              <ChoiceButton key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
                 {t(label)}
-              </button>
+              </ChoiceButton>
             ))}
           </div>
         </details>
-      </header>
+      </PageToolbar>
       {tab === "arxiv_doi" && <ImportSourceBanner source={source} />}
       <div className="min-h-0 flex-1 overflow-hidden">
         {tab === "paper" ? <CoreFrame showImport /> : (
-          <div className="h-full overflow-auto p-6">
-            {tab === "pdf" ? <PdfTab /> : (
+          <div className="h-full overflow-auto px-[var(--litera-page-inset)] py-4">
+            {tab === "pdf" ? <PdfTab allowFolderImport={!isAndroid} /> : (
               <ArxivDoiTab key={JSON.stringify([fromFeedItem, candidate, link])} source={source} />
             )}
           </div>

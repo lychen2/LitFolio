@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Database, FileText, HardDrive, Paperclip, StickyNote } from "lucide-react";
+import { Database, FileText, HardDrive, Paperclip, StickyNote } from "@/components/icons";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 

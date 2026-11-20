@@ -5,38 +5,21 @@ import {
   parseCandidatePaper,
   parseFeedItem,
   parseFeedWithCounts,
-  parseGraphData,
-  parsePaper,
   parsePdfImportSummary,
   parseTopicAlertResult,
 } from "./apiSchema";
-import { parseArray, parseNullable } from "./apiSchemaCore";
+import { parseArray } from "./apiSchemaCore";
 import { invokeParsed } from "./apiInvoke";
 import type {
   CandidateDraft,
   CandidateStatus,
-  Concept,
-  ConceptRelation,
-  CustomFieldDef,
-  DuplicatePair,
   ExportSummary,
-  ExtractedConcept,
+  FeedItemSort,
   FeedRefreshAllSummary,
   FeedRefreshResult,
-  FilterRule,
-  GraphFilter,
-  LinkBatchSummary,
-  LitReviewResult,
   NoteSection,
-  PaperConcept,
-  PaperCustomField,
-  PaperLink,
-  QueueEntry,
-  Recommendation,
-  SmartCollection,
   TopicAlert,
   UnifiedSearchResult,
-  CitationGraph,
 } from "./types/api";
 
 export const knowledgeApi = {
@@ -54,6 +37,7 @@ export const knowledgeApi = {
     feedId?: number | null;
     onlyUnread?: boolean;
     keyword?: string;
+    sort?: FeedItemSort;
     limit?: number;
     offset?: number;
   }) =>
@@ -63,6 +47,7 @@ export const knowledgeApi = {
         feedId: params.feedId ?? null,
         onlyUnread: params.onlyUnread ?? null,
         keyword: params.keyword ?? null,
+        sort: params.sort ?? null,
         limit: params.limit ?? null,
         offset: params.offset ?? null,
       },
@@ -76,41 +61,6 @@ export const knowledgeApi = {
     invoke<void>("feed_item_link_paper", { itemId, paperId }),
   feedItemPrepareDraft: (itemId: string) =>
     invokeParsed("feed_item_prepare_draft", { itemId }, parseArxivDraft),
-  graphData: (filter?: GraphFilter) =>
-    invokeParsed("graph_data", { filter: filter ?? {} }, parseGraphData),
-  paperLinkCreate: (
-    sourcePaperId: string,
-    targetPaperId: string,
-    relation: string,
-    snippet?: string | null
-  ) =>
-    invoke<PaperLink>("paper_link_create", {
-      sourcePaperId,
-      targetPaperId,
-      relation,
-      snippet: snippet ?? null,
-    }),
-  paperLinkCreateOrGet: (
-    sourcePaperId: string,
-    targetPaperId: string,
-    relation: string,
-    snippet?: string | null
-  ) =>
-    invoke<PaperLink>("paper_link_create_or_get", {
-      sourcePaperId,
-      targetPaperId,
-      relation,
-      snippet: snippet ?? null,
-    }),
-  paperLinkDelete: (id: number) => invoke<void>("paper_link_delete", { id }),
-  paperLinksForPaper: (paperId: string) =>
-    invoke<PaperLink[]>("paper_links_for_paper", { paperId }),
-  aiDiscoverLinks: (paperIds?: string[]) =>
-    invoke<LinkBatchSummary>("ai_discover_links", {
-      paperIds: paperIds ?? null,
-    }),
-  aiAcceptLink: (linkId: number) => invoke<void>("ai_accept_link", { linkId }),
-  aiRejectLink: (linkId: number) => invoke<void>("ai_reject_link", { linkId }),
   bibtexBackfill: () => invoke<number>("bibtex_backfill"),
   exportMarkdownDir: () => invoke<string | null>("export_markdown_dir"),
   exportMarkdownSetDir: (dir: string) =>
@@ -121,7 +71,6 @@ export const knowledgeApi = {
     }),
   exportMarkdownPaper: (paperId: string) =>
     invoke<string>("export_markdown_paper", { paperId }),
-  obsidianExportAll: () => invoke<ExportSummary>("obsidian_export_all"),
   searchUnified: (query: string, limit?: number) =>
     invoke<UnifiedSearchResult[]>("search_unified", {
       query,
@@ -145,39 +94,9 @@ export const knowledgeApi = {
     invoke<void>("note_sections_reorder", { paperId, sectionIds }),
   noteSectionDelete: (id: number) =>
     invoke<void>("note_section_delete", { id }),
-  paperSimilar: (id: string) =>
-    invoke<Recommendation[]>("paper_similar", { id }),
   exportCitations: (paperIds: string[], format: string) =>
     invoke<string>("export_citations", {
       request: { paper_ids: paperIds, format },
-    }),
-  paperCitations: (id: string) =>
-    invoke<CitationGraph>("paper_citations", { id }),
-  queueList: () => invoke<QueueEntry[]>("queue_list"),
-  queueAdd: (
-    paperId: string,
-    priority?: number,
-    targetDate?: number,
-    note?: string
-  ) =>
-    invoke<void>("queue_add", {
-      paperId,
-      priority: priority ?? 0,
-      targetDate: targetDate ?? null,
-      note: note ?? null,
-    }),
-  queueRemove: (paperId: string) => invoke<void>("queue_remove", { paperId }),
-  queueUpdate: (
-    paperId: string,
-    priority: number,
-    targetDate?: number,
-    note?: string
-  ) =>
-    invoke<void>("queue_update", {
-      paperId,
-      priority,
-      targetDate: targetDate ?? null,
-      note: note ?? null,
     }),
   candidatesList: (includeIgnored?: boolean) =>
     invokeParsed(
@@ -189,42 +108,6 @@ export const knowledgeApi = {
     invokeParsed("candidate_upsert", { draft }, parseCandidatePaper),
   candidateSetStatus: (id: number, status: CandidateStatus) =>
     invoke<void>("candidate_set_status", { id, status }),
-  generateLitReview: (paperIds: string[], grouping: string) =>
-    invoke<LitReviewResult>("generate_lit_review", { paperIds, grouping }),
-  smartCollectionsList: () =>
-    invoke<SmartCollection[]>("smart_collections_list"),
-  smartCollectionCreate: (name: string, rules: FilterRule) =>
-    invoke<number>("smart_collection_create", { name, rules }),
-  smartCollectionUpdate: (id: number, name: string, rules: FilterRule) =>
-    invoke<void>("smart_collection_update", { id, name, rules }),
-  smartCollectionDelete: (id: number) =>
-    invoke<void>("smart_collection_delete", { id }),
-  smartCollectionQueryPapers: (id: number) =>
-    invokeParsed("smart_collection_query_papers", { id }, (value, path) =>
-      parseArray(value, path, parsePaper)
-    ),
-  paperFindDuplicate: (paperId: string) =>
-    invokeParsed("paper_find_duplicate", { paperId }, (value, path) =>
-      parseNullable(value, path, parsePaper)
-    ),
-  paperScanDuplicates: () => invoke<DuplicatePair[]>("paper_scan_duplicates"),
-  paperMerge: (keepId: string, mergeId: string) =>
-    invoke<void>("paper_merge", { keepId, mergeId }),
-  customFieldDefsList: () => invoke<CustomFieldDef[]>("custom_field_defs_list"),
-  customFieldDefCreate: (name: string, fieldType: string, options?: string[]) =>
-    invoke<number>("custom_field_def_create", {
-      name,
-      fieldType,
-      options: options ?? null,
-    }),
-  customFieldDefDelete: (id: number) =>
-    invoke<void>("custom_field_def_delete", { id }),
-  paperCustomFieldsGet: (paperId: string) =>
-    invoke<PaperCustomField[]>("paper_custom_fields_get", { paperId }),
-  paperCustomFieldSet: (paperId: string, fieldId: number, value: string) =>
-    invoke<void>("paper_custom_field_set", { paperId, fieldId, value }),
-  paperCustomFieldDelete: (paperId: string, fieldId: number) =>
-    invoke<void>("paper_custom_field_delete", { paperId, fieldId }),
   importFolder: (dirPath: string) =>
     invokeParsed("import_folder", { dirPath }, parsePdfImportSummary),
   topicAlertsList: () => invoke<TopicAlert[]>("topic_alerts_list"),
@@ -255,43 +138,4 @@ export const knowledgeApi = {
   topicAlertRun: (alertId: number) =>
     invoke<number>("topic_alert_run", { alertId }),
   topicAlertRunAll: () => invoke<number>("topic_alert_run_all"),
-  conceptsList: () => invoke<Concept[]>("concepts_list"),
-  conceptCreate: (name: string, description?: string | null) =>
-    invoke<number>("concept_create", {
-      name,
-      description: description ?? null,
-    }),
-  conceptDelete: (id: number) => invoke<void>("concept_delete", { id }),
-  conceptRelationsList: () =>
-    invoke<ConceptRelation[]>("concept_relations_list"),
-  conceptRelationCreate: (
-    sourceId: number,
-    targetId: number,
-    relation: string,
-    evidencePaperId?: string | null,
-    snippet?: string | null
-  ) =>
-    invoke<number>("concept_relation_create", {
-      sourceId,
-      targetId,
-      relation,
-      evidencePaperId: evidencePaperId ?? null,
-      snippet: snippet ?? null,
-    }),
-  conceptRelationDelete: (id: number) =>
-    invoke<void>("concept_relation_delete", { id }),
-  conceptLinkPaper: (paperId: string, conceptId: number, relevance?: number) =>
-    invoke<void>("concept_link_paper", {
-      paperId,
-      conceptId,
-      relevance: relevance ?? 1.0,
-    }),
-  conceptUnlinkPaper: (paperId: string, conceptId: number) =>
-    invoke<void>("concept_unlink_paper", { paperId, conceptId }),
-  conceptForPaper: (paperId: string) =>
-    invoke<PaperConcept[]>("concept_for_paper", { paperId }),
-  conceptExtractFromPaper: (paperId: string) =>
-    invoke<ExtractedConcept[]>("concept_extract_from_paper", { paperId }),
-  conceptExtractAndStore: (paperId: string) =>
-    invoke<number>("concept_extract_and_store", { paperId }),
 };

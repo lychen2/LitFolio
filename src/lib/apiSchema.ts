@@ -1,14 +1,9 @@
 import type {
-  AskCapabilityState,
-  AskSession,
   ArxivDraft,
   CandidatePaper,
   CandidateStatus,
   FeedItem,
   FeedWithCounts,
-  GraphData,
-  GraphEdge,
-  GraphNode,
   Highlight,
   JobRecord,
   JobStatus,
@@ -16,8 +11,6 @@ import type {
   LlmProfile,
   Paper,
   PdfImportSummary,
-  PaperSupplement,
-  SupplementConversionResult,
   ReadStatus,
   TaskAssignments,
   TaskBinding,
@@ -32,21 +25,12 @@ import {
   nullableStringField,
   numberField,
   object,
-  optionalNumberField,
-  optionalStringField,
   parseArray,
   parseNullable,
   stringArrayField,
   stringField,
   type Shape,
 } from "./apiSchemaCore";
-import type {
-  SyncPreviewAction,
-  SyncPreviewChange,
-  SyncPreviewDirection,
-  SyncPreviewReport,
-  SyncReport,
-} from "./syncApi";
 
 const READ_STATUSES = new Set<ReadStatus>([
   "unread",
@@ -66,18 +50,6 @@ const PDF_MARKDOWN_ENGINES = new Set([
   "mineru-agent",
   "mineru-precise",
 ]);
-const NODE_TYPES = new Set(["paper", "concept", "tag", "folder"]);
-const EDGE_TYPES = new Set(["citation", "similar", "manual", "concept"]);
-const EDGE_SOURCE_TYPES = new Set(["user", "ai", "derived"]);
-const SYNC_PREVIEW_DIRECTIONS = new Set<SyncPreviewDirection>(["push", "pull"]);
-const SYNC_PREVIEW_ACTIONS = new Set<SyncPreviewAction>([
-  "upload_new",
-  "upload_replace",
-  "delete_remote",
-  "download_new",
-  "download_replace",
-  "delete_local",
-]);
 const JOB_STATUSES = new Set<JobStatus>([
   "queued",
   "running",
@@ -85,16 +57,6 @@ const JOB_STATUSES = new Set<JobStatus>([
   "failed",
   "cancelled",
 ]);
-const ASK_CAPABILITY_STATES = new Set([
-  "search_only",
-  "needs_model",
-  "answer_ready",
-  "indexing",
-  "degraded",
-]);
-
-
-
 export function parsePaper(value: unknown, path = "Paper"): Paper {
   const obj = object(value, path);
   return {
@@ -130,32 +92,6 @@ export function parsePaper(value: unknown, path = "Paper"): Paper {
   };
 }
 
-export function parsePaperSupplement(value: unknown, path = "PaperSupplement"): PaperSupplement {
-  const obj = object(value, path);
-  return {
-    id: numberField(obj, "id", path),
-    paper_id: stringField(obj, "paper_id", path),
-    title: stringField(obj, "title", path),
-    file_path: stringField(obj, "file_path", path),
-    file_kind: stringField(obj, "file_kind", path),
-    note: stringField(obj, "note", path),
-    converted_pdf_path: nullableStringField(obj, "converted_pdf_path", path),
-    created_at: numberField(obj, "created_at", path),
-    updated_at: numberField(obj, "updated_at", path),
-  };
-}
-
-export function parseSupplementConversionResult(
-  value: unknown,
-  path = "SupplementConversionResult",
-): SupplementConversionResult {
-  const obj = object(value, path);
-  return {
-    supplement: parsePaperSupplement(field(obj, "supplement", path), `${path}.supplement`),
-    pdf_path: stringField(obj, "pdf_path", path),
-  };
-}
-
 export function parsePdfImportSummary(
   value: unknown,
   path = "PdfImportSummary"
@@ -175,50 +111,6 @@ export function parsePdfImportSummary(
   };
 }
 
-export function parseAskSession(value: unknown, path = "AskSession"): AskSession {
-  const obj = object(value, path);
-  return {
-    id: stringField(obj, "id", path),
-    project_id: nullableNumberField(obj, "project_id", path),
-    title: stringField(obj, "title", path),
-    pinned_paper_ids: stringArrayField(obj, "pinned_paper_ids", path),
-    model: nullableStringField(obj, "model", path),
-    conversation: field(obj, "conversation", path),
-    saved_artifacts: field(obj, "saved_artifacts", path),
-    created_at: numberField(obj, "created_at", path),
-    updated_at: numberField(obj, "updated_at", path),
-  };
-}
-
-export function parseAskSessionMaybe(
-  value: unknown,
-  path = "AskSession | null"
-): AskSession | null {
-  if (value === null || value === undefined) return null;
-  return parseAskSession(value, path);
-}
-
-
-export function parseAskCapabilityState(
-  value: unknown,
-  path = "AskCapabilityState"
-): AskCapabilityState {
-  const obj = object(value, path);
-  const state = enumStringField(
-    obj,
-    "state",
-    path,
-    ASK_CAPABILITY_STATES
-  ) as AskCapabilityState["state"];
-  return {
-    state,
-    has_model: booleanField(obj, "has_model", path),
-    indexed_documents: numberField(obj, "indexed_documents", path),
-    failed_documents: numberField(obj, "failed_documents", path),
-    total_documents: numberField(obj, "total_documents", path),
-    reason: nullableStringField(obj, "reason", path),
-  };
-}
 export function parseJobRecord(value: unknown, path = "JobRecord"): JobRecord {
   const obj = object(value, path);
   return {
@@ -292,22 +184,6 @@ export function parseHighlight(value: unknown, path = "Highlight"): Highlight {
   };
 }
 
-export function parseGraphData(value: unknown, path = "GraphData"): GraphData {
-  const obj = object(value, path);
-  return {
-    nodes: parseArray(
-      field(obj, "nodes", path),
-      `${path}.nodes`,
-      parseGraphNode
-    ),
-    edges: parseArray(
-      field(obj, "edges", path),
-      `${path}.edges`,
-      parseGraphEdge
-    ),
-  };
-}
-
 export function parseFeedWithCounts(
   value: unknown,
   path = "FeedWithCounts"
@@ -325,6 +201,7 @@ export function parseFeedWithCounts(
     created_at: numberField(obj, "created_at", path),
     total_items: numberField(obj, "total_items", path),
     unread_items: numberField(obj, "unread_items", path),
+    impact_factor: nullableNumberField(obj, "impact_factor", path),
   };
 }
 
@@ -407,63 +284,6 @@ export function parseTopicAlertResult(
     abstract_text: nullableStringField(obj, "abstract_text", path),
     seen: booleanField(obj, "seen", path),
     added_at: numberField(obj, "added_at", path),
-  };
-}
-
-export function parseSyncReport(
-  value: unknown,
-  path = "SyncReport"
-): SyncReport {
-  const obj = object(value, path);
-  return {
-    remote_root: stringField(obj, "remote_root", path),
-    file_count: numberField(obj, "file_count", path),
-    total_bytes: numberField(obj, "total_bytes", path),
-    skipped_count: numberField(obj, "skipped_count", path),
-    skipped_bytes: numberField(obj, "skipped_bytes", path),
-    restart_required: booleanField(obj, "restart_required", path),
-    backup_path:
-      "backup_path" in obj
-        ? nullableStringField(obj, "backup_path", path)
-        : null,
-  };
-}
-
-export function parseSyncPreviewReport(
-  value: unknown,
-  path = "SyncPreviewReport"
-): SyncPreviewReport {
-  const obj = object(value, path);
-  return {
-    direction: syncPreviewDirectionField(obj, "direction", path),
-    remote_root: stringField(obj, "remote_root", path),
-    add_count: numberField(obj, "add_count", path),
-    update_count: numberField(obj, "update_count", path),
-    delete_count: numberField(obj, "delete_count", path),
-    unchanged_count: numberField(obj, "unchanged_count", path),
-    transfer_bytes: numberField(obj, "transfer_bytes", path),
-    restart_required: booleanField(obj, "restart_required", path),
-    backup_path:
-      "backup_path" in obj
-        ? nullableStringField(obj, "backup_path", path)
-        : null,
-    changes: parseArray(
-      field(obj, "changes", path),
-      `${path}.changes`,
-      parseSyncPreviewChange
-    ),
-  };
-}
-
-function parseSyncPreviewChange(
-  value: unknown,
-  path: string
-): SyncPreviewChange {
-  const obj = object(value, path);
-  return {
-    path: stringField(obj, "path", path),
-    action: syncPreviewActionField(obj, "action", path),
-    size: numberField(obj, "size", path),
   };
 }
 
@@ -551,41 +371,6 @@ function parseTaskBinding(value: unknown, path: string): TaskBinding {
   };
 }
 
-function parseGraphNode(value: unknown, path: string): GraphNode {
-  const obj = object(value, path);
-  const nodeType = enumStringField(obj, "node_type", path, NODE_TYPES);
-  return {
-    id: stringField(obj, "id", path),
-    node_type: nodeType as GraphNode["node_type"],
-    label: stringField(obj, "label", path),
-    sublabel: nullableStringField(obj, "sublabel", path),
-    year: optionalNumberField(obj, "year", path),
-    read_status: optionalStringField(obj, "read_status", path),
-    paper_count: optionalNumberField(obj, "paper_count", path),
-  };
-}
-
-function parseGraphEdge(value: unknown, path: string): GraphEdge {
-  const obj = object(value, path);
-  const edgeType = enumStringField(obj, "edge_type", path, EDGE_TYPES);
-  const sourceType = enumStringField(
-    obj,
-    "source_type",
-    path,
-    EDGE_SOURCE_TYPES
-  );
-  return {
-    id: stringField(obj, "id", path),
-    source: stringField(obj, "source", path),
-    target: stringField(obj, "target", path),
-    edge_type: edgeType as GraphEdge["edge_type"],
-    relation: "relation" in obj ? nullableStringField(obj, "relation", path) : null,
-    source_type: sourceType as GraphEdge["source_type"],
-    confidence: numberField(obj, "confidence", path),
-    snippet: nullableStringField(obj, "snippet", path),
-  };
-}
-
 function parsePdfFailure(
   value: unknown,
   path: string
@@ -614,24 +399,6 @@ function candidateStatusField(
 ): CandidateStatus {
   const value = enumStringField(obj, key, path, CANDIDATE_STATUSES);
   return value as CandidateStatus;
-}
-
-function syncPreviewDirectionField(
-  obj: Shape,
-  key: string,
-  path: string
-): SyncPreviewDirection {
-  const value = enumStringField(obj, key, path, SYNC_PREVIEW_DIRECTIONS);
-  return value as SyncPreviewDirection;
-}
-
-function syncPreviewActionField(
-  obj: Shape,
-  key: string,
-  path: string
-): SyncPreviewAction {
-  const value = enumStringField(obj, key, path, SYNC_PREVIEW_ACTIONS);
-  return value as SyncPreviewAction;
 }
 
 export function parseStorageStats(value: unknown, path = "StorageStats"): StorageStats {

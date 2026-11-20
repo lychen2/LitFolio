@@ -16,8 +16,9 @@ describe("DataPrivacyPanel", () => {
     expect(html).toContain("Export diagnostics log");
     expect(html).toContain("Data sent by AI requests");
     expect(html).toContain("Translation sends the selected text");
-    expect(html).toContain("Library Q&amp;A sends the question");
-    expect(html).toContain("Topic and literature review send the topic");
+    expect(html).toContain("Per-paper Q&amp;A sends the question");
+    expect(html).toContain("Topic surveys send the topic");
+    expect(html).not.toContain("Library Q&amp;A");
   });
 });
 

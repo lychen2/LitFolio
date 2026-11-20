@@ -381,6 +381,7 @@ fn read_non_empty_file(path: PathBuf) -> Option<String> {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn default_library_root() -> Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("cannot resolve home dir"))?;
     Ok(home.join("Litera-Library"))

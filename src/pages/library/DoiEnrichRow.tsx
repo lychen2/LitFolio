@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, RefreshCw, Search } from "lucide-react";
+import { XCircle, ExternalLink, Spinner, RefreshCw, Search } from "@/components/icons";
 import { api, type Paper } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { notifyLibraryChanged } from "@/lib/libraryRefresh";
@@ -64,7 +64,7 @@ export function DoiEnrichRow({
           title={hasDoi ? t("paper.detail.refetchMeta") : t("paper.detail.fetchMeta")}
         >
           {enrich.isPending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Spinner className="h-3 w-3 animate-spin" />
           ) : hasDoi ? (
             <RefreshCw className="h-3 w-3" />
           ) : (
@@ -75,7 +75,7 @@ export function DoiEnrichRow({
       </div>
       {enrich.isError && (
         <div className="text-[11px] text-litera-error">
-          ✕ {t("paper.detail.enrichFailed")}: {doiEnrichErrorMessage(enrich.error)}
+          <XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{t("paper.detail.enrichFailed")}: {doiEnrichErrorMessage(enrich.error)}
         </div>
       )}
       {enrich.isSuccess && (

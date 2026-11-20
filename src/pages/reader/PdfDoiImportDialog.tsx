@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Loader2, Paperclip, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Download, FileText, Spinner, Paperclip, X } from "@/components/icons";
 import { api, pickSinglePdf } from "@/lib/api";
 import { usePdfDropTarget } from "@/hooks/usePdfDropTarget";
 import { useT } from "@/i18n/I18nProvider";
-import { importDoiWithAutoPdfAndLink } from "./doiImportActions";
 
 interface Props {
   doi: string | null;
@@ -15,6 +15,7 @@ interface Props {
 export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
   const t = useT();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const dropRef = useRef<HTMLDivElement>(null);
   const [pdfPath, setPdfPath] = useState<string | null>(null);
   const existingQ = useQuery({
@@ -35,53 +36,25 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
     draftQ.isLoading ||
     draftQ.isFetching;
 
-  const linkImportedPaper = useCallback(
-    async (paperId: string) => {
-      await api.paperLinkCreateOrGet(
-        sourcePaperId,
-        paperId,
-        "builds_on",
-        doi ? `DOI link clicked in PDF: ${doi}` : null,
-      );
-    },
-    [doi, sourcePaperId],
-  );
-
-
   const autoDownload = useMutation({
-    mutationFn: async () => {
-      if (pointsToCurrentPaper) throw new Error(t("reader.doiSelfLink"));
-      const normalizedDoi = doi ?? "";
-      const existing = await api.paperFindByDoi(normalizedDoi);
-      if (existing) {
-        if (existing.id === sourcePaperId) throw new Error(t("reader.doiSelfLink"));
-        await linkImportedPaper(existing.id);
-        return existing;
-      }
-      return importDoiWithAutoPdfAndLink(api, sourcePaperId, normalizedDoi);
-    },
+    mutationFn: () => api.doiAddWithPdf(doi ?? ""),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
-      qc.invalidateQueries({ queryKey: ["paper-links", sourcePaperId] });
       onClose();
     },
   });
 
   const save = useMutation({
     mutationFn: async () => {
-      if (pointsToCurrentPaper) throw new Error(t("reader.doiSelfLink"));
       if (existingPaper) {
-        await linkImportedPaper(existingPaper.id);
-        return existingPaper;
+        navigate(`/reader/${existingPaper.id}`);
+        return;
       }
       if (!draftQ.data || !pdfPath) throw new Error(t("reader.doiPdfRequired"));
-      const paper = await api.paperSaveWithPdf(draftQ.data, pdfPath);
-      await linkImportedPaper(paper.id);
-      return paper;
+      await api.paperSaveWithPdf(draftQ.data, pdfPath);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
-      qc.invalidateQueries({ queryKey: ["paper-links", sourcePaperId] });
       onClose();
     },
   });
@@ -113,7 +86,7 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
       <div ref={dropRef} className="space-y-3 px-3 py-3">
         {existingQ.isLoading || draftQ.isLoading ? (
           <div className="inline-flex items-center gap-2 text-xs text-litera-mute">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner className="h-3.5 w-3.5 animate-spin" />
             {t("reader.doiLoading")}
           </div>
         ) : existingQ.error || draftQ.error ? (
@@ -158,7 +131,7 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
               disabled={doiLookupPending || autoDownload.isPending || save.isPending || pointsToCurrentPaper}
               className="litera-btn-primary text-xs disabled:opacity-50"
             >
-              {autoDownload.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {autoDownload.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               {t("reader.doiAutoDownload")}
             </button>
             <button
@@ -206,8 +179,8 @@ export function PdfDoiImportDialog({ doi, sourcePaperId, onClose }: Props) {
             }
             className="litera-btn-primary text-xs disabled:opacity-50"
           >
-            {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {existingPaper ? t("reader.doiLinkExisting") : t("reader.doiImportWithPdf")}
+            {save.isPending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : null}
+            {existingPaper ? t("reader.doiOpenExisting") : t("reader.doiImportWithPdf")}
           </button>
         </div>
       </div>

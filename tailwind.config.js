@@ -1,4 +1,4 @@
-// Theme colors are CSS variables holding complete colors (oklch), so Tailwind
+// Theme variables hold complete CSS colors, so Tailwind
 // cannot inject an alpha channel on its own. Routing them through color-mix
 // makes opacity modifiers such as `bg-litera-accent/15` produce real output.
 const token = (name) => `color-mix(in srgb, var(--litera-${name}) calc(<alpha-value> * 100%), transparent)`;

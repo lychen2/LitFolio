@@ -1,36 +1,57 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useId, useMemo, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, FileText, Download, Highlighter, BookMarked, type LucideIcon } from "lucide-react";
+import { Search, FileText, Download, Highlighter, BookMarked, type AppIcon } from "@/components/icons";
 import { api } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
+import type { TKey } from "@/i18n/dict";
 import { visibleNavigation } from "@/lib/navigationRegistry";
 import { useEnabledPluginIds } from "@/host/PluginSlot";
+import { useDialogKeyboard } from "./useDialogKeyboard";
 
 interface CommandItem {
   id: string;
   label: string;
   category: "navigation" | "papers" | "highlights" | "terms" | "actions";
-  icon: LucideIcon;
+  icon: AppIcon;
   action: () => void;
   keywords: string[];
   snippet?: string;
 }
 
+const categoryLabels: Record<CommandItem["category"], TKey> = {
+  navigation: "palette.group.navigation",
+  papers: "palette.group.papers",
+  highlights: "palette.group.highlights",
+  terms: "palette.group.terms",
+  actions: "palette.group.actions",
+};
+
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return open ? <OpenCommandPalette onClose={onClose} /> : null;
+}
+
+function OpenCommandPalette({ onClose }: { onClose: () => void }) {
+  const dialog = useDialogKeyboard(onClose);
   const t = useT();
   const navigate = useNavigate();
   const { data: enabled } = useEnabledPluginIds();
-  const { items: navItems } = visibleNavigation(enabled);
+  const { items: navItems } = useMemo(() => visibleNavigation(enabled), [enabled]);
   const [query, setQuery] = useState("");
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const hintsId = `${listId}-hints`;
+  const titleMatch = useMemo(() => {
+    const term = query.trim();
+    return term ? new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "iu") : null;
+  }, [query]);
 
   const { data: recentPapers } = useQuery({
     queryKey: ["papers", "recent", 10],
     queryFn: () => api.papersRecent(10),
-    enabled: open,
   });
 
   // Unified search when user types a query.
@@ -44,7 +65,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const { data: searchResults } = useQuery({
     queryKey: ["unifiedSearch", debouncedQuery],
     queryFn: () => api.searchUnified(debouncedQuery, 20),
-    enabled: open && debouncedQuery.length >= 2,
+    enabled: debouncedQuery.length >= 2,
   });
 
   const commands = useMemo<CommandItem[]>(() => [
@@ -75,13 +96,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   // Items from unified search results.
   const searchItems = useMemo<CommandItem[]>(() => {
     if (!searchResults || searchResults.length === 0) return [];
-    return searchResults.map((r) => {
-      const cat = r.source === "highlight" ? "highlights" : r.source === "term" ? "terms" : "papers";
+    return searchResults.map((r, index) => {
+      const category = r.source === "highlight" ? "highlights" : r.source === "term" ? "terms" : "papers";
       const icon = r.source === "highlight" ? Highlighter : r.source === "term" ? BookMarked : FileText;
       return {
-        id: `search:${r.source}:${r.paper_id}:${r.snippet.slice(0, 30)}`,
+        id: `search:${r.source}:${r.paper_id}:${r.snippet.slice(0, 30)}:${index}`,
         label: r.paper_title,
-        category: cat as CommandItem["category"],
+        category,
         icon,
         action: () => navigate(`/reader/${r.paper_id}`),
         keywords: [r.paper_title.toLowerCase()],
@@ -114,7 +135,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   // Group by category.
   const grouped = useMemo(() => {
-    const map = new Map<string, CommandItem[]>();
+    const map = new Map<CommandItem["category"], CommandItem[]>();
     for (const item of filtered) {
       const group = map.get(item.category) ?? [];
       group.push(item);
@@ -131,129 +152,151 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     return result;
   }, [grouped]);
 
-  // Reset on open.
-  useEffect(() => {
-    if (open) {
-      setQuery("");
-      setSelectedIdx(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+  const selectedIdx = Math.max(0, flatList.findIndex((item) => item.id === selectedId));
+  const selectedItem = flatList[selectedIdx];
+  const activeOptionId = selectedItem ? `${listId}-option-${selectedIdx}` : undefined;
+
+  useLayoutEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (activeOptionId) {
+      document.getElementById(activeOptionId)?.scrollIntoView({ block: "nearest" });
+    } else if (listRef.current) {
+      listRef.current.scrollTop = 0;
     }
-  }, [open]);
+  }, [activeOptionId, selectedItem?.id]);
 
-  // Clamp selected index.
-  useEffect(() => {
-    if (selectedIdx >= flatList.length) {
-      setSelectedIdx(Math.max(0, flatList.length - 1));
-    }
-  }, [flatList.length, selectedIdx]);
-
-  // Scroll selected into view.
-  useEffect(() => {
-    const el = listRef.current?.querySelector(`[data-idx="${selectedIdx}"]`);
-    el?.scrollIntoView({ block: "nearest" });
-  }, [selectedIdx]);
-
-  const execute = useCallback((item: CommandItem) => {
+  function execute(item: CommandItem) {
     onClose();
     item.action();
-  }, [onClose]);
+  }
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIdx((i) => Math.min(i + 1, flatList.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const item = flatList[selectedIdx];
-      if (item) execute(item);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const offset = event.key === "ArrowDown" ? 1 : -1;
+      const nextIdx = Math.max(0, Math.min(selectedIdx + offset, flatList.length - 1));
+      setSelectedId(flatList[nextIdx]?.id ?? null);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (selectedItem) execute(selectedItem);
     }
-  }, [flatList, selectedIdx, execute, onClose]);
-
-  if (!open) return null;
-
-  const categoryLabels: Record<string, string> = {
-    navigation: "Navigation",
-    papers: "Papers",
-    highlights: "Highlights",
-    terms: "Terms",
-    actions: "Actions",
-  };
+  }
 
   let globalIdx = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-litera-ink/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="litera-modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-litera-ink/50 pt-[15vh] backdrop-blur-sm" onClick={onClose}>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-[580px] max-w-[90vw] bg-litera-paper/95 backdrop-blur-md border border-litera-border-strong/60 rounded-2xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] overflow-hidden ring-1 ring-white/10"
+        {...dialog}
+        aria-label={t("palette.title")}
+        onClick={(event) => event.stopPropagation()}
+        className="litera-overlay litera-modal-enter w-[580px] max-w-[90vw] overflow-hidden"
       >
         {/* Search input */}
         <div className="flex items-center gap-2 px-4 py-3.5 border-b border-litera-line">
-          <Search className="h-4 w-4 text-litera-accent shrink-0" />
+          <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-litera-accent" />
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-label={t("palette.searchLabel")}
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={activeOptionId}
+            aria-describedby={hintsId}
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setSelectedIdx(0); }}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelectedId(null);
+            }}
             onKeyDown={handleKeyDown}
-            placeholder="Search papers, navigate, or run commands…"
-            className="flex-1 bg-transparent text-sm text-litera-text outline-none placeholder:text-litera-mute"
+            placeholder={t("palette.placeholder")}
+            className="min-w-0 flex-1 bg-transparent text-sm text-litera-text outline-none placeholder:text-litera-mute"
           />
+          {query && (
+            <button
+              type="button"
+              className="litera-icon-btn text-lg"
+              aria-label={t("palette.clearSearch")}
+              title={t("palette.clearSearch")}
+              onClick={() => {
+                setQuery("");
+                setSelectedId(null);
+                inputRef.current?.focus();
+              }}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
         </div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-[50vh] overflow-auto py-2">
-          {flatList.length === 0 && (
-            <div className="px-4 py-6 text-center text-sm text-litera-mute">No results</div>
-          )}
-          {Array.from(grouped.entries()).map(([category, items]) => (
-            <div key={category} className="mb-2">
-              <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-litera-mute">
-                {categoryLabels[category] ?? category}
-              </div>
-              {items.map((item) => {
-                const idx = globalIdx++;
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.id}
-                    data-idx={idx}
-                    className={
-                      "flex items-center gap-2.5 px-3.5 py-2 mx-2 rounded-lg text-sm cursor-pointer transition-all " +
-                      (idx === selectedIdx
-                        ? "bg-litera-accent/16 font-medium text-litera-accent ring-1 ring-litera-accent/25"
-                        : "text-litera-text hover:bg-litera-surface2")
-                    }
-                    onClick={() => execute(item)}
-                    onMouseEnter={() => setSelectedIdx(idx)}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-litera-mute group-hover:text-litera-accent" />
-                    <div className="min-w-0 flex-1">
-                      <span className="truncate block">{item.label}</span>
-                      {item.snippet && (
-                        <span className="text-[11px] text-litera-mute truncate block">
-                          {renderSnippet(item.snippet)}
-                        </span>
-                      )}
-                    </div>
+          <div id={listId} role="listbox" aria-label={t("palette.results")}>
+            {Array.from(grouped.entries()).map(([category, items]) => {
+              const labelId = `${listId}-group-${category}`;
+              return (
+                <div key={category} role="group" aria-labelledby={labelId} className="mb-2">
+                  <div id={labelId} className="litera-section-label px-4 py-1.5">
+                    {t(categoryLabels[category])}
+                    <span className="ml-2 font-normal tabular-nums">{items.length}</span>
                   </div>
-                );
-              })}
-            </div>
-          ))}
+                  {items.map((item) => {
+                    const idx = globalIdx++;
+                    const Icon = item.icon;
+                    const selected = idx === selectedIdx;
+                    return (
+                      <div
+                        key={item.id}
+                        id={`${listId}-option-${idx}`}
+                        role="option"
+                        aria-selected={selected}
+                        className={
+                          "mx-2 flex cursor-pointer items-center gap-2.5 rounded-lg px-3.5 py-2 text-sm transition-colors " +
+                          (selected
+                            ? "bg-litera-accent/16 font-medium text-litera-accent ring-1 ring-litera-accent/25"
+                            : "text-litera-text hover:bg-litera-surface2")
+                        }
+                        onClick={() => execute(item)}
+                        onMouseMove={() => setSelectedId(item.id)}
+                      >
+                        <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-litera-mute" />
+                        <div className="min-w-0 flex-1">
+                          <span className="block truncate">
+                            {titleMatch ? item.label.split(titleMatch).map((part, i) => i % 2 ? (
+                              <mark key={i} className="rounded-sm bg-litera-accent/20 text-litera-text">{part}</mark>
+                            ) : part) : item.label}
+                          </span>
+                          {item.snippet && (
+                            <span className="block truncate text-[11px] text-litera-mute">
+                              {renderSnippet(item.snippet)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          {flatList.length === 0 && (
+            <div role="status" className="px-4 py-6 text-center text-sm text-litera-mute">{t("palette.empty")}</div>
+          )}
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-2 border-t border-litera-line flex items-center gap-4 text-[11px] text-litera-mute">
-          <span>↑↓ navigate</span>
-          <span>↵ open</span>
-          <span>esc close</span>
+        <div id={hintsId} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-litera-line px-4 py-2 text-[11px] text-litera-mute">
+          <span className="inline-flex items-center gap-1.5">
+            <kbd className="litera-kbd">↑</kbd><kbd className="litera-kbd">↓</kbd> {t("palette.hint.navigate")}
+          </span>
+          <span className="inline-flex items-center gap-1.5"><kbd className="litera-kbd">Enter</kbd> {t("common.open")}</span>
+          <span className="inline-flex items-center gap-1.5"><kbd className="litera-kbd">Esc</kbd> {t("common.close")}</span>
         </div>
       </div>
     </div>

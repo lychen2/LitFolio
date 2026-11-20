@@ -58,10 +58,7 @@ fn legacy_profile_defaults_to_auto_thinking() {
 #[test]
 fn default_pdf_markdown_engine_is_mineru_agent() {
     let cfg = LlmConfig::default();
-    assert_eq!(
-        cfg.pdf_markdown.engine,
-        crate::mineru::PdfMarkdownEngine::MineruAgent
-    );
+    assert_eq!(cfg.pdf_markdown.engine, PdfMarkdownEngine::MineruAgent);
 }
 
 #[test]
@@ -89,15 +86,9 @@ fn load_migrates_local_pdf_markdown_engine_to_mineru_agent() {
     std::fs::write(paths.config_file(), raw).unwrap();
 
     let loaded = load_config(&paths).unwrap();
-    assert_eq!(
-        loaded.pdf_markdown.engine,
-        crate::mineru::PdfMarkdownEngine::MineruAgent
-    );
+    assert_eq!(loaded.pdf_markdown.engine, PdfMarkdownEngine::MineruAgent);
     let persisted = read_config_file(&paths);
-    assert_eq!(
-        persisted.pdf_markdown.engine,
-        crate::mineru::PdfMarkdownEngine::MineruAgent
-    );
+    assert_eq!(persisted.pdf_markdown.engine, PdfMarkdownEngine::MineruAgent);
     std::fs::remove_dir_all(&dir).ok();
 }
 
@@ -143,10 +134,8 @@ fn task_kind_as_str_matches_log_field_values() {
     assert_eq!(TaskKind::QuickRead.as_str(), "quick_read");
     assert_eq!(TaskKind::Translate.as_str(), "translate");
     assert_eq!(TaskKind::Tag.as_str(), "tag");
-    assert_eq!(TaskKind::Link.as_str(), "link");
     assert_eq!(TaskKind::TopicSurvey.as_str(), "topic_survey");
     assert_eq!(TaskKind::Ask.as_str(), "ask");
-    assert_eq!(TaskKind::LitReview.as_str(), "lit_review");
 }
 
 fn task_binding(profile: &str, model: Option<&str>) -> Option<TaskBinding> {

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path fill="none" stroke="var(--kubai-line, #324e64)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M12 2.5v11m-4-4 4 4 4-4"/>
+  <path fill="var(--kubai-face, #b9dbe4)" stroke="var(--kubai-edge, #38546c)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 14v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/>
+</svg>

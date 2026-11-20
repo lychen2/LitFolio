@@ -1,4 +1,6 @@
 import { renderMarkdown } from "@/lib/markdown";
+import "katex/dist/katex.min.css";
+import "@/styles/markdown.css";
 
 type MarkdownViewProps = {
   content: string;

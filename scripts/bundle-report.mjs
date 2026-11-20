@@ -41,7 +41,7 @@ function printSection(title, assets, limit) {
 }
 
 function printRouteSignals(scripts) {
-  const routeChunks = ["ReaderPage", "GraphPage", "MarkdownView", "pdf.worker"];
+  const routeChunks = ["ReaderPage", "MarkdownView", "pdf.worker"];
   console.log("\nRoute/lazy-load signals");
   for (const signal of routeChunks) {
     const hit = scripts.find((asset) => asset.name.includes(signal));

@@ -6,11 +6,10 @@ use crate::bibtex;
 use crate::http;
 use crate::ingest;
 use crate::network_egress::{HostNetworkState, NetworkEgressObserver};
-use crate::storage::{self, default_library_root, open_pool, run_migrations, LibraryPaths, Pool};
+use crate::storage::{self, open_pool, run_migrations, LibraryPaths, Pool};
 use crate::AppState;
 
-pub(crate) async fn bootstrap_state(resources: Option<&Path>) -> Result<Arc<AppState>> {
-    let root = default_library_root()?;
+pub(crate) async fn bootstrap_state(root: PathBuf, resources: Option<&Path>) -> Result<Arc<AppState>> {
     bootstrap_state_at(root, NetworkEgressObserver::default(), resources).await
 }
 
@@ -44,7 +43,6 @@ async fn bootstrap_state_at(
         http_external,
         host_network: HostNetworkState::new(network_egress),
         batch_cancel: tokio::sync::Mutex::new(None),
-        sync_lock: tokio::sync::Mutex::new(()),
         plugin_host: crate::plugin_host::PluginHostState::new(),
     }))
 }
@@ -61,8 +59,7 @@ async fn run_optional_startup_tasks(pool: &Pool, paths: &LibraryPaths, resources
         seed_manual_pdfs_if_empty(pool, paths, resources).await;
     }
     migrate_legacy_pdf_text_cache(pool, paths).await;
-    // PDF markdown rebuild stays lazy: imports, Ask backfill, and the PDF.js
-    // reader generate document.md without making startup parse the whole library.
+    // Keep PDF Markdown extraction lazy for documents without a cached body.
 }
 
 #[cfg(feature = "plugin-discovery-feeds")]

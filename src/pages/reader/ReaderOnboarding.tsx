@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BookOpen, FileText, Languages, Orbit, Keyboard } from "lucide-react";
+import { BookOpen, FileText, Languages, Orbit, Keyboard } from "@/components/icons";
 import { useT } from "@/i18n/I18nProvider";
 
 const STORAGE_KEY = "litera.reader.onboarded";

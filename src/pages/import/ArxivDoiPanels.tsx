@@ -1,17 +1,20 @@
-import { type Ref } from "react";
+import { useId } from "react";
+import type { Ref } from "react";
 import {
   AlertCircle,
   BookOpen,
   ExternalLink,
   FolderOpen,
-  Loader2,
+  Spinner,
   Rocket,
   Save,
   Search,
-} from "lucide-react";
+  XCircle,
+} from "@/components/icons";
 import { type Paper, type ArxivDraft } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { type TKey } from "@/i18n/dict";
+import { Button, Input } from "@/components/ui";
 import {
   type AutoDownloadFailure,
   type AutoDownloadSource,
@@ -40,48 +43,43 @@ export function IdentifierPanel({
   onSubmit: () => void;
 }) {
   const t = useT();
+  const inputId = useId();
   const trimmed = value.trim();
   return (
-    <div className="litera-panel p-5">
-      <label className="text-xs tracking-wider text-litera-mute">
-        {t("import.step1.label")}
+    <div className="litera-panel p-4">
+      <label htmlFor={inputId} className="text-xs font-medium text-litera-mute">
+        {t("import.tab.arxivDoi")}
       </label>
-      <div className="flex gap-2 mt-2">
-        <input
+      <div className="mt-2 flex gap-2 max-[540px]:flex-col max-[540px]:items-start">
+        <Input
+          id={inputId}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSubmit()}
           placeholder={t("import.step1.placeholder")}
-          className="litera-input flex-1 font-mono"
+          className="min-w-0 flex-1 font-mono max-[540px]:w-full"
         />
-        <button
-          onClick={onSubmit}
-          disabled={fetching || !trimmed}
-          className="litera-btn-primary disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={onSubmit} disabled={fetching || !trimmed}>
           {fetching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner className="h-4 w-4 animate-spin" />
           ) : (
             <Search className="h-4 w-4" />
           )}
           {t("import.step1.fetch")}
-        </button>
+        </Button>
       </div>
-      <div className="mt-2 text-xs text-litera-mute">
-        {t("import.step1.hint")}
-      </div>
-      {error && <div className="mt-3 text-sm text-litera-error">✕ {error}</div>}
+      {error && <div className="mt-3 text-sm text-litera-error"><XCircle className="mr-1 h-3.5 w-3.5 align-text-bottom" />{error}</div>}
       {success && (
         <div className="mt-3 text-sm text-litera-accent">{success}</div>
       )}
       {existingPaper && onOpenExisting && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-litera-success/25 bg-litera-success/10 px-3 py-2 text-sm text-litera-success">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-litera-success/25 bg-litera-success/10 p-3 text-sm text-litera-success">
           <span className="min-w-0 flex-1 truncate">
             {t("import.existingDoi", { title: existingPaper.title })}
           </span>
-          <button type="button" onClick={onOpenExisting} className="litera-btn px-2 py-1 text-xs">
+          <Button size="sm" onClick={onOpenExisting}>
             <BookOpen className="h-3.5 w-3.5" /> {t("import.openExisting")}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -117,25 +115,20 @@ export function DraftSavePanel({
 }) {
   const t = useT();
   return (
-    <div className="litera-panel p-5 space-y-4">
+    <div className="litera-panel space-y-4 p-4">
       <DraftPreview draft={draft} />
       <div ref={pdfDropRef} className="border-t border-litera-line pt-4">
-        <div className="mb-2 text-xs uppercase tracking-wider text-litera-mute">
-          {t("import.step3.label")}
+        <div className="mb-2 text-xs font-medium text-litera-mute">
+          {t("import.jobs.pdf")}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={onPickPdf}
-            disabled={saving}
-            className="litera-btn text-sm disabled:opacity-50"
-          >
+          <Button onClick={onPickPdf} disabled={saving}>
             <FolderOpen className="h-4 w-4" /> {t("import.step3.pickPdf")}
-          </button>
+          </Button>
           {sourceKind && (
-            <button
+            <Button
               onClick={onAutoDownload}
               disabled={saving}
-              className="litera-btn text-sm disabled:opacity-50"
               title={
                 sourceKind === "doi"
                   ? t("import.step3.doiAutoDownloadTitle")
@@ -143,32 +136,24 @@ export function DraftSavePanel({
               }
             >
               {autoPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Spinner className="h-4 w-4 animate-spin" />
               ) : (
                 <Rocket className="h-4 w-4" />
               )}
               {t("import.step3.autoDownload")}
-            </button>
+            </Button>
           )}
-          <button
-            onClick={onSave}
-            disabled={!selectedPdf || saving}
-            className="litera-btn-primary text-sm disabled:opacity-50"
-          >
+          <Button variant="primary" onClick={onSave} disabled={!selectedPdf || saving}>
             {savePending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner className="h-4 w-4 animate-spin" />
             ) : (
               <Save className="h-4 w-4" />
             )}
             {t("import.step3.save")}
-          </button>
-          <button
-            onClick={onReset}
-            disabled={saving}
-            className="litera-btn text-xs ml-auto disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="ghost" onClick={onReset} disabled={saving} className="ml-auto">
             {t("import.step3.cancel")}
-          </button>
+          </Button>
         </div>
         <SelectedPdf path={selectedPdf} />
         <AutoDownloadFailurePanel failure={autoDownloadFailure} />
@@ -303,12 +288,8 @@ function sourceStatusClassName(status: AutoDownloadSourceStatus): string {
 }
 
 function DraftPreview({ draft }: { draft: ArxivDraft }) {
-  const t = useT();
   return (
     <div>
-      <div className="text-xs uppercase tracking-wider text-litera-mute mb-1.5">
-        {t("import.step2.label")}
-      </div>
       <div className="font-serif text-lg leading-snug text-litera-text">
         {draft.title}
       </div>

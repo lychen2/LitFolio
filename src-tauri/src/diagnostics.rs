@@ -42,8 +42,13 @@ static PRIVATE_KEY_RE: Lazy<Regex> = Lazy::new(|| {
 
 /// Initialize tracing. When the library root resolves, log events are written to
 /// both stderr and `<root>/logs/litfolio.log`; otherwise stderr only.
+#[cfg(not(target_os = "android"))]
 pub(crate) fn init(filter: EnvFilter) {
-    let Some(path) = resolve_log_file() else {
+    init_at(filter, resolve_log_file());
+}
+
+pub(crate) fn init_at(filter: EnvFilter, path: Option<PathBuf>) {
+    let Some(path) = path else {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(filter)
             .with_writer(RedactingStderr)
@@ -81,10 +86,16 @@ pub(crate) fn write_fatal(message: &str) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn resolve_log_file() -> Option<PathBuf> {
     crate::storage::default_library_root()
         .ok()
         .map(|root| crate::storage::LibraryPaths::new(root).app_log_file())
+}
+
+#[cfg(target_os = "android")]
+fn resolve_log_file() -> Option<PathBuf> {
+    None
 }
 
 fn ensure_parent(path: &Path) {

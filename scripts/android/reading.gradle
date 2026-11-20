@@ -1,0 +1,28 @@
+chaquopy {
+    defaultConfig {
+        version = '3.11'
+        extractPackages('pypdfium2_raw')
+        pip {
+            options('--only-binary', ':all:', '--find-links', file('reading-wheels').absolutePath)
+            install('-r', 'reading-requirements.txt')
+        }
+        pyc {
+            src = true
+            pip = true
+            stdlib = true
+        }
+    }
+    sourceSets {
+        getByName('main') {
+            srcDir('reading-python')
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name.startsWith('install') && name.endsWith('PythonRequirements')) {
+        // Chaquopy tracks the --find-links argument, but not the wheels inside it.
+        inputs.files(fileTree('reading-wheels') { include('*.whl') })
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, BookOpenText } from "lucide-react";
+import { BookOpenText, Calendar, ChevronDown, ChevronRight, Star } from "@/components/icons";
 import type { SurveySubareaResult } from "@/lib/api";
 import { useT } from "@/i18n/I18nProvider";
 import { SurveyPaperRow } from "./SurveyPaperRow";
@@ -37,10 +37,10 @@ export function SubareaCard({ subarea, initialOpen = true, onToggleMustRead, onS
         <div className="flex-1 min-w-0">
           <h3 className="font-serif text-lg leading-tight text-litera-text">{subarea.name}</h3>
           <div className="text-xs text-litera-mute mt-0.5 flex gap-3 flex-wrap">
-            <span>📅 {year}</span>
-            <span>📚 {t("topic.survey.paperCount", { count: subarea.papers.length })}</span>
+            <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />{year}</span>
+            <span className="inline-flex items-center gap-1"><BookOpenText className="h-3 w-3" />{t("topic.survey.paperCount", { count: subarea.papers.length })}</span>
             {mustCount > 0 && (
-              <span className="text-litera-warn">⭐ {t("topic.survey.mustReadCount", { count: mustCount })}</span>
+              <span className="inline-flex items-center gap-1 text-litera-warn"><Star className="h-3 w-3" />{t("topic.survey.mustReadCount", { count: mustCount })}</span>
             )}
           </div>
         </div>

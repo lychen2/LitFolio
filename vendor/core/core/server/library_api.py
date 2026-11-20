@@ -14,7 +14,7 @@ from ..app.i18n import tr
 class LibraryLocation:
     def __init__(self, app):
         self.app = app
-        self.lock = threading.RLock()
+        self.lock = threading.Condition()
         self.active = 0
         self.status = "idle"
         self.marker = LibraryMarker(app.lib.root)
@@ -32,6 +32,13 @@ class LibraryLocation:
     def end(self):
         with self.lock:
             self.active -= 1
+            if self.active == 0:
+                self.lock.notify_all()
+
+    def wait_idle(self):
+        """Wait for reader preparation after the embedded HTTP server stops accepting requests."""
+        with self.lock:
+            self.lock.wait_for(lambda: self.active == 0)
 
     @contextmanager
     def request(self, method: str, raw_path: str):
