@@ -17,9 +17,9 @@
   </p>
 </div>
 
-[![观看 LitFolio 宣传片](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@11e514983e/media/litfolio-intro.mp4)
+[![观看 LitFolio 宣传片](media/litfolio-intro.webp)](https://github.com/user-attachments/assets/2d67e4fb-6870-4abd-93e5-075dfb54729c)
 
-[播放高清短片 · 41 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@11e514983e/media/litfolio-intro.mp4)
+[播放高清短片 · 41 秒，有声](https://github.com/user-attachments/assets/2d67e4fb-6870-4abd-93e5-075dfb54729c)
 
 沿引用线回到《Attention Is All You Need》，在 RSS 中把它收入文库。读到公式时，对着原句提问，再把解释留在页边。片中译文与回答为演示示例。
 
