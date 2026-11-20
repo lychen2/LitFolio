@@ -1,4 +1,4 @@
-"""Install the reading runtime inputs into a Tauri-generated Android project."""
+"""Prepare launcher resources and the reading runtime in the generated Android project."""
 
 import base64
 import csv
@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+from tempfile import TemporaryDirectory
 from urllib.request import urlopen
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -68,6 +69,29 @@ def insert_once(path, anchor, insertion):
     if text.count(anchor) != 1:
         raise RuntimeError(f"Expected one {anchor!r} in {path}. Check the Tauri template.")
     write_if_changed(path, text.replace(anchor, anchor + insertion).encode("utf-8"))
+
+
+def stage_launcher_icons():
+    resources = APP / "src/main/res"
+    # Generate from the canonical artwork without writing to the desktop icon directory.
+    with TemporaryDirectory(prefix="litfolio-android-icons-") as temporary:
+        output = Path(temporary) / "icons"
+        subprocess.run([
+            "pnpm", "exec", "tauri", "icon", str(ROOT / "src-tauri/icons/icon.png"),
+            "--output", str(output),
+        ], cwd=ROOT, check=True)
+        for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+            for name in ("ic_launcher", "ic_launcher_round", "ic_launcher_foreground"):
+                path = Path(f"mipmap-{density}") / f"{name}.png"
+                write_if_changed(resources / path, (output / "android" / path).read_bytes())
+
+    adaptive = (HERE / "launcher-adaptive.xml").read_bytes()
+    for name in ("ic_launcher", "ic_launcher_round"):
+        write_if_changed(resources / "mipmap-anydpi-v26" / f"{name}.xml", adaptive)
+
+    # Remove the unused vector layers that ship with the Tauri init template.
+    (resources / "drawable/ic_launcher_background.xml").unlink(missing_ok=True)
+    (resources / "drawable-v24/ic_launcher_foreground.xml").unlink(missing_ok=True)
 
 
 def fetch(path, url, digest):
@@ -214,6 +238,12 @@ def main():
         "android.nonFinalResIds=false",
         "\nabiList=arm64-v8a,x86_64\narchList=arm64,x86_64\ntargetList=aarch64,x86_64\n",
     )
+    insert_once(
+        APP / "src/main/AndroidManifest.xml",
+        '        android:icon="@mipmap/ic_launcher"\n',
+        '        android:roundIcon="@mipmap/ic_launcher_round"\n',
+    )
+    stage_launcher_icons()
     insert_once(
         APP / "src/main/AndroidManifest.xml",
         '        android:label="@string/app_name"\n',
