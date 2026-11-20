@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   android:
-    name: ARM64 and x86_64 debug APK
+    name: ARM64 and x86_64 release APKs
     runs-on: ubuntu-24.04
     env:
       LITFOLIO_PROFILE: all
@@ -32,9 +32,11 @@ jobs:
         with:
           python-version: '3.11'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android SDK and NDK
         run: |
-          sdkmanager "platforms;android-36" "ndk;$NDK_VERSION"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
       - name: Install native wheel build tools
         run: sudo apt-get install -y cmake ninja-build
@@ -43,9 +45,25 @@ jobs:
           targets: aarch64-linux-android,x86_64-linux-android
       - run: pnpm install --frozen-lockfile
       - run: pnpm tauri android init --ci --skip-targets-install
-      - run: pnpm tauri android build --ci --debug --apk --target aarch64 x86_64
+      - name: Build ABI-specific release APKs
+        run: pnpm tauri android build --ci --apk --split-per-abi --target aarch64 x86_64
+      - name: Sign release APKs with the upgrade certificate
+        env:
+          ANDROID_SIGNING_KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${ANDROID_SIGNING_KEYSTORE_BASE64:?Configure the Android upgrade keystore secret}"
+          umask 077
+          keystore=$(mktemp "$RUNNER_TEMP/litfolio-android-keystore.XXXXXX")
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$ANDROID_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          unset ANDROID_SIGNING_KEYSTORE_BASE64
+          ANDROID_SIGNING_KEYSTORE="$keystore" bash scripts/android/sign-release.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: litfolio-android-debug
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: litfolio-android-release
+          path: src-tauri/gen/android/app/build/outputs/apk/signed/*.apk
           if-no-files-found: error
