@@ -17,11 +17,11 @@
   </p>
 </div>
 
-[![观看 LitFolio 暗色短片：RSS、文献关联、双语问答与页边笔记](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@53064d4/media/litfolio-intro.mp4)
+[![观看 LitFolio 全动画短片](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@a24bcfb237/media/litfolio-intro.mp4)
 
-[播放高清短片 · 35 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@53064d4/media/litfolio-intro.mp4)
+[播放高清短片 · 31.5 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@a24bcfb237/media/litfolio-intro.mp4)
 
-短片录自 LitFolio 0.5.2。发现与关联镜头回放公开的 arXiv、OpenAlex 数据；双语与问答镜头使用预先准备的译文和离线演示回答。
+动画跟随《Attention Is All You Need》，从 RSS 订阅走进引用网络，再把公式旁的疑问和解释收进页边笔记。片中译文与回答为演示示例。
 
 ---
 
