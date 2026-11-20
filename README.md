@@ -17,9 +17,9 @@
   </p>
 </div>
 
-[![观看 LitFolio 短片：从 RSS 发现论文，探索引用，再双语对读、随文提问](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@faaa6989da/media/litfolio-intro.mp4)
+[![观看 LitFolio 暗色短片：RSS、文献关联、双语问答与页边笔记](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@53064d4/media/litfolio-intro.mp4)
 
-[播放高清短片 · 32.5 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@faaa6989da/media/litfolio-intro.mp4)
+[播放高清短片 · 35 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@53064d4/media/litfolio-intro.mp4)
 
 短片录自 LitFolio 0.5.2。发现与关联镜头回放公开的 arXiv、OpenAlex 数据；双语与问答镜头使用预先准备的译文和离线演示回答。
 
@@ -35,7 +35,7 @@
 | --- | --- |
 | **跟进研究** | 订阅 RSS、浏览 arXiv 分类或设置主题提醒。把感兴趣的条目放进候选收件箱，筛选后再入库。 |
 | **探索关联** | 从库中选择一至五篇论文，通过 OpenAlex 查找相关工作。点一条连线，就能查看直接引用、共被引或共同参考文献的证据。 |
-| **读懂论文** | 对照原文和译文，就当前论文提问。需要比较两篇论文时，可以分屏阅读；术语、笔记和高亮供以后回看。 |
+| **读懂论文** | 对照原文和译文，选中难句就地提问。点击回答下方的「放到页边」，下次读到这一段还能看到自己的问题和回答。也可以分屏比较两篇论文，回看术语和高亮。 |
 | **整理成果** | 用主题搜索区分近期与经典研究，编辑主题综述并导出 Markdown。也可以从文献库复制或导出 BibTeX、RIS 等格式的引文。 |
 
 正式版首次安装默认启用发现订阅、候选收件箱和文献网络，可在 **设置 → 插件** 中管理。打开已有 PDF、记笔记和本地检索无需配置模型。
