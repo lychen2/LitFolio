@@ -17,6 +17,10 @@
   </p>
 </div>
 
+[![LitFolio 30 秒短片：从发现论文到阅读批注](media/litfolio-intro.webp)](https://raw.githubusercontent.com/lychen2/LitFolio/main/media/litfolio-intro.mp4)
+
+[播放高清短片 · 30 秒](https://raw.githubusercontent.com/lychen2/LitFolio/main/media/litfolio-intro.mp4)
+
 ---
 
 LitFolio 把**发现论文 → 筛选收藏 → 阅读批注 → 推送 Zotero**串成一条日常工作流。论文、笔记、高亮与文献库保存在本机；阅读已有 PDF、批注和本地检索无需配置模型。
