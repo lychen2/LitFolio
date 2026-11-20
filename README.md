@@ -2,7 +2,7 @@
   <img src="public/litera.svg" alt="LitFolio logo" width="128" height="128" />
   <h1>LitFolio</h1>
   <p><strong>追踪研究热点，专注论文阅读。</strong></p>
-  <p>本地优先的桌面文献阅读工具 · 可选 AI 辅助 · Zotero 衔接</p>
+  <p>RSS 发现 · 文献关联 · 双语阅读 · 随文提问</p>
   <p>
     <a href="https://github.com/lychen2/LitFolio/releases/latest"><img src="https://img.shields.io/github/v/release/lychen2/LitFolio?style=flat-square&color=9b84bb" alt="Latest release" /></a>
     <a href="https://github.com/lychen2/LitFolio/actions/workflows/ci.yml"><img src="https://github.com/lychen2/LitFolio/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
@@ -17,33 +17,35 @@
   </p>
 </div>
 
-[![LitFolio 30 秒短片：从发现论文到阅读批注](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@ada2287203/media/litfolio-intro.mp4)
+[![观看 LitFolio 短片：从 RSS 发现论文，探索引用，再双语对读、随文提问](media/litfolio-intro.webp)](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@faaa6989da/media/litfolio-intro.mp4)
 
-[播放高清短片 · 30 秒](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@ada2287203/media/litfolio-intro.mp4)
+[播放高清短片 · 32.5 秒，有声](https://cdn.jsdelivr.net/gh/lychen2/LitFolio@faaa6989da/media/litfolio-intro.mp4)
+
+短片录自 LitFolio 0.5.2。发现与关联镜头回放公开的 arXiv、OpenAlex 数据；双语与问答镜头使用预先准备的译文和离线演示回答。
 
 ---
 
-LitFolio 把**发现论文 → 筛选收藏 → 阅读批注 → 推送 Zotero**串成一条日常工作流。论文、笔记、高亮与文献库保存在本机；阅读已有 PDF、批注和本地检索无需配置模型。
+在 LitFolio 里，你可以从 **RSS 订阅**发现一篇论文，沿着**文献关联图**追到它引用的研究，再打开**双语阅读**。遇到难懂的公式或论证，可以留在阅读器里，直接就这篇论文提问。论文和笔记保存在本机，在线发现使用外部数据源，翻译和问答使用你配置的模型。
 
-> A local-first desktop app for following research topics and reading papers. Keep your library on your machine, add AI when useful, and send selected papers to Zotero.
+> Follow a paper from your RSS feed through its citations. Read the original alongside a translation and ask questions about the paper as you go. Your library stays on your device.
 
 ## 阅读工作流
 
 | 环节 | 可以做什么 |
 | --- | --- |
-| **发现** | 浏览 arXiv 分类、订阅 RSS、跟踪主题提醒，在候补收件箱筛选论文。 |
-| **整理** | 导入本地 PDF、arXiv 或 DOI；使用文件夹、标签与阅读状态管理文献，导出 BibTeX。 |
-| **阅读** | 本地原文阅读、可选全文译文与 PDF 对照；PDF 高亮、笔记及选段翻译继续保存在文献库。 |
-| **衔接** | 将选中的论文推送到本机 Zotero，继续管理引用与长期收藏。 |
+| **跟进研究** | 订阅 RSS、浏览 arXiv 分类或设置主题提醒。把感兴趣的条目放进候选收件箱，筛选后再入库。 |
+| **探索关联** | 从库中选择一至五篇论文，通过 OpenAlex 查找相关工作。点一条连线，就能查看直接引用、共被引或共同参考文献的证据。 |
+| **读懂论文** | 对照原文和译文，就当前论文提问。需要比较两篇论文时，可以分屏阅读；术语、笔记和高亮供以后回看。 |
+| **整理成果** | 用主题搜索区分近期与经典研究，编辑主题综述并导出 Markdown。也可以从文献库复制或导出 BibTeX、RIS 等格式的引文。 |
 
-界面提供多套配色、字体与字号设置。发现订阅、候补收件箱等能力由插件提供；可用插件取决于安装包的构建配置，在 **设置 → 插件** 中管理。包含相应插件的全新安装默认启用发现订阅与候补收件箱。
+正式版首次安装默认启用发现订阅、候选收件箱和文献网络，可在 **设置 → 插件** 中管理。打开已有 PDF、记笔记和本地检索无需配置模型。
 
 ## 安装与开始使用
 
-1. 在 [Releases](https://github.com/lychen2/LitFolio/releases/latest) 下载适合系统的安装包：Windows（安装程序 / MSI）、Linux（AppImage / DEB / RPM）。
+1. 从 [Releases](https://github.com/lychen2/LitFolio/releases/latest) 下载适合设备的安装包。0.5.2 提供 Windows x64、macOS ARM64、Linux x86-64 和 Android 安装包。
 2. 启动后，从 **导入** 添加 PDF、arXiv 链接或 DOI，进入文献库开始阅读。
 3. 需要 AI 时，在 **设置 → LLM 配置** 添加模型、测试连接并保存。
-4. 需要 Zotero 推送时，先启动本机 Zotero，再到 **设置 → 同步** 配置目标库。
+4. 想从订阅开始，可打开 **RSS** 选择期刊或添加订阅源；想从已入库的论文继续探索，可打开 **文献网络** 并选择种子论文。
 
 默认文献库位于 `~/Litera-Library/`。更详细的操作说明见[中文手册](docs/manual/manual.pdf)和[英文手册](docs/manual/manual-en.pdf)。
 
